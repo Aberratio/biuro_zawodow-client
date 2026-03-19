@@ -1,3 +1,4 @@
+import React from 'react';
 import { LayoutDashboard, CalendarDays, Users, ScanLine, FileUp, Mail, UserCog, Shield, Pencil, Eye } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useMockData } from '@/contexts/MockDataContext';
