@@ -5,10 +5,10 @@ import { useMockData } from '@/contexts/MockDataContext';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const roleLabels = { admin: 'Admin', editor: 'Edytor', scanner: 'Skaner' };
+const roleLabels = { admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { currentRole, selectedEventId, setSelectedEventId, events } = useMockData();
+  const { currentRole, selectedEventId, setSelectedEventId, visibleEvents } = useMockData();
 
   return (
     <SidebarProvider>
@@ -23,7 +23,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   <SelectValue placeholder="Wybierz wydarzenie" />
                 </SelectTrigger>
                 <SelectContent>
-                  {events.map(e => (
+                  {visibleEvents.map(e => (
                     <SelectItem key={e.id} value={e.id} className="text-xs">{e.name}</SelectItem>
                   ))}
                 </SelectContent>

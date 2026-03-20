@@ -8,30 +8,33 @@ import { formatDistanceToNow } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
 export default function Dashboard() {
-  const { currentRole, events, participants, activityLog, selectedEventId } = useMockData();
+  const { currentRole, visibleEvents, participants, activityLog, selectedEventId } = useMockData();
   const navigate = useNavigate();
   const eventParticipants = participants.filter(p => p.event_id === selectedEventId);
   const checkedIn = eventParticipants.filter(p => p.status === 'checked_in').length;
   const collected = eventParticipants.filter(p => p.package_status === 'collected').length;
-  const currentEvent = events.find(e => e.id === selectedEventId);
+  const currentEvent = visibleEvents.find(e => e.id === selectedEventId);
 
-  if (currentRole === 'admin') {
-    const totalParticipants = participants.length;
-    const totalCheckedIn = participants.filter(p => p.status === 'checked_in').length;
+  // Admin and Editor get the rich dashboard (editor scoped to their events)
+  if (currentRole === 'admin' || currentRole === 'editor') {
+    const scopedParticipants = participants.filter(p => visibleEvents.some(e => e.id === p.event_id));
+    const totalParticipants = scopedParticipants.length;
+    const totalCheckedIn = scopedParticipants.filter(p => p.status === 'checked_in').length;
+    const totalCollected = scopedParticipants.filter(p => p.package_status === 'collected').length;
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <div className="grid gap-4 md:grid-cols-4">
-          <StatCard icon={CalendarDays} label="Wydarzenia" value={events.length} />
+          <StatCard icon={CalendarDays} label="Wydarzenia" value={visibleEvents.length} />
           <StatCard icon={Users} label="Uczestnicy" value={totalParticipants} />
           <StatCard icon={CheckCircle} label="Odprawieni" value={totalCheckedIn} />
-          <StatCard icon={Package} label="Pakiety wydane" value={participants.filter(p => p.package_status === 'collected').length} />
+          <StatCard icon={Package} label="Pakiety wydane" value={totalCollected} />
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader><CardTitle className="text-base">Wydarzenia</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {events.map(e => {
+              {visibleEvents.map(e => {
                 const ep = participants.filter(p => p.event_id === e.id);
                 const ci = ep.filter(p => p.status === 'checked_in').length;
                 return (
@@ -71,7 +74,7 @@ export default function Dashboard() {
     );
   }
 
-  // Scanner / Editor view
+  // Scanner view — single event focus
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
