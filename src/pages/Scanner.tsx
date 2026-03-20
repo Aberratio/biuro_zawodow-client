@@ -3,16 +3,20 @@ import { useMockData } from '@/contexts/MockDataContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { CheckCircle, Package, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, Package, AlertTriangle, ChevronDown, ChevronUp, Undo2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Participant } from '@/types';
 import QrScannerView from '@/components/QrScannerView';
 import ParticipantSearch from '@/components/ParticipantSearch';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type ScannerView = 'idle' | 'success' | 'error' | 'detail';
 
 export default function Scanner() {
-  const { participants, selectedEventId, checkIn, collectPackage, currentRole } = useMockData();
+  const { participants, selectedEventId, checkIn, undoCheckIn, collectPackage, currentRole } = useMockData();
   const eventParticipants = participants.filter(p => p.event_id === selectedEventId);
 
   const [view, setView] = useState<ScannerView>('idle');
@@ -20,6 +24,14 @@ export default function Scanner() {
   const [recentScans, setRecentScans] = useState<Participant[]>([]);
   const [autoCheckIn, setAutoCheckIn] = useState(true);
   const [showRecent, setShowRecent] = useState(true);
+
+  // Confirmation modal state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingParticipant, setPendingParticipant] = useState<Participant | null>(null);
+
+  // Undo modal state
+  const [undoOpen, setUndoOpen] = useState(false);
+  const [undoTarget, setUndoTarget] = useState<Participant | null>(null);
 
   const successTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const canToggleAuto = currentRole !== 'scanner';
@@ -34,55 +46,61 @@ export default function Scanner() {
     setRecentScans(prev => [p, ...prev.filter(x => x.id !== p.id)].slice(0, 5));
   }, []);
 
-  const handleSuccess = useCallback((participant: Participant) => {
+  const showSuccessScreen = useCallback((participant: Participant) => {
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
-
-    if (autoCheckIn && participant.status !== 'checked_in') {
-      checkIn(participant.id);
-      const updated = { ...participant, status: 'checked_in' as const, checked_in_at: new Date().toISOString() };
-      setScannedParticipant(updated);
-      addToRecent(updated);
-      setView('success');
-      toast({ title: '✅ Zarejestrowany!', description: participant.name });
-
-      successTimerRef.current = setTimeout(() => {
-        setView('idle');
-        setScannedParticipant(null);
-      }, 1800);
-    } else {
-      setScannedParticipant(participant);
-      addToRecent(participant);
-      setView('detail');
-    }
-  }, [autoCheckIn, checkIn, addToRecent]);
-
-  const handleQrScan = useCallback((decodedText: string) => {
-    const found = eventParticipants.find(p => p.qr_code.toLowerCase() === decodedText.toLowerCase());
-    if (found) {
-      handleSuccess(found);
-    } else {
-      setView('error');
-      successTimerRef.current = setTimeout(() => setView('idle'), 2500);
-    }
-  }, [eventParticipants, handleSuccess]);
-
-  const handleSearchSelect = useCallback((participant: Participant) => {
-    if (successTimerRef.current) clearTimeout(successTimerRef.current);
-    handleSuccess(participant);
-  }, [handleSuccess]);
-
-  const handleCheckIn = () => {
-    if (!scannedParticipant) return;
-    checkIn(scannedParticipant.id);
-    const updated = { ...scannedParticipant, status: 'checked_in' as const, checked_in_at: new Date().toISOString() };
+    const updated = { ...participant, status: 'checked_in' as const, checked_in_at: new Date().toISOString() };
     setScannedParticipant(updated);
     addToRecent(updated);
-    toast({ title: '✅ Zarejestrowany!', description: scannedParticipant.name });
     setView('success');
+    toast({ title: '✅ Zarejestrowany!', description: participant.name });
     successTimerRef.current = setTimeout(() => {
       setView('idle');
       setScannedParticipant(null);
     }, 1800);
+  }, [addToRecent]);
+
+  const handleQrScan = useCallback((decodedText: string) => {
+    const found = eventParticipants.find(p => p.qr_code.toLowerCase() === decodedText.toLowerCase());
+    if (!found) {
+      setView('error');
+      successTimerRef.current = setTimeout(() => setView('idle'), 2500);
+      return;
+    }
+
+    if (autoCheckIn && found.status !== 'checked_in') {
+      checkIn(found.id);
+      showSuccessScreen(found);
+    } else {
+      // No auto → show confirmation modal
+      setPendingParticipant(found);
+      setConfirmOpen(true);
+    }
+  }, [eventParticipants, autoCheckIn, checkIn, showSuccessScreen]);
+
+  // Manual search always opens confirmation modal
+  const handleSearchSelect = useCallback((participant: Participant) => {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    setPendingParticipant(participant);
+    setConfirmOpen(true);
+  }, []);
+
+  // Confirm check-in from modal
+  const handleConfirmCheckIn = () => {
+    if (!pendingParticipant) return;
+    checkIn(pendingParticipant.id);
+    showSuccessScreen(pendingParticipant);
+    setConfirmOpen(false);
+    setPendingParticipant(null);
+  };
+
+  // Show detail without check-in (already checked in)
+  const handleViewDetail = () => {
+    if (!pendingParticipant) return;
+    setScannedParticipant(pendingParticipant);
+    addToRecent(pendingParticipant);
+    setView('detail');
+    setConfirmOpen(false);
+    setPendingParticipant(null);
   };
 
   const handleCollectPackage = () => {
@@ -90,6 +108,18 @@ export default function Scanner() {
     collectPackage(scannedParticipant.id);
     setScannedParticipant({ ...scannedParticipant, package_status: 'collected' });
     toast({ title: '📦 Pakiet wydany!', description: scannedParticipant.name });
+  };
+
+  // Undo check-in
+  const handleUndoConfirm = () => {
+    if (!undoTarget) return;
+    undoCheckIn(undoTarget.id);
+    const updated = { ...undoTarget, status: 'pending' as const, checked_in_at: undefined };
+    setScannedParticipant(updated);
+    addToRecent(updated);
+    toast({ title: '↩️ Odprawa cofnięta', description: undoTarget.name });
+    setUndoOpen(false);
+    setUndoTarget(null);
   };
 
   const resetToIdle = () => {
@@ -150,19 +180,12 @@ export default function Scanner() {
 
       {/* Autocomplete search */}
       <div className="px-4 md:px-0">
-        <ParticipantSearch
-          participants={eventParticipants}
-          onSelect={handleSearchSelect}
-          autoFocus={view === 'idle'}
-        />
+        <ParticipantSearch participants={eventParticipants} onSelect={handleSearchSelect} autoFocus={view === 'idle'} />
       </div>
 
       {/* QR Camera Scanner */}
       <div className="px-4 md:px-0">
-        <QrScannerView
-          onScan={handleQrScan}
-          paused={view !== 'idle'}
-        />
+        <QrScannerView onScan={handleQrScan} paused={view !== 'idle'} />
       </div>
 
       {/* Detail view */}
@@ -189,13 +212,25 @@ export default function Scanner() {
               </div>
               <div className="space-y-2">
                 {scannedParticipant.status !== 'checked_in' && (
-                  <Button className="w-full h-16 text-lg font-bold touch-manipulation" onClick={handleCheckIn}>
+                  <Button className="w-full h-16 text-lg font-bold touch-manipulation" onClick={() => {
+                    setPendingParticipant(scannedParticipant);
+                    setConfirmOpen(true);
+                  }}>
                     <CheckCircle className="h-6 w-6 mr-2" /> Odpraw zawodnika
                   </Button>
                 )}
                 {scannedParticipant.package_status !== 'collected' && (
                   <Button variant="outline" className="w-full h-12 text-sm font-semibold touch-manipulation" onClick={handleCollectPackage}>
                     <Package className="h-5 w-5 mr-2" /> Wydaj pakiet
+                  </Button>
+                )}
+                {scannedParticipant.status === 'checked_in' && (
+                  <Button
+                    variant="outline"
+                    className="w-full h-10 text-xs font-medium text-destructive border-destructive/30 hover:bg-destructive/10 touch-manipulation"
+                    onClick={() => { setUndoTarget(scannedParticipant); setUndoOpen(true); }}
+                  >
+                    <Undo2 className="h-4 w-4 mr-1.5" /> Cofnij odprawę
                   </Button>
                 )}
                 {scannedParticipant.status === 'checked_in' && scannedParticipant.package_status === 'collected' && (
@@ -250,6 +285,93 @@ export default function Scanner() {
           </Card>
         </div>
       )}
+
+      {/* Confirmation modal for manual search / check-in */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent className="max-w-sm mx-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl">
+              {pendingParticipant?.status === 'checked_in' ? 'Zawodnik już odprawiony' : 'Potwierdź odprawę'}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-2">
+                {pendingParticipant && (
+                  <>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-base font-semibold text-foreground">{pendingParticipant.name}</span>
+                      <span className="text-lg font-black tabular-nums text-primary">#{pendingParticipant.bib_number}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">{pendingParticipant.email}</div>
+                    <div className="flex gap-2">
+                      <span className={`text-xs font-bold px-2 py-1 rounded ${
+                        pendingParticipant.status === 'checked_in' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-600'
+                      }`}>
+                        {pendingParticipant.status === 'checked_in' ? 'Odprawiony' : 'Oczekuje'}
+                      </span>
+                      <span className={`text-xs font-bold px-2 py-1 rounded ${
+                        pendingParticipant.package_status === 'collected' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {pendingParticipant.package_status === 'collected' ? 'Pakiet wydany' : 'Pakiet do wydania'}
+                      </span>
+                    </div>
+                    {pendingParticipant.status === 'checked_in' && (
+                      <p className="text-sm font-semibold text-destructive">Ten zawodnik jest już odprawiony.</p>
+                    )}
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="touch-manipulation">Anuluj</AlertDialogCancel>
+            {pendingParticipant?.status !== 'checked_in' ? (
+              <AlertDialogAction className="h-12 text-base font-bold touch-manipulation" onClick={handleConfirmCheckIn}>
+                <CheckCircle className="h-5 w-5 mr-2" /> Potwierdź odprawę
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogAction className="touch-manipulation" onClick={handleViewDetail}>
+                Pokaż szczegóły
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Undo check-in confirmation modal */}
+      <AlertDialog open={undoOpen} onOpenChange={setUndoOpen}>
+        <AlertDialogContent className="max-w-sm mx-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl text-destructive">Cofnij odprawę</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-2">
+                {undoTarget && (
+                  <>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-base font-semibold text-foreground">{undoTarget.name}</span>
+                      <span className="text-lg font-black tabular-nums text-primary">#{undoTarget.bib_number}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Czy na pewno chcesz cofnąć odprawę tego zawodnika?
+                    </p>
+                    <p className="text-xs text-destructive/80">
+                      Ta akcja zmieni status z <strong>checked_in</strong> na <strong>pending</strong>.
+                    </p>
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="touch-manipulation">Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 h-12 text-base font-bold touch-manipulation"
+              onClick={handleUndoConfirm}
+            >
+              <Undo2 className="h-5 w-5 mr-2" /> Tak, cofnij odprawę
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
