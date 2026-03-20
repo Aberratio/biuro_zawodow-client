@@ -1,60 +1,35 @@
 
 
-# Przebudowa Skanera QR — Real Camera + Autocomplete
+# Scanner: Confirmation Modals, Undo Check-in, Mobile Header
 
-## Overview
+## Changes
 
-Replace the mock scanner buttons with a real QR code scanning library and replace the simple search input with a debounced autocomplete dropdown. Keep all existing logic (auto check-in, success/error screens, recent scans, package handling).
+### 1. Add `undoCheckIn` to MockDataContext
+- New function that sets participant status back to `pending` and clears `checked_in_at`
+- Add to context interface and provider
 
-## Key Changes
+### 2. Scanner page (`Scanner.tsx`) — Search confirmation modal
+- When user selects participant from autocomplete, do NOT auto check-in
+- Instead, open a confirmation dialog showing: name, bib number, email, status, package status
+- If participant is `pending`: show "Potwierdź odprawę" button + "Anuluj"
+- If participant is `checked_in`: show "Już odprawiony" message, no check-in button
+- After confirmation: run check-in, show success overlay, add to recent
 
-### 1. Add `html5-qrcode` library
-- Install `html5-qrcode` npm package
-- It works entirely in the browser, no backend needed
-- Renders camera feed into a div, fires callback on successful decode
+### 3. Scanner page — Undo check-in ("Cofnij odprawę")
+- In the detail card, when participant is `checked_in`, show a destructive "Cofnij odprawę" button (smaller, outline/destructive style)
+- Clicking opens a separate warning dialog: name, bib, warning text, destructive "Tak, cofnij odprawę" button + "Anuluj"
+- After confirm: call `undoCheckIn`, toast, update recent scans
 
-### 2. QR Scanner Component (`src/components/QrScannerView.tsx`)
-- Wrap `html5-qrcode`'s `Html5Qrcode` class in a React component
-- Handle camera permission states: requesting, active, denied/error
-- On scan success: call parent callback with decoded string
-- On camera error: show fallback message "Użyj wyszukiwania ręcznego"
-- Cleanup scanner on unmount
-- Aspect ratio ~4:3 for mobile camera feed
+### 4. QR scan behavior
+- QR scan with auto check-in ON: keeps current fast behavior (auto check-in, success screen, no modal)
+- QR scan with auto check-in OFF: opens the same confirmation modal as manual search
 
-### 3. Autocomplete Search (`src/components/ParticipantSearch.tsx`)
-- Input with debounce (300ms via `setTimeout`)
-- Simulated API call: `searchParticipants(query)` returns `Promise<Participant[]>` with 300-500ms delay
-- Shows loading spinner "Szukam..."
-- Dropdown with max 5 results showing: name, bib number, status badge
-- Large touch targets (min 48px height per result)
-- Click result → selects participant
-- Empty state: "Brak wyników"
-- Close dropdown on blur/selection
+### 5. Mobile header (`Layout.tsx`)
+- On mobile (below `md`): show only event selector + sidebar trigger (hamburger)
+- Hide organization badge and role badge on mobile
 
-### 4. Scanner Page Rebuild (`src/pages/Scanner.tsx`)
-- **Remove**: "Poprawny skan" and "Błędny skan" buttons entirely
-- **Layout order**: Header → Autocomplete search → Camera scanner → Participant card → Recent scans
-- **QR scan handler**: match decoded value against `participant.qr_code` in event participants → call existing `handleSuccess` logic
-- **Keep intact**: auto check-in toggle, success/error fullscreen overlays, detail card with check-in/package buttons, recent scans section
-
-### 5. Camera States UI
-- Requesting permission: pulsing camera icon + "Uruchamiam kamerę..."
-- Active: live camera feed with corner markers overlay
-- Denied/error: icon + "Brak dostępu do kamery" + "Użyj wyszukiwania ręcznego"
-- No camera (desktop): same fallback message
-
-## Files
-
-| Action | File |
-|--------|------|
-| Create | `src/components/QrScannerView.tsx` |
-| Create | `src/components/ParticipantSearch.tsx` |
-| Rewrite | `src/pages/Scanner.tsx` |
-| Install | `html5-qrcode` package |
-
-## Technical Notes
-- `html5-qrcode` uses `Html5Qrcode` class — start/stop must be managed with `useEffect` cleanup
-- Debounce implemented with `useRef` + `setTimeout`, no extra library needed
-- Autocomplete dropdown positioned absolutely below input, z-indexed above camera
-- Search matches on: `name`, `email`, `bib_number` (case-insensitive partial match)
+### Files to modify
+- `src/contexts/MockDataContext.tsx` — add `undoCheckIn`
+- `src/pages/Scanner.tsx` — add confirmation dialog, undo dialog, change search select flow
+- `src/components/Layout.tsx` — hide badges on mobile
 
