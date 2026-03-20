@@ -1,32 +1,35 @@
 import React from 'react';
-import { LayoutDashboard, CalendarDays, Users, ScanLine, FileUp, Mail, UserCog, Shield, Pencil, Eye } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Users, ScanLine, FileUp, Mail, UserCog, Shield, Pencil, Eye, Building2, LogOut, Crown } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useMockData } from '@/contexts/MockDataContext';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import type { Role } from '@/types';
 
 const allItems = [
-  { title: 'Dashboard', url: '/', icon: LayoutDashboard, roles: ['scanner', 'editor', 'admin'] as Role[] },
-  { title: 'Wydarzenia', url: '/events', icon: CalendarDays, roles: ['editor', 'admin'] as Role[] },
-  { title: 'Uczestnicy', url: '/participants', icon: Users, roles: ['scanner', 'editor', 'admin'] as Role[] },
-  { title: 'Skaner QR', url: '/scanner', icon: ScanLine, roles: ['scanner', 'editor', 'admin'] as Role[] },
-  { title: 'Import CSV', url: '/import', icon: FileUp, roles: ['editor', 'admin'] as Role[] },
-  { title: 'Wysyłka QR', url: '/emails', icon: Mail, roles: ['editor', 'admin'] as Role[] },
-  { title: 'Użytkownicy', url: '/users', icon: UserCog, roles: ['editor', 'admin'] as Role[] },
+  { title: 'Dashboard', url: '/', icon: LayoutDashboard, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Organizacje', url: '/organizations', icon: Building2, roles: ['superadmin'] as Role[] },
+  { title: 'Wydarzenia', url: '/events', icon: CalendarDays, roles: ['editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Uczestnicy', url: '/participants', icon: Users, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Skaner QR', url: '/scanner', icon: ScanLine, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Import CSV', url: '/import', icon: FileUp, roles: ['editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Wysyłka QR', url: '/emails', icon: Mail, roles: ['editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Użytkownicy', url: '/users', icon: UserCog, roles: ['editor', 'admin', 'superadmin'] as Role[] },
 ];
 
-const roleIcons: Record<Role, typeof Shield> = { admin: Shield, editor: Pencil, scanner: Eye };
-const roleLabels: Record<Role, string> = { admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
+const roleIcons: Record<Role, typeof Shield> = { superadmin: Crown, admin: Shield, editor: Pencil, scanner: Eye };
+const roleLabels: Record<Role, string> = { superadmin: 'Superadmin', admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const { currentRole, setCurrentRole } = useMockData();
+  const { currentRole, currentUser } = useMockData();
+  const { logout } = useAuth();
   const items = allItems.filter(item => item.roles.includes(currentRole));
   const RoleIcon = roleIcons[currentRole];
 
@@ -59,24 +62,21 @@ export function AppSidebar() {
       <SidebarFooter className="p-3">
         {!collapsed ? (
           <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Demo — zmień rolę</p>
-            <Select value={currentRole} onValueChange={(v) => setCurrentRole(v as Role)}>
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(['admin', 'editor', 'scanner'] as Role[]).map(r => (
-                  <SelectItem key={r} value={r}>
-                    <span className="flex items-center gap-2">{React.createElement(roleIcons[r], { className: 'h-3.5 w-3.5' })} {roleLabels[r]}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <RoleIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-medium truncate">{currentUser.name}</p>
+                <p className="text-[10px] text-muted-foreground">{roleLabels[currentRole]}</p>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" className="w-full justify-start text-xs h-8" onClick={logout}>
+              <LogOut className="h-3.5 w-3.5 mr-2" /> Wyloguj
+            </Button>
           </div>
         ) : (
-          <Badge variant="outline" className="mx-auto flex h-8 w-8 items-center justify-center p-0">
-            <RoleIcon className="h-3.5 w-3.5" />
-          </Badge>
+          <Button variant="ghost" size="icon" className="mx-auto h-8 w-8" onClick={logout} title="Wyloguj">
+            <LogOut className="h-3.5 w-3.5" />
+          </Button>
         )}
       </SidebarFooter>
     </Sidebar>
