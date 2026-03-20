@@ -14,6 +14,7 @@ interface MockDataContextType {
   selectedEventId: string;
   setSelectedEventId: (id: string) => void;
   checkIn: (participantId: string) => void;
+  undoCheckIn: (participantId: string) => void;
   collectPackage: (participantId: string) => void;
   addParticipant: (p: Omit<Participant, 'id' | 'qr_code' | 'status' | 'package_status' | 'email_status'>) => void;
   updateParticipant: (id: string, data: Partial<Participant>) => void;
