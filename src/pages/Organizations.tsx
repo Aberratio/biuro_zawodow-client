@@ -3,10 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Building2 } from 'lucide-react';
-import { mockOrganizations } from '@/data/mockData';
 
 export default function Organizations() {
-  const { events, users } = useMockData();
+  const { organizations, events, users } = useMockData();
 
   return (
     <div className="space-y-6">
@@ -15,7 +14,7 @@ export default function Organizations() {
         <h1 className="text-2xl font-bold tracking-tight">Organizacje</h1>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        {mockOrganizations.map(org => {
+        {organizations.map(org => {
           const orgEvents = events.filter(e => e.organization_id === org.id);
           const orgUsers = users.filter(u => u.organization_id === org.id);
           return (
