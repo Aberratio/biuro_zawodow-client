@@ -1,94 +1,60 @@
 
 
-# Login Screen + Organization Model + Superadmin
+# Przebudowa Skanera QR — Real Camera + Autocomplete
 
-## New Role Hierarchy
+## Overview
 
-```text
-superadmin (platform-wide)
-  └── admin (per organization)
-       └── editor (per events within org)
-            └── scanner (field staff)
-```
+Replace the mock scanner buttons with a real QR code scanning library and replace the simple search input with a debounced autocomplete dropdown. Keep all existing logic (auto check-in, success/error screens, recent scans, package handling).
 
-## Changes
+## Key Changes
 
-### 1. Data Model (`src/types/index.ts`)
-- Add `Organization` type: `{ id, name, logo? }`
-- Add `superadmin` to `Role` type
-- Add `organization_id` to `User` and `Event`
-- Add `password` to `User` (mock-only, plaintext for demo)
+### 1. Add `html5-qrcode` library
+- Install `html5-qrcode` npm package
+- It works entirely in the browser, no backend needed
+- Renders camera feed into a div, fires callback on successful decode
 
-### 2. Mock Data (`src/data/mockData.ts`)
-- Add 2 organizations: "SportEvents Pro", "RunPoland"
-- Add superadmin user (access to everything)
-- Assign existing admin/editors/scanners to organizations
-- Add mock passwords for all users
-- Display demo credentials on login page:
+### 2. QR Scanner Component (`src/components/QrScannerView.tsx`)
+- Wrap `html5-qrcode`'s `Html5Qrcode` class in a React component
+- Handle camera permission states: requesting, active, denied/error
+- On scan success: call parent callback with decoded string
+- On camera error: show fallback message "Użyj wyszukiwania ręcznego"
+- Cleanup scanner on unmount
+- Aspect ratio ~4:3 for mobile camera feed
 
-| Role | Email | Password |
-|------|-------|----------|
-| Superadmin | super@biurozawodow.pl | demo123 |
-| Admin | admin@sportevents.pl | demo123 |
-| Organizator | org.gniezno@sportevents.pl | demo123 |
-| Skaner | skaner1@sportevents.pl | demo123 |
+### 3. Autocomplete Search (`src/components/ParticipantSearch.tsx`)
+- Input with debounce (300ms via `setTimeout`)
+- Simulated API call: `searchParticipants(query)` returns `Promise<Participant[]>` with 300-500ms delay
+- Shows loading spinner "Szukam..."
+- Dropdown with max 5 results showing: name, bib number, status badge
+- Large touch targets (min 48px height per result)
+- Click result → selects participant
+- Empty state: "Brak wyników"
+- Close dropdown on blur/selection
 
-### 3. Auth Context (`src/contexts/AuthContext.tsx`)
-- New context wrapping the app
-- State: `loggedInUser | null`
-- `login(email, password)` — validates against mock users
-- `logout()` — clears state
-- `isAuthenticated` boolean
-- Persists to `sessionStorage` (survives refresh)
+### 4. Scanner Page Rebuild (`src/pages/Scanner.tsx`)
+- **Remove**: "Poprawny skan" and "Błędny skan" buttons entirely
+- **Layout order**: Header → Autocomplete search → Camera scanner → Participant card → Recent scans
+- **QR scan handler**: match decoded value against `participant.qr_code` in event participants → call existing `handleSuccess` logic
+- **Keep intact**: auto check-in toggle, success/error fullscreen overlays, detail card with check-in/package buttons, recent scans section
 
-### 4. Login Page (`src/pages/Login.tsx`)
-- Clean centered login form (email + password)
-- Below form: collapsible "Demo credentials" card showing all test accounts
-- Error toast on invalid credentials
-- Redirects to `/` on success
+### 5. Camera States UI
+- Requesting permission: pulsing camera icon + "Uruchamiam kamerę..."
+- Active: live camera feed with corner markers overlay
+- Denied/error: icon + "Brak dostępu do kamery" + "Użyj wyszukiwania ręcznego"
+- No camera (desktop): same fallback message
 
-### 5. App Routing (`src/App.tsx`)
-- Wrap routes with `AuthProvider`
-- If not authenticated → show Login page
-- Remove role switcher from sidebar (role comes from logged-in user)
-- Replace `MockDataProvider`'s role detection with auth user
+## Files
 
-### 6. MockDataContext Updates
-- Remove `setCurrentRole` — role is now determined by `AuthContext.loggedInUser`
-- `currentUser` comes from auth context
-- `visibleEvents` filters by `organization_id` for admin, then by `assigned_events` for editor/scanner
-- Superadmin sees all organizations and all events
+| Action | File |
+|--------|------|
+| Create | `src/components/QrScannerView.tsx` |
+| Create | `src/components/ParticipantSearch.tsx` |
+| Rewrite | `src/pages/Scanner.tsx` |
+| Install | `html5-qrcode` package |
 
-### 7. Sidebar (`AppSidebar.tsx`)
-- Remove demo role switcher from footer
-- Add logout button in footer
-- Show current user name + role badge
-- Superadmin gets extra "Organizacje" nav item (simple list view)
-- Add `superadmin` to nav item role arrays (same access as admin + org management)
-
-### 8. User Management (`UserManagement.tsx`)
-- Admin can create editors and scanners within their org
-- Editor can create scanners (existing logic, already works)
-- Superadmin can create admins for any organization
-- New user form gets password field (mock)
-- Filter visible users by organization_id
-
-### 9. New Page: Organizations (`src/pages/Organizations.tsx`)
-- Superadmin-only view
-- Simple list of organizations with event counts
-- Ability to switch org context    
-
-### Files to create
-- `src/contexts    /AuthContext.tsx`
-- `src/pages/Login.tsx`
-- `src/pages/Organizations.tsx`
-
-### Files to modify
-- `src/types/index.ts`
-- `src/data/mockData.ts`
-- `src/contexts/MockDataContext.tsx`
-- `src/App.tsx`
-- `src/components/AppSidebar.tsx`
-- `src/components/Layout.tsx`
-- `src/pages/UserManagement.tsx`
+## Technical Notes
+- `html5-qrcode` uses `Html5Qrcode` class — start/stop must be managed with `useEffect` cleanup
+- Debounce implemented with `useRef` + `setTimeout`, no extra library needed
+- Autocomplete dropdown positioned absolutely below input, z-indexed above camera
+- Search matches on: `name`, `email`, `bib_number` (case-insensitive partial match)
 
