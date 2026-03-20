@@ -9,14 +9,14 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, MapPin, Calendar } from 'lucide-react';
 
 export default function Events() {
-  const { visibleEvents, participants, createEvent } = useMockData();
+  const { visibleEvents, participants, createEvent, currentUser } = useMockData();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: '', date: '', location: '' });
 
   const handleCreate = () => {
     if (!form.name || !form.date) return;
-    createEvent(form);
+    createEvent({ ...form, organization_id: currentUser.organization_id || 'org-1' });
     setForm({ name: '', date: '', location: '' });
     setOpen(false);
   };
