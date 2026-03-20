@@ -1,14 +1,21 @@
-export type Role = 'scanner' | 'editor' | 'admin';
+export type Role = 'superadmin' | 'admin' | 'editor' | 'scanner';
 
 export type ParticipantStatus = 'pending' | 'checked_in';
 export type PackageStatus = 'not_collected' | 'collected';
 export type EmailStatus = 'not_sent' | 'sent';
+
+export interface Organization {
+  id: string;
+  name: string;
+  logo?: string;
+}
 
 export interface Event {
   id: string;
   name: string;
   date: string;
   location: string;
+  organization_id: string;
 }
 
 export interface Participant {
@@ -28,7 +35,9 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  password: string;
   role: Role;
+  organization_id?: string;
   assigned_events: string[];
 }
 
