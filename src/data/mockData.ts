@@ -1,9 +1,14 @@
-import { Event, Participant, User, ActivityLog } from '@/types';
+import { Event, Participant, User, ActivityLog, Organization } from '@/types';
+
+export const mockOrganizations: Organization[] = [
+  { id: 'org-1', name: 'SportEvents Pro' },
+  { id: 'org-2', name: 'RunPoland' },
+];
 
 export const mockEvents: Event[] = [
-  { id: 'evt-1', name: 'Bieg Piastowski 10km', date: '2026-04-12', location: 'Gniezno, Park Miejski' },
-  { id: 'evt-2', name: 'Triathlon Poznań Sprint', date: '2026-05-18', location: 'Poznań, Malta' },
-  { id: 'evt-3', name: 'Maraton Wrocław', date: '2026-06-07', location: 'Wrocław, Hala Stulecia' },
+  { id: 'evt-1', name: 'Bieg Piastowski 10km', date: '2026-04-12', location: 'Gniezno, Park Miejski', organization_id: 'org-1' },
+  { id: 'evt-2', name: 'Triathlon Poznań Sprint', date: '2026-05-18', location: 'Poznań, Malta', organization_id: 'org-1' },
+  { id: 'evt-3', name: 'Maraton Wrocław', date: '2026-06-07', location: 'Wrocław, Hala Stulecia', organization_id: 'org-2' },
 ];
 
 const names = [
@@ -43,19 +48,21 @@ export const mockParticipants: Participant[] = [
 ];
 
 export const mockUsers: User[] = [
-  { id: 'u-1', name: 'Admin Główny', email: 'admin@biurozawodow.pl', role: 'admin', assigned_events: [] },
-  { id: 'u-2', name: 'Organizator Gniezno', email: 'org.gniezno@biurozawodow.pl', role: 'editor', assigned_events: ['evt-1'] },
-  { id: 'u-3', name: 'Organizator Poznań', email: 'org.poznan@biurozawodow.pl', role: 'editor', assigned_events: ['evt-2', 'evt-3'] },
-  { id: 'u-4', name: 'Wolontariusz Skaner 1', email: 'skaner1@biurozawodow.pl', role: 'scanner', assigned_events: ['evt-1'] },
-  { id: 'u-5', name: 'Wolontariusz Skaner 2', email: 'skaner2@biurozawodow.pl', role: 'scanner', assigned_events: ['evt-2'] },
+  { id: 'u-0', name: 'Super Admin', email: 'super@biurozawodow.pl', password: 'demo123', role: 'superadmin', assigned_events: [] },
+  { id: 'u-1', name: 'Admin SportEvents', email: 'admin@sportevents.pl', password: 'demo123', role: 'admin', organization_id: 'org-1', assigned_events: [] },
+  { id: 'u-1b', name: 'Admin RunPoland', email: 'admin@runpoland.pl', password: 'demo123', role: 'admin', organization_id: 'org-2', assigned_events: [] },
+  { id: 'u-2', name: 'Organizator Gniezno', email: 'org.gniezno@sportevents.pl', password: 'demo123', role: 'editor', organization_id: 'org-1', assigned_events: ['evt-1'] },
+  { id: 'u-3', name: 'Organizator Poznań', email: 'org.poznan@sportevents.pl', password: 'demo123', role: 'editor', organization_id: 'org-1', assigned_events: ['evt-2'] },
+  { id: 'u-4', name: 'Wolontariusz Skaner 1', email: 'skaner1@sportevents.pl', password: 'demo123', role: 'scanner', organization_id: 'org-1', assigned_events: ['evt-1'] },
+  { id: 'u-5', name: 'Wolontariusz Skaner 2', email: 'skaner2@sportevents.pl', password: 'demo123', role: 'scanner', organization_id: 'org-1', assigned_events: ['evt-2'] },
 ];
 
 export const mockActivityLog: ActivityLog[] = [
   { id: 'log-1', timestamp: new Date(Date.now() - 120000).toISOString(), action: 'Check-in', participant_name: 'Jan Kowalski', user_name: 'Wolontariusz Skaner 1' },
   { id: 'log-2', timestamp: new Date(Date.now() - 300000).toISOString(), action: 'Wydano pakiet', participant_name: 'Anna Nowak', user_name: 'Organizator Gniezno' },
-  { id: 'log-3', timestamp: new Date(Date.now() - 600000).toISOString(), action: 'Import CSV', participant_name: undefined, user_name: 'Admin Główny' },
+  { id: 'log-3', timestamp: new Date(Date.now() - 600000).toISOString(), action: 'Import CSV', participant_name: undefined, user_name: 'Admin SportEvents' },
   { id: 'log-4', timestamp: new Date(Date.now() - 900000).toISOString(), action: 'Check-in', participant_name: 'Piotr Wiśniewski', user_name: 'Wolontariusz Skaner 2' },
-  { id: 'log-5', timestamp: new Date(Date.now() - 1800000).toISOString(), action: 'Wysłano QR', participant_name: 'Maria Wójcik', user_name: 'Admin Główny' },
+  { id: 'log-5', timestamp: new Date(Date.now() - 1800000).toISOString(), action: 'Wysłano QR', participant_name: 'Maria Wójcik', user_name: 'Super Admin' },
 ];
 
 export const demoCsvData = [
