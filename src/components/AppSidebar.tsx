@@ -12,16 +12,16 @@ import type { Role } from '@/types';
 
 const allItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard, roles: ['scanner', 'editor', 'admin'] as Role[] },
-  { title: 'Wydarzenia', url: '/events', icon: CalendarDays, roles: ['admin'] as Role[] },
+  { title: 'Wydarzenia', url: '/events', icon: CalendarDays, roles: ['editor', 'admin'] as Role[] },
   { title: 'Uczestnicy', url: '/participants', icon: Users, roles: ['scanner', 'editor', 'admin'] as Role[] },
   { title: 'Skaner QR', url: '/scanner', icon: ScanLine, roles: ['scanner', 'editor', 'admin'] as Role[] },
-  { title: 'Import CSV', url: '/import', icon: FileUp, roles: ['admin'] as Role[] },
-  { title: 'Wysyłka QR', url: '/emails', icon: Mail, roles: ['admin'] as Role[] },
-  { title: 'Użytkownicy', url: '/users', icon: UserCog, roles: ['admin'] as Role[] },
+  { title: 'Import CSV', url: '/import', icon: FileUp, roles: ['editor', 'admin'] as Role[] },
+  { title: 'Wysyłka QR', url: '/emails', icon: Mail, roles: ['editor', 'admin'] as Role[] },
+  { title: 'Użytkownicy', url: '/users', icon: UserCog, roles: ['editor', 'admin'] as Role[] },
 ];
 
 const roleIcons: Record<Role, typeof Shield> = { admin: Shield, editor: Pencil, scanner: Eye };
-const roleLabels: Record<Role, string> = { admin: 'Admin', editor: 'Edytor', scanner: 'Skaner' };
+const roleLabels: Record<Role, string> = { admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
 
 export function AppSidebar() {
   const { state } = useSidebar();
