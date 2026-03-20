@@ -330,6 +330,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
       selectedEventId,
       setSelectedEventId,
       checkIn,
+      undoCheckIn,
       collectPackage,
       addParticipant,
       updateParticipant,

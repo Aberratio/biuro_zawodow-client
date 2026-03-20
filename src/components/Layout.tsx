@@ -29,7 +29,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-2">
               {currentUser.organization_id && (
                 <Badge variant="outline" className="text-[10px]">
                   {currentUser.organization_id === 'org-1' ? 'SportEvents Pro' : 'RunPoland'}
