@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMockData } from '@/contexts/MockDataContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -12,33 +12,40 @@ import { Plus, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { Role } from '@/types';
 
-const roleLabels: Record<Role, string> = { admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
+const roleLabels: Record<Role, string> = { superadmin: 'Superadmin', admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
 
 export default function UserManagement() {
   const { users, addUser, removeUser, changeRole, currentRole, currentUser } = useMockData();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', role: 'scanner' as Role });
+  const [form, setForm] = useState({ name: '', email: '', password: 'demo123', role: 'scanner' as Role });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Editor can only see/manage scanners assigned to their events
-  const visibleUsers = currentRole === 'admin'
-    ? users
-    : users.filter(u =>
-        u.id === currentUser.id ||
-        (u.role === 'scanner' && u.assigned_events.some(eid => currentUser.assigned_events.includes(eid)))
-      );
+  // Filter visible users by role hierarchy and organization
+  const visibleUsers = (() => {
+    if (currentRole === 'superadmin') return users;
+    if (currentRole === 'admin') return users.filter(u => u.organization_id === currentUser.organization_id);
+    // editor sees themselves + their scanners
+    return users.filter(u =>
+      u.id === currentUser.id ||
+      (u.role === 'scanner' && u.assigned_events.some(eid => currentUser.assigned_events.includes(eid)))
+    );
+  })();
 
-  // Editor can only create scanners
-  const creatableRoles: Role[] = currentRole === 'admin' ? ['scanner', 'editor'] : ['scanner'];
+  // Creatable roles based on current user role
+  const creatableRoles: Role[] = (() => {
+    if (currentRole === 'superadmin') return ['admin', 'editor', 'scanner'];
+    if (currentRole === 'admin') return ['editor', 'scanner'];
+    return ['scanner'];
+  })();
 
   const handleAdd = () => {
     if (!form.name || !form.email) return;
-    // When editor creates a scanner, assign to editor's events
     const assigned_events = currentRole === 'editor' ? [...currentUser.assigned_events] : [];
-    addUser({ ...form, assigned_events });
-    setForm({ name: '', email: '', role: 'scanner' });
+    const organization_id = currentRole === 'superadmin' ? undefined : currentUser.organization_id;
+    addUser({ ...form, organization_id, assigned_events });
+    setForm({ name: '', email: '', password: 'demo123', role: 'scanner' });
     setOpen(false);
-    toast({ title: 'Użytkownik dodany', description: 'Zaproszenie zostało wysłane (symulacja)' });
+    toast({ title: 'Użytkownik dodany', description: 'Konto zostało utworzone' });
   };
 
   const handleDelete = () => {
@@ -48,11 +55,14 @@ export default function UserManagement() {
     toast({ title: 'Użytkownik usunięty' });
   };
 
-  // Editor can only change roles for their scanners, not for themselves or other editors
   const canManageUser = (userId: string) => {
-    if (currentRole === 'admin') return true;
+    if (currentRole === 'superadmin') return true;
+    if (userId === currentUser.id) return false;
     const target = users.find(u => u.id === userId);
-    return target && target.role === 'scanner' && target.assigned_events.some(eid => currentUser.assigned_events.includes(eid));
+    if (!target) return false;
+    if (currentRole === 'admin') return target.organization_id === currentUser.organization_id && target.role !== 'superadmin' && target.role !== 'admin';
+    // editor can manage their scanners
+    return target.role === 'scanner' && target.assigned_events.some(eid => currentUser.assigned_events.includes(eid));
   };
 
   return (
@@ -82,7 +92,7 @@ export default function UserManagement() {
                       <Select value={u.role} onValueChange={v => changeRole(u.id, v as Role)}>
                         <SelectTrigger className="h-8 w-[140px]"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {(currentRole === 'admin' ? ['admin', 'editor', 'scanner'] as Role[] : ['scanner'] as Role[]).map(r => (
+                          {creatableRoles.map(r => (
                             <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
                           ))}
                         </SelectContent>
@@ -111,6 +121,7 @@ export default function UserManagement() {
           <div className="space-y-4">
             <div><Label>Imię</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
             <div><Label>Email</Label><Input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
+            <div><Label>Hasło</Label><Input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
             <div>
               <Label>Rola</Label>
               <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v as Role }))}>
@@ -123,7 +134,7 @@ export default function UserManagement() {
               </Select>
             </div>
           </div>
-          <DialogFooter><Button onClick={handleAdd} disabled={!form.name || !form.email}>Dodaj i wyślij zaproszenie</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleAdd} disabled={!form.name || !form.email}>Dodaj użytkownika</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

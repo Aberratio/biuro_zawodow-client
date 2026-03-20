@@ -5,10 +5,10 @@ import { useMockData } from '@/contexts/MockDataContext';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const roleLabels = { admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
+const roleLabels: Record<string, string> = { superadmin: 'Superadmin', admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { currentRole, selectedEventId, setSelectedEventId, visibleEvents } = useMockData();
+  const { currentRole, currentUser, selectedEventId, setSelectedEventId, visibleEvents } = useMockData();
 
   return (
     <SidebarProvider>
@@ -29,9 +29,16 @@ export function Layout({ children }: { children: ReactNode }) {
                 </SelectContent>
               </Select>
             </div>
-            <Badge variant="secondary" className="text-xs uppercase tracking-wider">
-              {roleLabels[currentRole]}
-            </Badge>
+            <div className="flex items-center gap-2">
+              {currentUser.organization_id && (
+                <Badge variant="outline" className="text-[10px]">
+                  {currentUser.organization_id === 'org-1' ? 'SportEvents Pro' : 'RunPoland'}
+                </Badge>
+              )}
+              <Badge variant="secondary" className="text-xs uppercase tracking-wider">
+                {roleLabels[currentRole]}
+              </Badge>
+            </div>
           </header>
           <main className="flex-1 overflow-auto p-4 md:p-6">
             {children}

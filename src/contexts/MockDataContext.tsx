@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import { Event, Participant, User, ActivityLog, Role } from '@/types';
 import { mockEvents, mockParticipants, mockUsers, mockActivityLog } from '@/data/mockData';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MockDataContextType {
   events: Event[];
@@ -10,7 +11,6 @@ interface MockDataContextType {
   currentRole: Role;
   currentUser: User;
   selectedEventId: string;
-  setCurrentRole: (role: Role) => void;
   setSelectedEventId: (id: string) => void;
   checkIn: (participantId: string) => void;
   collectPackage: (participantId: string) => void;
@@ -24,41 +24,42 @@ interface MockDataContextType {
   markEmailsSent: (eventId: string) => void;
   addLog: (action: string, participantName?: string) => void;
   getParticipantsByEvent: (eventId: string) => Participant[];
-  /** Events visible to the current user (all for admin, assigned for editor/scanner) */
   visibleEvents: Event[];
-  /** Whether the current user can access a given event */
   canAccessEvent: (eventId: string) => boolean;
 }
 
 const MockDataContext = createContext<MockDataContextType | null>(null);
 
 export function MockDataProvider({ children }: { children: ReactNode }) {
+  const { user: authUser } = useAuth();
   const [events, setEvents] = useState<Event[]>(mockEvents);
   const [participants, setParticipants] = useState<Participant[]>(mockParticipants);
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [activityLog, setActivityLog] = useState<ActivityLog[]>(mockActivityLog);
-  const [currentRole, setCurrentRoleState] = useState<Role>('admin');
   const [selectedEventId, setSelectedEventId] = useState<string>('evt-1');
 
-  // Get the first user matching the current demo role
   const currentUser = useMemo(() => {
-    return users.find(u => u.role === currentRole) || users[0];
-  }, [users, currentRole]);
+    if (!authUser) return users[0];
+    return users.find(u => u.id === authUser.id) || users[0];
+  }, [users, authUser]);
 
-  const setCurrentRole = useCallback((role: Role) => {
-    setCurrentRoleState(role);
-  }, []);
+  const currentRole = currentUser.role;
 
-  // Visible events based on role
+  // Visible events: superadmin=all, admin=org events, editor/scanner=assigned
   const visibleEvents = useMemo(() => {
-    if (currentRole === 'admin') return events;
+    if (currentRole === 'superadmin') return events;
+    if (currentRole === 'admin') return events.filter(e => e.organization_id === currentUser.organization_id);
     return events.filter(e => currentUser.assigned_events.includes(e.id));
   }, [events, currentRole, currentUser]);
 
   const canAccessEvent = useCallback((eventId: string) => {
-    if (currentRole === 'admin') return true;
+    if (currentRole === 'superadmin') return true;
+    if (currentRole === 'admin') {
+      const ev = events.find(e => e.id === eventId);
+      return !!ev && ev.organization_id === currentUser.organization_id;
+    }
     return currentUser.assigned_events.includes(eventId);
-  }, [currentRole, currentUser]);
+  }, [currentRole, currentUser, events]);
 
   const addLog = useCallback((action: string, participantName?: string) => {
     setActivityLog(prev => [{
@@ -89,12 +90,9 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const addParticipant = useCallback((data: Omit<Participant, 'id' | 'qr_code' | 'status' | 'package_status' | 'email_status'>) => {
     const id = `p-${Date.now()}`;
     setParticipants(prev => [...prev, {
-      ...data,
-      id,
+      ...data, id,
       qr_code: `QR-${data.event_id}-${Date.now()}`,
-      status: 'pending',
-      package_status: 'not_collected',
-      email_status: 'not_sent',
+      status: 'pending', package_status: 'not_collected', email_status: 'not_sent',
     }]);
     addLog('Dodano uczestnika', data.name);
   }, [addLog]);
@@ -109,15 +107,9 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     const valid = data.filter(d => d.email && !existingEmails.has(d.email));
     const maxBib = Math.max(0, ...existing.map(p => parseInt(p.bib_number) || 0));
     const newParticipants: Participant[] = valid.map((d, i) => ({
-      id: `p-${Date.now()}-${i}`,
-      event_id: eventId,
-      name: d.name,
-      email: d.email,
-      bib_number: String(maxBib + i + 1),
-      qr_code: `QR-${eventId}-${maxBib + i + 1}`,
-      status: 'pending' as const,
-      package_status: 'not_collected' as const,
-      email_status: 'not_sent' as const,
+      id: `p-${Date.now()}-${i}`, event_id: eventId, name: d.name, email: d.email,
+      bib_number: String(maxBib + i + 1), qr_code: `QR-${eventId}-${maxBib + i + 1}`,
+      status: 'pending' as const, package_status: 'not_collected' as const, email_status: 'not_sent' as const,
     }));
     setParticipants(prev => [...prev, ...newParticipants]);
     addLog(`Import CSV (${newParticipants.length} uczestników)`);
@@ -127,7 +119,6 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const createEvent = useCallback((e: Omit<Event, 'id'>) => {
     const newId = `evt-${Date.now()}`;
     setEvents(prev => [...prev, { ...e, id: newId }]);
-    // If editor creates event, auto-assign it to them
     if (currentRole === 'editor') {
       setUsers(prev => prev.map(u =>
         u.id === currentUser.id ? { ...u, assigned_events: [...u.assigned_events, newId] } : u
@@ -165,7 +156,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   return (
     <MockDataContext.Provider value={{
       events, participants, users, activityLog, currentRole, currentUser, selectedEventId,
-      setCurrentRole, setSelectedEventId, checkIn, collectPackage,
+      setSelectedEventId, checkIn, collectPackage,
       addParticipant, updateParticipant, importParticipants, createEvent,
       addUser, removeUser, changeRole, markEmailsSent, addLog, getParticipantsByEvent,
       visibleEvents, canAccessEvent,
