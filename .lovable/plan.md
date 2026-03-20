@@ -1,81 +1,48 @@
 
 
-# Biuro Zawodów Online — MVP Frontend Plan
+## Updated Role Model
 
-## Overview
-Complete React frontend for sports event check-in management with mock data, role-based access (scanner/editor/admin), and full user flow simulation.
+Current state: Scanner has minimal access, Editor can edit participants, Admin has full access. Events page is admin-only.
 
-## Architecture
-- **Routing**: React Router with sidebar navigation
-- **State**: React context for global state (participants, events, users, current role)
-- **Data**: Rich mock data (~30 participants, 3 events, 3 users) with various statuses
-- **Design**: Following the design brief — Inter font, shadow-based cards, high-contrast utility badges, large touch targets
+**New role hierarchy per user's clarification:**
 
-## Pages & Components
+- **Admin** — platform owner, sees ALL events, all data, full management
+- **Editor** — event organizer, manages THEIR events (participants, import CSV, email sending, user management for their events). Essentially admin-scoped to assigned events.
+- **Scanner** — field worker for an editor, only scans QR and searches participants within assigned event
 
-### 1. Layout & Navigation
-- Sidebar with role-aware nav items (scanner sees only Scanner + Participants)
-- Role switcher at bottom of sidebar (demo mode)
-- Global toast notifications
+### Changes needed
 
-### 2. Dashboard (`/`)
-- **Admin**: Event count, participant count, checked-in today, recent activity timeline, event list
-- **Scanner/Editor**: Single event focus, big "Open Scanner" button, checked-in counter, recent scans list
+**1. Sidebar navigation (`AppSidebar.tsx`)**
+- Give Editor access to: Wydarzenia, Import CSV, Wysyłka QR, Użytkownicy (same as admin)
+- Scanner stays: Dashboard, Uczestnicy, Skaner QR
 
-### 3. Events (`/events`)
-- Admin-only event list with progress bars
-- "Create Event" modal with form
-- Click → Event details
+**2. Dashboard (`Dashboard.tsx`)**
+- Editor gets the same rich dashboard as Admin, but filtered to their events (selected event context)
+- Scanner stays with the simple single-event view
 
-### 4. Event Details (`/events/:id`)
-- Event info, stats, participant breakdown chart
-- Quick actions: open scanner, view participants
+**3. Pages access adjustments**
+- `Events.tsx` — accessible by Editor (sees only their assigned events) and Admin (sees all)
+- `EventDetails.tsx` — accessible by Editor + Admin
+- `CsvImport.tsx` — accessible by Editor + Admin
+- `EmailSending.tsx` — accessible by Editor + Admin
+- `UserManagement.tsx` — accessible by Editor (manages scanners for their events) + Admin (manages everyone)
+- `ParticipantDetails.tsx` — Editor can edit (already works via `canEdit` check)
 
-### 5. Participants (`/participants`)
-- Full table: name, email, bib, status, package status
-- Search, filter (status, package), sort
-- Click row → participant details
+**4. Data model update (`types/index.ts`, `mockData.ts`, `MockDataContext.tsx`)**
+- Add `assigned_events: string[]` to `User` type so editors are linked to specific events
+- Update mock users to reflect: 1 admin, 1-2 editors each with assigned events, 2-3 scanners
+- Editor's data is filtered to their assigned events throughout the app
 
-### 6. Participant Details (`/participants/:id`)
-- Full data display, status badges, mock timeline history
-- **Editor/Admin**: Edit form, status change buttons, "Transfer package" modal
+**5. Role labels update**
+- Editor label: "Edytor" → "Organizator" (optional, matches the concept better)
 
-### 7. QR Scanner (`/scanner`) — **Priority #1**
-- Large mock camera viewfinder with scanning animation
-- "Simulate valid scan" / "Simulate error" buttons
-- Manual search input field
-- Scan result: slide-up sheet with name, bib, status, large action buttons (Check-in / Issue package)
-- Already checked-in: clear green confirmation message
-- Recent scans section below scanner
-
-### 8. CSV Import (`/import`)
-- Drag & drop zone with format instructions
-- "Load demo data" button that populates preview table
-- Validation display (missing emails, duplicates highlighted)
-- Summary + "Import" button → updates global state
-
-### 9. User Management (`/users`)
-- Admin-only user table with roles
-- Add user modal, change role dropdown, delete with confirmation
-- Mock invitation toast
-
-### 10. QR Email Sending (`/emails`)
-- Email template preview with QR placeholder
-- Participant list with sent/pending status
-- "Send to all" button → progress simulation → toast
-- Sent counter
-
-## Data Layer
-- `MockDataContext` with React Context providing all state + actions
-- Actions: checkIn, collectPackage, addParticipant, updateParticipant, importCSV, createEvent, addUser, removeUser, changeRole, simulateSendEmails
-- Realistic Polish mock data for sports events
-
-## UX Details
-- Loading skeletons on view transitions
-- Empty states with illustrations for empty lists
-- Form validation with inline errors
-- Toast notifications for all actions
-- `tabular-nums` on all numeric displays
-- 48-64px touch targets on scanner action buttons
-- Smooth transitions (150ms cubic-bezier)
+### Files to modify
+- `src/types/index.ts` — add `assigned_events` to User
+- `src/data/mockData.ts` — update mock users
+- `src/contexts/MockDataContext.tsx` — add event-scoped filtering helpers
+- `src/components/AppSidebar.tsx` — update role access for nav items
+- `src/pages/Dashboard.tsx` — editor gets admin-like dashboard scoped to their events
+- `src/pages/Events.tsx` — allow editor access, filter by assigned events
+- `src/pages/UserManagement.tsx` — editor can manage scanners
+- `src/pages/CsvImport.tsx`, `src/pages/EmailSending.tsx` — allow editor access
 
