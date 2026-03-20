@@ -183,6 +183,14 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     if (p) addLog('Check-in', p.name);
   }, [participants, addLog]);
 
+  const undoCheckIn = useCallback((participantId: string) => {
+    setParticipants(prev => prev.map(p =>
+      p.id === participantId ? { ...p, status: 'pending' as const, checked_in_at: undefined } : p
+    ));
+    const p = participants.find(x => x.id === participantId);
+    if (p) addLog('Cofnięto odprawę', p.name);
+  }, [participants, addLog]);
+
   const collectPackage = useCallback((participantId: string) => {
     setParticipants(prev => prev.map(p =>
       p.id === participantId ? { ...p, package_status: 'collected' as const } : p
