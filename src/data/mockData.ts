@@ -43,16 +43,18 @@ export const mockParticipants: Participant[] = [
 ];
 
 export const mockUsers: User[] = [
-  { id: 'u-1', name: 'Admin Główny', email: 'admin@biurozawodow.pl', role: 'admin' },
-  { id: 'u-2', name: 'Wolontariusz Skaner', email: 'skaner@biurozawodow.pl', role: 'scanner' },
-  { id: 'u-3', name: 'Edytor Danych', email: 'edytor@biurozawodow.pl', role: 'editor' },
+  { id: 'u-1', name: 'Admin Główny', email: 'admin@biurozawodow.pl', role: 'admin', assigned_events: [] },
+  { id: 'u-2', name: 'Organizator Gniezno', email: 'org.gniezno@biurozawodow.pl', role: 'editor', assigned_events: ['evt-1'] },
+  { id: 'u-3', name: 'Organizator Poznań', email: 'org.poznan@biurozawodow.pl', role: 'editor', assigned_events: ['evt-2', 'evt-3'] },
+  { id: 'u-4', name: 'Wolontariusz Skaner 1', email: 'skaner1@biurozawodow.pl', role: 'scanner', assigned_events: ['evt-1'] },
+  { id: 'u-5', name: 'Wolontariusz Skaner 2', email: 'skaner2@biurozawodow.pl', role: 'scanner', assigned_events: ['evt-2'] },
 ];
 
 export const mockActivityLog: ActivityLog[] = [
-  { id: 'log-1', timestamp: new Date(Date.now() - 120000).toISOString(), action: 'Check-in', participant_name: 'Jan Kowalski', user_name: 'Wolontariusz Skaner' },
-  { id: 'log-2', timestamp: new Date(Date.now() - 300000).toISOString(), action: 'Wydano pakiet', participant_name: 'Anna Nowak', user_name: 'Edytor Danych' },
+  { id: 'log-1', timestamp: new Date(Date.now() - 120000).toISOString(), action: 'Check-in', participant_name: 'Jan Kowalski', user_name: 'Wolontariusz Skaner 1' },
+  { id: 'log-2', timestamp: new Date(Date.now() - 300000).toISOString(), action: 'Wydano pakiet', participant_name: 'Anna Nowak', user_name: 'Organizator Gniezno' },
   { id: 'log-3', timestamp: new Date(Date.now() - 600000).toISOString(), action: 'Import CSV', participant_name: undefined, user_name: 'Admin Główny' },
-  { id: 'log-4', timestamp: new Date(Date.now() - 900000).toISOString(), action: 'Check-in', participant_name: 'Piotr Wiśniewski', user_name: 'Wolontariusz Skaner' },
+  { id: 'log-4', timestamp: new Date(Date.now() - 900000).toISOString(), action: 'Check-in', participant_name: 'Piotr Wiśniewski', user_name: 'Wolontariusz Skaner 2' },
   { id: 'log-5', timestamp: new Date(Date.now() - 1800000).toISOString(), action: 'Wysłano QR', participant_name: 'Maria Wójcik', user_name: 'Admin Główny' },
 ];
 

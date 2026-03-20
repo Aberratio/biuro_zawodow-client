@@ -29,6 +29,7 @@ export interface User {
   name: string;
   email: string;
   role: Role;
+  assigned_events: string[];
 }
 
 export interface ActivityLog {
