@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, MapPin, Calendar } from 'lucide-react';
 
 export default function Events() {
-  const { events, participants, createEvent } = useMockData();
+  const { visibleEvents, participants, createEvent } = useMockData();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: '', date: '', location: '' });
@@ -28,7 +28,7 @@ export default function Events() {
         <Button onClick={() => setOpen(true)} size="sm"><Plus className="h-4 w-4 mr-1" /> Nowe wydarzenie</Button>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {events.map(e => {
+        {visibleEvents.map(e => {
           const ep = participants.filter(p => p.event_id === e.id);
           const ci = ep.filter(p => p.status === 'checked_in').length;
           return (

@@ -12,17 +12,30 @@ import { Plus, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { Role } from '@/types';
 
-const roleLabels: Record<Role, string> = { admin: 'Admin', editor: 'Edytor', scanner: 'Skaner' };
+const roleLabels: Record<Role, string> = { admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
 
 export default function UserManagement() {
-  const { users, addUser, removeUser, changeRole } = useMockData();
+  const { users, addUser, removeUser, changeRole, currentRole, currentUser } = useMockData();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', role: 'scanner' as Role });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  // Editor can only see/manage scanners assigned to their events
+  const visibleUsers = currentRole === 'admin'
+    ? users
+    : users.filter(u =>
+        u.id === currentUser.id ||
+        (u.role === 'scanner' && u.assigned_events.some(eid => currentUser.assigned_events.includes(eid)))
+      );
+
+  // Editor can only create scanners
+  const creatableRoles: Role[] = currentRole === 'admin' ? ['scanner', 'editor'] : ['scanner'];
+
   const handleAdd = () => {
     if (!form.name || !form.email) return;
-    addUser(form);
+    // When editor creates a scanner, assign to editor's events
+    const assigned_events = currentRole === 'editor' ? [...currentUser.assigned_events] : [];
+    addUser({ ...form, assigned_events });
     setForm({ name: '', email: '', role: 'scanner' });
     setOpen(false);
     toast({ title: 'Użytkownik dodany', description: 'Zaproszenie zostało wysłane (symulacja)' });
@@ -33,6 +46,13 @@ export default function UserManagement() {
     removeUser(deleteId);
     setDeleteId(null);
     toast({ title: 'Użytkownik usunięty' });
+  };
+
+  // Editor can only change roles for their scanners, not for themselves or other editors
+  const canManageUser = (userId: string) => {
+    if (currentRole === 'admin') return true;
+    const target = users.find(u => u.id === userId);
+    return target && target.role === 'scanner' && target.assigned_events.some(eid => currentUser.assigned_events.includes(eid));
   };
 
   return (
@@ -53,24 +73,30 @@ export default function UserManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map(u => (
+              {visibleUsers.map(u => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.name}</TableCell>
                   <TableCell className="text-muted-foreground">{u.email}</TableCell>
                   <TableCell>
-                    <Select value={u.role} onValueChange={v => changeRole(u.id, v as Role)}>
-                      <SelectTrigger className="h-8 w-[120px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {(['admin', 'editor', 'scanner'] as Role[]).map(r => (
-                          <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {canManageUser(u.id) ? (
+                      <Select value={u.role} onValueChange={v => changeRole(u.id, v as Role)}>
+                        <SelectTrigger className="h-8 w-[140px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(currentRole === 'admin' ? ['admin', 'editor', 'scanner'] as Role[] : ['scanner'] as Role[]).map(r => (
+                            <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Badge variant="secondary">{roleLabels[u.role]}</Badge>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteId(u.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {canManageUser(u.id) && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteId(u.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -90,7 +116,7 @@ export default function UserManagement() {
               <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v as Role }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(['scanner', 'editor'] as Role[]).map(r => (
+                  {creatableRoles.map(r => (
                     <SelectItem key={r} value={r}>{roleLabels[r]}</SelectItem>
                   ))}
                 </SelectContent>
