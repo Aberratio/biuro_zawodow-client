@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
-import { Event, Participant, User, ActivityLog, Role } from '@/types';
-import { mockEvents, mockParticipants, mockUsers, mockActivityLog } from '@/data/mockData';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, ReactNode } from 'react';
+import { Event, Participant, User, ActivityLog, Role, Organization } from '@/types';
+import { mockEvents, mockParticipants, mockUsers, mockActivityLog, mockOrganizations } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface MockDataContextType {
+  organizations: Organization[];
   events: Event[];
   participants: Participant[];
   users: User[];
@@ -26,17 +27,120 @@ interface MockDataContextType {
   getParticipantsByEvent: (eventId: string) => Participant[];
   visibleEvents: Event[];
   canAccessEvent: (eventId: string) => boolean;
+  isUsingApi: boolean;
 }
 
 const MockDataContext = createContext<MockDataContextType | null>(null);
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8081').replace(/\/+$/, '');
+
+interface ApiParticipant {
+  id: number | string;
+  event_id: string | null;
+  first_name: string;
+  last_name: string;
+  email: string;
+  bib_number: string | null;
+  qr_code: string | null;
+  status: 'pending' | 'checked_in' | null;
+  package_status: 'not_collected' | 'collected' | null;
+  email_status: 'not_sent' | 'sent' | null;
+  checked_in_at: string | null;
+}
+
+interface ApiUser {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  role: Role;
+  organization_id?: string | null;
+  assigned_events: string[];
+}
+
+interface BootstrapResponse {
+  data: {
+    organizations: Organization[];
+    events: Event[];
+    users: ApiUser[];
+    participants: ApiParticipant[];
+    activityLog: ActivityLog[];
+  };
+}
+
+function mapApiParticipantToUi(p: ApiParticipant, fallbackEventId: string): Participant {
+  const eventId = p.event_id ?? fallbackEventId;
+
+  return {
+    id: `p-${p.id}`,
+    event_id: eventId,
+    name: `${p.first_name} ${p.last_name}`.trim(),
+    email: p.email,
+    bib_number: p.bib_number ?? `BIB-${p.id}`,
+    qr_code: p.qr_code ?? `API-QR-${p.id}`,
+    status: p.status ?? 'pending',
+    package_status: p.package_status ?? 'not_collected',
+    email_status: p.email_status ?? 'not_sent',
+    checked_in_at: p.checked_in_at ?? undefined,
+  };
+}
+
+function splitFullName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: 'Unknown', lastName: 'Participant' };
+  if (parts.length === 1) return { firstName: parts[0], lastName: '-' };
+
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(' '),
+  };
+}
 
 export function MockDataProvider({ children }: { children: ReactNode }) {
   const { user: authUser } = useAuth();
+  const [organizations, setOrganizations] = useState<Organization[]>(mockOrganizations);
   const [events, setEvents] = useState<Event[]>(mockEvents);
   const [participants, setParticipants] = useState<Participant[]>(mockParticipants);
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [activityLog, setActivityLog] = useState<ActivityLog[]>(mockActivityLog);
   const [selectedEventId, setSelectedEventId] = useState<string>('evt-1');
+  const [isUsingApi, setIsUsingApi] = useState(false);
+
+  useEffect(() => {
+    const loadBootstrap = async () => {
+      const response = await fetch(`${API_BASE_URL}/bootstrap`);
+      if (!response.ok) {
+        throw new Error(`API bootstrap failed: ${response.status}`);
+      }
+
+      const payload = (await response.json()) as BootstrapResponse;
+      const data = payload?.data;
+      if (!data) {
+        throw new Error('API bootstrap returned empty payload');
+      }
+
+      const apiEvents = Array.isArray(data.events) && data.events.length > 0 ? data.events : mockEvents;
+      const nextSelectedEvent = apiEvents.some(e => e.id === selectedEventId)
+        ? selectedEventId
+        : apiEvents[0]?.id ?? 'evt-1';
+
+      setOrganizations(Array.isArray(data.organizations) && data.organizations.length > 0 ? data.organizations : mockOrganizations);
+      setEvents(apiEvents);
+      const apiUsers = data.users.map(u => ({
+        ...u,
+        organization_id: u.organization_id ?? undefined,
+        assigned_events: Array.isArray(u.assigned_events) ? u.assigned_events : [],
+      }));
+      setUsers(apiUsers.length > 0 ? apiUsers : mockUsers);
+      setParticipants((data.participants ?? []).map(p => mapApiParticipantToUi(p, nextSelectedEvent)));
+      setActivityLog(Array.isArray(data.activityLog) ? data.activityLog : mockActivityLog);
+      setSelectedEventId(nextSelectedEvent);
+      setIsUsingApi(true);
+    };
+
+    void loadBootstrap().catch(() => {
+      setIsUsingApi(false);
+    });
+  }, []);
 
   const currentUser = useMemo(() => {
     if (!authUser) return users[0];
@@ -45,7 +149,6 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
 
   const currentRole = currentUser.role;
 
-  // Visible events: superadmin=all, admin=org events, editor/scanner=assigned
   const visibleEvents = useMemo(() => {
     if (currentRole === 'superadmin') return events;
     if (currentRole === 'admin') return events.filter(e => e.organization_id === currentUser.organization_id);
@@ -75,7 +178,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     setParticipants(prev => prev.map(p =>
       p.id === participantId ? { ...p, status: 'checked_in' as const, checked_in_at: new Date().toISOString() } : p
     ));
-    const p = participants.find(p => p.id === participantId);
+    const p = participants.find(x => x.id === participantId);
     if (p) addLog('Check-in', p.name);
   }, [participants, addLog]);
 
@@ -83,19 +186,66 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     setParticipants(prev => prev.map(p =>
       p.id === participantId ? { ...p, package_status: 'collected' as const } : p
     ));
-    const p = participants.find(p => p.id === participantId);
+    const p = participants.find(x => x.id === participantId);
     if (p) addLog('Wydano pakiet', p.name);
   }, [participants, addLog]);
 
+  const createParticipantInApi = useCallback(async (
+    data: Omit<Participant, 'id' | 'qr_code' | 'status' | 'package_status' | 'email_status'>
+  ): Promise<Participant | null> => {
+    const { firstName, lastName } = splitFullName(data.name);
+    const response = await fetch(`${API_BASE_URL}/participants`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event_id: data.event_id,
+        first_name: firstName,
+        last_name: lastName,
+        email: data.email,
+        bib_number: data.bib_number,
+        qr_code: `QR-${data.event_id}-${Date.now()}`,
+        status: 'pending',
+        package_status: 'not_collected',
+        email_status: 'not_sent',
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API participant create failed: ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const created = payload?.data as ApiParticipant | undefined;
+    if (!created) return null;
+    return mapApiParticipantToUi(created, data.event_id);
+  }, []);
+
   const addParticipant = useCallback((data: Omit<Participant, 'id' | 'qr_code' | 'status' | 'package_status' | 'email_status'>) => {
-    const id = `p-${Date.now()}`;
-    setParticipants(prev => [...prev, {
-      ...data, id,
+    const fallbackParticipant: Participant = {
+      ...data,
+      id: `p-${Date.now()}`,
       qr_code: `QR-${data.event_id}-${Date.now()}`,
-      status: 'pending', package_status: 'not_collected', email_status: 'not_sent',
-    }]);
+      status: 'pending',
+      package_status: 'not_collected',
+      email_status: 'not_sent',
+    };
+
+    if (!isUsingApi) {
+      setParticipants(prev => [...prev, fallbackParticipant]);
+      addLog('Dodano uczestnika', data.name);
+      return;
+    }
+
+    void createParticipantInApi(data)
+      .then(apiParticipant => {
+        setParticipants(prev => [...prev, apiParticipant ?? fallbackParticipant]);
+      })
+      .catch(() => {
+        setParticipants(prev => [...prev, fallbackParticipant]);
+      });
+
     addLog('Dodano uczestnika', data.name);
-  }, [addLog]);
+  }, [addLog, createParticipantInApi, isUsingApi]);
 
   const updateParticipant = useCallback((id: string, data: Partial<Participant>) => {
     setParticipants(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
@@ -105,14 +255,20 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     const existing = participants.filter(p => p.event_id === eventId);
     const existingEmails = new Set(existing.map(p => p.email));
     const valid = data.filter(d => d.email && !existingEmails.has(d.email));
-    const maxBib = Math.max(0, ...existing.map(p => parseInt(p.bib_number) || 0));
+    const maxBib = Math.max(0, ...existing.map(p => parseInt(p.bib_number, 10) || 0));
     const newParticipants: Participant[] = valid.map((d, i) => ({
-      id: `p-${Date.now()}-${i}`, event_id: eventId, name: d.name, email: d.email,
-      bib_number: String(maxBib + i + 1), qr_code: `QR-${eventId}-${maxBib + i + 1}`,
-      status: 'pending' as const, package_status: 'not_collected' as const, email_status: 'not_sent' as const,
+      id: `p-${Date.now()}-${i}`,
+      event_id: eventId,
+      name: d.name,
+      email: d.email,
+      bib_number: String(maxBib + i + 1),
+      qr_code: `QR-${eventId}-${maxBib + i + 1}`,
+      status: 'pending',
+      package_status: 'not_collected',
+      email_status: 'not_sent',
     }));
     setParticipants(prev => [...prev, ...newParticipants]);
-    addLog(`Import CSV (${newParticipants.length} uczestników)`);
+    addLog(`Import CSV (${newParticipants.length} uczestnikow)`);
     return newParticipants.length;
   }, [participants, addLog]);
 
@@ -129,13 +285,13 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
 
   const addUser = useCallback((u: Omit<User, 'id'>) => {
     setUsers(prev => [...prev, { ...u, id: `u-${Date.now()}` }]);
-    addLog(`Dodano użytkownika: ${u.name}`);
+    addLog(`Dodano uzytkownika: ${u.name}`);
   }, [addLog]);
 
   const removeUser = useCallback((id: string) => {
-    const u = users.find(u => u.id === id);
-    setUsers(prev => prev.filter(u => u.id !== id));
-    if (u) addLog(`Usunięto użytkownika: ${u.name}`);
+    const u = users.find(x => x.id === id);
+    setUsers(prev => prev.filter(x => x.id !== id));
+    if (u) addLog(`Usunieto uzytkownika: ${u.name}`);
   }, [users, addLog]);
 
   const changeRole = useCallback((userId: string, role: Role) => {
@@ -146,7 +302,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     setParticipants(prev => prev.map(p =>
       p.event_id === eventId ? { ...p, email_status: 'sent' as const } : p
     ));
-    addLog('Wysłano kody QR do wszystkich');
+    addLog('Wyslano kody QR do wszystkich');
   }, [addLog]);
 
   const getParticipantsByEvent = useCallback((eventId: string) => {
@@ -155,11 +311,30 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
 
   return (
     <MockDataContext.Provider value={{
-      events, participants, users, activityLog, currentRole, currentUser, selectedEventId,
-      setSelectedEventId, checkIn, collectPackage,
-      addParticipant, updateParticipant, importParticipants, createEvent,
-      addUser, removeUser, changeRole, markEmailsSent, addLog, getParticipantsByEvent,
-      visibleEvents, canAccessEvent,
+      organizations,
+      events,
+      participants,
+      users,
+      activityLog,
+      currentRole,
+      currentUser,
+      selectedEventId,
+      setSelectedEventId,
+      checkIn,
+      collectPackage,
+      addParticipant,
+      updateParticipant,
+      importParticipants,
+      createEvent,
+      addUser,
+      removeUser,
+      changeRole,
+      markEmailsSent,
+      addLog,
+      getParticipantsByEvent,
+      visibleEvents,
+      canAccessEvent,
+      isUsingApi,
     }}>
       {children}
     </MockDataContext.Provider>
