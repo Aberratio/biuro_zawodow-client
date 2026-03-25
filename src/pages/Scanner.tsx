@@ -3,7 +3,7 @@ import { useMockData } from '@/contexts/MockDataContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { CheckCircle, Package, AlertTriangle, ChevronDown, ChevronUp, Undo2 } from 'lucide-react';
+import { CheckCircle, Package, AlertTriangle, ChevronDown, ChevronUp, Undo2, Info } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Participant } from '@/types';
 import QrScannerView from '@/components/QrScannerView';
@@ -24,12 +24,11 @@ export default function Scanner() {
   const [recentScans, setRecentScans] = useState<Participant[]>([]);
   const [autoCheckIn, setAutoCheckIn] = useState(true);
   const [showRecent, setShowRecent] = useState(true);
+  const [showHelp, setShowHelp] = useState(false);
 
-  // Confirmation modal state
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingParticipant, setPendingParticipant] = useState<Participant | null>(null);
 
-  // Undo modal state
   const [undoOpen, setUndoOpen] = useState(false);
   const [undoTarget, setUndoTarget] = useState<Participant | null>(null);
 
@@ -71,20 +70,17 @@ export default function Scanner() {
       checkIn(found.id);
       showSuccessScreen(found);
     } else {
-      // No auto → show confirmation modal
       setPendingParticipant(found);
       setConfirmOpen(true);
     }
   }, [eventParticipants, autoCheckIn, checkIn, showSuccessScreen]);
 
-  // Manual search always opens confirmation modal
   const handleSearchSelect = useCallback((participant: Participant) => {
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
     setPendingParticipant(participant);
     setConfirmOpen(true);
   }, []);
 
-  // Confirm check-in from modal
   const handleConfirmCheckIn = () => {
     if (!pendingParticipant) return;
     checkIn(pendingParticipant.id);
@@ -93,7 +89,6 @@ export default function Scanner() {
     setPendingParticipant(null);
   };
 
-  // Show detail without check-in (already checked in)
   const handleViewDetail = () => {
     if (!pendingParticipant) return;
     setScannedParticipant(pendingParticipant);
@@ -110,7 +105,6 @@ export default function Scanner() {
     toast({ title: '📦 Pakiet wydany!', description: scannedParticipant.name });
   };
 
-  // Undo check-in
   const handleUndoConfirm = () => {
     if (!undoTarget) return;
     undoCheckIn(undoTarget.id);
@@ -132,15 +126,15 @@ export default function Scanner() {
   if (view === 'success' && scannedParticipant) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-600 cursor-pointer animate-in fade-in duration-200" onClick={resetToIdle}>
-        <div className="text-center text-white px-6 space-y-4">
-          <CheckCircle className="h-20 w-20 md:h-24 md:w-24 mx-auto" strokeWidth={2.5} />
-          <p className="text-4xl md:text-6xl font-black tracking-tight">ZAREJESTROWANY</p>
-          <p className="text-2xl md:text-3xl font-bold">{scannedParticipant.name}</p>
-          <p className="text-5xl md:text-7xl font-black tabular-nums">#{scannedParticipant.bib_number}</p>
+        <div className="text-center text-white px-6 space-y-3 sm:space-y-4">
+          <CheckCircle className="h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 mx-auto" strokeWidth={2.5} />
+          <p className="text-3xl sm:text-4xl md:text-6xl font-black tracking-tight">ZAREJESTROWANY</p>
+          <p className="text-xl sm:text-2xl md:text-3xl font-bold">{scannedParticipant.name}</p>
+          <p className="text-4xl sm:text-5xl md:text-7xl font-black tabular-nums">#{scannedParticipant.bib_number}</p>
           {scannedParticipant.package_status === 'not_collected' && (
-            <p className="text-lg opacity-80 mt-4">📦 Pakiet do wydania</p>
+            <p className="text-base sm:text-lg opacity-80 mt-2 sm:mt-4">📦 Pakiet do wydania</p>
           )}
-          <p className="text-sm opacity-60 mt-6">Dotknij aby kontynuować</p>
+          <p className="text-xs sm:text-sm opacity-60 mt-4 sm:mt-6">Dotknij aby kontynuować</p>
         </div>
       </div>
     );
@@ -150,11 +144,11 @@ export default function Scanner() {
   if (view === 'error') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-destructive cursor-pointer animate-in fade-in duration-200" onClick={resetToIdle}>
-        <div className="text-center text-white px-6 space-y-4">
-          <AlertTriangle className="h-20 w-20 md:h-24 md:w-24 mx-auto" strokeWidth={2.5} />
-          <p className="text-3xl md:text-5xl font-black">NIE ZNALEZIONO</p>
-          <p className="text-lg opacity-80">Użyj wyszukiwarki ręcznej</p>
-          <p className="text-sm opacity-60 mt-6">Dotknij aby wrócić</p>
+        <div className="text-center text-white px-6 space-y-3 sm:space-y-4">
+          <AlertTriangle className="h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 mx-auto" strokeWidth={2.5} />
+          <p className="text-2xl sm:text-3xl md:text-5xl font-black">NIE ZNALEZIONO</p>
+          <p className="text-base sm:text-lg opacity-80">Użyj wyszukiwarki ręcznej</p>
+          <p className="text-xs sm:text-sm opacity-60 mt-4 sm:mt-6">Dotknij aby wrócić</p>
         </div>
       </div>
     );
@@ -164,19 +158,51 @@ export default function Scanner() {
     <div className="space-y-3 max-w-lg mx-auto -mx-4 md:mx-auto px-0">
       {/* Header */}
       <div className="flex items-center justify-between px-4 md:px-0 gap-2">
-        <h1 className="text-lg md:text-2xl font-bold tracking-tight">Skaner</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg md:text-2xl font-bold tracking-tight">Skaner</h1>
+          <button
+            className="text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
+            onClick={() => setShowHelp(prev => !prev)}
+            aria-label="Pokaż instrukcje"
+          >
+            <Info className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex items-center gap-2 sm:gap-3">
           {canToggleAuto && (
-            <label className="flex items-center gap-2 cursor-pointer">
-              <span className="text-xs font-medium text-muted-foreground">Auto</span>
+            <label className="flex items-center gap-1.5 sm:gap-2 cursor-pointer">
+              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Auto</span>
               <Switch checked={autoCheckIn} onCheckedChange={setAutoCheckIn} />
             </label>
           )}
-          <div className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 tabular-nums text-sm font-bold">
+          <div className="bg-primary text-primary-foreground rounded-md px-2 sm:px-3 py-1 sm:py-1.5 tabular-nums text-xs sm:text-sm font-bold">
             {checkedIn}/{eventParticipants.length}
           </div>
         </div>
       </div>
+
+      {/* Help / Instructions */}
+      {showHelp && (
+        <div className="px-4 md:px-0">
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="py-3 space-y-2">
+              <p className="text-xs font-semibold text-foreground">Jak korzystać ze skanera:</p>
+              <ul className="text-xs text-muted-foreground space-y-1.5 list-none">
+                <li>📷 <strong>Skan QR</strong> — skieruj kamerę na kod QR uczestnika</li>
+                <li>🔍 <strong>Wyszukiwanie ręczne</strong> — wpisz nazwisko, numer lub email w pole wyszukiwania</li>
+                <li>⚡ <strong>Tryb Auto</strong> — {autoCheckIn ? 'włączony: skan QR od razu odprawia' : 'wyłączony: każdy skan wymaga potwierdzenia'}</li>
+                <li>📦 <strong>Pakiet</strong> — po odprawie możesz wydać pakiet startowy</li>
+                <li>↩️ <strong>Cofnij odprawę</strong> — w szczegółach zawodnika możesz cofnąć odprawę</li>
+              </ul>
+              {!canToggleAuto && (
+                <p className="text-[10px] text-muted-foreground/70 pt-1">
+                  💡 Tryb Auto jest zarządzany przez organizatora.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Autocomplete search */}
       <div className="px-4 md:px-0">
@@ -192,36 +218,36 @@ export default function Scanner() {
       {view === 'detail' && scannedParticipant && (
         <div className="px-4 md:px-0">
           {scannedParticipant.status === 'checked_in' ? (
-            <div className="rounded-lg bg-destructive/10 border-2 border-destructive p-4 mb-3">
-              <p className="text-center text-xl md:text-2xl font-black text-destructive">🔴 JUŻ ODPRAWIONY</p>
-              <p className="text-center text-sm text-muted-foreground mt-1">
+            <div className="rounded-lg bg-destructive/10 border-2 border-destructive p-3 sm:p-4 mb-3">
+              <p className="text-center text-lg sm:text-xl md:text-2xl font-black text-destructive">🔴 JUŻ ODPRAWIONY</p>
+              <p className="text-center text-xs sm:text-sm text-muted-foreground mt-1">
                 {scannedParticipant.checked_in_at && new Date(scannedParticipant.checked_in_at).toLocaleTimeString('pl-PL')}
               </p>
             </div>
           ) : (
-            <div className="rounded-lg bg-emerald-500/10 border-2 border-emerald-500 p-4 mb-3">
-              <p className="text-center text-xl md:text-2xl font-black text-emerald-600">🟢 GOTOWY DO ODPRAWY</p>
+            <div className="rounded-lg bg-emerald-500/10 border-2 border-emerald-500 p-3 sm:p-4 mb-3">
+              <p className="text-center text-lg sm:text-xl md:text-2xl font-black text-emerald-600">🟢 GOTOWY DO ODPRAWY</p>
             </div>
           )}
 
           <Card>
-            <CardContent className="py-4 space-y-3">
+            <CardContent className="py-3 sm:py-4 space-y-3">
               <div className="flex items-baseline justify-between gap-2">
-                <p className="text-xl font-bold truncate">{scannedParticipant.name}</p>
-                <span className="text-2xl font-black tabular-nums text-primary shrink-0">#{scannedParticipant.bib_number}</span>
+                <p className="text-lg sm:text-xl font-bold truncate">{scannedParticipant.name}</p>
+                <span className="text-xl sm:text-2xl font-black tabular-nums text-primary shrink-0">#{scannedParticipant.bib_number}</span>
               </div>
               <div className="space-y-2">
                 {scannedParticipant.status !== 'checked_in' && (
-                  <Button className="w-full h-16 text-lg font-bold touch-manipulation" onClick={() => {
+                  <Button className="w-full h-14 sm:h-16 text-base sm:text-lg font-bold touch-manipulation" onClick={() => {
                     setPendingParticipant(scannedParticipant);
                     setConfirmOpen(true);
                   }}>
-                    <CheckCircle className="h-6 w-6 mr-2" /> Odpraw zawodnika
+                    <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 mr-2" /> Odpraw zawodnika
                   </Button>
                 )}
                 {scannedParticipant.package_status !== 'collected' && (
-                  <Button variant="outline" className="w-full h-12 text-sm font-semibold touch-manipulation" onClick={handleCollectPackage}>
-                    <Package className="h-5 w-5 mr-2" /> Wydaj pakiet
+                  <Button variant="outline" className="w-full h-11 sm:h-12 text-sm font-semibold touch-manipulation" onClick={handleCollectPackage}>
+                    <Package className="h-4 w-4 sm:h-5 sm:w-5 mr-2" /> Wydaj pakiet
                   </Button>
                 )}
                 {scannedParticipant.status === 'checked_in' && (
@@ -271,7 +297,7 @@ export default function Scanner() {
                         <span className="font-medium truncate">
                           {current.name} <span className="text-muted-foreground tabular-nums">#{current.bib_number}</span>
                         </span>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${
                           current.status === 'checked_in' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-600'
                         }`}>
                           {current.status === 'checked_in' ? '✓' : '○'}
@@ -286,11 +312,23 @@ export default function Scanner() {
         </div>
       )}
 
-      {/* Confirmation modal for manual search / check-in */}
+      {/* No participants hint */}
+      {eventParticipants.length === 0 && view === 'idle' && (
+        <div className="px-4 md:px-0">
+          <Card className="border-dashed">
+            <CardContent className="py-6 text-center">
+              <p className="text-sm font-medium text-muted-foreground">Brak uczestników w tym wydarzeniu</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">Zaimportuj uczestników lub wybierz inne wydarzenie w nagłówku.</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Confirmation modal */}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent className="max-w-sm mx-auto">
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-sm mx-auto">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl">
+            <AlertDialogTitle className="text-lg sm:text-xl">
               {pendingParticipant?.status === 'checked_in' ? 'Zawodnik już odprawiony' : 'Potwierdź odprawę'}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -298,11 +336,11 @@ export default function Scanner() {
                 {pendingParticipant && (
                   <>
                     <div className="flex items-baseline justify-between">
-                      <span className="text-base font-semibold text-foreground">{pendingParticipant.name}</span>
-                      <span className="text-lg font-black tabular-nums text-primary">#{pendingParticipant.bib_number}</span>
+                      <span className="text-sm sm:text-base font-semibold text-foreground">{pendingParticipant.name}</span>
+                      <span className="text-base sm:text-lg font-black tabular-nums text-primary">#{pendingParticipant.bib_number}</span>
                     </div>
                     <div className="text-xs text-muted-foreground">{pendingParticipant.email}</div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <span className={`text-xs font-bold px-2 py-1 rounded ${
                         pendingParticipant.status === 'checked_in' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-600'
                       }`}>
@@ -322,14 +360,14 @@ export default function Scanner() {
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-2">
-            <AlertDialogCancel className="touch-manipulation">Anuluj</AlertDialogCancel>
+          <AlertDialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+            <AlertDialogCancel className="touch-manipulation h-11 sm:h-10">Anuluj</AlertDialogCancel>
             {pendingParticipant?.status !== 'checked_in' ? (
-              <AlertDialogAction className="h-12 text-base font-bold touch-manipulation" onClick={handleConfirmCheckIn}>
+              <AlertDialogAction className="h-12 sm:h-12 text-base font-bold touch-manipulation" onClick={handleConfirmCheckIn}>
                 <CheckCircle className="h-5 w-5 mr-2" /> Potwierdź odprawę
               </AlertDialogAction>
             ) : (
-              <AlertDialogAction className="touch-manipulation" onClick={handleViewDetail}>
+              <AlertDialogAction className="touch-manipulation h-11 sm:h-10" onClick={handleViewDetail}>
                 Pokaż szczegóły
               </AlertDialogAction>
             )}
@@ -339,16 +377,16 @@ export default function Scanner() {
 
       {/* Undo check-in confirmation modal */}
       <AlertDialog open={undoOpen} onOpenChange={setUndoOpen}>
-        <AlertDialogContent className="max-w-sm mx-auto">
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-sm mx-auto">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl text-destructive">Cofnij odprawę</AlertDialogTitle>
+            <AlertDialogTitle className="text-lg sm:text-xl text-destructive">Cofnij odprawę</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 pt-2">
                 {undoTarget && (
                   <>
                     <div className="flex items-baseline justify-between">
-                      <span className="text-base font-semibold text-foreground">{undoTarget.name}</span>
-                      <span className="text-lg font-black tabular-nums text-primary">#{undoTarget.bib_number}</span>
+                      <span className="text-sm sm:text-base font-semibold text-foreground">{undoTarget.name}</span>
+                      <span className="text-base sm:text-lg font-black tabular-nums text-primary">#{undoTarget.bib_number}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Czy na pewno chcesz cofnąć odprawę tego zawodnika?
@@ -361,8 +399,8 @@ export default function Scanner() {
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-2">
-            <AlertDialogCancel className="touch-manipulation">Anuluj</AlertDialogCancel>
+          <AlertDialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+            <AlertDialogCancel className="touch-manipulation h-11 sm:h-10">Anuluj</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 h-12 text-base font-bold touch-manipulation"
               onClick={handleUndoConfirm}

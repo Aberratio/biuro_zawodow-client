@@ -23,25 +23,40 @@ export default function Events() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Wydarzenia</h1>
-        <Button onClick={() => setOpen(true)} size="sm"><Plus className="h-4 w-4 mr-1" /> Nowe wydarzenie</Button>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Wydarzenia</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Lista Twoich wydarzeń. Kliknij wydarzenie, aby zobaczyć szczegóły i statystyki.
+          </p>
+        </div>
+        <Button onClick={() => setOpen(true)} size="sm" className="self-start sm:self-auto"><Plus className="h-4 w-4 mr-1" /> Nowe wydarzenie</Button>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+
+      {visibleEvents.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="py-8 text-center">
+            <p className="text-sm font-medium text-muted-foreground">Nie masz jeszcze żadnych wydarzeń</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Kliknij „Nowe wydarzenie" aby utworzyć pierwsze.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visibleEvents.map(e => {
           const ep = participants.filter(p => p.event_id === e.id);
           const ci = ep.filter(p => p.status === 'checked_in').length;
           return (
-            <Card key={e.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/events/${e.id}`)}>
+            <Card key={e.id} className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]" onClick={() => navigate(`/events/${e.id}`)}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">{e.name}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-3.5 w-3.5" /> {e.date}
+                  <Calendar className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{e.date}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5" /> {e.location}
+                  <MapPin className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{e.location}</span>
                 </div>
                 <div className="pt-2">
                   <div className="flex justify-between text-xs mb-1">
@@ -57,15 +72,18 @@ export default function Events() {
           );
         })}
       </div>
+
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader><DialogTitle>Nowe wydarzenie</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div><Label>Nazwa</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="np. Bieg Wiosenny" /></div>
             <div><Label>Data</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
             <div><Label>Lokalizacja</Label><Input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} placeholder="np. Kraków, Błonia" /></div>
           </div>
-          <DialogFooter><Button onClick={handleCreate} disabled={!form.name || !form.date}>Utwórz</Button></DialogFooter>
+          <DialogFooter>
+            <Button onClick={handleCreate} disabled={!form.name || !form.date} className="h-11 sm:h-10">Utwórz</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
