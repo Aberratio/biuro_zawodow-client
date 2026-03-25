@@ -9,9 +9,14 @@ export default function Organizations() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Building2 className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold tracking-tight">Organizacje</h1>
+      <div>
+        <div className="flex items-center gap-3">
+          <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Organizacje</h1>
+        </div>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+          Przegląd wszystkich organizacji w systemie, ich wydarzeń i użytkowników.
+        </p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         {organizations.map(org => {
@@ -20,29 +25,31 @@ export default function Organizations() {
           return (
             <Card key={org.id}>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">{org.name}</CardTitle>
+                <CardTitle className="text-base sm:text-lg">{org.name}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-2">
                   <Badge variant="secondary">{orgEvents.length} wydarzeń</Badge>
                   <Badge variant="outline">{orgUsers.length} użytkowników</Badge>
                 </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Wydarzenie</TableHead>
-                      <TableHead className="text-xs">Data</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {orgEvents.map(e => (
-                      <TableRow key={e.id}>
-                        <TableCell className="text-sm py-1.5">{e.name}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground py-1.5">{e.date}</TableCell>
+                <div className="overflow-x-auto -mx-6 px-6">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Wydarzenie</TableHead>
+                        <TableHead className="text-xs">Data</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {orgEvents.map(e => (
+                        <TableRow key={e.id}>
+                          <TableCell className="text-sm py-1.5">{e.name}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground py-1.5">{e.date}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           );

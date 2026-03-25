@@ -49,23 +49,23 @@ export default function ParticipantDetails() {
   ];
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <Button variant="ghost" size="sm" onClick={() => navigate(-1)}><ArrowLeft className="h-4 w-4 mr-1" /> Wróć</Button>
-      <div className="flex items-start justify-between">
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="touch-manipulation"><ArrowLeft className="h-4 w-4 mr-1" /> Wróć</Button>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{participant.name}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{participant.email}</p>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{participant.name}</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">{participant.email}</p>
         </div>
-        {canEdit && <Button variant="outline" size="sm" onClick={startEdit}><Edit className="h-3.5 w-3.5 mr-1" /> Edytuj</Button>}
+        {canEdit && <Button variant="outline" size="sm" onClick={startEdit} className="self-start touch-manipulation"><Edit className="h-3.5 w-3.5 mr-1" /> Edytuj</Button>}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Card>
-          <CardContent className="pt-6 space-y-3">
+          <CardContent className="pt-5 sm:pt-6 space-y-3">
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Numer startowy</span><span className="font-semibold tabular-nums">#{participant.bib_number}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Status</span><Badge variant={participant.status === 'checked_in' ? 'default' : 'secondary'}>{participant.status === 'checked_in' ? 'Odprawiony' : 'Oczekuje'}</Badge></div>
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Pakiet</span><Badge variant={participant.package_status === 'collected' ? 'default' : 'outline'}>{participant.package_status === 'collected' ? 'Wydany' : 'Nie wydany'}</Badge></div>
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">QR Code</span><span className="font-mono text-xs">{participant.qr_code}</span></div>
+            <div className="flex justify-between text-sm items-center"><span className="text-muted-foreground">Status</span><Badge variant={participant.status === 'checked_in' ? 'default' : 'secondary'}>{participant.status === 'checked_in' ? 'Odprawiony' : 'Oczekuje'}</Badge></div>
+            <div className="flex justify-between text-sm items-center"><span className="text-muted-foreground">Pakiet</span><Badge variant={participant.package_status === 'collected' ? 'default' : 'outline'}>{participant.package_status === 'collected' ? 'Wydany' : 'Nie wydany'}</Badge></div>
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">QR Code</span><span className="font-mono text-xs truncate ml-2">{participant.qr_code}</span></div>
           </CardContent>
         </Card>
         {canEdit && (
@@ -73,16 +73,16 @@ export default function ParticipantDetails() {
             <CardHeader className="pb-3"><CardTitle className="text-base">Akcje</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {participant.status !== 'checked_in' && (
-                <Button className="w-full" onClick={() => { checkIn(participant.id); toast({ title: 'Uczestnik odprawiony!' }); }}>
+                <Button className="w-full h-11 sm:h-10 touch-manipulation" onClick={() => { checkIn(participant.id); toast({ title: 'Uczestnik odprawiony!' }); }}>
                   <CheckCircle className="h-4 w-4 mr-1" /> Oznacz jako obecny
                 </Button>
               )}
               {participant.package_status !== 'collected' && (
-                <Button variant="outline" className="w-full" onClick={() => { collectPackage(participant.id); toast({ title: 'Pakiet wydany!' }); }}>
+                <Button variant="outline" className="w-full h-11 sm:h-10 touch-manipulation" onClick={() => { collectPackage(participant.id); toast({ title: 'Pakiet wydany!' }); }}>
                   <Package className="h-4 w-4 mr-1" /> Wydaj pakiet
                 </Button>
               )}
-              <Button variant="outline" className="w-full" onClick={() => setTransferOpen(true)}>
+              <Button variant="outline" className="w-full h-11 sm:h-10 touch-manipulation" onClick={() => setTransferOpen(true)}>
                 <Repeat className="h-4 w-4 mr-1" /> Przepisz pakiet
               </Button>
             </CardContent>
@@ -110,22 +110,23 @@ export default function ParticipantDetails() {
       </Card>
 
       <Dialog open={editing} onOpenChange={setEditing}>
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader><DialogTitle>Edytuj uczestnika</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div><Label>Imię i nazwisko</Label><Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} /></div>
             <div><Label>Email</Label><Input value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} /></div>
             <div><Label>Numer startowy</Label><Input value={editForm.bib_number} onChange={e => setEditForm(f => ({ ...f, bib_number: e.target.value }))} /></div>
           </div>
-          <DialogFooter><Button onClick={saveEdit}>Zapisz</Button></DialogFooter>
+          <DialogFooter><Button onClick={saveEdit} className="h-11 sm:h-10">Zapisz</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader><DialogTitle>Przepisz pakiet</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Przepisz pakiet startowy na inną osobę. Obecny uczestnik straci przypisanie pakietu.</p>
           <div><Label>Imię nowej osoby</Label><Input value={transferName} onChange={e => setTransferName(e.target.value)} placeholder="np. Jan Nowak" /></div>
-          <DialogFooter><Button onClick={handleTransfer} disabled={!transferName}>Przepisz</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleTransfer} disabled={!transferName} className="h-11 sm:h-10">Przepisz</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
