@@ -18,41 +18,74 @@ export default function EventDetails() {
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate('/events')}><ArrowLeft className="h-4 w-4 mr-1" /> Wróć</Button>
+      <Button variant="ghost" size="sm" onClick={() => navigate('/events')} className="touch-manipulation"><ArrowLeft className="h-4 w-4 mr-1" /> Wróć</Button>
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{event.name}</h1>
-        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{event.name}</h1>
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2 text-xs sm:text-sm text-muted-foreground">
           <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{event.date}</span>
           <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{event.location}</span>
         </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card><CardContent className="flex items-center gap-4 pt-6"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Users className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold tabular-nums">{ep.length}</p><p className="text-xs text-muted-foreground">Uczestnicy</p></div></CardContent></Card>
-        <Card><CardContent className="flex items-center gap-4 pt-6"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><CheckCircle className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold tabular-nums">{checkedIn}</p><p className="text-xs text-muted-foreground">Odprawieni</p></div></CardContent></Card>
-        <Card><CardContent className="flex items-center gap-4 pt-6"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Package className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold tabular-nums">{collected}</p><p className="text-xs text-muted-foreground">Pakiety</p></div></CardContent></Card>
+      <div className="grid gap-3 sm:gap-4 grid-cols-3">
+        <Card>
+          <CardContent className="flex items-center gap-3 sm:gap-4 pt-4 sm:pt-6 pb-4 sm:pb-6 px-3 sm:px-6">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-lg sm:text-2xl font-bold tabular-nums">{ep.length}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Uczestnicy</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 sm:gap-4 pt-4 sm:pt-6 pb-4 sm:pb-6 px-3 sm:px-6">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-lg sm:text-2xl font-bold tabular-nums">{checkedIn}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Odprawieni</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 sm:gap-4 pt-4 sm:pt-6 pb-4 sm:pb-6 px-3 sm:px-6">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+              <Package className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-lg sm:text-2xl font-bold tabular-nums">{collected}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Pakiety</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-      <div className="flex gap-3">
-        <Button onClick={() => { setSelectedEventId(event.id); navigate('/scanner'); }}><ScanLine className="h-4 w-4 mr-1" /> Otwórz skaner</Button>
-        <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate('/participants'); }}><Users className="h-4 w-4 mr-1" /> Uczestnicy</Button>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Button onClick={() => { setSelectedEventId(event.id); navigate('/scanner'); }} className="h-11 sm:h-10 touch-manipulation">
+          <ScanLine className="h-4 w-4 mr-1" /> Otwórz skaner
+        </Button>
+        <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate('/participants'); }} className="h-11 sm:h-10 touch-manipulation">
+          <Users className="h-4 w-4 mr-1" /> Uczestnicy
+        </Button>
       </div>
       <Card>
         <CardHeader><CardTitle className="text-base">Uczestnicy</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-2">
             {ep.slice(0, 10).map(p => (
-              <div key={p.id} className="flex items-center justify-between py-2 text-sm border-b last:border-0 cursor-pointer hover:bg-accent/30 px-2 rounded" onClick={() => navigate(`/participants/${p.id}`)}>
-                <div>
+              <div key={p.id} className="flex items-center justify-between py-2.5 text-sm border-b last:border-0 cursor-pointer hover:bg-accent/30 active:bg-accent/50 px-2 rounded touch-manipulation" onClick={() => navigate(`/participants/${p.id}`)}>
+                <div className="min-w-0 mr-2">
                   <span className="font-medium">{p.name}</span>
-                  <span className="text-muted-foreground ml-2">#{p.bib_number}</span>
+                  <span className="text-muted-foreground ml-2 tabular-nums">#{p.bib_number}</span>
                 </div>
-                <div className="flex gap-2">
-                  <Badge variant={p.status === 'checked_in' ? 'default' : 'secondary'} className="text-[10px]">
-                    {p.status === 'checked_in' ? 'Odprawiony' : 'Oczekuje'}
-                  </Badge>
-                </div>
+                <Badge variant={p.status === 'checked_in' ? 'default' : 'secondary'} className="text-[10px] shrink-0">
+                  {p.status === 'checked_in' ? 'Odprawiony' : 'Oczekuje'}
+                </Badge>
               </div>
             ))}
             {ep.length > 10 && <p className="text-xs text-muted-foreground text-center pt-2">...i {ep.length - 10} więcej</p>}
+            {ep.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Brak uczestników — zaimportuj listę z CSV.</p>}
           </div>
         </CardContent>
       </Card>

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, FileText, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
+import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, Info } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { demoCsvData } from '@/data/mockData';
 
@@ -49,8 +49,27 @@ export default function CsvImport() {
   const errorCount = rows.filter(r => !r.valid || r.duplicate).length;
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <h1 className="text-2xl font-bold tracking-tight">Import CSV</h1>
+    <div className="space-y-6 max-w-3xl mx-auto">
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Import CSV</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+          Zaimportuj listę uczestników z pliku CSV do aktualnie wybranego wydarzenia.
+        </p>
+      </div>
+
+      {/* Instructions */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="py-3">
+          <div className="flex items-start gap-2">
+            <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p><strong>Wymagany format:</strong> plik CSV z kolumnami <code className="bg-muted px-1 py-0.5 rounded text-[10px]">name</code> i <code className="bg-muted px-1 py-0.5 rounded text-[10px]">email</code>.</p>
+              <p>Duplikaty (ten sam email) zostaną automatycznie oznaczone i pominięte przy imporcie.</p>
+              <p>Możesz też użyć przycisku „Załaduj dane demo" aby zobaczyć jak działa import.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {rows.length === 0 ? (
         <>
@@ -60,8 +79,8 @@ export default function CsvImport() {
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
           >
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <Upload className="h-10 w-10 text-muted-foreground mb-4" />
+            <CardContent className="flex flex-col items-center justify-center py-12 sm:py-16">
+              <Upload className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground mb-4" />
               <p className="text-sm font-medium">Przeciągnij plik CSV tutaj</p>
               <p className="text-xs text-muted-foreground mt-1">Format: name, email</p>
             </CardContent>
@@ -72,13 +91,13 @@ export default function CsvImport() {
         </>
       ) : (
         <>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             <Badge variant="default" className="gap-1"><CheckCircle className="h-3 w-3" /> {validCount} poprawnych</Badge>
             {errorCount > 0 && <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" /> {errorCount} błędów</Badge>}
           </div>
           <Card>
             <CardHeader><CardTitle className="text-base">Podgląd danych</CardTitle></CardHeader>
-            <CardContent>
+            <CardContent className="overflow-x-auto -mx-6 px-6">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -90,8 +109,8 @@ export default function CsvImport() {
                 <TableBody>
                   {rows.map((r, i) => (
                     <TableRow key={i} className={!r.valid || r.duplicate ? 'bg-destructive/5' : ''}>
-                      <TableCell>{r.name}</TableCell>
-                      <TableCell>{r.email || <span className="text-destructive text-xs">Brak email</span>}</TableCell>
+                      <TableCell className="text-sm">{r.name}</TableCell>
+                      <TableCell className="text-sm">{r.email || <span className="text-destructive text-xs">Brak email</span>}</TableCell>
                       <TableCell>
                         {!r.valid && <Badge variant="destructive" className="text-[10px]">Błąd</Badge>}
                         {r.duplicate && <Badge variant="destructive" className="text-[10px]">Duplikat</Badge>}
@@ -103,12 +122,12 @@ export default function CsvImport() {
               </Table>
             </CardContent>
           </Card>
-          <div className="flex gap-3">
-            <Button onClick={handleImport} disabled={importing || validCount === 0}>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button onClick={handleImport} disabled={importing || validCount === 0} className="h-11 sm:h-10">
               {importing && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Importuj {validCount} uczestników
             </Button>
-            <Button variant="outline" onClick={() => setRows([])}>Anuluj</Button>
+            <Button variant="outline" onClick={() => setRows([])} className="h-11 sm:h-10">Anuluj</Button>
           </div>
         </>
       )}
