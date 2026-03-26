@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ArrowLeft, CheckCircle, Package, Clock, Edit, Repeat } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
 
 export default function ParticipantDetails() {
   const { id } = useParams<{ id: string }>();
