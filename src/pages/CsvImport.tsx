@@ -17,6 +17,8 @@ export default function CsvImport() {
   const [importing, setImporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
+  if (isLoading) return <TableSkeleton rows={5} cols={3} subtitle="" />;
+
   const existingEmails = new Set(participants.filter(p => p.event_id === selectedEventId).map(p => p.email));
 
   const loadDemo = useCallback(() => {
