@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { ScanLine, Users, CalendarDays, CheckCircle, Package, Clock, Info } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import DashboardSkeleton from '@/components/skeletons/DashboardSkeleton';
+import { pl } from 'date-fns/locale';
 
 export default function Dashboard() {
   const { currentRole, visibleEvents, participants, activityLog, selectedEventId } = useMockData();
