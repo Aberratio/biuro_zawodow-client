@@ -16,7 +16,6 @@ export default function Participants() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [packageFilter, setPackageFilter] = useState('all');
 
-  if (isLoading) return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
 
   const filtered = useMemo(() => {
     return participants
