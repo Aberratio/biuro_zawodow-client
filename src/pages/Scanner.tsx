@@ -8,6 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { Participant } from '@/types';
 import QrScannerView from '@/components/QrScannerView';
 import ParticipantSearch from '@/components/ParticipantSearch';
+import ScannerSkeleton from '@/components/skeletons/ScannerSkeleton';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
