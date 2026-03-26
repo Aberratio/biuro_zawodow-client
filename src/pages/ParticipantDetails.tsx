@@ -15,14 +15,14 @@ export default function ParticipantDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { participants, currentRole, checkIn, collectPackage, updateParticipant, isLoading } = useMockData();
-
-  if (isLoading) return <DetailSkeleton />;
   const participant = participants.find(p => p.id === id);
   const [editing, setEditing] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferName, setTransferName] = useState('');
   const [editForm, setEditForm] = useState({ name: '', email: '', bib_number: '' });
   const canEdit = currentRole === 'editor' || currentRole === 'admin';
+
+  if (isLoading) return <DetailSkeleton />;
 
   if (!participant) return <div className="text-center py-12 text-muted-foreground">Nie znaleziono uczestnika</div>;
 

@@ -23,11 +23,11 @@ const roleDescriptions: Record<Role, string> = {
 
 export default function UserManagement() {
   const { users, addUser, removeUser, changeRole, currentRole, currentUser, isLoading } = useMockData();
-
-  if (isLoading) return <TableSkeleton rows={5} cols={3} subtitle="" />;
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', password: 'demo123', role: 'scanner' as Role });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  if (isLoading) return <TableSkeleton rows={5} cols={3} subtitle="" />;
 
   const visibleUsers = (() => {
     if (currentRole === 'superadmin') return users;
