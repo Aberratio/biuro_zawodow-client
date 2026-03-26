@@ -120,6 +120,8 @@ export default function Scanner() {
     setScannedParticipant(null);
   };
 
+  if (isLoading) return <ScannerSkeleton />;
+
   // ── SUCCESS SCREEN ──
   if (view === 'success' && scannedParticipant) {
     return (
