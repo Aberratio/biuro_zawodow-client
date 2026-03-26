@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
 import { Plus, MapPin, Calendar } from 'lucide-react';
+import EventsSkeleton from '@/components/skeletons/EventsSkeleton';
 
 export default function Events() {
   const { visibleEvents, participants, createEvent, currentUser } = useMockData();
