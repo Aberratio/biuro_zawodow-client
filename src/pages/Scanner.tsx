@@ -8,6 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { Participant } from '@/types';
 import QrScannerView from '@/components/QrScannerView';
 import ParticipantSearch from '@/components/ParticipantSearch';
+import ScannerSkeleton from '@/components/skeletons/ScannerSkeleton';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -16,8 +17,7 @@ import {
 type ScannerView = 'idle' | 'success' | 'error' | 'detail';
 
 export default function Scanner() {
-  const { participants, selectedEventId, checkIn, undoCheckIn, collectPackage, currentRole } = useMockData();
-  const eventParticipants = participants.filter(p => p.event_id === selectedEventId);
+  const { participants, selectedEventId, checkIn, undoCheckIn, collectPackage, currentRole, isLoading } = useMockData();
 
   const [view, setView] = useState<ScannerView>('idle');
   const [scannedParticipant, setScannedParticipant] = useState<Participant | null>(null);
@@ -25,16 +25,14 @@ export default function Scanner() {
   const [autoCheckIn, setAutoCheckIn] = useState(true);
   const [showRecent, setShowRecent] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
-
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingParticipant, setPendingParticipant] = useState<Participant | null>(null);
-
   const [undoOpen, setUndoOpen] = useState(false);
   const [undoTarget, setUndoTarget] = useState<Participant | null>(null);
-
   const successTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const canToggleAuto = currentRole !== 'scanner';
 
+  const eventParticipants = participants.filter(p => p.event_id === selectedEventId);
+  const canToggleAuto = currentRole !== 'scanner';
   const checkedIn = eventParticipants.filter(p => p.status === 'checked_in').length;
 
   useEffect(() => () => {
@@ -121,6 +119,8 @@ export default function Scanner() {
     setView('idle');
     setScannedParticipant(null);
   };
+
+  if (isLoading) return <ScannerSkeleton />;
 
   // ── SUCCESS SCREEN ──
   if (view === 'success' && scannedParticipant) {

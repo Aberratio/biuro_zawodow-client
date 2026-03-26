@@ -7,12 +7,15 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
 import { Plus, MapPin, Calendar } from 'lucide-react';
+import EventsSkeleton from '@/components/skeletons/EventsSkeleton';
 
 export default function Events() {
-  const { visibleEvents, participants, createEvent, currentUser } = useMockData();
+  const { visibleEvents, participants, createEvent, currentUser, isLoading } = useMockData();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: '', date: '', location: '' });
+
+  if (isLoading) return <EventsSkeleton />;
 
   const handleCreate = () => {
     if (!form.name || !form.date) return;
