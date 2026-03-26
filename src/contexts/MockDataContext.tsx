@@ -29,6 +29,7 @@ interface MockDataContextType {
   visibleEvents: Event[];
   canAccessEvent: (eventId: string) => boolean;
   isUsingApi: boolean;
+  isLoading: boolean;
 }
 
 const MockDataContext = createContext<MockDataContextType | null>(null);
