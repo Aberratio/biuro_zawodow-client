@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Trash2, Info } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { Role } from '@/types';
+import TableSkeleton from '@/components/skeletons/TableSkeleton';
 
 const roleLabels: Record<Role, string> = { superadmin: 'Superadmin', admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
 const roleDescriptions: Record<Role, string> = {
