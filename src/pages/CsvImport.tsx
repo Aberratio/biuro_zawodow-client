@@ -7,11 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, Info } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { demoCsvData } from '@/data/mockData';
+import TableSkeleton from '@/components/skeletons/TableSkeleton';
 
 interface CsvRow { name: string; email: string; valid: boolean; duplicate: boolean; }
 
 export default function CsvImport() {
-  const { importParticipants, selectedEventId, participants } = useMockData();
+  const { importParticipants, selectedEventId, participants, isLoading } = useMockData();
   const [rows, setRows] = useState<CsvRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -33,6 +34,8 @@ export default function CsvImport() {
     loadDemo();
     toast({ title: 'Plik załadowany (demo)', description: 'Użyto danych demonstracyjnych' });
   }, [loadDemo]);
+
+  if (isLoading) return <TableSkeleton rows={5} cols={3} subtitle="" />;
 
   const handleImport = () => {
     setImporting(true);

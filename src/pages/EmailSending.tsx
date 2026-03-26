@@ -6,12 +6,16 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Mail, Send, CheckCircle, Loader2, QrCode, Info } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import TableSkeleton from '@/components/skeletons/TableSkeleton';
 
 export default function EmailSending() {
-  const { participants, selectedEventId, markEmailsSent } = useMockData();
+  const { participants, selectedEventId, markEmailsSent, isLoading } = useMockData();
+  const [sending, setSending] = useState(false);
+
+  if (isLoading) return <TableSkeleton rows={5} cols={3} subtitle="" />;
+
   const eventParticipants = participants.filter(p => p.event_id === selectedEventId);
   const sent = eventParticipants.filter(p => p.email_status === 'sent').length;
-  const [sending, setSending] = useState(false);
 
   const handleSendAll = () => {
     setSending(true);

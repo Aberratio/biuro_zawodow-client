@@ -3,9 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Building2 } from 'lucide-react';
+import TableSkeleton from '@/components/skeletons/TableSkeleton';
 
 export default function Organizations() {
-  const { organizations, events, users } = useMockData();
+  const { organizations, events, users, isLoading } = useMockData();
+
+  if (isLoading) return <TableSkeleton rows={4} cols={2} subtitle="" />;
 
   return (
     <div className="space-y-6">

@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Trash2, Info } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { Role } from '@/types';
+import TableSkeleton from '@/components/skeletons/TableSkeleton';
 
 const roleLabels: Record<Role, string> = { superadmin: 'Superadmin', admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
 const roleDescriptions: Record<Role, string> = {
@@ -21,10 +22,12 @@ const roleDescriptions: Record<Role, string> = {
 };
 
 export default function UserManagement() {
-  const { users, addUser, removeUser, changeRole, currentRole, currentUser } = useMockData();
+  const { users, addUser, removeUser, changeRole, currentRole, currentUser, isLoading } = useMockData();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', password: 'demo123', role: 'scanner' as Role });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  if (isLoading) return <TableSkeleton rows={5} cols={3} subtitle="" />;
 
   const visibleUsers = (() => {
     if (currentRole === 'superadmin') return users;

@@ -29,6 +29,7 @@ interface MockDataContextType {
   visibleEvents: Event[];
   canAccessEvent: (eventId: string) => boolean;
   isUsingApi: boolean;
+  isLoading: boolean;
 }
 
 const MockDataContext = createContext<MockDataContextType | null>(null);
@@ -105,6 +106,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const [activityLog, setActivityLog] = useState<ActivityLog[]>(mockActivityLog);
   const [selectedEventId, setSelectedEventId] = useState<string>('evt-1');
   const [isUsingApi, setIsUsingApi] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadBootstrap = async () => {
@@ -136,10 +138,12 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
       setActivityLog(Array.isArray(data.activityLog) ? data.activityLog : mockActivityLog);
       setSelectedEventId(nextSelectedEvent);
       setIsUsingApi(true);
+      setIsLoading(false);
     };
 
     void loadBootstrap().catch(() => {
       setIsUsingApi(false);
+      setIsLoading(false);
     });
   }, []);
 
@@ -345,6 +349,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
       visibleEvents,
       canAccessEvent,
       isUsingApi,
+      isLoading,
     }}>
       {children}
     </MockDataContext.Provider>
