@@ -17,8 +17,6 @@ export default function CsvImport() {
   const [importing, setImporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
-  if (isLoading) return <TableSkeleton rows={5} cols={3} subtitle="" />;
-
   const existingEmails = new Set(participants.filter(p => p.event_id === selectedEventId).map(p => p.email));
 
   const loadDemo = useCallback(() => {
@@ -36,6 +34,8 @@ export default function CsvImport() {
     loadDemo();
     toast({ title: 'Plik załadowany (demo)', description: 'Użyto danych demonstracyjnych' });
   }, [loadDemo]);
+
+  if (isLoading) return <TableSkeleton rows={5} cols={3} subtitle="" />;
 
   const handleImport = () => {
     setImporting(true);
