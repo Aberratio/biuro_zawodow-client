@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Users, CheckCircle, Package, ScanLine, MapPin, Calendar, ArrowLeft } from 'lucide-react';
+import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
 
 export default function EventDetails() {
   const { id } = useParams<{ id: string }>();
