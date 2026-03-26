@@ -143,14 +143,12 @@ export default function Dashboard() {
 function StatCard({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: number }) {
   return (
     <Card>
-      <CardContent className="flex items-center gap-3 sm:gap-4 pt-4 sm:pt-6 pb-4 sm:pb-6 px-3 sm:px-6">
+      <CardContent className="flex flex-col items-center gap-1 pt-4 sm:pt-6 pb-4 sm:pb-6 px-2 sm:px-6">
         <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
           <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
         </div>
-        <div className="min-w-0">
-          <p className="text-lg sm:text-2xl font-bold tabular-nums">{value}</p>
-          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{label}</p>
-        </div>
+        <p className="text-lg sm:text-2xl font-bold tabular-nums">{value}</p>
+        <p className="text-[10px] sm:text-xs text-muted-foreground text-center leading-tight">{label}</p>
       </CardContent>
     </Card>
   );
