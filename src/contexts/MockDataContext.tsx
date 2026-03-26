@@ -349,6 +349,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
       visibleEvents,
       canAccessEvent,
       isUsingApi,
+      isLoading,
     }}>
       {children}
     </MockDataContext.Provider>
