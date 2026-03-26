@@ -19,25 +19,21 @@ type ScannerView = 'idle' | 'success' | 'error' | 'detail';
 export default function Scanner() {
   const { participants, selectedEventId, checkIn, undoCheckIn, collectPackage, currentRole, isLoading } = useMockData();
 
-  if (isLoading) return <ScannerSkeleton />;
-
-  const eventParticipants = participants.filter(p => p.event_id === selectedEventId);
-
   const [view, setView] = useState<ScannerView>('idle');
   const [scannedParticipant, setScannedParticipant] = useState<Participant | null>(null);
   const [recentScans, setRecentScans] = useState<Participant[]>([]);
   const [autoCheckIn, setAutoCheckIn] = useState(true);
   const [showRecent, setShowRecent] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
-
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingParticipant, setPendingParticipant] = useState<Participant | null>(null);
-
   const [undoOpen, setUndoOpen] = useState(false);
   const [undoTarget, setUndoTarget] = useState<Participant | null>(null);
-
   const successTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const eventParticipants = participants.filter(p => p.event_id === selectedEventId);
   const canToggleAuto = currentRole !== 'scanner';
+  const checkedIn = eventParticipants.filter(p => p.status === 'checked_in').length;
 
   const checkedIn = eventParticipants.filter(p => p.status === 'checked_in').length;
 
