@@ -35,8 +35,6 @@ export default function Scanner() {
   const canToggleAuto = currentRole !== 'scanner';
   const checkedIn = eventParticipants.filter(p => p.status === 'checked_in').length;
 
-  const checkedIn = eventParticipants.filter(p => p.status === 'checked_in').length;
-
   useEffect(() => () => {
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
   }, []);
