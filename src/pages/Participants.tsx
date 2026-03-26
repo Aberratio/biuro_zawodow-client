@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
+import TableSkeleton from '@/components/skeletons/TableSkeleton';
 
 export default function Participants() {
   const { participants, selectedEventId } = useMockData();
