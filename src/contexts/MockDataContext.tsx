@@ -138,10 +138,12 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
       setActivityLog(Array.isArray(data.activityLog) ? data.activityLog : mockActivityLog);
       setSelectedEventId(nextSelectedEvent);
       setIsUsingApi(true);
+      setIsLoading(false);
     };
 
     void loadBootstrap().catch(() => {
       setIsUsingApi(false);
+      setIsLoading(false);
     });
   }, []);
 
