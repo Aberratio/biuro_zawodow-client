@@ -9,7 +9,9 @@ import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
 export default function EventDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { events, participants, setSelectedEventId } = useMockData();
+  const { events, participants, setSelectedEventId, isLoading } = useMockData();
+
+  if (isLoading) return <DetailSkeleton />;
   const event = events.find(e => e.id === id);
   const ep = participants.filter(p => p.event_id === id);
   const checkedIn = ep.filter(p => p.status === 'checked_in').length;

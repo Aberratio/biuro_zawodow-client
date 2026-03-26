@@ -10,8 +10,10 @@ import { Search } from 'lucide-react';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 
 export default function Participants() {
-  const { participants, selectedEventId } = useMockData();
+  const { participants, selectedEventId, isLoading } = useMockData();
   const navigate = useNavigate();
+
+  if (isLoading) return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [packageFilter, setPackageFilter] = useState('all');

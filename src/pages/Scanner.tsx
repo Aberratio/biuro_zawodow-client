@@ -17,7 +17,10 @@ import {
 type ScannerView = 'idle' | 'success' | 'error' | 'detail';
 
 export default function Scanner() {
-  const { participants, selectedEventId, checkIn, undoCheckIn, collectPackage, currentRole } = useMockData();
+  const { participants, selectedEventId, checkIn, undoCheckIn, collectPackage, currentRole, isLoading } = useMockData();
+
+  if (isLoading) return <ScannerSkeleton />;
+
   const eventParticipants = participants.filter(p => p.event_id === selectedEventId);
 
   const [view, setView] = useState<ScannerView>('idle');
