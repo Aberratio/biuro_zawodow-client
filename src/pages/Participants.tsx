@@ -28,6 +28,8 @@ export default function Participants() {
       .filter(p => packageFilter === 'all' || p.package_status === packageFilter);
   }, [participants, selectedEventId, search, statusFilter, packageFilter]);
 
+  if (isLoading) return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
+
   return (
     <div className="space-y-4">
       <div>
