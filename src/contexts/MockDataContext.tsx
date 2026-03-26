@@ -106,6 +106,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const [activityLog, setActivityLog] = useState<ActivityLog[]>(mockActivityLog);
   const [selectedEventId, setSelectedEventId] = useState<string>('evt-1');
   const [isUsingApi, setIsUsingApi] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadBootstrap = async () => {
