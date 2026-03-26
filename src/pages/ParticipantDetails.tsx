@@ -14,7 +14,9 @@ import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
 export default function ParticipantDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { participants, currentRole, checkIn, collectPackage, updateParticipant } = useMockData();
+  const { participants, currentRole, checkIn, collectPackage, updateParticipant, isLoading } = useMockData();
+
+  if (isLoading) return <DetailSkeleton />;
   const participant = participants.find(p => p.id === id);
   const [editing, setEditing] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);

@@ -10,8 +10,10 @@ import { Plus, MapPin, Calendar } from 'lucide-react';
 import EventsSkeleton from '@/components/skeletons/EventsSkeleton';
 
 export default function Events() {
-  const { visibleEvents, participants, createEvent, currentUser } = useMockData();
+  const { visibleEvents, participants, createEvent, currentUser, isLoading } = useMockData();
   const navigate = useNavigate();
+
+  if (isLoading) return <EventsSkeleton />;
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: '', date: '', location: '' });
 
