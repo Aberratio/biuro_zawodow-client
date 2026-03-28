@@ -1,23 +1,56 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { User } from '@/types';
-import { mockUsers } from '@/data/mockData';
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => boolean;
+  isAuthLoading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  getAuthHeaders: (includeJsonContentType?: boolean) => Record<string, string>;
+  clearSession: () => void;
+}
+
+interface AuthMeResponse {
+  data?: Omit<User, 'password'> & { password?: string };
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080').replace(/\/+$/, '');
+const AUTH_USER_KEY = 'auth_user';
+const AUTH_TOKEN_KEY = 'auth_token';
+
+function normalizeUser(user: (Omit<User, 'password'> & { password?: string }) | null | undefined): User | null {
+  if (!user?.id || !user.email || !user.role || !user.name) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    password: '',
+    role: user.role,
+    organization_id: user.organization_id ?? undefined,
+    organization_ids: Array.isArray(user.organization_ids) ? user.organization_ids : [],
+    assigned_events: Array.isArray(user.assigned_events) ? user.assigned_events : [],
+  };
+}
 
 function loadUser(): User | null {
   try {
-    const stored = sessionStorage.getItem('auth_user');
+    const stored = sessionStorage.getItem(AUTH_USER_KEY);
     if (!stored) return null;
-    const parsed = JSON.parse(stored);
-    // Re-validate against mock users to ensure consistency
-    return mockUsers.find(u => u.id === parsed.id) || null;
+    return normalizeUser(JSON.parse(stored) as User);
+  } catch {
+    return null;
+  }
+}
+
+function loadToken(): string | null {
+  try {
+    return sessionStorage.getItem(AUTH_TOKEN_KEY);
   } catch {
     return null;
   }
@@ -25,22 +58,123 @@ function loadUser(): User | null {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(loadUser);
+  const [token, setToken] = useState<string | null>(loadToken);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  const login = useCallback((email: string, password: string): boolean => {
-    const found = mockUsers.find(u => u.email === email && u.password === password);
-    if (!found) return false;
-    setUser(found);
-    sessionStorage.setItem('auth_user', JSON.stringify(found));
-    return true;
+  const clearSession = useCallback(() => {
+    setUser(null);
+    setToken(null);
+    sessionStorage.removeItem(AUTH_USER_KEY);
+    sessionStorage.removeItem(AUTH_TOKEN_KEY);
   }, []);
+
+  const persistSession = useCallback((nextUser: User, nextToken: string) => {
+    setUser(nextUser);
+    setToken(nextToken);
+    sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
+    sessionStorage.setItem(AUTH_TOKEN_KEY, nextToken);
+  }, []);
+
+  const getAuthHeaders = useCallback((includeJsonContentType = false) => {
+    const headers: Record<string, string> = {};
+    if (includeJsonContentType) {
+      headers['Content-Type'] = 'application/json';
+    }
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    return headers;
+  }, [token]);
+
+  useEffect(() => {
+    const validateStoredSession = async () => {
+      const storedToken = loadToken();
+      if (!storedToken) {
+        clearSession();
+        setIsAuthLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${storedToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          clearSession();
+          setIsAuthLoading(false);
+          return;
+        }
+
+        const payload = await response.json() as AuthMeResponse;
+        const nextUser = normalizeUser(payload.data);
+        if (!nextUser) {
+          clearSession();
+          setIsAuthLoading(false);
+          return;
+        }
+
+        persistSession(nextUser, storedToken);
+      } catch {
+        clearSession();
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+
+    void validateStoredSession();
+  }, [clearSession, persistSession]);
+
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        clearSession();
+        return false;
+      }
+
+      const payload = await response.json() as {
+        access_token?: string;
+        user?: Omit<User, 'password'> & { password?: string };
+      };
+      const nextUser = normalizeUser(payload.user);
+
+      if (!payload.access_token || !nextUser) {
+        clearSession();
+        return false;
+      }
+
+      persistSession(nextUser, payload.access_token);
+      return true;
+    } catch {
+      clearSession();
+      return false;
+    }
+  }, [clearSession, persistSession]);
 
   const logout = useCallback(() => {
-    setUser(null);
-    sessionStorage.removeItem('auth_user');
-  }, []);
+    clearSession();
+  }, [clearSession]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      token,
+      isAuthenticated: !!token && !!user,
+      isAuthLoading,
+      login,
+      logout,
+      getAuthHeaders,
+      clearSession,
+    }}>
       {children}
     </AuthContext.Provider>
   );

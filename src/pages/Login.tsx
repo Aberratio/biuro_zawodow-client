@@ -23,16 +23,19 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [demoOpen, setDemoOpen] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const ok = login(email, password);
+    const ok = await login(email, password);
     if (!ok) {
       toast({ title: 'Błąd logowania', description: 'Nieprawidłowy email lub hasło', variant: 'destructive' });
     }
   };
 
-  const quickLogin = (email: string, password: string) => {
-    login(email, password);
+  const quickLogin = async (email: string, password: string) => {
+    const ok = await login(email, password);
+    if (!ok) {
+      toast({ title: 'BĹ‚Ä…d logowania', description: 'NieprawidĹ‚owy email lub hasĹ‚o', variant: 'destructive' });
+    }
   };
 
   return (

@@ -1,23 +1,23 @@
 import { Event, Participant, User, ActivityLog, Organization } from '@/types';
 
 export const mockOrganizations: Organization[] = [
-  { id: 'org-1', name: 'SportEvents Pro' },
-  { id: 'org-2', name: 'RunPoland' },
+  { id: 'org-1', name: 'SportEvents Pro', event_limit: 4, admin_user_id: 'u-1', admin_user_name: 'Admin SportEvents' },
+  { id: 'org-2', name: 'RunPoland', event_limit: 2, admin_user_id: 'u-1b', admin_user_name: 'Admin RunPoland' },
 ];
 
 export const mockEvents: Event[] = [
   { id: 'evt-1', name: 'Bieg Piastowski 10km', date: '2026-04-12', location: 'Gniezno, Park Miejski', organization_id: 'org-1' },
-  { id: 'evt-2', name: 'Triathlon Poznań Sprint', date: '2026-05-18', location: 'Poznań, Malta', organization_id: 'org-1' },
-  { id: 'evt-3', name: 'Maraton Wrocław', date: '2026-06-07', location: 'Wrocław, Hala Stulecia', organization_id: 'org-2' },
+  { id: 'evt-2', name: 'Triathlon Poznan Sprint', date: '2026-05-18', location: 'Poznan, Malta', organization_id: 'org-1' },
+  { id: 'evt-3', name: 'Maraton Wroclaw', date: '2026-06-07', location: 'Wroclaw, Hala Stulecia', organization_id: 'org-2' },
 ];
 
 const names = [
-  'Jan Kowalski', 'Anna Nowak', 'Piotr Wiśniewski', 'Maria Wójcik', 'Tomasz Kamiński',
-  'Katarzyna Lewandowska', 'Andrzej Zieliński', 'Małgorzata Szymańska', 'Krzysztof Woźniak', 'Agnieszka Dąbrowska',
-  'Michał Kozłowski', 'Joanna Jankowska', 'Marcin Mazur', 'Barbara Krawczyk', 'Paweł Piotrowski',
-  'Monika Grabowska', 'Łukasz Nowakowski', 'Ewa Pawłowska', 'Adam Michalski', 'Dorota Adamczyk',
-  'Robert Król', 'Magdalena Wieczorek', 'Jakub Jabłoński', 'Aleksandra Majewska', 'Damian Olszewski',
-  'Natalia Stępień', 'Grzegorz Malinowski', 'Karolina Jaworska', 'Rafał Dudek', 'Sylwia Urbańska',
+  'Jan Kowalski', 'Anna Nowak', 'Piotr Wisniewski', 'Maria Wojcik', 'Tomasz Kaminski',
+  'Katarzyna Lewandowska', 'Andrzej Zielinski', 'Malgorzata Szymanska', 'Krzysztof Wozniak', 'Agnieszka Dabrowska',
+  'Michal Kozlowski', 'Joanna Jankowska', 'Marcin Mazur', 'Barbara Krawczyk', 'Pawel Piotrowski',
+  'Monika Grabowska', 'Lukasz Nowakowski', 'Ewa Pawlowska', 'Adam Michalski', 'Dorota Adamczyk',
+  'Robert Krol', 'Magdalena Wieczorek', 'Jakub Jablonski', 'Aleksandra Majewska', 'Damian Olszewski',
+  'Natalia Stepien', 'Grzegorz Malinowski', 'Karolina Jaworska', 'Rafal Dudek', 'Sylwia Urbanska',
 ];
 
 function generateParticipants(eventId: string, count: number, startBib: number): Participant[] {
@@ -25,7 +25,8 @@ function generateParticipants(eventId: string, count: number, startBib: number):
   return shuffled.map((name, i) => {
     const status = i < Math.floor(count * 0.4) ? 'checked_in' as const : 'pending' as const;
     const packageStatus = status === 'checked_in' && i < Math.floor(count * 0.25) ? 'collected' as const : 'not_collected' as const;
-    const emailPart = name.toLowerCase().replace(/\s/g, '.').replace(/ł/g, 'l').replace(/ś/g, 's').replace(/ó/g, 'o').replace(/ż/g, 'z').replace(/ź/g, 'z').replace(/ą/g, 'a').replace(/ę/g, 'e').replace(/ń/g, 'n').replace(/ć/g, 'c');
+    const emailPart = name.toLowerCase().replace(/\s/g, '.');
+
     return {
       id: `p-${eventId}-${i + 1}`,
       event_id: eventId,
@@ -49,10 +50,10 @@ export const mockParticipants: Participant[] = [
 
 export const mockUsers: User[] = [
   { id: 'u-0', name: 'Super Admin', email: 'super@biurozawodow.pl', password: 'demo123', role: 'superadmin', assigned_events: [] },
-  { id: 'u-1', name: 'Admin SportEvents', email: 'admin@sportevents.pl', password: 'demo123', role: 'admin', organization_id: 'org-1', assigned_events: [] },
-  { id: 'u-1b', name: 'Admin RunPoland', email: 'admin@runpoland.pl', password: 'demo123', role: 'admin', organization_id: 'org-2', assigned_events: [] },
-  { id: 'u-2', name: 'Organizator Gniezno', email: 'org.gniezno@sportevents.pl', password: 'demo123', role: 'editor', organization_id: 'org-1', assigned_events: ['evt-1'] },
-  { id: 'u-3', name: 'Organizator Poznań', email: 'org.poznan@sportevents.pl', password: 'demo123', role: 'editor', organization_id: 'org-1', assigned_events: ['evt-2'] },
+  { id: 'u-1', name: 'Admin SportEvents', email: 'admin@sportevents.pl', password: 'demo123', role: 'admin', organization_ids: ['org-1'], assigned_events: [] },
+  { id: 'u-1b', name: 'Admin RunPoland', email: 'admin@runpoland.pl', password: 'demo123', role: 'admin', organization_ids: ['org-2'], assigned_events: [] },
+  { id: 'u-2', name: 'Organizator Gniezno', email: 'org.gniezno@sportevents.pl', password: 'demo123', role: 'editor', organization_id: 'org-1', assigned_events: [] },
+  { id: 'u-3', name: 'Organizator Poznan', email: 'org.poznan@sportevents.pl', password: 'demo123', role: 'editor', organization_id: 'org-1', assigned_events: [] },
   { id: 'u-4', name: 'Wolontariusz Skaner 1', email: 'skaner1@sportevents.pl', password: 'demo123', role: 'scanner', organization_id: 'org-1', assigned_events: ['evt-1'] },
   { id: 'u-5', name: 'Wolontariusz Skaner 2', email: 'skaner2@sportevents.pl', password: 'demo123', role: 'scanner', organization_id: 'org-1', assigned_events: ['evt-2'] },
 ];
@@ -61,8 +62,8 @@ export const mockActivityLog: ActivityLog[] = [
   { id: 'log-1', timestamp: new Date(Date.now() - 120000).toISOString(), action: 'Check-in', participant_name: 'Jan Kowalski', user_name: 'Wolontariusz Skaner 1' },
   { id: 'log-2', timestamp: new Date(Date.now() - 300000).toISOString(), action: 'Wydano pakiet', participant_name: 'Anna Nowak', user_name: 'Organizator Gniezno' },
   { id: 'log-3', timestamp: new Date(Date.now() - 600000).toISOString(), action: 'Import CSV', participant_name: undefined, user_name: 'Admin SportEvents' },
-  { id: 'log-4', timestamp: new Date(Date.now() - 900000).toISOString(), action: 'Check-in', participant_name: 'Piotr Wiśniewski', user_name: 'Wolontariusz Skaner 2' },
-  { id: 'log-5', timestamp: new Date(Date.now() - 1800000).toISOString(), action: 'Wysłano QR', participant_name: 'Maria Wójcik', user_name: 'Super Admin' },
+  { id: 'log-4', timestamp: new Date(Date.now() - 900000).toISOString(), action: 'Check-in', participant_name: 'Piotr Wisniewski', user_name: 'Wolontariusz Skaner 2' },
+  { id: 'log-5', timestamp: new Date(Date.now() - 1800000).toISOString(), action: 'Wyslano QR', participant_name: 'Maria Wojcik', user_name: 'Super Admin' },
 ];
 
 export const demoCsvData = [

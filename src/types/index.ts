@@ -8,6 +8,9 @@ export interface Organization {
   id: string;
   name: string;
   logo?: string;
+  event_limit: number;
+  admin_user_id?: string;
+  admin_user_name?: string;
 }
 
 export interface Event {
@@ -29,6 +32,18 @@ export interface Participant {
   package_status: PackageStatus;
   email_status: EmailStatus;
   checked_in_at?: string;
+  custom_fields?: Record<string, string>;
+}
+
+export type ParticipantFieldRole = 'email' | 'display_name_part' | 'bib_number' | 'custom';
+
+export interface ParticipantFieldMapping {
+  source_column_name: string;
+  alias: string;
+  field_role: ParticipantFieldRole;
+  display_order: number;
+  is_required: boolean;
+  is_active: boolean;
 }
 
 export interface User {
@@ -38,6 +53,7 @@ export interface User {
   password: string;
   role: Role;
   organization_id?: string;
+  organization_ids?: string[];
   assigned_events: string[];
 }
 

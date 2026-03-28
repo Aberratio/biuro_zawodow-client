@@ -8,7 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const roleLabels: Record<string, string> = { superadmin: 'Superadmin', admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { currentRole, currentUser, selectedEventId, setSelectedEventId, visibleEvents } = useMockData();
+  const { currentRole, currentUser, organizations, selectedEventId, setSelectedEventId, visibleEvents } = useMockData();
+  const currentOrganization = organizations.find(org => org.id === currentUser.organization_id)
+    ?? organizations.find(org => (currentUser.organization_ids ?? []).includes(org.id));
+  const organizationLabel = currentRole === 'admin'
+    ? `${(currentUser.organization_ids ?? []).length} organizacji`
+    : (currentOrganization?.name ?? currentUser.organization_id);
 
   return (
     <SidebarProvider>
@@ -30,9 +35,9 @@ export function Layout({ children }: { children: ReactNode }) {
               </Select>
             </div>
             <div className="hidden md:flex items-center gap-2">
-              {currentUser.organization_id && (
+              {(currentUser.organization_id || currentRole === 'admin') && (
                 <Badge variant="outline" className="text-[10px]">
-                  {currentUser.organization_id === 'org-1' ? 'SportEvents Pro' : 'RunPoland'}
+                  {organizationLabel}
                 </Badge>
               )}
               <Badge variant="secondary" className="text-xs uppercase tracking-wider">
