@@ -13,6 +13,8 @@ import { Loader2, Search, UserPlus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { ParticipantFieldMapping } from '@/types';
+import { buildEmptyParticipantFieldValues, getActiveParticipantMappings } from '@/lib/participant-fields';
+import { getParticipantStatusDefinition, PARTICIPANT_STATUS_DEFINITIONS } from '@/lib/participant-status';
 
 export default function Participants() {
   const {
@@ -25,7 +27,6 @@ export default function Participants() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [packageFilter, setPackageFilter] = useState('all');
   const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualEmail, setManualEmail] = useState('');
@@ -46,9 +47,8 @@ export default function Participants() {
           || participant.email.toLowerCase().includes(query)
           || participant.bib_number.includes(query);
       })
-      .filter(participant => statusFilter === 'all' || participant.status === statusFilter)
-      .filter(participant => packageFilter === 'all' || participant.package_status === packageFilter);
-  }, [eventParticipants, packageFilter, search, statusFilter]);
+      .filter(participant => statusFilter === 'all' || participant.status === statusFilter);
+  }, [eventParticipants, search, statusFilter]);
 
   useEffect(() => {
     if (!selectedEventId) {
@@ -60,14 +60,7 @@ export default function Participants() {
     void getParticipantFieldMappings(selectedEventId)
       .then(data => {
         setMappings(data);
-        setManualFields(
-          data
-            .filter(mapping => mapping.is_active && mapping.field_role !== 'email')
-            .reduce<Record<string, string>>((acc, mapping) => {
-              acc[mapping.alias] = '';
-              return acc;
-            }, {})
-        );
+        setManualFields(buildEmptyParticipantFieldValues(data));
       })
       .catch(() => {
         setMappings([]);
@@ -75,10 +68,7 @@ export default function Participants() {
       });
   }, [getParticipantFieldMappings, selectedEventId]);
 
-  const activeMappings = useMemo(
-    () => mappings.filter(mapping => mapping.is_active && mapping.field_role !== 'email'),
-    [mappings]
-  );
+  const activeMappings = useMemo(() => getActiveParticipantMappings(mappings), [mappings]);
   const canAddManually = eventParticipants.length > 0 && mappings.length > 0;
 
   const handleManualFieldChange = (alias: string, value: string) => {
@@ -92,7 +82,7 @@ export default function Participants() {
 
     if (!result.ok) {
       toast({
-        title: 'Nie udało się dodać uczestnika',
+        title: 'Nie udalo sie dodac uczestnika',
         description: result.error,
         variant: 'destructive',
       });
@@ -101,11 +91,8 @@ export default function Participants() {
 
     setManualOpen(false);
     setManualEmail('');
-    setManualFields(prev => Object.keys(prev).reduce<Record<string, string>>((acc, key) => {
-      acc[key] = '';
-      return acc;
-    }, {}));
-    toast({ title: 'Dodano uczestnika ręcznie' });
+    setManualFields(buildEmptyParticipantFieldValues(mappings));
+    toast({ title: 'Dodano uczestnika recznie' });
   };
 
   if (isLoading) return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
@@ -116,12 +103,12 @@ export default function Participants() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Uczestnicy</h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Lista uczestników wybranego wydarzenia. Kliknij wiersz, aby zobaczyć szczegóły.
+            Lista uczestnikow wybranego wydarzenia. Kliknij wiersz, aby zobaczyc szczegoly.
           </p>
         </div>
         {canAddManually && (
           <Button onClick={() => setManualOpen(true)} className="h-11 sm:h-10">
-            <UserPlus className="h-4 w-4 mr-1" /> Dodaj ręcznie
+            <UserPlus className="h-4 w-4 mr-1" /> Dodaj recznie
           </Button>
         )}
       </div>
@@ -138,19 +125,12 @@ export default function Participants() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[160px] h-10"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[220px] h-10"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Wszystkie statusy</SelectItem>
-              <SelectItem value="pending">Oczekuje</SelectItem>
-              <SelectItem value="checked_in">Odprawiony</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={packageFilter} onValueChange={setPackageFilter}>
-            <SelectTrigger className="w-full sm:w-[160px] h-10"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Wszystkie pakiety</SelectItem>
-              <SelectItem value="not_collected">Nie wydany</SelectItem>
-              <SelectItem value="collected">Wydany</SelectItem>
+              {PARTICIPANT_STATUS_DEFINITIONS.map(status => (
+                <SelectItem key={status.code} value={status.code}>{status.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -159,8 +139,8 @@ export default function Participants() {
       {filtered.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-8 text-center">
-            <p className="text-sm font-medium text-muted-foreground">Brak uczestników spełniających kryteria</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">Spróbuj zmienić filtry lub wyszukaj inną frazę.</p>
+            <p className="text-sm font-medium text-muted-foreground">Brak uczestnikow spelniajacych kryteria</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Sprobuj zmienic filtry lub wyszukaj inna fraze.</p>
           </CardContent>
         </Card>
       ) : (
@@ -168,55 +148,48 @@ export default function Participants() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Imię i nazwisko</TableHead>
+                <TableHead>Imie i nazwisko</TableHead>
                 <TableHead className="hidden md:table-cell">Email</TableHead>
                 <TableHead>Numer</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="hidden sm:table-cell">Pakiet</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(participant => (
-                <TableRow
-                  key={participant.id}
-                  className="cursor-pointer active:bg-accent/50"
-                  onClick={() => navigate(`/participants/${participant.id}`)}
-                >
-                  <TableCell>
-                    <div>
-                      <span className="font-medium text-sm">{participant.name}</span>
-                      <span className="block md:hidden text-xs text-muted-foreground truncate">{participant.email}</span>
-                      <span className="block sm:hidden mt-0.5">
-                        <Badge variant={participant.package_status === 'collected' ? 'default' : 'outline'} className="text-[9px]">
-                          {participant.package_status === 'collected' ? 'Pakiet ✓' : 'Pakiet ○'}
-                        </Badge>
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground text-sm">{participant.email}</TableCell>
-                  <TableCell className="tabular-nums text-sm">#{participant.bib_number}</TableCell>
-                  <TableCell>
-                    <Badge variant={participant.status === 'checked_in' ? 'default' : 'secondary'} className="text-[10px]">
-                      {participant.status === 'checked_in' ? 'Odprawiony' : 'Oczekuje'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <Badge variant={participant.package_status === 'collected' ? 'default' : 'outline'} className="text-[10px]">
-                      {participant.package_status === 'collected' ? 'Wydany' : 'Nie wydany'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filtered.map(participant => {
+                const status = getParticipantStatusDefinition(participant.status);
+
+                return (
+                  <TableRow
+                    key={participant.id}
+                    className="cursor-pointer active:bg-accent/50"
+                    onClick={() => navigate(`/participants/${participant.id}`)}
+                  >
+                    <TableCell>
+                      <div>
+                        <span className="font-medium text-sm">{participant.name}</span>
+                        <span className="block md:hidden text-xs text-muted-foreground truncate">{participant.email}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground text-sm">{participant.email}</TableCell>
+                    <TableCell className="tabular-nums text-sm">#{participant.bib_number}</TableCell>
+                    <TableCell>
+                      <Badge variant={status.badgeVariant} className="text-[10px]">
+                        {status.label}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">{filtered.length} uczestników</p>
+      <p className="text-xs text-muted-foreground">{filtered.length} uczestnikow</p>
 
       <Dialog open={manualOpen} onOpenChange={setManualOpen}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[calc(100vh-2rem)] overflow-hidden p-0 flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-            <DialogTitle>Dodaj uczestnika ręcznie</DialogTitle>
+            <DialogTitle>Dodaj uczestnika recznie</DialogTitle>
           </DialogHeader>
           <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4 space-y-4">
             <div>

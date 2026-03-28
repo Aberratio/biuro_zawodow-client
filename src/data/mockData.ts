@@ -6,9 +6,9 @@ export const mockOrganizations: Organization[] = [
 ];
 
 export const mockEvents: Event[] = [
-  { id: 'evt-1', name: 'Bieg Piastowski 10km', date: '2026-04-12', location: 'Gniezno, Park Miejski', organization_id: 'org-1' },
-  { id: 'evt-2', name: 'Triathlon Poznan Sprint', date: '2026-05-18', location: 'Poznan, Malta', organization_id: 'org-1' },
-  { id: 'evt-3', name: 'Maraton Wroclaw', date: '2026-06-07', location: 'Wroclaw, Hala Stulecia', organization_id: 'org-2' },
+  { id: 'evt-1', name: 'Bieg Piastowski 10km', date: '2026-04-12', location: 'Gniezno, Park Miejski', organization_id: 'org-1', office_open_at: '2026-03-28T07:00:00', office_close_at: '2026-03-28T18:00:00' },
+  { id: 'evt-2', name: 'Triathlon Poznan Sprint', date: '2026-05-18', location: 'Poznan, Malta', organization_id: 'org-1', office_open_at: '2026-05-18T06:30:00', office_close_at: '2026-05-18T14:30:00' },
+  { id: 'evt-3', name: 'Maraton Wroclaw', date: '2026-06-07', location: 'Wroclaw, Hala Stulecia', organization_id: 'org-2', office_open_at: '2026-06-07T05:30:00', office_close_at: '2026-06-07T16:00:00' },
 ];
 
 const names = [
@@ -23,8 +23,11 @@ const names = [
 function generateParticipants(eventId: string, count: number, startBib: number): Participant[] {
   const shuffled = [...names].sort(() => Math.random() - 0.5).slice(0, count);
   return shuffled.map((name, i) => {
-    const status = i < Math.floor(count * 0.4) ? 'checked_in' as const : 'pending' as const;
-    const packageStatus = status === 'checked_in' && i < Math.floor(count * 0.25) ? 'collected' as const : 'not_collected' as const;
+    const status = i < Math.floor(count * 0.2)
+      ? 'checked_in_not_starting' as const
+      : i < Math.floor(count * 0.4)
+        ? 'checked_in' as const
+        : 'not_checked_in' as const;
     const emailPart = name.toLowerCase().replace(/\s/g, '.');
 
     return {
@@ -35,9 +38,8 @@ function generateParticipants(eventId: string, count: number, startBib: number):
       bib_number: String(startBib + i),
       qr_code: `QR-${eventId}-${startBib + i}`,
       status,
-      package_status: packageStatus,
       email_status: i < Math.floor(count * 0.7) ? 'sent' as const : 'not_sent' as const,
-      checked_in_at: status === 'checked_in' ? new Date(Date.now() - Math.random() * 3600000).toISOString() : undefined,
+      checked_in_at: status === 'not_checked_in' ? undefined : new Date(Date.now() - Math.random() * 3600000).toISOString(),
     };
   });
 }

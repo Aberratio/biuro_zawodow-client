@@ -1,7 +1,6 @@
 export type Role = 'superadmin' | 'admin' | 'editor' | 'scanner';
 
-export type ParticipantStatus = 'pending' | 'checked_in';
-export type PackageStatus = 'not_collected' | 'collected';
+export type ParticipantStatus = 'not_checked_in' | 'checked_in' | 'checked_in_not_starting';
 export type EmailStatus = 'not_sent' | 'sent';
 
 export interface Organization {
@@ -19,6 +18,8 @@ export interface Event {
   date: string;
   location: string;
   organization_id: string;
+  office_open_at: string;
+  office_close_at: string;
 }
 
 export interface Participant {
@@ -29,7 +30,6 @@ export interface Participant {
   bib_number: string;
   qr_code: string;
   status: ParticipantStatus;
-  package_status: PackageStatus;
   email_status: EmailStatus;
   checked_in_at?: string;
   custom_fields?: Record<string, string>;

@@ -1,6 +1,8 @@
 ﻿import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityLog, Event, Organization, Participant, ParticipantFieldMapping, ParticipantFieldRole, ParticipantQrPreview, ParticipantScanResult, Role, User } from '@/types';
+import { ActivityLog, Event, Organization, Participant, ParticipantFieldMapping, ParticipantFieldRole, ParticipantQrPreview, ParticipantScanResult, ParticipantStatus, Role, User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { isEventOfficeOpen } from '@/lib/events';
+import { normalizeParticipantStatus } from '@/lib/participant-status';
 
 type UserCreateInput = Omit<User, 'id' | 'password'>;
 interface MutationResult { ok: boolean; error?: string; }
@@ -9,10 +11,11 @@ interface ParticipantImportAnalysis { headers: string[]; sample_rows: Record<str
 interface ParticipantImportMappingFieldInput { source_column_name: string; alias: string; field_role: Exclude<ParticipantFieldRole, 'email'>; is_active: boolean; }
 interface ParticipantImportMappingPayload { csv_columns: string[]; email_column: string; fields: ParticipantImportMappingFieldInput[]; }
 interface ParticipantImportRunResult { created_count: number; duplicate_count: number; invalid_count: number; invalid_rows: number[]; participants: Participant[]; }
+interface ParticipantUpdatePayload { status?: ParticipantStatus; email?: string; field_values?: Record<string, string>; }
 interface MockDataContextType {
   organizations: Organization[]; events: Event[]; participants: Participant[]; users: User[]; activityLog: ActivityLog[]; currentRole: Role; currentUser: User; selectedEventId: string; setSelectedEventId: (id: string) => void;
-  checkIn: (participantId: string) => Promise<MutationResult>; undoCheckIn: (participantId: string) => Promise<MutationResult>; collectPackage: (participantId: string) => Promise<MutationResult>;
-  addParticipant: (p: Omit<Participant, 'id' | 'qr_code' | 'status' | 'package_status' | 'email_status'>) => void; updateParticipant: (id: string, data: Partial<Participant>) => void; importParticipants: (data: { name: string; email: string }[], eventId: string) => number;
+  updateParticipantStatus: (participantId: string, status: ParticipantStatus) => Promise<MutationResult>; reassignParticipantPackage: (participantId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
+  addParticipant: (p: Omit<Participant, 'id' | 'qr_code' | 'status' | 'email_status'>) => void; updateParticipant: (id: string, data: Partial<Participant>) => void; importParticipants: (data: { name: string; email: string }[], eventId: string) => number;
   analyzeParticipantImport: (eventId: string, csvContent: string) => Promise<ParticipantImportAnalysis>; confirmParticipantImportMapping: (eventId: string, payload: ParticipantImportMappingPayload) => Promise<ParticipantFieldMapping[]>; runParticipantImport: (eventId: string, csvContent: string) => Promise<ParticipantImportRunResult>; getParticipantFieldMappings: (eventId: string) => Promise<ParticipantFieldMapping[]>; addParticipantManually: (eventId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
   createEvent: (e: Omit<Event, 'id'>) => Promise<MutationResult>; addUser: (u: UserCreateInput) => Promise<MutationResult>; createOrganization: (data: { name: string; event_limit: number; admin_user_id?: string }) => Promise<MutationResult>; updateOrganizationEventLimit: (organizationId: string, eventLimit: number) => Promise<MutationResult>; removeUser: (id: string) => Promise<MutationResult>; changeRole: (userId: string, role: Role) => Promise<MutationResult>; assignScannerEvents: (userId: string, eventIds: string[]) => Promise<MutationResult>;
   sendParticipantQrEmail: (participantId: string) => Promise<MutationResult>; sendEventQrEmails: (eventId: string, resendAll?: boolean) => Promise<EventQrEmailResult>; getParticipantQrPreview: (participantId: string) => Promise<ParticipantQrPreview>; scanParticipantQr: (qrCode: string, autoCheckIn?: boolean) => Promise<{ ok: boolean; data?: ParticipantScanResult; error?: string; status?: number }>;
@@ -20,47 +23,108 @@ interface MockDataContextType {
 }
 const MockDataContext = createContext<MockDataContextType | null>(null);
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080').replace(/\/+$/, '');
-interface ApiParticipant { id: number | string; event_id: string | null; first_name: string; last_name: string; display_name?: string | null; email: string; bib_number: string | null; qr_code: string | null; custom_fields?: Record<string, string> | null; status: 'pending' | 'checked_in' | null; package_status: 'not_collected' | 'collected' | null; email_status: 'not_sent' | 'sent' | null; checked_in_at: string | null; }
+const SELECTED_EVENT_STORAGE_KEY_PREFIX = 'selected_event_context';
+interface ApiParticipant { id: number | string; event_id: string | null; first_name: string; last_name: string; display_name?: string | null; email: string; bib_number: string | null; qr_code: string | null; custom_fields?: Record<string, string> | null; status: ParticipantStatus | 'pending' | null; email_status: 'not_sent' | 'sent' | null; checked_in_at: string | null; }
 interface ApiUser { id: string; name: string; email: string; password?: string; role: Role; organization_id?: string | null; organization_ids?: string[]; assigned_events: string[]; }
-interface ApiEvent { id: string; name: string; date: string; location: string; organization_id: string; }
+interface ApiEvent { id: string; name: string; date: string; location: string; organization_id: string; office_open_at: string; office_close_at: string; }
 interface BootstrapResponse { data: { organizations: Organization[]; events: ApiEvent[]; users: ApiUser[]; participants: ApiParticipant[]; activityLog: ActivityLog[]; }; }
 interface ParticipantQrPreviewResponse { data?: { participant?: ApiParticipant; event?: ApiEvent; qr_code_svg_data_uri?: string; qr_code_image_url?: string; }; error?: string; }
 interface ParticipantScanApiResponse { data?: { participant?: ApiParticipant; event?: ApiEvent; access?: { allowed?: boolean; }; }; error?: string; }
-function mapApiParticipantToUi(participant: ApiParticipant, fallbackEventId: string): Participant { const eventId = participant.event_id ?? fallbackEventId; return { id: `p-${participant.id}`, event_id: eventId, name: (participant.display_name ?? `${participant.first_name} ${participant.last_name}`.trim()).trim(), email: participant.email, bib_number: participant.bib_number ?? `BIB-${participant.id}`, qr_code: participant.qr_code ?? '', status: participant.status ?? 'pending', package_status: participant.package_status ?? 'not_collected', email_status: participant.email_status ?? 'not_sent', checked_in_at: participant.checked_in_at ?? undefined, custom_fields: participant.custom_fields ?? {} }; }
+function getSelectedEventStorageKey(userId: string) { return `${SELECTED_EVENT_STORAGE_KEY_PREFIX}:${userId}`; }
+function readStoredSelectedEventId(userId?: string | null): string {
+  if (!userId) return '';
+  try {
+    return localStorage.getItem(getSelectedEventStorageKey(userId)) ?? '';
+  } catch {
+    return '';
+  }
+}
+function mapApiParticipantToUi(participant: ApiParticipant, fallbackEventId: string): Participant { const eventId = participant.event_id ?? fallbackEventId; return { id: `p-${participant.id}`, event_id: eventId, name: (participant.display_name ?? `${participant.first_name} ${participant.last_name}`.trim()).trim(), email: participant.email, bib_number: participant.bib_number ?? `BIB-${participant.id}`, qr_code: participant.qr_code ?? '', status: normalizeParticipantStatus(participant.status), email_status: participant.email_status ?? 'not_sent', checked_in_at: participant.checked_in_at ?? undefined, custom_fields: participant.custom_fields ?? {} }; }
 function splitFullName(fullName: string): { firstName: string; lastName: string } { const parts = fullName.trim().split(/\s+/).filter(Boolean); if (parts.length === 0) return { firstName: 'Unknown', lastName: 'Participant' }; if (parts.length === 1) return { firstName: parts[0], lastName: '-' }; return { firstName: parts[0], lastName: parts.slice(1).join(' ') }; }
 function participantUiIdToApiId(participantId: string): string { return participantId.startsWith('p-') ? participantId.slice(2) : participantId; }
 function mapApiUserToUi(user: ApiUser): User { return { ...user, password: '', organization_id: user.organization_id ?? undefined, organization_ids: Array.isArray(user.organization_ids) ? user.organization_ids : [], assigned_events: Array.isArray(user.assigned_events) ? user.assigned_events : [] }; }
 export function MockDataProvider({ children }: { children: ReactNode }) {
   const { user: authUser, token, getAuthHeaders, clearSession } = useAuth();
-  const [organizations, setOrganizations] = useState<Organization[]>([]); const [events, setEvents] = useState<Event[]>([]); const [participants, setParticipants] = useState<Participant[]>([]); const [users, setUsers] = useState<User[]>([]); const [activityLog, setActivityLog] = useState<ActivityLog[]>([]); const [selectedEventId, setSelectedEventId] = useState<string>('evt-1'); const [isUsingApi, setIsUsingApi] = useState(false); const [isLoading, setIsLoading] = useState(true);
+  const [organizations, setOrganizations] = useState<Organization[]>([]); const [events, setEvents] = useState<Event[]>([]); const [participants, setParticipants] = useState<Participant[]>([]); const [users, setUsers] = useState<User[]>([]); const [activityLog, setActivityLog] = useState<ActivityLog[]>([]); const [selectedEventId, setSelectedEventIdState] = useState<string>(''); const [isUsingApi, setIsUsingApi] = useState(false); const [isLoading, setIsLoading] = useState(true); const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
+  const persistSelectedEventId = useCallback((eventId: string, userId?: string | null) => { if (!userId) return; try { const key = getSelectedEventStorageKey(userId); if (eventId) { localStorage.setItem(key, eventId); return; } localStorage.removeItem(key); } catch {} }, []);
+  const setSelectedEventId = useCallback((eventId: string) => { setSelectedEventIdState(eventId); persistSelectedEventId(eventId, authUser?.id); }, [authUser?.id, persistSelectedEventId]);
   const syncStoredAuthUser = useCallback((updater: (user: User) => User) => { try { const raw = sessionStorage.getItem('auth_user'); if (!raw) return; const parsed = JSON.parse(raw) as User; sessionStorage.setItem('auth_user', JSON.stringify(updater(parsed))); } catch {} }, []);
   const loadBootstrap = useCallback(async () => {
     setIsLoading(true); if (!authUser || !token) { setOrganizations([]); setEvents([]); setParticipants([]); setUsers([]); setActivityLog([]); setSelectedEventId(''); setIsUsingApi(false); setIsLoading(false); throw new Error('Missing API token'); }
     const response = await fetch(`${API_BASE_URL}/bootstrap`, { headers: getAuthHeaders() }); if (response.status === 401) { clearSession(); throw new Error('Unauthorized'); } if (!response.ok) throw new Error(`API bootstrap failed: ${response.status}`);
-    const payload = (await response.json()) as BootstrapResponse; const data = payload?.data; if (!data) throw new Error('API bootstrap returned empty payload'); const apiEvents = Array.isArray(data.events) ? data.events : []; const nextSelectedEvent = apiEvents.some(event => event.id === selectedEventId) ? selectedEventId : apiEvents[0]?.id ?? '';
+    const payload = (await response.json()) as BootstrapResponse; const data = payload?.data; if (!data) throw new Error('API bootstrap returned empty payload'); const apiEvents = Array.isArray(data.events) ? data.events : []; const storedSelectedEventId = readStoredSelectedEventId(authUser.id); const preferredSelectedEventId = storedSelectedEventId || selectedEventId; const nextSelectedEvent = apiEvents.some(event => event.id === preferredSelectedEventId) ? preferredSelectedEventId : apiEvents[0]?.id ?? '';
     setOrganizations(Array.isArray(data.organizations) ? data.organizations : []); setEvents(apiEvents); setUsers((data.users ?? []).map(mapApiUserToUi)); setParticipants((data.participants ?? []).map(participant => mapApiParticipantToUi(participant, nextSelectedEvent))); setActivityLog(Array.isArray(data.activityLog) ? data.activityLog : []); setSelectedEventId(nextSelectedEvent); setIsUsingApi(true); setIsLoading(false);
-  }, [authUser, clearSession, getAuthHeaders, selectedEventId, token]);
+  }, [authUser, clearSession, getAuthHeaders, selectedEventId, setSelectedEventId, token]);
   useEffect(() => { void loadBootstrap().catch(() => { setIsUsingApi(false); setIsLoading(false); }); }, [loadBootstrap]);
+  useEffect(() => { if (!authUser?.id) { setSelectedEventIdState(''); return; } const storedSelectedEventId = readStoredSelectedEventId(authUser.id); if (storedSelectedEventId) setSelectedEventIdState(storedSelectedEventId); }, [authUser?.id]);
+  useEffect(() => {
+    if (!authUser?.id) return undefined;
+    const storageKey = getSelectedEventStorageKey(authUser.id);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== storageKey) return;
+      setSelectedEventIdState(event.newValue ?? '');
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [authUser?.id]);
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowTimestamp(Date.now()), 30_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
   const currentUser = useMemo(() => { if (!authUser) { return { id: '', name: '', email: '', password: '', role: 'scanner' as const, assigned_events: [] }; } return users.find(user => user.id === authUser.id) || authUser; }, [users, authUser]);
   const currentRole = currentUser.role;
-  const visibleEvents = useMemo(() => { if (currentRole === 'superadmin') return events; if (currentRole === 'admin') return events.filter(event => (currentUser.organization_ids ?? []).includes(event.organization_id)); if (currentRole === 'editor') return events.filter(event => event.organization_id === currentUser.organization_id); return events.filter(event => currentUser.assigned_events.includes(event.id)); }, [currentRole, currentUser, events]);
-  const canAccessEvent = useCallback((eventId: string) => { if (currentRole === 'superadmin') return true; const event = events.find(entry => entry.id === eventId); if (!event) return false; if (currentRole === 'admin') return (currentUser.organization_ids ?? []).includes(event.organization_id); if (currentRole === 'editor') return event.organization_id === currentUser.organization_id; return currentUser.assigned_events.includes(eventId); }, [currentRole, currentUser, events]);
+  const visibleEvents = useMemo(() => {
+    const now = new Date(nowTimestamp);
+    if (currentRole === 'superadmin') return events;
+    if (currentRole === 'admin') return events.filter(event => (currentUser.organization_ids ?? []).includes(event.organization_id));
+    if (currentRole === 'editor') return events.filter(event => event.organization_id === currentUser.organization_id);
+    return events.filter(event => currentUser.assigned_events.includes(event.id) && isEventOfficeOpen(event, now));
+  }, [currentRole, currentUser, events, nowTimestamp]);
+  useEffect(() => {
+    if (visibleEvents.some(event => event.id === selectedEventId)) {
+      return;
+    }
+
+    setSelectedEventId(visibleEvents[0]?.id ?? '');
+  }, [selectedEventId, setSelectedEventId, visibleEvents]);
+  const canAccessEvent = useCallback((eventId: string) => { if (currentRole === 'superadmin') return true; const event = events.find(entry => entry.id === eventId); if (!event) return false; if (currentRole === 'admin') return (currentUser.organization_ids ?? []).includes(event.organization_id); if (currentRole === 'editor') return event.organization_id === currentUser.organization_id; return currentUser.assigned_events.includes(eventId) && isEventOfficeOpen(event, new Date(nowTimestamp)); }, [currentRole, currentUser, events, nowTimestamp]);
   const addLog = useCallback((action: string, participantName?: string) => { setActivityLog(previous => [{ id: `log-${Date.now()}`, timestamp: new Date().toISOString(), action, participant_name: participantName, user_name: currentUser.name }, ...previous]); }, [currentUser.name]);
   const replaceParticipant = useCallback((participant: Participant) => { setParticipants(previous => previous.map(existing => existing.id === participant.id ? participant : existing)); }, []);
-  const runParticipantMutation = useCallback(async (participantId: string, endpoint: 'check-in' | 'undo-check-in' | 'collect-package'): Promise<MutationResult> => {
+  const updateParticipantInApi = useCallback(async (participantId: string, data: ParticipantUpdatePayload): Promise<Participant | null> => {
+    const response = await fetch(`${API_BASE_URL}/participants/${participantUiIdToApiId(participantId)}`, { method: 'PATCH', headers: getAuthHeaders(true), body: JSON.stringify(data) });
+    const payload = await response.json().catch(() => ({})) as { data?: ApiParticipant; error?: string };
+    if (!response.ok || !payload.data) throw new Error(payload.error ?? `API participant update failed: ${response.status}`);
+    return mapApiParticipantToUi(payload.data, selectedEventId);
+  }, [getAuthHeaders, selectedEventId]);
+  const updateParticipantStatus = useCallback(async (participantId: string, status: ParticipantStatus): Promise<MutationResult> => {
     if (!isUsingApi) {
-      setParticipants(previous => previous.map(participant => { if (participant.id !== participantId) return participant; if (endpoint === 'check-in') return { ...participant, status: 'checked_in', checked_in_at: new Date().toISOString() }; if (endpoint === 'undo-check-in') return { ...participant, status: 'pending', checked_in_at: undefined }; return { ...participant, package_status: 'collected' }; }));
+      setParticipants(previous => previous.map(participant => participant.id === participantId ? { ...participant, status, checked_in_at: status === 'not_checked_in' ? undefined : (participant.checked_in_at ?? new Date().toISOString()) } : participant));
       return { ok: true };
     }
-    const response = await fetch(`${API_BASE_URL}/participants/${participantUiIdToApiId(participantId)}/${endpoint}`, { method: 'POST', headers: getAuthHeaders() });
-    const payload = await response.json().catch(() => ({})) as { data?: ApiParticipant; error?: string };
-    if (!response.ok || !payload.data) return { ok: false, error: payload.error ?? `API participant ${endpoint} failed: ${response.status}` };
-    replaceParticipant(mapApiParticipantToUi(payload.data, selectedEventId)); await loadBootstrap().catch(() => undefined); return { ok: true };
-  }, [getAuthHeaders, isUsingApi, loadBootstrap, replaceParticipant, selectedEventId]);
-  const checkIn = useCallback(async (participantId: string) => runParticipantMutation(participantId, 'check-in'), [runParticipantMutation]);
-  const undoCheckIn = useCallback(async (participantId: string) => runParticipantMutation(participantId, 'undo-check-in'), [runParticipantMutation]);
-  const collectPackage = useCallback(async (participantId: string) => runParticipantMutation(participantId, 'collect-package'), [runParticipantMutation]);
-  const createParticipantInApi = useCallback(async (data: Omit<Participant, 'id' | 'qr_code' | 'status' | 'package_status' | 'email_status'>): Promise<Participant | null> => {
+    try {
+      const participant = await updateParticipantInApi(participantId, { status });
+      if (participant) replaceParticipant(participant);
+      await loadBootstrap().catch(() => undefined);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Nie udalo sie zaktualizowac statusu uczestnika' };
+    }
+  }, [isUsingApi, loadBootstrap, replaceParticipant, updateParticipantInApi]);
+  const reassignParticipantPackage = useCallback(async (participantId: string, email: string, fieldValues: Record<string, string>): Promise<MutationResult> => {
+    if (!isUsingApi) {
+      setParticipants(previous => previous.map(participant => participant.id === participantId ? { ...participant, email, custom_fields: fieldValues, email_status: 'not_sent' } : participant));
+      return { ok: true };
+    }
+    try {
+      const participant = await updateParticipantInApi(participantId, { email, field_values: fieldValues });
+      if (participant) replaceParticipant(participant);
+      await loadBootstrap().catch(() => undefined);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Nie udalo sie przepisac pakietu' };
+    }
+  }, [isUsingApi, loadBootstrap, replaceParticipant, updateParticipantInApi]);
+  const createParticipantInApi = useCallback(async (data: Omit<Participant, 'id' | 'qr_code' | 'status' | 'email_status'>): Promise<Participant | null> => {
     const { firstName, lastName } = splitFullName(data.name);
     const response = await fetch(`${API_BASE_URL}/participants`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ event_id: data.event_id, first_name: firstName, last_name: lastName, display_name: data.name, email: data.email, bib_number: data.bib_number }) });
     if (!response.ok) throw new Error(`API participant create failed: ${response.status}`);
@@ -118,8 +182,8 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     const response = await fetch(`${API_BASE_URL}/users/${userId}/role`, { method: 'PATCH', headers: getAuthHeaders(true), body: JSON.stringify({ role }) }); if (!response.ok) { const payload = await response.json().catch(() => ({})) as { error?: string }; throw new Error(payload.error ?? `API user role change failed: ${response.status}`); }
     const payload = await response.json() as { data?: ApiUser }; if (!payload.data) throw new Error('API user role change returned empty payload'); return mapApiUserToUi(payload.data);
   }, [getAuthHeaders]);
-  const addParticipant = useCallback((data: Omit<Participant, 'id' | 'qr_code' | 'status' | 'package_status' | 'email_status'>) => {
-    const fallbackParticipant: Participant = { ...data, id: `p-${Date.now()}`, qr_code: `fallback-${Date.now()}`, status: 'pending', package_status: 'not_collected', email_status: 'not_sent' };
+  const addParticipant = useCallback((data: Omit<Participant, 'id' | 'qr_code' | 'status' | 'email_status'>) => {
+    const fallbackParticipant: Participant = { ...data, id: `p-${Date.now()}`, qr_code: `fallback-${Date.now()}`, status: 'not_checked_in', email_status: 'not_sent' };
     if (!isUsingApi) { setParticipants(previous => [...previous, fallbackParticipant]); addLog('Dodano uczestnika', data.name); return; }
     void createParticipantInApi(data).then(apiParticipant => { setParticipants(previous => [...previous, apiParticipant ?? fallbackParticipant]); }).catch(() => { setParticipants(previous => [...previous, fallbackParticipant]); });
     addLog('Dodano uczestnika', data.name);
@@ -127,7 +191,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const updateParticipant = useCallback((id: string, data: Partial<Participant>) => { setParticipants(previous => previous.map(participant => participant.id === id ? { ...participant, ...data } : participant)); }, []);
   const importParticipants = useCallback((data: { name: string; email: string }[], eventId: string) => {
     const existing = participants.filter(participant => participant.event_id === eventId); const existingEmails = new Set(existing.map(participant => participant.email)); const valid = data.filter(entry => entry.email && !existingEmails.has(entry.email)); const maxBib = Math.max(0, ...existing.map(participant => parseInt(participant.bib_number, 10) || 0));
-    const newParticipants: Participant[] = valid.map((entry, index) => ({ id: `p-${Date.now()}-${index}`, event_id: eventId, name: entry.name, email: entry.email, bib_number: String(maxBib + index + 1), qr_code: `fallback-${eventId}-${Date.now()}-${index}`, status: 'pending', package_status: 'not_collected', email_status: 'not_sent' }));
+    const newParticipants: Participant[] = valid.map((entry, index) => ({ id: `p-${Date.now()}-${index}`, event_id: eventId, name: entry.name, email: entry.email, bib_number: String(maxBib + index + 1), qr_code: `fallback-${eventId}-${Date.now()}-${index}`, status: 'not_checked_in', email_status: 'not_sent' }));
     setParticipants(previous => [...previous, ...newParticipants]); addLog(`Import CSV (${newParticipants.length} uczestnikow)`); return newParticipants.length;
   }, [addLog, participants]);
   const createEvent = useCallback(async (eventData: Omit<Event, 'id'>): Promise<MutationResult> => {
@@ -189,7 +253,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const markEmailsSent = useCallback((eventId: string) => { setParticipants(previous => previous.map(participant => participant.event_id === eventId ? { ...participant, email_status: 'sent' as const } : participant)); addLog('Wyslano kody QR do wszystkich'); }, [addLog]);
   const getParticipantsByEvent = useCallback((eventId: string) => participants.filter(participant => participant.event_id === eventId), [participants]);
   return (
-    <MockDataContext.Provider value={{ organizations, events, participants, users, activityLog, currentRole, currentUser, selectedEventId, setSelectedEventId, checkIn, undoCheckIn, collectPackage, addParticipant, updateParticipant, importParticipants, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, addUser, createOrganization, updateOrganizationEventLimit, removeUser, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, markEmailsSent, addLog, getParticipantsByEvent, visibleEvents, canAccessEvent, isUsingApi, isLoading }}>
+    <MockDataContext.Provider value={{ organizations, events, participants, users, activityLog, currentRole, currentUser, selectedEventId, setSelectedEventId, updateParticipantStatus, reassignParticipantPackage, addParticipant, updateParticipant, importParticipants, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, addUser, createOrganization, updateOrganizationEventLimit, removeUser, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, markEmailsSent, addLog, getParticipantsByEvent, visibleEvents, canAccessEvent, isUsingApi, isLoading }}>
       {children}
     </MockDataContext.Provider>
   );
