@@ -112,6 +112,20 @@ export default function ParticipantDetails() {
         </CardContent>
       </Card>
 
+      {participant.custom_fields && Object.keys(participant.custom_fields).length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Dodatkowe dane</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {Object.entries(participant.custom_fields).map(([key, value]) => (
+              <div key={key} className="flex justify-between gap-4 text-sm">
+                <span className="text-muted-foreground">{key}</span>
+                <span className="text-right break-all">{value}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader><DialogTitle>Edytuj uczestnika</DialogTitle></DialogHeader>

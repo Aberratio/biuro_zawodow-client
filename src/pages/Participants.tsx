@@ -1,48 +1,140 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMockData } from '@/contexts/MockDataContext';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { Loader2, Search, UserPlus } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
+import { ParticipantFieldMapping } from '@/types';
 
 export default function Participants() {
-  const { participants, selectedEventId, isLoading } = useMockData();
+  const {
+    participants,
+    selectedEventId,
+    isLoading,
+    getParticipantFieldMappings,
+    addParticipantManually,
+  } = useMockData();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [packageFilter, setPackageFilter] = useState('all');
+  const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualEmail, setManualEmail] = useState('');
+  const [manualFields, setManualFields] = useState<Record<string, string>>({});
+  const [manualSaving, setManualSaving] = useState(false);
 
+  const eventParticipants = useMemo(
+    () => participants.filter(participant => participant.event_id === selectedEventId),
+    [participants, selectedEventId]
+  );
 
   const filtered = useMemo(() => {
-    return participants
-      .filter(p => p.event_id === selectedEventId)
-      .filter(p => {
-        const q = search.toLowerCase();
-        return !q || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q) || p.bib_number.includes(q);
+    return eventParticipants
+      .filter(participant => {
+        const query = search.toLowerCase();
+        return !query
+          || participant.name.toLowerCase().includes(query)
+          || participant.email.toLowerCase().includes(query)
+          || participant.bib_number.includes(query);
       })
-      .filter(p => statusFilter === 'all' || p.status === statusFilter)
-      .filter(p => packageFilter === 'all' || p.package_status === packageFilter);
-  }, [participants, selectedEventId, search, statusFilter, packageFilter]);
+      .filter(participant => statusFilter === 'all' || participant.status === statusFilter)
+      .filter(participant => packageFilter === 'all' || participant.package_status === packageFilter);
+  }, [eventParticipants, packageFilter, search, statusFilter]);
+
+  useEffect(() => {
+    if (!selectedEventId) {
+      setMappings([]);
+      setManualFields({});
+      return;
+    }
+
+    void getParticipantFieldMappings(selectedEventId)
+      .then(data => {
+        setMappings(data);
+        setManualFields(
+          data
+            .filter(mapping => mapping.is_active && mapping.field_role !== 'email')
+            .reduce<Record<string, string>>((acc, mapping) => {
+              acc[mapping.alias] = '';
+              return acc;
+            }, {})
+        );
+      })
+      .catch(() => {
+        setMappings([]);
+        setManualFields({});
+      });
+  }, [getParticipantFieldMappings, selectedEventId]);
+
+  const activeMappings = useMemo(
+    () => mappings.filter(mapping => mapping.is_active && mapping.field_role !== 'email'),
+    [mappings]
+  );
+  const canAddManually = eventParticipants.length > 0 && mappings.length > 0;
+
+  const handleManualFieldChange = (alias: string, value: string) => {
+    setManualFields(prev => ({ ...prev, [alias]: value }));
+  };
+
+  const handleManualSubmit = async () => {
+    setManualSaving(true);
+    const result = await addParticipantManually(selectedEventId, manualEmail, manualFields);
+    setManualSaving(false);
+
+    if (!result.ok) {
+      toast({
+        title: 'Nie udało się dodać uczestnika',
+        description: result.error,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setManualOpen(false);
+    setManualEmail('');
+    setManualFields(prev => Object.keys(prev).reduce<Record<string, string>>((acc, key) => {
+      acc[key] = '';
+      return acc;
+    }, {}));
+    toast({ title: 'Dodano uczestnika ręcznie' });
+  };
 
   if (isLoading) return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Uczestnicy</h1>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-          Lista uczestników wybranego wydarzenia. Kliknij wiersz, aby zobaczyć szczegóły.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Uczestnicy</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Lista uczestników wybranego wydarzenia. Kliknij wiersz, aby zobaczyć szczegóły.
+          </p>
+        </div>
+        {canAddManually && (
+          <Button onClick={() => setManualOpen(true)} className="h-11 sm:h-10">
+            <UserPlus className="h-4 w-4 mr-1" /> Dodaj ręcznie
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Szukaj po imieniu, email lub numerze..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-11 sm:h-10" />
+          <Input
+            placeholder="Szukaj po imieniu, email lub numerze..."
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            className="pl-9 h-11 sm:h-10"
+          />
         </div>
         <div className="flex flex-wrap gap-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -84,29 +176,33 @@ export default function Participants() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(p => (
-                <TableRow key={p.id} className="cursor-pointer active:bg-accent/50" onClick={() => navigate(`/participants/${p.id}`)}>
+              {filtered.map(participant => (
+                <TableRow
+                  key={participant.id}
+                  className="cursor-pointer active:bg-accent/50"
+                  onClick={() => navigate(`/participants/${participant.id}`)}
+                >
                   <TableCell>
                     <div>
-                      <span className="font-medium text-sm">{p.name}</span>
-                      <span className="block md:hidden text-xs text-muted-foreground truncate">{p.email}</span>
+                      <span className="font-medium text-sm">{participant.name}</span>
+                      <span className="block md:hidden text-xs text-muted-foreground truncate">{participant.email}</span>
                       <span className="block sm:hidden mt-0.5">
-                        <Badge variant={p.package_status === 'collected' ? 'default' : 'outline'} className="text-[9px]">
-                          {p.package_status === 'collected' ? 'Pakiet ✓' : 'Pakiet ○'}
+                        <Badge variant={participant.package_status === 'collected' ? 'default' : 'outline'} className="text-[9px]">
+                          {participant.package_status === 'collected' ? 'Pakiet ✓' : 'Pakiet ○'}
                         </Badge>
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground text-sm">{p.email}</TableCell>
-                  <TableCell className="tabular-nums text-sm">#{p.bib_number}</TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground text-sm">{participant.email}</TableCell>
+                  <TableCell className="tabular-nums text-sm">#{participant.bib_number}</TableCell>
                   <TableCell>
-                    <Badge variant={p.status === 'checked_in' ? 'default' : 'secondary'} className="text-[10px]">
-                      {p.status === 'checked_in' ? 'Odprawiony' : 'Oczekuje'}
+                    <Badge variant={participant.status === 'checked_in' ? 'default' : 'secondary'} className="text-[10px]">
+                      {participant.status === 'checked_in' ? 'Odprawiony' : 'Oczekuje'}
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
-                    <Badge variant={p.package_status === 'collected' ? 'default' : 'outline'} className="text-[10px]">
-                      {p.package_status === 'collected' ? 'Wydany' : 'Nie wydany'}
+                    <Badge variant={participant.package_status === 'collected' ? 'default' : 'outline'} className="text-[10px]">
+                      {participant.package_status === 'collected' ? 'Wydany' : 'Nie wydany'}
                     </Badge>
                   </TableCell>
                 </TableRow>
@@ -116,6 +212,36 @@ export default function Participants() {
         </div>
       )}
       <p className="text-xs text-muted-foreground">{filtered.length} uczestników</p>
+
+      <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[calc(100vh-2rem)] overflow-hidden p-0 flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
+            <DialogTitle>Dodaj uczestnika ręcznie</DialogTitle>
+          </DialogHeader>
+          <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            <div>
+              <Label>Email</Label>
+              <Input value={manualEmail} onChange={event => setManualEmail(event.target.value)} className="mt-2" />
+            </div>
+            {activeMappings.map(mapping => (
+              <div key={`${mapping.alias}-${mapping.source_column_name}`}>
+                <Label>{mapping.alias}</Label>
+                <Input
+                  value={manualFields[mapping.alias] ?? ''}
+                  onChange={event => handleManualFieldChange(mapping.alias, event.target.value)}
+                  className="mt-2"
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="px-6 py-4 border-t shrink-0">
+            <Button onClick={handleManualSubmit} disabled={manualSaving}>
+              {manualSaving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Zapisz uczestnika
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
