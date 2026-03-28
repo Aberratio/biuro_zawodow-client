@@ -19,9 +19,54 @@ import OrganizationDetails from "./pages/OrganizationDetails";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
+import ScannerInfo from "./pages/ScannerInfo";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+function HomeRoute() {
+  const { currentRole, visibleEvents } = useMockData();
+
+  if (currentRole === "scanner") {
+    return <Navigate to={visibleEvents.length > 0 ? "/scanner" : "/scanner-info"} replace />;
+  }
+
+  return <Dashboard />;
+}
+
+function ScannerParticipantsRoute() {
+  const { currentRole, visibleEvents } = useMockData();
+
+  if (currentRole === "scanner" && visibleEvents.length === 0) {
+    return <Navigate to="/scanner-info" replace />;
+  }
+
+  return <Participants />;
+}
+
+function ScannerRoute() {
+  const { currentRole, visibleEvents } = useMockData();
+
+  if (currentRole === "scanner" && visibleEvents.length === 0) {
+    return <Navigate to="/scanner-info" replace />;
+  }
+
+  return <Scanner />;
+}
+
+function ScannerInfoRoute() {
+  const { currentRole, visibleEvents } = useMockData();
+
+  if (currentRole !== "scanner") {
+    return <Navigate to="/" replace />;
+  }
+
+  if (visibleEvents.length > 0) {
+    return <Navigate to="/scanner" replace />;
+  }
+
+  return <ScannerInfo />;
+}
 
 function ImportRedirect() {
   const { selectedEventId } = useMockData();
@@ -33,13 +78,14 @@ function ProtectedAppRoutes() {
     <MockDataProvider>
       <Layout>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<HomeRoute />} />
           <Route path="/events" element={<Events />} />
           <Route path="/events/:id" element={<EventDetails />} />
           <Route path="/events/:id/import" element={<CsvImport />} />
-          <Route path="/participants" element={<Participants />} />
+          <Route path="/participants" element={<ScannerParticipantsRoute />} />
           <Route path="/participants/:id" element={<ParticipantDetails />} />
-          <Route path="/scanner" element={<Scanner />} />
+          <Route path="/scanner" element={<ScannerRoute />} />
+          <Route path="/scanner-info" element={<ScannerInfoRoute />} />
           <Route path="/import" element={<ImportRedirect />} />
           <Route path="/emails" element={<EmailSending />} />
           <Route path="/organizations" element={<Organizations />} />

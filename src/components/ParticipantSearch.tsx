@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Participant } from '@/types';
+import { getParticipantStatusDefinition } from '@/lib/participant-status';
 
 interface ParticipantSearchProps {
   participants: Participant[];
@@ -9,11 +10,8 @@ interface ParticipantSearchProps {
   autoFocus?: boolean;
 }
 
-function simulateApiSearch(
-  participants: Participant[],
-  query: string
-): Promise<Participant[]> {
-  return new Promise((resolve) => {
+function simulateApiSearch(participants: Participant[], query: string): Promise<Participant[]> {
+  return new Promise(resolve => {
     const delay = 300 + Math.random() * 200;
     setTimeout(() => {
       const q = query.toLowerCase().trim();
@@ -21,12 +19,14 @@ function simulateApiSearch(
         resolve([]);
         return;
       }
+
       const results = participants.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.email.toLowerCase().includes(q) ||
-          p.bib_number === q
+        participant =>
+          participant.name.toLowerCase().includes(q) ||
+          participant.email.toLowerCase().includes(q) ||
+          participant.bib_number === q
       );
+
       resolve(results.slice(0, 5));
     }, delay);
   });
@@ -51,47 +51,45 @@ export default function ParticipantSearch({
     }
   }, [autoFocus]);
 
-  // Close dropdown on outside click
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+    const handler = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
     };
+
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const search = useCallback(
-    (q: string) => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      if (!q.trim()) {
-        setResults([]);
-        setOpen(false);
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      setOpen(true);
-      debounceRef.current = setTimeout(async () => {
-        const res = await simulateApiSearch(participants, q);
-        setResults(res);
-        setLoading(false);
-      }, 300);
-    },
-    [participants]
-  );
+  const search = useCallback((nextQuery: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!nextQuery.trim()) {
+      setResults([]);
+      setOpen(false);
+      setLoading(false);
+      return;
+    }
 
-  const handleChange = (val: string) => {
-    setQuery(val);
-    search(val);
+    setLoading(true);
+    setOpen(true);
+    debounceRef.current = setTimeout(async () => {
+      const response = await simulateApiSearch(participants, nextQuery);
+      setResults(response);
+      setLoading(false);
+    }, 300);
+  }, [participants]);
+
+  const handleChange = (value: string) => {
+    setQuery(value);
+    search(value);
   };
 
-  const handleSelect = (p: Participant) => {
+  const handleSelect = (participant: Participant) => {
     setQuery('');
     setResults([]);
     setOpen(false);
-    onSelect(p);
+    onSelect(participant);
   };
 
   return (
@@ -102,7 +100,7 @@ export default function ParticipantSearch({
           ref={inputRef}
           placeholder="Nazwisko, numer, email..."
           value={query}
-          onChange={(e) => handleChange(e.target.value)}
+          onChange={event => handleChange(event.target.value)}
           onFocus={() => query.trim() && results.length > 0 && setOpen(true)}
           className="h-12 pl-10 text-base font-medium"
         />
@@ -120,35 +118,38 @@ export default function ParticipantSearch({
             </div>
           ) : results.length === 0 ? (
             <div className="px-4 py-3 text-sm text-muted-foreground">
-              Brak wyników
+              Brak wynikow
             </div>
           ) : (
-            results.map((p) => (
-              <button
-                key={p.id}
-                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-accent active:bg-accent/70 touch-manipulation transition-colors border-b last:border-b-0 border-border/50"
-                onClick={() => handleSelect(p)}
-              >
-                <div className="min-w-0">
-                  <p className="font-semibold text-sm truncate">{p.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{p.email}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0 ml-3">
-                  <span className="text-sm font-bold tabular-nums text-primary">
-                    #{p.bib_number}
-                  </span>
-                  <span
-                    className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                      p.status === 'checked_in'
-                        ? 'bg-emerald-500/15 text-emerald-600'
-                        : 'bg-amber-500/15 text-amber-600'
-                    }`}
-                  >
-                    {p.status === 'checked_in' ? '✓' : '○'}
-                  </span>
-                </div>
-              </button>
-            ))
+            results.map(participant => {
+              const status = getParticipantStatusDefinition(participant.status);
+
+              return (
+                <button
+                  key={participant.id}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-accent active:bg-accent/70 touch-manipulation transition-colors border-b last:border-b-0 border-border/50"
+                  onClick={() => handleSelect(participant)}
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm truncate">{participant.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{participant.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                    <span className="text-sm font-bold tabular-nums text-primary">
+                      #{participant.bib_number}
+                    </span>
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        status.countsAsCheckedIn ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-600'
+                      }`}
+                      title={status.label}
+                    >
+                      {status.countsAsCheckedIn ? '✓' : '○'}
+                    </span>
+                  </div>
+                </button>
+              );
+            })
           )}
         </div>
       )}

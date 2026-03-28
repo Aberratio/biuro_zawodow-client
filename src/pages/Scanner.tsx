@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Info, Loader2, Package, Undo2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Info, Loader2, Undo2, UserX2 } from 'lucide-react';
 import { useMockData } from '@/contexts/MockDataContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { Participant } from '@/types';
 import QrScannerView from '@/components/QrScannerView';
 import ParticipantSearch from '@/components/ParticipantSearch';
 import ScannerSkeleton from '@/components/skeletons/ScannerSkeleton';
+import { getParticipantStatusDefinition, participantCountsAsCheckedIn } from '@/lib/participant-status';
+import { Navigate } from 'react-router-dom';
 
 type ScannerView = 'idle' | 'success' | 'error' | 'detail';
 
 export default function Scanner() {
-  const { participants, selectedEventId, checkIn, undoCheckIn, collectPackage, currentRole, scanParticipantQr, isLoading } = useMockData();
+  const { participants, selectedEventId, updateParticipantStatus, currentRole, scanParticipantQr, isLoading, visibleEvents } = useMockData();
   const [view, setView] = useState<ScannerView>('idle');
   const [scannedParticipant, setScannedParticipant] = useState<Participant | null>(null);
   const [recentScans, setRecentScans] = useState<Participant[]>([]);
@@ -23,13 +26,16 @@ export default function Scanner() {
   const [isMutating, setIsMutating] = useState(false);
   const [errorMessage, setErrorMessage] = useState('Nie znaleziono uczestnika dla tego kodu QR.');
   const successTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const selectedEvent = visibleEvents.find(event => event.id === selectedEventId) ?? visibleEvents[0] ?? null;
+  const activeEventId = selectedEvent?.id ?? selectedEventId;
 
   const eventParticipants = useMemo(
-    () => participants.filter(participant => participant.event_id === selectedEventId),
-    [participants, selectedEventId]
+    () => participants.filter(participant => participant.event_id === activeEventId),
+    [activeEventId, participants]
   );
-  const checkedIn = eventParticipants.filter(participant => participant.status === 'checked_in').length;
+  const checkedIn = eventParticipants.filter(participantCountsAsCheckedIn).length;
   const canToggleAuto = currentRole !== 'scanner';
+  const hasActiveEvents = visibleEvents.length > 0;
 
   useEffect(() => () => {
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
@@ -84,51 +90,30 @@ export default function Scanner() {
     setScannedParticipant(null);
   };
 
-  const handleCheckIn = async () => {
+  const mutateStatus = async (status: Participant['status'], successTitle: string) => {
     if (!scannedParticipant) return;
+
     setIsMutating(true);
     try {
-      const result = await checkIn(scannedParticipant.id);
+      const result = await updateParticipantStatus(scannedParticipant.id, status);
       if (!result.ok) {
-        toast({ title: 'Nie udało się odprawić zawodnika', description: result.error, variant: 'destructive' });
+        toast({ title: 'Nie udalo sie zaktualizowac statusu', description: result.error, variant: 'destructive' });
         return;
       }
 
-      showSuccessScreen({ ...scannedParticipant, status: 'checked_in', checked_in_at: new Date().toISOString() });
-    } finally {
-      setIsMutating(false);
-    }
-  };
+      const updatedParticipant: Participant = {
+        ...scannedParticipant,
+        status,
+        checked_in_at: status === 'not_checked_in' ? undefined : (scannedParticipant.checked_in_at ?? new Date().toISOString()),
+      };
 
-  const handleCollectPackage = async () => {
-    if (!scannedParticipant) return;
-    setIsMutating(true);
-    try {
-      const result = await collectPackage(scannedParticipant.id);
-      if (!result.ok) {
-        toast({ title: 'Nie udało się wydać pakietu', description: result.error, variant: 'destructive' });
-        return;
+      if (status === 'not_checked_in') {
+        setScannedParticipant(updatedParticipant);
+      } else {
+        showSuccessScreen(updatedParticipant);
       }
 
-      setScannedParticipant(previous => previous ? { ...previous, package_status: 'collected' } : previous);
-      toast({ title: 'Pakiet wydany', description: scannedParticipant.name });
-    } finally {
-      setIsMutating(false);
-    }
-  };
-
-  const handleUndoCheckIn = async () => {
-    if (!scannedParticipant) return;
-    setIsMutating(true);
-    try {
-      const result = await undoCheckIn(scannedParticipant.id);
-      if (!result.ok) {
-        toast({ title: 'Nie udało się cofnąć odprawy', description: result.error, variant: 'destructive' });
-        return;
-      }
-
-      setScannedParticipant(previous => previous ? { ...previous, status: 'pending', checked_in_at: undefined } : previous);
-      toast({ title: 'Odprawa cofnięta', description: scannedParticipant.name });
+      toast({ title: successTitle, description: scannedParticipant.name });
     } finally {
       setIsMutating(false);
     }
@@ -136,16 +121,22 @@ export default function Scanner() {
 
   if (isLoading) return <ScannerSkeleton />;
 
+  if (!hasActiveEvents || !selectedEvent) {
+    return <Navigate to="/scanner-info" replace />;
+  }
+
   if (view === 'success' && scannedParticipant) {
+    const status = getParticipantStatusDefinition(scannedParticipant.status);
+
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-600 cursor-pointer animate-in fade-in duration-200" onClick={resetToIdle}>
         <div className="text-center text-white px-6 space-y-4">
           <CheckCircle className="h-20 w-20 mx-auto" strokeWidth={2.5} />
-          <p className="text-4xl md:text-6xl font-black tracking-tight">ZAREJESTROWANY</p>
+          <p className="text-4xl md:text-6xl font-black tracking-tight">{status.shortLabel.toUpperCase()}</p>
           <p className="text-2xl md:text-3xl font-bold">{scannedParticipant.name}</p>
           <p className="text-5xl md:text-7xl font-black tabular-nums">#{scannedParticipant.bib_number}</p>
-          {scannedParticipant.package_status === 'not_collected' && (
-            <p className="text-base opacity-80 mt-4">Pakiet do wydania</p>
+          {scannedParticipant.status === 'checked_in_not_starting' && (
+            <p className="text-base opacity-80 mt-4">Pakiet odebrany, uczestnik nie wystartuje</p>
           )}
         </div>
       </div>
@@ -157,7 +148,7 @@ export default function Scanner() {
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-destructive cursor-pointer animate-in fade-in duration-200" onClick={resetToIdle}>
         <div className="text-center text-white px-6 space-y-4">
           <AlertTriangle className="h-20 w-20 mx-auto" strokeWidth={2.5} />
-          <p className="text-3xl md:text-5xl font-black">BŁĄD SKANU</p>
+          <p className="text-3xl md:text-5xl font-black">BLAD SKANU</p>
           <p className="text-base opacity-80">{errorMessage}</p>
         </div>
       </div>
@@ -169,7 +160,7 @@ export default function Scanner() {
       <div className="flex items-center justify-between px-4 md:px-0 gap-2">
         <div className="flex items-center gap-2">
           <h1 className="text-lg md:text-2xl font-bold tracking-tight">Skaner</h1>
-          <button className="text-muted-foreground hover:text-foreground transition-colors touch-manipulation" onClick={() => setShowHelp(previous => !previous)} aria-label="Pokaż instrukcje">
+          <button className="text-muted-foreground hover:text-foreground transition-colors touch-manipulation" onClick={() => setShowHelp(previous => !previous)} aria-label="Pokaz instrukcje">
             <Info className="h-4 w-4" />
           </button>
         </div>
@@ -190,9 +181,9 @@ export default function Scanner() {
         <div className="px-4 md:px-0">
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="py-3 space-y-2 text-xs text-muted-foreground">
-              <p className="font-semibold text-foreground">Jak korzystać ze skanera</p>
-              <p>Skan QR zawsze weryfikuje kod po stronie API i pilnuje przypisań skanera do wydarzeń.</p>
-              <p>Tryb auto może od razu wykonać check-in, ale tylko gdy backend potwierdzi poprawny kod.</p>
+              <p className="font-semibold text-foreground">Jak korzystac ze skanera</p>
+              <p>Skan QR zawsze weryfikuje kod po stronie API i pilnuje przypisan skanera do wydarzen.</p>
+              <p>Tryb auto moze od razu ustawic status "Odprawiony", ale tylko gdy backend potwierdzi poprawny kod.</p>
             </CardContent>
           </Card>
         </div>
@@ -215,30 +206,27 @@ export default function Scanner() {
                 <span className="text-xl sm:text-2xl font-black tabular-nums text-primary shrink-0">#{scannedParticipant.bib_number}</span>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge variant={scannedParticipant.status === 'checked_in' ? 'default' : 'secondary'}>
-                  {scannedParticipant.status === 'checked_in' ? 'Odprawiony' : 'Oczekuje'}
-                </Badge>
-                <Badge variant={scannedParticipant.package_status === 'collected' ? 'default' : 'outline'}>
-                  {scannedParticipant.package_status === 'collected' ? 'Pakiet wydany' : 'Pakiet do wydania'}
+                <Badge variant={getParticipantStatusDefinition(scannedParticipant.status).badgeVariant}>
+                  {getParticipantStatusDefinition(scannedParticipant.status).label}
                 </Badge>
               </div>
               <div className="grid gap-2">
                 {scannedParticipant.status !== 'checked_in' && (
-                  <Button className="w-full" onClick={() => void handleCheckIn()} disabled={isMutating}>
+                  <Button className="w-full" onClick={() => void mutateStatus('checked_in', 'Uczestnik odprawiony')} disabled={isMutating}>
                     {isMutating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                    Odpraw zawodnika
+                    Odpraw uczestnika
                   </Button>
                 )}
-                {scannedParticipant.package_status !== 'collected' && (
-                  <Button variant="outline" className="w-full" onClick={() => void handleCollectPackage()} disabled={isMutating}>
-                    {isMutating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Package className="h-4 w-4 mr-1" />}
-                    Wydaj pakiet
+                {scannedParticipant.status !== 'checked_in_not_starting' && (
+                  <Button variant="outline" className="w-full" onClick={() => void mutateStatus('checked_in_not_starting', 'Uczestnik oznaczony jako bez startu')} disabled={isMutating}>
+                    {isMutating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <UserX2 className="h-4 w-4 mr-1" />}
+                    Oznacz jako bez startu
                   </Button>
                 )}
-                {scannedParticipant.status === 'checked_in' && (
-                  <Button variant="outline" className="w-full text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => void handleUndoCheckIn()} disabled={isMutating}>
+                {scannedParticipant.status !== 'not_checked_in' && (
+                  <Button variant="outline" className="w-full text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => void mutateStatus('not_checked_in', 'Odprawa cofnieta')} disabled={isMutating}>
                     {isMutating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Undo2 className="h-4 w-4 mr-1" />}
-                    Cofnij odprawę
+                    Cofnij odprawe
                   </Button>
                 )}
               </div>

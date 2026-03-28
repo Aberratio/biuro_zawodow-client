@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
+import { formatEventOfficeWindow, isValidEventOfficeRange } from '@/lib/events';
 
 type MemberRole = 'editor' | 'scanner';
 
@@ -47,6 +48,8 @@ export default function OrganizationDetails() {
     name: '',
     date: '',
     location: '',
+    office_open_at: '',
+    office_close_at: '',
   });
   const [scannerAssignmentDraft, setScannerAssignmentDraft] = useState<string[]>([]);
   const [limitDraft, setLimitDraft] = useState('');
@@ -154,6 +157,10 @@ export default function OrganizationDetails() {
 
   const handleAddEvent = async () => {
     if (!eventForm.name || !eventForm.date || !eventForm.location) return;
+    if (!eventForm.office_open_at || !eventForm.office_close_at || !isValidEventOfficeRange(eventForm.office_open_at, eventForm.office_close_at)) {
+      toast({ title: 'Nieprawidlowe godziny biura', description: 'Podaj poprawny zakres otwarcia i zamkniecia biura zawodow.', variant: 'destructive' });
+      return;
+    }
 
     setIsSubmittingEvent(true);
     const result = await createEvent({
@@ -161,6 +168,8 @@ export default function OrganizationDetails() {
       date: eventForm.date,
       location: eventForm.location,
       organization_id: organization.id,
+      office_open_at: eventForm.office_open_at,
+      office_close_at: eventForm.office_close_at,
     });
     setIsSubmittingEvent(false);
 
@@ -170,7 +179,7 @@ export default function OrganizationDetails() {
     }
 
     setEventDialogOpen(false);
-    setEventForm({ name: '', date: '', location: '' });
+    setEventForm({ name: '', date: '', location: '', office_open_at: '', office_close_at: '' });
     toast({ title: 'Wydarzenie utworzone' });
   };
 
@@ -257,6 +266,7 @@ export default function OrganizationDetails() {
                     <div>
                       <div className="text-sm font-medium">{event.name}</div>
                       <div className="text-xs text-muted-foreground">{event.date} • {event.location}</div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">Biuro: {formatEventOfficeWindow(event)}</div>
                     </div>
                     <Button size="sm" variant="outline" onClick={() => navigate(`/events/${event.id}`)}>
                       Wejdz do wydarzenia
@@ -378,10 +388,12 @@ export default function OrganizationDetails() {
             <div><Label>Nazwa</Label><Input value={eventForm.name} onChange={e => setEventForm(prev => ({ ...prev, name: e.target.value }))} /></div>
             <div><Label>Data</Label><Input type="date" value={eventForm.date} onChange={e => setEventForm(prev => ({ ...prev, date: e.target.value }))} /></div>
             <div><Label>Lokalizacja</Label><Input value={eventForm.location} onChange={e => setEventForm(prev => ({ ...prev, location: e.target.value }))} /></div>
+            <div><Label>Otwarcie biura zawodow</Label><Input type="datetime-local" value={eventForm.office_open_at} onChange={e => setEventForm(prev => ({ ...prev, office_open_at: e.target.value }))} /></div>
+            <div><Label>Zamkniecie biura zawodow</Label><Input type="datetime-local" value={eventForm.office_close_at} onChange={e => setEventForm(prev => ({ ...prev, office_close_at: e.target.value }))} /></div>
             <p className="text-[10px] text-muted-foreground">Limit organizacji: {orgEvents.length}/{organization.event_limit} wydarzen.</p>
           </div>
           <DialogFooter>
-            <Button onClick={handleAddEvent} disabled={!eventForm.name || !eventForm.date || !eventForm.location || remainingSlots <= 0 || isSubmittingEvent}>Zapisz</Button>
+            <Button onClick={handleAddEvent} disabled={!eventForm.name || !eventForm.date || !eventForm.location || !eventForm.office_open_at || !eventForm.office_close_at || remainingSlots <= 0 || isSubmittingEvent}>Zapisz</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

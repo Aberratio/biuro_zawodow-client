@@ -1,50 +1,76 @@
 import React from 'react';
-import { LayoutDashboard, CalendarDays, Users, ScanLine, FileUp, Mail, Shield, Pencil, Eye, Building2, LogOut, Crown, UserRound } from 'lucide-react';
+import { Building2, CalendarDays, Crown, Eye, FileUp, Info, LayoutDashboard, LogOut, Mail, Pencil, ScanLine, Shield, UserRound, Users } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useMockData } from '@/contexts/MockDataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
-  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Role } from '@/types';
 
 const allItems = [
-  { title: 'Dashboard', url: '/', icon: LayoutDashboard, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Dashboard', url: '/', icon: LayoutDashboard, roles: ['editor', 'admin', 'superadmin'] as Role[] },
   { title: 'Organizacje', url: '/organizations', icon: Building2, roles: ['admin', 'superadmin'] as Role[] },
   { title: 'Wydarzenia', url: '/events', icon: CalendarDays, roles: ['editor', 'admin', 'superadmin'] as Role[] },
   { title: 'Uczestnicy', url: '/participants', icon: Users, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
   { title: 'Skaner QR', url: '/scanner', icon: ScanLine, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Informacje', url: '/scanner-info', icon: Info, roles: ['scanner'] as Role[] },
   { title: 'Import CSV', url: '/import', icon: FileUp, roles: ['editor', 'admin', 'superadmin'] as Role[] },
   { title: 'Wysylka QR', url: '/emails', icon: Mail, roles: ['editor', 'admin', 'superadmin'] as Role[] },
-  { title: 'Mój profil', url: '/profile', icon: UserRound, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Moj profil', url: '/profile', icon: UserRound, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
 ];
 
 const roleIcons: Record<Role, typeof Shield> = { superadmin: Crown, admin: Shield, editor: Pencil, scanner: Eye };
 const roleLabels: Record<Role, string> = { superadmin: 'Superadmin', admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
-
+const eventScopedUrls = new Set(['/participants', '/scanner', '/import', '/emails']);
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const { currentRole, currentUser } = useMockData();
+  const { currentRole, currentUser, visibleEvents, selectedEventId, setSelectedEventId } = useMockData();
   const { logout } = useAuth();
-  const items = allItems.filter(item => item.roles.includes(currentRole));
+
+  const scannerHasActiveEvents = currentRole !== 'scanner' || visibleEvents.length > 0;
+  const items = allItems.filter(item => {
+    if (!item.roles.includes(currentRole)) return false;
+    if (currentRole !== 'scanner') return true;
+    if (item.url === '/participants' || item.url === '/scanner') return scannerHasActiveEvents;
+    if (item.url === '/scanner-info') return !scannerHasActiveEvents;
+    return true;
+  });
+
+  const generalItems = items.filter(item => !eventScopedUrls.has(item.url));
+  const eventScopedItems = items.filter(item => eventScopedUrls.has(item.url));
   const RoleIcon = roleIcons[currentRole];
+  const selectedEvent = visibleEvents.find(event => event.id === selectedEventId) ?? visibleEvents[0] ?? null;
+  const showEventSelector = visibleEvents.length > 0;
+  const showEventSelectControl = visibleEvents.length > 1 || currentRole !== 'scanner';
 
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>
-            {!collapsed && <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
-              <ScanLine className="h-4 w-4" /> Biuro Zawodow
-            </span>}
+            {!collapsed && (
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                <ScanLine className="h-4 w-4" /> Biuro Zawodow
+              </span>
+            )}
             {collapsed && <ScanLine className="h-4 w-4" />}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map(item => (
+              {generalItems.map(item => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end={item.url === '/'} className="hover:bg-accent/50" activeClassName="bg-accent font-medium text-accent-foreground">
@@ -57,7 +83,77 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {!collapsed && eventScopedItems.length > 0 && visibleEvents.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>
+              <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-sidebar-foreground/70">
+                Praca Na Wydarzeniu
+              </span>
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <div className="mx-2 rounded-2xl border border-sidebar-border/70 bg-sidebar-accent/35 p-2">
+                <div className="rounded-xl border border-sidebar-border/60 bg-sidebar-accent/50 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-sidebar-foreground/60">
+                    Wybrane wydarzenie
+                  </p>
+                  {showEventSelectControl ? (
+                    <div className="mt-2">
+                      <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+                        <SelectTrigger className="h-10 border-sidebar-border bg-sidebar text-xs text-sidebar-foreground">
+                          <SelectValue placeholder="Wybierz wydarzenie" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {visibleEvents.map(event => (
+                            <SelectItem key={event.id} value={event.id} className="text-xs">
+                              {event.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : selectedEvent ? (
+                    <div className="mt-2 rounded-xl bg-sidebar px-3 py-3">
+                      <p className="text-sm font-medium leading-snug text-sidebar-foreground">{selectedEvent.name}</p>
+                      <p className="mt-1 text-[11px] text-sidebar-foreground/65">
+                        Ten kontekst steruje narzedziami pracy dla wydarzenia.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-2 rounded-xl bg-sidebar px-3 py-3 text-xs text-sidebar-foreground/70">
+                      Brak dostepnych wydarzen w tym kontekscie.
+                    </div>
+                  )}
+                </div>
+
+                <SidebarMenu className="mt-2">
+                  {selectedEvent && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <NavLink to={`/events/${selectedEvent.id}`} end className="rounded-xl hover:bg-accent/50" activeClassName="rounded-xl bg-accent font-medium text-accent-foreground">
+                          <CalendarDays className="mr-2 h-4 w-4 shrink-0" />
+                          <span>Szczegoly wydarzenia</span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
+                  {eventScopedItems.map(item => (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton asChild>
+                        <NavLink to={item.url === '/import' && selectedEvent ? `/events/${selectedEvent.id}/import` : item.url} end={item.url !== '/import'} className="rounded-xl hover:bg-accent/50" activeClassName="rounded-xl bg-accent font-medium text-accent-foreground">
+                          <item.icon className="mr-2 h-4 w-4 shrink-0" />
+                          <span>{item.title}</span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
+
       <SidebarFooter className="p-3">
         {!collapsed ? (
           <div className="space-y-2">
