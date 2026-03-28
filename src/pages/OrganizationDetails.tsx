@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMockData } from '@/contexts/MockDataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Building2, CalendarDays, Users, Radio, ArrowLeft, Eye, EyeOff, RefreshCw, ArrowRight, Plus } from 'lucide-react';
+import { Building2, CalendarDays, Users, Radio, ArrowLeft, ArrowRight, Plus } from 'lucide-react';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -36,13 +36,11 @@ export default function OrganizationDetails() {
   const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
   const [isSavingScannerAssignments, setIsSavingScannerAssignments] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [selectedScannerId, setSelectedScannerId] = useState<string | null>(null);
   const [memberForm, setMemberForm] = useState({
     role: 'editor' as MemberRole,
     name: '',
     email: '',
-    password: 'demo123',
     assigned_events: [] as string[],
   });
   const [eventForm, setEventForm] = useState({
@@ -81,10 +79,8 @@ export default function OrganizationDetails() {
       role,
       name: '',
       email: '',
-      password: 'demo123',
       assigned_events: [],
     });
-    setShowPassword(false);
     setMemberDialogOpen(true);
   };
 
@@ -95,37 +91,7 @@ export default function OrganizationDetails() {
     setScannerAssignmentsDialogOpen(true);
   };
 
-  const generatePassword = () => {
-    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-    const lower = 'abcdefghijkmnopqrstuvwxyz';
-    const digits = '23456789';
-    const special = '!@#$%&*?';
-    const all = upper + lower + digits + special;
-    const picks = [
-      upper[Math.floor(Math.random() * upper.length)],
-      lower[Math.floor(Math.random() * lower.length)],
-      digits[Math.floor(Math.random() * digits.length)],
-      special[Math.floor(Math.random() * special.length)],
-    ];
-
-    while (picks.length < 14) {
-      picks.push(all[Math.floor(Math.random() * all.length)]);
-    }
-
-    setMemberForm(prev => ({ ...prev, password: picks.sort(() => Math.random() - 0.5).join('') }));
-    setShowPassword(true);
-  };
-
   const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
-  const validatePassword = (password: string) => {
-    if (password.length < 10) return 'Haslo musi miec co najmniej 10 znakow.';
-    if (!/[A-Z]/.test(password)) return 'Haslo musi zawierac wielka litere.';
-    if (!/[a-z]/.test(password)) return 'Haslo musi zawierac mala litere.';
-    if (!/\d/.test(password)) return 'Haslo musi zawierac cyfre.';
-    if (!/[^a-zA-Z0-9]/.test(password)) return 'Haslo musi zawierac znak specjalny.';
-    return null;
-  };
 
   const toggleScannerEvent = (eventId: string, checked: boolean) => {
     setMemberForm(prev => ({
@@ -148,17 +114,10 @@ export default function OrganizationDetails() {
       return;
     }
 
-    const passwordError = validatePassword(memberForm.password);
-    if (passwordError) {
-      toast({ title: 'Nieprawidlowe haslo', description: passwordError, variant: 'destructive' });
-      return;
-    }
-
     setIsSubmittingMember(true);
     const result = await addUser({
       name: memberForm.name,
       email: memberForm.email,
-      password: memberForm.password,
       role: memberForm.role,
       organization_id: organization.id,
       assigned_events: memberForm.role === 'scanner' ? memberForm.assigned_events : [],
@@ -171,7 +130,10 @@ export default function OrganizationDetails() {
     }
 
     setMemberDialogOpen(false);
-    toast({ title: memberForm.role === 'editor' ? 'Dodano organizatora' : 'Dodano skanera' });
+    toast({
+      title: memberForm.role === 'editor' ? 'Dodano organizatora' : 'Dodano skanera',
+      description: 'Użytkownik otrzyma mail z linkiem do ustawienia własnego hasła.',
+    });
   };
 
   const handleSaveLimit = async () => {
@@ -363,21 +325,9 @@ export default function OrganizationDetails() {
           <div className="space-y-4">
             <div><Label>Imie i nazwisko</Label><Input value={memberForm.name} onChange={e => setMemberForm(prev => ({ ...prev, name: e.target.value }))} /></div>
             <div><Label>Email</Label><Input value={memberForm.email} onChange={e => setMemberForm(prev => ({ ...prev, email: e.target.value }))} /></div>
-            <div className="space-y-2">
-              <Label>Haslo</Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input type={showPassword ? 'text' : 'password'} value={memberForm.password} onChange={e => setMemberForm(prev => ({ ...prev, password: e.target.value }))} className="pr-10" />
-                  <button type="button" onClick={() => setShowPassword(prev => !prev)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-label={showPassword ? 'Ukryj haslo' : 'Pokaz haslo'}>
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                <Button type="button" variant="outline" onClick={generatePassword}>
-                  <RefreshCw className="mr-1 h-4 w-4" /> Generuj
-                </Button>
-              </div>
-              <p className="text-[10px] text-muted-foreground">Minimum 10 znakow, wielka i mala litera, cyfra oraz znak specjalny.</p>
-            </div>
+            <p className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              Po zapisaniu konto zostanie utworzone, a użytkownik dostanie mail z bezpiecznym linkiem do ustawienia własnego hasła.
+            </p>
             {memberForm.role === 'scanner' && orgEvents.length > 0 && (
               <div className="space-y-2">
                 <Label>Przypisane wydarzenia</Label>
@@ -393,7 +343,7 @@ export default function OrganizationDetails() {
             )}
           </div>
           <DialogFooter>
-            <Button onClick={handleAddMember} disabled={!memberForm.name || !memberForm.email || !memberForm.password || isSubmittingMember}>Zapisz</Button>
+            <Button onClick={handleAddMember} disabled={!memberForm.name || !memberForm.email || isSubmittingMember}>Zapisz</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

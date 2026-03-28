@@ -7,6 +7,9 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAuthLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
+  forgotPassword: (email: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
+  resetPassword: (token: string, password: string, passwordConfirmation: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
+  changePassword: (currentPassword: string, newPassword: string, newPasswordConfirmation: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
   logout: () => void;
   getAuthHeaders: (includeJsonContentType?: boolean) => Record<string, string>;
   clearSession: () => void;
@@ -133,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
       if (!response.ok) {
@@ -160,6 +163,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearSession, persistSession]);
 
+  const forgotPassword = useCallback(async (email: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string; message?: string };
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          error: payload.error ?? 'Nie udało się wysłać linku resetującego.',
+        };
+      }
+
+      return { ok: true, message: payload.message };
+    } catch {
+      return { ok: false, error: 'Nie udało się połączyć z serwerem.' };
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (tokenValue: string, password: string, passwordConfirmation: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: tokenValue,
+          password,
+          password_confirmation: passwordConfirmation,
+        }),
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string; message?: string };
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          error: payload.error ?? 'Nie udało się zresetować hasła.',
+        };
+      }
+
+      return { ok: true, message: payload.message };
+    } catch {
+      return { ok: false, error: 'Nie udało się połączyć z serwerem.' };
+    }
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string, newPasswordConfirmation: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+          new_password_confirmation: newPasswordConfirmation,
+        }),
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string; message?: string };
+
+      if (response.status === 401) {
+        clearSession();
+      }
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          error: payload.error ?? 'Nie udało się zmienić hasła.',
+        };
+      }
+
+      return { ok: true, message: payload.message };
+    } catch {
+      return { ok: false, error: 'Nie udało się połączyć z serwerem.' };
+    }
+  }, [clearSession, getAuthHeaders]);
+
   const logout = useCallback(() => {
     clearSession();
   }, [clearSession]);
@@ -171,6 +252,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: !!token && !!user,
       isAuthLoading,
       login,
+      forgotPassword,
+      resetPassword,
+      changePassword,
       logout,
       getAuthHeaders,
       clearSession,

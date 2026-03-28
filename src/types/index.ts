@@ -35,6 +35,21 @@ export interface Participant {
   custom_fields?: Record<string, string>;
 }
 
+export interface ParticipantQrPreview {
+  participant: Participant;
+  event: Event;
+  qr_code_svg_data_uri: string;
+  qr_code_image_url: string;
+}
+
+export interface ParticipantScanResult {
+  participant: Participant;
+  event: Event;
+  access: {
+    allowed: boolean;
+  };
+}
+
 export type ParticipantFieldRole = 'email' | 'display_name_part' | 'bib_number' | 'custom';
 
 export interface ParticipantFieldMapping {
