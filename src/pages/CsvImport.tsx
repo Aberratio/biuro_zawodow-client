@@ -110,13 +110,11 @@ export default function CsvImport() {
     if (!analysis) return [];
     if (analysis.has_mapping) return analysis.headers;
 
-    const visibleHeaders = analysis.headers.filter(header => {
+    return analysis.headers.filter(header => {
       if (header === selectedEmailColumn) return true;
       const matchingDraft = mappingDrafts.find(field => field.source_column_name === header);
       return matchingDraft ? matchingDraft.field_role !== 'ignore' : true;
     });
-
-    return visibleHeaders;
   }, [analysis, mappingDrafts, selectedEmailColumn]);
 
   const handleFilePicked = async (eventValue: ChangeEvent<HTMLInputElement>) => {

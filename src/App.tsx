@@ -17,6 +17,8 @@ import EmailSending from "./pages/EmailSending";
 import Organizations from "./pages/Organizations";
 import OrganizationDetails from "./pages/OrganizationDetails";
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +28,31 @@ function ImportRedirect() {
   return <Navigate to={`/events/${selectedEventId}/import`} replace />;
 }
 
+function ProtectedAppRoutes() {
+  return (
+    <MockDataProvider>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/events/:id" element={<EventDetails />} />
+          <Route path="/events/:id/import" element={<CsvImport />} />
+          <Route path="/participants" element={<Participants />} />
+          <Route path="/participants/:id" element={<ParticipantDetails />} />
+          <Route path="/scanner" element={<Scanner />} />
+          <Route path="/import" element={<ImportRedirect />} />
+          <Route path="/emails" element={<EmailSending />} />
+          <Route path="/organizations" element={<Organizations />} />
+          <Route path="/organizations/:id" element={<OrganizationDetails />} />
+          <Route path="/users" element={<Organizations />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Layout>
+    </MockDataProvider>
+  );
+}
+
 function AppRoutes() {
   const { isAuthenticated, isAuthLoading } = useAuth();
 
@@ -33,30 +60,16 @@ function AppRoutes() {
     return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Trwa weryfikacja sesji...</div>;
   }
 
-  if (!isAuthenticated) return <Login />;
-
   return (
-    <MockDataProvider>
-      <BrowserRouter>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/events" element={<Events />} />
-            <Route path="/events/:id" element={<EventDetails />} />
-            <Route path="/events/:id/import" element={<CsvImport />} />
-            <Route path="/participants" element={<Participants />} />
-            <Route path="/participants/:id" element={<ParticipantDetails />} />
-            <Route path="/scanner" element={<Scanner />} />
-            <Route path="/import" element={<ImportRedirect />} />
-            <Route path="/emails" element={<EmailSending />} />
-            <Route path="/organizations" element={<Organizations />} />
-            <Route path="/organizations/:id" element={<OrganizationDetails />} />
-            <Route path="/users" element={<Organizations />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Layout>
-      </BrowserRouter>
-    </MockDataProvider>
+    <Routes>
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
+      {isAuthenticated ? (
+        <Route path="/*" element={<ProtectedAppRoutes />} />
+      ) : (
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      )}
+    </Routes>
   );
 }
 
@@ -66,7 +79,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
-        <AppRoutes />
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

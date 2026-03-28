@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, CalendarDays, Users, ScanLine, FileUp, Mail, Shield, Pencil, Eye, Building2, LogOut, Crown } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Users, ScanLine, FileUp, Mail, Shield, Pencil, Eye, Building2, LogOut, Crown, UserRound } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useMockData } from '@/contexts/MockDataContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +18,7 @@ const allItems = [
   { title: 'Skaner QR', url: '/scanner', icon: ScanLine, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
   { title: 'Import CSV', url: '/import', icon: FileUp, roles: ['editor', 'admin', 'superadmin'] as Role[] },
   { title: 'Wysylka QR', url: '/emails', icon: Mail, roles: ['editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Mój profil', url: '/profile', icon: UserRound, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
 ];
 
 const roleIcons: Record<Role, typeof Shield> = { superadmin: Crown, admin: Shield, editor: Pencil, scanner: Eye };
