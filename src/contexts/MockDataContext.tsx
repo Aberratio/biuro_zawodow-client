@@ -12,12 +12,13 @@ interface ParticipantImportMappingFieldInput { source_column_name: string; alias
 interface ParticipantImportMappingPayload { csv_columns: string[]; email_column: string; fields: ParticipantImportMappingFieldInput[]; }
 interface ParticipantImportRunResult { created_count: number; duplicate_count: number; invalid_count: number; invalid_rows: number[]; participants: Participant[]; }
 interface ParticipantUpdatePayload { status?: ParticipantStatus; email?: string; field_values?: Record<string, string>; }
+type EventMutationInput = Omit<Event, 'id'>;
 interface MockDataContextType {
   organizations: Organization[]; events: Event[]; participants: Participant[]; users: User[]; activityLog: ActivityLog[]; currentRole: Role; currentUser: User; selectedEventId: string; setSelectedEventId: (id: string) => void;
   updateParticipantStatus: (participantId: string, status: ParticipantStatus) => Promise<MutationResult>; reassignParticipantPackage: (participantId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
   addParticipant: (p: Omit<Participant, 'id' | 'qr_code' | 'status' | 'email_status'>) => void; updateParticipant: (id: string, data: Partial<Participant>) => void; importParticipants: (data: { name: string; email: string }[], eventId: string) => number;
   analyzeParticipantImport: (eventId: string, csvContent: string) => Promise<ParticipantImportAnalysis>; confirmParticipantImportMapping: (eventId: string, payload: ParticipantImportMappingPayload) => Promise<ParticipantFieldMapping[]>; runParticipantImport: (eventId: string, csvContent: string) => Promise<ParticipantImportRunResult>; getParticipantFieldMappings: (eventId: string) => Promise<ParticipantFieldMapping[]>; addParticipantManually: (eventId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
-  createEvent: (e: Omit<Event, 'id'>) => Promise<MutationResult>; addUser: (u: UserCreateInput) => Promise<MutationResult>; createOrganization: (data: { name: string; event_limit: number; admin_user_id?: string }) => Promise<MutationResult>; updateOrganizationEventLimit: (organizationId: string, eventLimit: number) => Promise<MutationResult>; removeUser: (id: string) => Promise<MutationResult>; changeRole: (userId: string, role: Role) => Promise<MutationResult>; assignScannerEvents: (userId: string, eventIds: string[]) => Promise<MutationResult>;
+  createEvent: (e: EventMutationInput) => Promise<MutationResult>; updateEvent: (eventId: string, data: EventMutationInput) => Promise<MutationResult>; addUser: (u: UserCreateInput) => Promise<MutationResult>; createOrganization: (data: { name: string; event_limit: number; admin_user_id?: string }) => Promise<MutationResult>; updateOrganizationEventLimit: (organizationId: string, eventLimit: number) => Promise<MutationResult>; removeUser: (id: string) => Promise<MutationResult>; changeRole: (userId: string, role: Role) => Promise<MutationResult>; assignScannerEvents: (userId: string, eventIds: string[]) => Promise<MutationResult>;
   sendParticipantQrEmail: (participantId: string) => Promise<MutationResult>; sendEventQrEmails: (eventId: string, resendAll?: boolean) => Promise<EventQrEmailResult>; getParticipantQrPreview: (participantId: string) => Promise<ParticipantQrPreview>; scanParticipantQr: (qrCode: string, autoCheckIn?: boolean) => Promise<{ ok: boolean; data?: ParticipantScanResult; error?: string; status?: number }>;
   markEmailsSent: (eventId: string) => void; addLog: (action: string, participantName?: string) => void; getParticipantsByEvent: (eventId: string) => Participant[]; visibleEvents: Event[]; canAccessEvent: (eventId: string) => boolean; isUsingApi: boolean; isLoading: boolean;
 }
@@ -43,6 +44,16 @@ function mapApiParticipantToUi(participant: ApiParticipant, fallbackEventId: str
 function splitFullName(fullName: string): { firstName: string; lastName: string } { const parts = fullName.trim().split(/\s+/).filter(Boolean); if (parts.length === 0) return { firstName: 'Unknown', lastName: 'Participant' }; if (parts.length === 1) return { firstName: parts[0], lastName: '-' }; return { firstName: parts[0], lastName: parts.slice(1).join(' ') }; }
 function participantUiIdToApiId(participantId: string): string { return participantId.startsWith('p-') ? participantId.slice(2) : participantId; }
 function mapApiUserToUi(user: ApiUser): User { return { ...user, password: '', organization_id: user.organization_id ?? undefined, organization_ids: Array.isArray(user.organization_ids) ? user.organization_ids : [], assigned_events: Array.isArray(user.assigned_events) ? user.assigned_events : [] }; }
+function getDefaultCurrentUser(): User { return { id: '', name: '', email: '', password: '', role: 'scanner', assigned_events: [] }; }
+function getVisibleEventsForUser(allEvents: Event[], user: User, now = new Date()): Event[] {
+  if (user.role === 'superadmin') return allEvents;
+  if (user.role === 'admin') return allEvents.filter(event => (user.organization_ids ?? []).includes(event.organization_id));
+  if (user.role === 'editor') return allEvents.filter(event => event.organization_id === user.organization_id);
+  return allEvents.filter(event => user.assigned_events.includes(event.id) && isEventOfficeOpen(event, now));
+}
+function resolveSelectedEventId(availableEvents: Event[], preferredSelectedEventId: string): string {
+  return availableEvents.some(event => event.id === preferredSelectedEventId) ? preferredSelectedEventId : availableEvents[0]?.id ?? '';
+}
 export function MockDataProvider({ children }: { children: ReactNode }) {
   const { user: authUser, token, getAuthHeaders, clearSession } = useAuth();
   const [organizations, setOrganizations] = useState<Organization[]>([]); const [events, setEvents] = useState<Event[]>([]); const [participants, setParticipants] = useState<Participant[]>([]); const [users, setUsers] = useState<User[]>([]); const [activityLog, setActivityLog] = useState<ActivityLog[]>([]); const [selectedEventId, setSelectedEventIdState] = useState<string>(''); const [isUsingApi, setIsUsingApi] = useState(false); const [isLoading, setIsLoading] = useState(true); const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
@@ -50,13 +61,13 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const setSelectedEventId = useCallback((eventId: string) => { setSelectedEventIdState(eventId); persistSelectedEventId(eventId, authUser?.id); }, [authUser?.id, persistSelectedEventId]);
   const syncStoredAuthUser = useCallback((updater: (user: User) => User) => { try { const raw = sessionStorage.getItem('auth_user'); if (!raw) return; const parsed = JSON.parse(raw) as User; sessionStorage.setItem('auth_user', JSON.stringify(updater(parsed))); } catch {} }, []);
   const loadBootstrap = useCallback(async () => {
-    setIsLoading(true); if (!authUser || !token) { setOrganizations([]); setEvents([]); setParticipants([]); setUsers([]); setActivityLog([]); setSelectedEventId(''); setIsUsingApi(false); setIsLoading(false); throw new Error('Missing API token'); }
+    setIsLoading(true); if (!authUser || !token) { setOrganizations([]); setEvents([]); setParticipants([]); setUsers([]); setActivityLog([]); setSelectedEventIdState(''); setIsUsingApi(false); setIsLoading(false); throw new Error('Missing API token'); }
     const response = await fetch(`${API_BASE_URL}/bootstrap`, { headers: getAuthHeaders() }); if (response.status === 401) { clearSession(); throw new Error('Unauthorized'); } if (!response.ok) throw new Error(`API bootstrap failed: ${response.status}`);
-    const payload = (await response.json()) as BootstrapResponse; const data = payload?.data; if (!data) throw new Error('API bootstrap returned empty payload'); const apiEvents = Array.isArray(data.events) ? data.events : []; const storedSelectedEventId = readStoredSelectedEventId(authUser.id); const preferredSelectedEventId = storedSelectedEventId || selectedEventId; const nextSelectedEvent = apiEvents.some(event => event.id === preferredSelectedEventId) ? preferredSelectedEventId : apiEvents[0]?.id ?? '';
-    setOrganizations(Array.isArray(data.organizations) ? data.organizations : []); setEvents(apiEvents); setUsers((data.users ?? []).map(mapApiUserToUi)); setParticipants((data.participants ?? []).map(participant => mapApiParticipantToUi(participant, nextSelectedEvent))); setActivityLog(Array.isArray(data.activityLog) ? data.activityLog : []); setSelectedEventId(nextSelectedEvent); setIsUsingApi(true); setIsLoading(false);
-  }, [authUser, clearSession, getAuthHeaders, selectedEventId, setSelectedEventId, token]);
+    const payload = (await response.json()) as BootstrapResponse; const data = payload?.data; if (!data) throw new Error('API bootstrap returned empty payload'); const apiEvents = Array.isArray(data.events) ? data.events : []; const nextUsers = (data.users ?? []).map(mapApiUserToUi); const nextCurrentUser = nextUsers.find(user => user.id === authUser.id) ?? authUser; const availableEvents = getVisibleEventsForUser(apiEvents, nextCurrentUser); const storedSelectedEventId = readStoredSelectedEventId(authUser.id); const nextSelectedEvent = resolveSelectedEventId(availableEvents, storedSelectedEventId);
+    setOrganizations(Array.isArray(data.organizations) ? data.organizations : []); setEvents(apiEvents); setUsers(nextUsers); setParticipants((data.participants ?? []).map(participant => mapApiParticipantToUi(participant, nextSelectedEvent))); setActivityLog(Array.isArray(data.activityLog) ? data.activityLog : []); setSelectedEventIdState(nextSelectedEvent); persistSelectedEventId(nextSelectedEvent, authUser.id); setIsUsingApi(true); setIsLoading(false);
+  }, [authUser, clearSession, getAuthHeaders, persistSelectedEventId, token]);
   useEffect(() => { void loadBootstrap().catch(() => { setIsUsingApi(false); setIsLoading(false); }); }, [loadBootstrap]);
-  useEffect(() => { if (!authUser?.id) { setSelectedEventIdState(''); return; } const storedSelectedEventId = readStoredSelectedEventId(authUser.id); if (storedSelectedEventId) setSelectedEventIdState(storedSelectedEventId); }, [authUser?.id]);
+  useEffect(() => { if (!authUser?.id) { setSelectedEventIdState(''); return; } setSelectedEventIdState(readStoredSelectedEventId(authUser.id)); }, [authUser?.id]);
   useEffect(() => {
     if (!authUser?.id) return undefined;
     const storageKey = getSelectedEventStorageKey(authUser.id);
@@ -71,21 +82,16 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     const intervalId = window.setInterval(() => setNowTimestamp(Date.now()), 30_000);
     return () => window.clearInterval(intervalId);
   }, []);
-  const currentUser = useMemo(() => { if (!authUser) { return { id: '', name: '', email: '', password: '', role: 'scanner' as const, assigned_events: [] }; } return users.find(user => user.id === authUser.id) || authUser; }, [users, authUser]);
+  const currentUser = useMemo(() => { if (!authUser) return getDefaultCurrentUser(); return users.find(user => user.id === authUser.id) || authUser; }, [users, authUser]);
   const currentRole = currentUser.role;
-  const visibleEvents = useMemo(() => {
-    const now = new Date(nowTimestamp);
-    if (currentRole === 'superadmin') return events;
-    if (currentRole === 'admin') return events.filter(event => (currentUser.organization_ids ?? []).includes(event.organization_id));
-    if (currentRole === 'editor') return events.filter(event => event.organization_id === currentUser.organization_id);
-    return events.filter(event => currentUser.assigned_events.includes(event.id) && isEventOfficeOpen(event, now));
-  }, [currentRole, currentUser, events, nowTimestamp]);
+  const visibleEvents = useMemo(() => getVisibleEventsForUser(events, currentUser, new Date(nowTimestamp)), [currentUser, events, nowTimestamp]);
   useEffect(() => {
-    if (visibleEvents.some(event => event.id === selectedEventId)) {
+    const nextVisibleEventId = visibleEvents[0]?.id ?? '';
+    if (visibleEvents.some(event => event.id === selectedEventId) || nextVisibleEventId === selectedEventId) {
       return;
     }
 
-    setSelectedEventId(visibleEvents[0]?.id ?? '');
+    setSelectedEventId(nextVisibleEventId);
   }, [selectedEventId, setSelectedEventId, visibleEvents]);
   const canAccessEvent = useCallback((eventId: string) => { if (currentRole === 'superadmin') return true; const event = events.find(entry => entry.id === eventId); if (!event) return false; if (currentRole === 'admin') return (currentUser.organization_ids ?? []).includes(event.organization_id); if (currentRole === 'editor') return event.organization_id === currentUser.organization_id; return currentUser.assigned_events.includes(eventId) && isEventOfficeOpen(event, new Date(nowTimestamp)); }, [currentRole, currentUser, events, nowTimestamp]);
   const addLog = useCallback((action: string, participantName?: string) => { setActivityLog(previous => [{ id: `log-${Date.now()}`, timestamp: new Date().toISOString(), action, participant_name: participantName, user_name: currentUser.name }, ...previous]); }, [currentUser.name]);
@@ -107,7 +113,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
       await loadBootstrap().catch(() => undefined);
       return { ok: true };
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : 'Nie udalo sie zaktualizowac statusu uczestnika' };
+      return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zaktualizować statusu uczestnika' };
     }
   }, [isUsingApi, loadBootstrap, replaceParticipant, updateParticipantInApi]);
   const reassignParticipantPackage = useCallback(async (participantId: string, email: string, fieldValues: Record<string, string>): Promise<MutationResult> => {
@@ -121,7 +127,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
       await loadBootstrap().catch(() => undefined);
       return { ok: true };
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : 'Nie udalo sie przepisac pakietu' };
+      return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się przepisać pakietu' };
     }
   }, [isUsingApi, loadBootstrap, replaceParticipant, updateParticipantInApi]);
   const createParticipantInApi = useCallback(async (data: Omit<Participant, 'id' | 'qr_code' | 'status' | 'email_status'>): Promise<Participant | null> => {
@@ -142,7 +148,7 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const runParticipantImport = useCallback(async (eventId: string, csvContent: string): Promise<ParticipantImportRunResult> => {
     const response = await fetch(`${API_BASE_URL}/events/${eventId}/participant-imports/run`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ csv_content: csvContent }) });
     const payload = await response.json().catch(() => ({})); if (!response.ok) { const details = Array.isArray(payload?.missing_columns) && payload.missing_columns.length > 0 ? ` (${payload.missing_columns.join(', ')})` : ''; throw new Error((payload?.error ?? `API participant import run failed: ${response.status}`) + details); }
-    const data = payload?.data ?? {}; const createdParticipants = Array.isArray(data.participants) ? data.participants.map((participant: ApiParticipant) => mapApiParticipantToUi(participant, eventId)) : []; setParticipants(previous => [...previous, ...createdParticipants]); if (createdParticipants.length > 0) addLog(`Import CSV (${createdParticipants.length} uczestnikow)`);
+    const data = payload?.data ?? {}; const createdParticipants = Array.isArray(data.participants) ? data.participants.map((participant: ApiParticipant) => mapApiParticipantToUi(participant, eventId)) : []; setParticipants(previous => [...previous, ...createdParticipants]); if (createdParticipants.length > 0) addLog(`Import CSV (${createdParticipants.length} uczestników)`);
     return { created_count: Number(data.created_count ?? 0), duplicate_count: Number(data.duplicate_count ?? 0), invalid_count: Number(data.invalid_count ?? 0), invalid_rows: Array.isArray(data.invalid_rows) ? data.invalid_rows.map((row: number) => Number(row)) : [], participants: createdParticipants };
   }, [addLog, getAuthHeaders]);
   const getParticipantFieldMappings = useCallback(async (eventId: string): Promise<ParticipantFieldMapping[]> => {
@@ -159,9 +165,19 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     if (!response.ok) { const payload = await response.json().catch(() => ({})) as { error?: string }; throw new Error(payload.error ?? `API user create failed: ${response.status}`); }
     const payload = await response.json() as { data?: ApiUser }; if (!payload.data) throw new Error('API user create returned empty payload'); return mapApiUserToUi(payload.data);
   }, [getAuthHeaders]);
-  const createEventInApi = useCallback(async (data: Omit<Event, 'id'>): Promise<Event> => {
+  const createEventInApi = useCallback(async (data: EventMutationInput): Promise<Event> => {
     const response = await fetch(`${API_BASE_URL}/events`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(data) }); if (!response.ok) { const payload = await response.json().catch(() => ({})) as { error?: string }; throw new Error(payload.error ?? `API event create failed: ${response.status}`); }
     const payload = await response.json() as { data?: ApiEvent }; if (!payload.data) throw new Error('API event create returned empty payload'); return payload.data;
+  }, [getAuthHeaders]);
+  const updateEventInApi = useCallback(async (eventId: string, data: EventMutationInput): Promise<Event> => {
+    const response = await fetch(`${API_BASE_URL}/events/${eventId}`, { method: 'PATCH', headers: getAuthHeaders(true), body: JSON.stringify(data) });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      throw new Error(payload.error ?? `API event update failed: ${response.status}`);
+    }
+    const payload = await response.json() as { data?: ApiEvent };
+    if (!payload.data) throw new Error('API event update returned empty payload');
+    return payload.data;
   }, [getAuthHeaders]);
   const updateOrganizationEventLimitInApi = useCallback(async (organizationId: string, eventLimit: number): Promise<Organization> => {
     const response = await fetch(`${API_BASE_URL}/organizations/${organizationId}/event-limit`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ event_limit: eventLimit }) }); if (!response.ok) { const payload = await response.json().catch(() => ({})) as { error?: string }; throw new Error(payload.error ?? `API organization update failed: ${response.status}`); }
@@ -192,38 +208,49 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
   const importParticipants = useCallback((data: { name: string; email: string }[], eventId: string) => {
     const existing = participants.filter(participant => participant.event_id === eventId); const existingEmails = new Set(existing.map(participant => participant.email)); const valid = data.filter(entry => entry.email && !existingEmails.has(entry.email)); const maxBib = Math.max(0, ...existing.map(participant => parseInt(participant.bib_number, 10) || 0));
     const newParticipants: Participant[] = valid.map((entry, index) => ({ id: `p-${Date.now()}-${index}`, event_id: eventId, name: entry.name, email: entry.email, bib_number: String(maxBib + index + 1), qr_code: `fallback-${eventId}-${Date.now()}-${index}`, status: 'not_checked_in', email_status: 'not_sent' }));
-    setParticipants(previous => [...previous, ...newParticipants]); addLog(`Import CSV (${newParticipants.length} uczestnikow)`); return newParticipants.length;
+    setParticipants(previous => [...previous, ...newParticipants]); addLog(`Import CSV (${newParticipants.length} uczestników)`); return newParticipants.length;
   }, [addLog, participants]);
-  const createEvent = useCallback(async (eventData: Omit<Event, 'id'>): Promise<MutationResult> => {
+  const createEvent = useCallback(async (eventData: EventMutationInput): Promise<MutationResult> => {
     const organization = organizations.find(entry => entry.id === eventData.organization_id); const organizationEventCount = events.filter(event => event.organization_id === eventData.organization_id).length;
-    if (organization && organizationEventCount >= organization.event_limit) return { ok: false, error: 'Limit wydarzen dla tej organizacji zostal osiagniety' };
-    if (!isUsingApi) return { ok: false, error: 'API jest niedostepne. Wydarzenie nie zostalo zapisane w bazie danych.' };
-    try { const createdEvent = await createEventInApi(eventData); setEvents(previous => [...previous, createdEvent]); addLog(`Utworzono wydarzenie: ${createdEvent.name}`); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udalo sie utworzyc wydarzenia' }; }
+    if (organization && organizationEventCount >= organization.event_limit) return { ok: false, error: 'Limit wydarzeń dla tej organizacji został osiągnięty' };
+    if (!isUsingApi) return { ok: false, error: 'API jest niedostępne. Wydarzenie nie zostało zapisane w bazie danych.' };
+    try { const createdEvent = await createEventInApi(eventData); setEvents(previous => [...previous, createdEvent]); addLog(`Utworzono wydarzenie: ${createdEvent.name}`); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się utworzyć wydarzenia' }; }
   }, [addLog, createEventInApi, events, isUsingApi, organizations]);
+  const updateEvent = useCallback(async (eventId: string, eventData: EventMutationInput): Promise<MutationResult> => {
+    if (!isUsingApi) return { ok: false, error: 'API jest niedostępne. Wydarzenie nie zostało zapisane w bazie danych.' };
+    try {
+      const updatedEvent = await updateEventInApi(eventId, eventData);
+      setEvents(previous => previous.map(event => event.id === eventId ? updatedEvent : event));
+      addLog(`Zaktualizowano wydarzenie: ${updatedEvent.name}`);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zaktualizować wydarzenia' };
+    }
+  }, [addLog, isUsingApi, updateEventInApi]);
   const addUser = useCallback(async (userData: UserCreateInput): Promise<MutationResult> => {
-    if (!isUsingApi) return { ok: false, error: 'API jest niedostepne. Uzytkownik nie zostal zapisany w bazie danych.' };
-    try { const createdUser = await createUserInApi(userData); setUsers(previous => [...previous, createdUser]); addLog(`Dodano uzytkownika: ${createdUser.name}`); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udalo sie utworzyc uzytkownika' }; }
+    if (!isUsingApi) return { ok: false, error: 'API jest niedostępne. Użytkownik nie został zapisany w bazie danych.' };
+    try { const createdUser = await createUserInApi(userData); setUsers(previous => [...previous, createdUser]); addLog(`Dodano użytkownika: ${createdUser.name}`); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się utworzyć użytkownika' }; }
   }, [addLog, createUserInApi, isUsingApi]);
   const createOrganization = useCallback(async (data: { name: string; event_limit: number; admin_user_id?: string }): Promise<MutationResult> => {
-    if (!isUsingApi) return { ok: false, error: 'API jest niedostepne. Organizacja nie zostala zapisana w bazie danych.' };
-    try { const createdOrganization = await createOrganizationInApi(data); setOrganizations(previous => [...previous, createdOrganization]); if (currentRole === 'admin') { setUsers(previous => previous.map(user => user.id === currentUser.id ? { ...user, organization_ids: [...new Set([...(user.organization_ids ?? []), createdOrganization.id])] } : user)); syncStoredAuthUser(user => ({ ...user, organization_ids: [...new Set([...(user.organization_ids ?? []), createdOrganization.id])] })); } return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udalo sie utworzyc organizacji' }; }
+    if (!isUsingApi) return { ok: false, error: 'API jest niedostępne. Organizacja nie została zapisana w bazie danych.' };
+    try { const createdOrganization = await createOrganizationInApi(data); setOrganizations(previous => [...previous, createdOrganization]); if (currentRole === 'admin') { setUsers(previous => previous.map(user => user.id === currentUser.id ? { ...user, organization_ids: [...new Set([...(user.organization_ids ?? []), createdOrganization.id])] } : user)); syncStoredAuthUser(user => ({ ...user, organization_ids: [...new Set([...(user.organization_ids ?? []), createdOrganization.id])] })); } return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się utworzyć organizacji' }; }
   }, [createOrganizationInApi, currentRole, currentUser.id, isUsingApi, syncStoredAuthUser]);
   const assignScannerEvents = useCallback(async (userId: string, eventIds: string[]): Promise<MutationResult> => {
-    if (!isUsingApi) return { ok: false, error: 'API jest niedostepne. Przypisania skanera nie zostaly zapisane w bazie danych.' };
-    try { const updatedUser = await assignScannerEventsInApi(userId, eventIds); setUsers(previous => previous.map(user => user.id === userId ? updatedUser : user)); syncStoredAuthUser(user => user.id === userId ? updatedUser : user); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udalo sie zapisac przypisan skanera' }; }
+    if (!isUsingApi) return { ok: false, error: 'API jest niedostępne. Przypisania skanera nie zostały zapisane w bazie danych.' };
+    try { const updatedUser = await assignScannerEventsInApi(userId, eventIds); setUsers(previous => previous.map(user => user.id === userId ? updatedUser : user)); syncStoredAuthUser(user => user.id === userId ? updatedUser : user); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zapisać przypisań skanera' }; }
   }, [assignScannerEventsInApi, isUsingApi, syncStoredAuthUser]);
   const updateOrganizationEventLimit = useCallback(async (organizationId: string, eventLimit: number): Promise<MutationResult> => {
     if (!isUsingApi) { setOrganizations(previous => previous.map(organization => organization.id === organizationId ? { ...organization, event_limit: eventLimit } : organization)); return { ok: true }; }
-    try { const updatedOrganization = await updateOrganizationEventLimitInApi(organizationId, eventLimit); setOrganizations(previous => previous.map(organization => organization.id === organizationId ? updatedOrganization : organization)); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udalo sie zaktualizowac limitu wydarzen' }; }
+    try { const updatedOrganization = await updateOrganizationEventLimitInApi(organizationId, eventLimit); setOrganizations(previous => previous.map(organization => organization.id === organizationId ? updatedOrganization : organization)); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zaktualizować limitu wydarzeń' }; }
   }, [isUsingApi, updateOrganizationEventLimitInApi]);
   const removeUser = useCallback(async (id: string): Promise<MutationResult> => {
-    if (!isUsingApi) return { ok: false, error: 'API jest niedostepne. Uzytkownik nie zostal usuniety z bazy danych.' };
+    if (!isUsingApi) return { ok: false, error: 'API jest niedostępne. Użytkownik nie został usunięty z bazy danych.' };
     const existingUser = users.find(user => user.id === id);
-    try { await deleteUserInApi(id); setUsers(previous => previous.filter(user => user.id !== id)); if (existingUser) addLog(`Usunieto uzytkownika: ${existingUser.name}`); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udalo sie usunac uzytkownika' }; }
+    try { await deleteUserInApi(id); setUsers(previous => previous.filter(user => user.id !== id)); if (existingUser) addLog(`Usunięto użytkownika: ${existingUser.name}`); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się usunąć użytkownika' }; }
   }, [addLog, deleteUserInApi, isUsingApi, users]);
   const changeRole = useCallback(async (userId: string, role: Role): Promise<MutationResult> => {
-    if (!isUsingApi) return { ok: false, error: 'API jest niedostepne. Rola nie zostala zapisana w bazie danych.' };
-    try { const updatedUser = await changeUserRoleInApi(userId, role); setUsers(previous => previous.map(user => user.id === userId ? updatedUser : user)); syncStoredAuthUser(user => user.id === userId ? updatedUser : user); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udalo sie zmienic roli uzytkownika' }; }
+    if (!isUsingApi) return { ok: false, error: 'API jest niedostępne. Rola nie została zapisana w bazie danych.' };
+    try { const updatedUser = await changeUserRoleInApi(userId, role); setUsers(previous => previous.map(user => user.id === userId ? updatedUser : user)); syncStoredAuthUser(user => user.id === userId ? updatedUser : user); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zmienić roli użytkownika' }; }
   }, [changeUserRoleInApi, isUsingApi, syncStoredAuthUser]);
   const sendParticipantQrEmail = useCallback(async (participantId: string): Promise<MutationResult> => {
     const response = await fetch(`${API_BASE_URL}/participants/${participantUiIdToApiId(participantId)}/send-qr-email`, { method: 'POST', headers: getAuthHeaders() });
@@ -250,10 +277,10 @@ export function MockDataProvider({ children }: { children: ReactNode }) {
     await loadBootstrap().catch(() => undefined);
     return { ok: true, data: { participant: mapApiParticipantToUi(payload.data.participant, payload.data.event.id), event: payload.data.event, access: { allowed: Boolean(payload.data.access?.allowed) } }, status: response.status };
   }, [getAuthHeaders, loadBootstrap]);
-  const markEmailsSent = useCallback((eventId: string) => { setParticipants(previous => previous.map(participant => participant.event_id === eventId ? { ...participant, email_status: 'sent' as const } : participant)); addLog('Wyslano kody QR do wszystkich'); }, [addLog]);
+  const markEmailsSent = useCallback((eventId: string) => { setParticipants(previous => previous.map(participant => participant.event_id === eventId ? { ...participant, email_status: 'sent' as const } : participant)); addLog('Wysłano kody QR do wszystkich'); }, [addLog]);
   const getParticipantsByEvent = useCallback((eventId: string) => participants.filter(participant => participant.event_id === eventId), [participants]);
   return (
-    <MockDataContext.Provider value={{ organizations, events, participants, users, activityLog, currentRole, currentUser, selectedEventId, setSelectedEventId, updateParticipantStatus, reassignParticipantPackage, addParticipant, updateParticipant, importParticipants, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, addUser, createOrganization, updateOrganizationEventLimit, removeUser, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, markEmailsSent, addLog, getParticipantsByEvent, visibleEvents, canAccessEvent, isUsingApi, isLoading }}>
+    <MockDataContext.Provider value={{ organizations, events, participants, users, activityLog, currentRole, currentUser, selectedEventId, setSelectedEventId, updateParticipantStatus, reassignParticipantPackage, addParticipant, updateParticipant, importParticipants, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, addUser, createOrganization, updateOrganizationEventLimit, removeUser, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, markEmailsSent, addLog, getParticipantsByEvent, visibleEvents, canAccessEvent, isUsingApi, isLoading }}>
       {children}
     </MockDataContext.Provider>
   );

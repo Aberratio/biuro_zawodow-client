@@ -28,10 +28,10 @@ export default function Dashboard() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Przeglad {currentRole === 'admin' ? 'organizacji' : 'Twoich wydarzen'} - statystyki i ostatnie akcje.
+            Przegląd {currentRole === 'admin' ? 'organizacji' : 'Twoich wydarzeń'} - statystyki i ostatnie akcje.
           </p>
         </div>
-        <div className="grid gap-3 sm:gap-4 grid-cols-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
           <StatCard icon={CalendarDays} label="Wydarzenia" value={visibleEvents.length} />
           <StatCard icon={Users} label="Uczestnicy" value={totalParticipants} />
           <StatCard icon={CheckCircle} label="Odprawieni" value={totalCheckedIn} />
@@ -45,12 +45,12 @@ export default function Dashboard() {
                 const scopedCheckedIn = scopedEventParticipants.filter(participantCountsAsCheckedIn).length;
 
                 return (
-                  <div key={event.id} className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-accent/50 active:scale-[0.98] transition-all" onClick={() => navigate(`/events/${event.id}`)}>
-                    <div className="min-w-0 mr-3">
+                  <div key={event.id} className="flex flex-col gap-3 rounded-lg border p-3 transition-all hover:bg-accent/50 active:scale-[0.98] sm:flex-row sm:items-center sm:justify-between" onClick={() => navigate(`/events/${event.id}`)}>
+                    <div className="min-w-0 sm:mr-3">
                       <p className="font-medium text-sm truncate">{event.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{event.date} · {event.location}</p>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="shrink-0 sm:text-right">
                       <p className="text-sm font-semibold tabular-nums">{scopedCheckedIn}/{scopedEventParticipants.length}</p>
                       <div className="w-16 sm:w-20 h-1.5 bg-muted rounded-full mt-1">
                         <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${scopedEventParticipants.length ? (scopedCheckedIn / scopedEventParticipants.length) * 100 : 0}%` }} />
@@ -75,7 +75,7 @@ export default function Dashboard() {
                 </div>
               ))}
               {activityLog.length === 0 && (
-                <p className="text-sm text-muted-foreground py-4 text-center">Brak akcji do wyswietlenia</p>
+                <p className="text-sm text-muted-foreground py-4 text-center">Brak akcji do wyświetlenia</p>
               )}
             </CardContent>
           </Card>
@@ -89,14 +89,14 @@ export default function Dashboard() {
       <div>
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-          Twoj panel skanera - statystyki aktualnego wydarzenia.
+          Twój panel skanera - statystyki aktualnego wydarzenia.
         </p>
       </div>
 
       {currentEvent && (
         <Card className="border-2">
           <CardContent className="pt-6">
-            <p className="text-base sm:text-lg font-semibold">{currentEvent.name}</p>
+            <p className="text-base sm:text-lg font-semibold break-words">{currentEvent.name}</p>
             <p className="text-xs sm:text-sm text-muted-foreground">{currentEvent.date} · {currentEvent.location}</p>
           </CardContent>
         </Card>
@@ -107,8 +107,8 @@ export default function Dashboard() {
           <div className="flex items-start gap-2">
             <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <div className="text-xs text-muted-foreground space-y-1">
-              <p>Witaj! Kliknij <strong>"Przejdz do skanera"</strong> aby rozpoczac odprawe uczestnikow.</p>
-              <p>Mozesz skanowac kody QR kamera lub wyszukac zawodnika recznie po nazwisku albo numerze.</p>
+              <p>Witaj! Kliknij <strong>"Przejdź do skanera"</strong>, aby rozpocząć odprawę uczestników.</p>
+              <p>Możesz skanować kody QR kamerą lub wyszukać zawodnika ręcznie po nazwisku albo numerze.</p>
             </div>
           </div>
         </CardContent>
@@ -120,20 +120,20 @@ export default function Dashboard() {
       </div>
 
       <Button size="lg" className="w-full h-14 sm:h-16 text-base sm:text-lg gap-3 touch-manipulation active:scale-[0.98]" onClick={() => navigate('/scanner')}>
-        <ScanLine className="h-5 w-5 sm:h-6 sm:w-6" /> Przejdz do skanera
+        <ScanLine className="h-5 w-5 sm:h-6 sm:w-6" /> Przejdź do skanera
       </Button>
 
       <Card>
         <CardHeader><CardTitle className="text-base">Ostatnie skany</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           {activityLog.filter(log => log.action === 'Check-in').slice(0, 5).map(log => (
-            <div key={log.id} className="flex items-center justify-between py-1.5 text-sm">
-              <span className="font-medium truncate mr-2">{log.participant_name}</span>
-              <span className="text-xs text-muted-foreground shrink-0">{formatDistanceToNow(new Date(log.timestamp), { addSuffix: true, locale: pl })}</span>
+            <div key={log.id} className="flex flex-col gap-1 py-1.5 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <span className="mr-2 truncate font-medium">{log.participant_name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{formatDistanceToNow(new Date(log.timestamp), { addSuffix: true, locale: pl })}</span>
             </div>
           ))}
           {activityLog.filter(log => log.action === 'Check-in').length === 0 && (
-            <p className="text-sm text-muted-foreground py-4 text-center">Brak skanow - przejdz do skanera aby rozpoczac odprawe</p>
+            <p className="text-sm text-muted-foreground py-4 text-center">Brak skanów - przejdź do skanera, aby rozpocząć odprawę</p>
           )}
         </CardContent>
       </Card>

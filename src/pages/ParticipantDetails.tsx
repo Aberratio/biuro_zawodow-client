@@ -70,7 +70,7 @@ export default function ParticipantDetails() {
     void getParticipantQrPreview(participant.id)
       .then(setQrPreview)
       .catch(error => {
-        toast({ title: 'Nie udalo sie pobrac podgladu QR', description: error instanceof Error ? error.message : 'Blad API', variant: 'destructive' });
+        toast({ title: 'Nie udało się pobrać podglądu QR', description: error instanceof Error ? error.message : 'Błąd API', variant: 'destructive' });
       })
       .finally(() => setIsQrLoading(false));
   }, [canManage, getParticipantQrPreview, participant?.id]);
@@ -83,8 +83,8 @@ export default function ParticipantDetails() {
     const status = getParticipantStatusDefinition(participant.status);
 
     return [
-      { time: 'Rejestracja', desc: 'Uczestnik znajduje sie na liscie startowej', icon: Clock },
-      ...(participant.email_status === 'sent' ? [{ time: 'QR wyslany', desc: 'Kod QR zostal wyslany mailem', icon: Mail }] : []),
+      { time: 'Rejestracja', desc: 'Uczestnik znajduje się na liście startowej', icon: Clock },
+      ...(participant.email_status === 'sent' ? [{ time: 'QR wysłany', desc: 'Kod QR został wysłany mailem', icon: Mail }] : []),
       ...(participant.checked_in_at ? [{ time: 'Status', desc: `${status.label}${participant.checked_in_at ? ` o ${new Date(participant.checked_in_at).toLocaleTimeString('pl-PL')}` : ''}`, icon: CheckCircle }] : []),
     ];
   }, [participant]);
@@ -99,11 +99,11 @@ export default function ParticipantDetails() {
     try {
       const result = await sendParticipantQrEmail(participant.id);
       if (!result.ok) {
-        toast({ title: 'Nie udalo sie wyslac maila', description: result.error, variant: 'destructive' });
+        toast({ title: 'Nie udało się wysłać maila', description: result.error, variant: 'destructive' });
         return;
       }
 
-      toast({ title: 'Mail z QR wyslany', description: participant.name });
+      toast({ title: 'Mail z QR wysłany', description: participant.name });
     } finally {
       setIsSendingQr(false);
     }
@@ -116,7 +116,7 @@ export default function ParticipantDetails() {
     try {
       const result = await updateParticipantStatus(participant.id, statusValue);
       if (!result.ok) {
-        toast({ title: 'Nie udalo sie zmienic statusu', description: result.error, variant: 'destructive' });
+        toast({ title: 'Nie udało się zmienić statusu', description: result.error, variant: 'destructive' });
         return;
       }
 
@@ -141,7 +141,7 @@ export default function ParticipantDetails() {
     }
 
     if (missingFields.length > 0) {
-      toast({ title: 'Uzupelnij wszystkie pola uczestnika', description: missingFields.join(', '), variant: 'destructive' });
+      toast({ title: 'Uzupełnij wszystkie pola uczestnika', description: missingFields.join(', '), variant: 'destructive' });
       return;
     }
 
@@ -149,21 +149,21 @@ export default function ParticipantDetails() {
     try {
       const result = await reassignParticipantPackage(participant.id, transferEmail, transferFields);
       if (!result.ok) {
-        toast({ title: 'Nie udalo sie przepisac pakietu', description: result.error, variant: 'destructive' });
+        toast({ title: 'Nie udało się przepisać pakietu', description: result.error, variant: 'destructive' });
         return;
       }
 
       setTransferOpen(false);
-      toast({ title: 'Pakiet przepisany na nowa osobe' });
+      toast({ title: 'Pakiet przepisany na nową osobę' });
     } finally {
       setIsSavingTransfer(false);
     }
   };
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="mx-auto max-w-4xl space-y-6">
       <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="touch-manipulation">
-        <ArrowLeft className="h-4 w-4 mr-1" /> Wroc
+        <ArrowLeft className="h-4 w-4 mr-1" /> Wróć
       </Button>
 
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -173,14 +173,14 @@ export default function ParticipantDetails() {
           {event && <p className="text-xs text-muted-foreground mt-1">{event.name}</p>}
         </div>
         {canManage && (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setTransferOpen(true)}>
               <UserRoundCog className="h-4 w-4 mr-1" />
-              Przepisz pakiet na inna osobe
+              Przepisz pakiet na inną osobę
             </Button>
-            <Button variant="outline" size="sm" onClick={() => void handleSendQr()} disabled={isSendingQr}>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => void handleSendQr()} disabled={isSendingQr}>
               {isSendingQr ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Repeat className="h-4 w-4 mr-1" />}
-              Wyslij ponownie QR
+              Wyślij ponownie QR
             </Button>
           </div>
         )}
@@ -188,15 +188,15 @@ export default function ParticipantDetails() {
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <Card>
-          <CardHeader><CardTitle className="text-base">Szczegoly uczestnika</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Szczegóły uczestnika</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Numer startowy</span><span className="font-semibold tabular-nums">#{participant.bib_number}</span></div>
-            <div className="flex justify-between text-sm items-center"><span className="text-muted-foreground">Status</span><Badge variant={statusDefinition.badgeVariant}>{statusDefinition.label}</Badge></div>
-            <div className="flex justify-between text-sm items-center"><span className="text-muted-foreground">Mail z QR</span><Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'}>{participant.email_status === 'sent' ? 'Wyslany' : 'Oczekuje'}</Badge></div>
-            <div className="flex justify-between gap-4 text-sm"><span className="text-muted-foreground">Token QR</span><span className="font-mono text-xs break-all text-right">{participant.qr_code}</span></div>
+            <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Numer startowy</span><span className="font-semibold tabular-nums">#{participant.bib_number}</span></div>
+            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Status</span><Badge variant={statusDefinition.badgeVariant}>{statusDefinition.label}</Badge></div>
+            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Mail z QR</span><Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'}>{participant.email_status === 'sent' ? 'Wysłany' : 'Oczekuje'}</Badge></div>
+            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-start sm:justify-between"><span className="text-muted-foreground">Token QR</span><span className="font-mono text-xs break-all sm:max-w-[18rem] sm:text-right">{participant.qr_code}</span></div>
             {canManage && (
               <div className="space-y-2 pt-2">
-                <Label>Zmien status</Label>
+                <Label>Zmień status</Label>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Select value={statusValue} onValueChange={value => setStatusValue(value as ParticipantStatus)}>
                     <SelectTrigger className="sm:flex-1"><SelectValue /></SelectTrigger>
@@ -208,7 +208,7 @@ export default function ParticipantDetails() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button onClick={() => void handleSaveStatus()} disabled={isSavingStatus || statusValue === participant.status}>
+                  <Button className="w-full sm:w-auto" onClick={() => void handleSaveStatus()} disabled={isSavingStatus || statusValue === participant.status}>
                     {isSavingStatus && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                     Zapisz status
                   </Button>
@@ -222,7 +222,7 @@ export default function ParticipantDetails() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base">Podglad QR</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Podgląd QR</CardTitle></CardHeader>
           <CardContent>
             {isQrLoading ? (
               <div className="aspect-square rounded-xl border border-dashed flex items-center justify-center text-muted-foreground">
@@ -240,7 +240,7 @@ export default function ParticipantDetails() {
             ) : (
               <div className="aspect-square rounded-xl border border-dashed flex flex-col items-center justify-center text-muted-foreground gap-2">
                 <QrCode className="h-8 w-8" />
-                <span className="text-sm">Brak podgladu QR</span>
+                <span className="text-sm">Brak podglądu QR</span>
               </div>
             )}
           </CardContent>
@@ -269,7 +269,7 @@ export default function ParticipantDetails() {
       <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[calc(100vh-2rem)] overflow-hidden p-0 flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-            <DialogTitle>Przepisz pakiet na inna osobe</DialogTitle>
+            <DialogTitle>Przepisz pakiet na inną osobę</DialogTitle>
           </DialogHeader>
           <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4 space-y-4">
             <div>
@@ -289,7 +289,7 @@ export default function ParticipantDetails() {
             ))}
           </div>
           <DialogFooter className="px-6 py-4 border-t shrink-0">
-            <Button onClick={() => void handleTransferSubmit()} disabled={isSavingTransfer}>
+            <Button className="w-full sm:w-auto" onClick={() => void handleTransferSubmit()} disabled={isSavingTransfer}>
               {isSavingTransfer && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Zapisz zmiany
             </Button>

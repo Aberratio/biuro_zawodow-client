@@ -97,7 +97,7 @@ export default function Scanner() {
     try {
       const result = await updateParticipantStatus(scannedParticipant.id, status);
       if (!result.ok) {
-        toast({ title: 'Nie udalo sie zaktualizowac statusu', description: result.error, variant: 'destructive' });
+        toast({ title: 'Nie udało się zaktualizować statusu', description: result.error, variant: 'destructive' });
         return;
       }
 
@@ -129,12 +129,12 @@ export default function Scanner() {
     const status = getParticipantStatusDefinition(scannedParticipant.status);
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-600 cursor-pointer animate-in fade-in duration-200" onClick={resetToIdle}>
-        <div className="text-center text-white px-6 space-y-4">
-          <CheckCircle className="h-20 w-20 mx-auto" strokeWidth={2.5} />
-          <p className="text-4xl md:text-6xl font-black tracking-tight">{status.shortLabel.toUpperCase()}</p>
-          <p className="text-2xl md:text-3xl font-bold">{scannedParticipant.name}</p>
-          <p className="text-5xl md:text-7xl font-black tabular-nums">#{scannedParticipant.bib_number}</p>
+      <div className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-emerald-600 animate-in fade-in duration-200" onClick={resetToIdle}>
+        <div className="max-w-md space-y-4 px-6 text-center text-white">
+          <CheckCircle className="mx-auto h-16 w-16 sm:h-20 sm:w-20" strokeWidth={2.5} />
+          <p className="text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">{status.shortLabel.toUpperCase()}</p>
+          <p className="break-words text-xl font-bold sm:text-2xl md:text-3xl">{scannedParticipant.name}</p>
+          <p className="text-4xl font-black tabular-nums sm:text-5xl md:text-7xl">#{scannedParticipant.bib_number}</p>
           {scannedParticipant.status === 'checked_in_not_starting' && (
             <p className="text-base opacity-80 mt-4">Pakiet odebrany, uczestnik nie wystartuje</p>
           )}
@@ -145,22 +145,22 @@ export default function Scanner() {
 
   if (view === 'error') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-destructive cursor-pointer animate-in fade-in duration-200" onClick={resetToIdle}>
-        <div className="text-center text-white px-6 space-y-4">
-          <AlertTriangle className="h-20 w-20 mx-auto" strokeWidth={2.5} />
-          <p className="text-3xl md:text-5xl font-black">BLAD SKANU</p>
-          <p className="text-base opacity-80">{errorMessage}</p>
+      <div className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-destructive animate-in fade-in duration-200" onClick={resetToIdle}>
+        <div className="max-w-md space-y-4 px-6 text-center text-white">
+          <AlertTriangle className="mx-auto h-16 w-16 sm:h-20 sm:w-20" strokeWidth={2.5} />
+          <p className="text-3xl font-black sm:text-4xl md:text-5xl">BŁĄD SKANU</p>
+          <p className="text-sm opacity-80 sm:text-base">{errorMessage}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3 max-w-lg mx-auto -mx-4 md:mx-auto px-0">
-      <div className="flex items-center justify-between px-4 md:px-0 gap-2">
+    <div className="mx-auto max-w-xl space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 md:px-0">
         <div className="flex items-center gap-2">
           <h1 className="text-lg md:text-2xl font-bold tracking-tight">Skaner</h1>
-          <button className="text-muted-foreground hover:text-foreground transition-colors touch-manipulation" onClick={() => setShowHelp(previous => !previous)} aria-label="Pokaz instrukcje">
+          <button className="text-muted-foreground hover:text-foreground transition-colors touch-manipulation" onClick={() => setShowHelp(previous => !previous)} aria-label="Pokaż instrukcję">
             <Info className="h-4 w-4" />
           </button>
         </div>
@@ -181,9 +181,9 @@ export default function Scanner() {
         <div className="px-4 md:px-0">
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="py-3 space-y-2 text-xs text-muted-foreground">
-              <p className="font-semibold text-foreground">Jak korzystac ze skanera</p>
-              <p>Skan QR zawsze weryfikuje kod po stronie API i pilnuje przypisan skanera do wydarzen.</p>
-              <p>Tryb auto moze od razu ustawic status "Odprawiony", ale tylko gdy backend potwierdzi poprawny kod.</p>
+              <p className="font-semibold text-foreground">Jak korzystać ze skanera</p>
+              <p>Skan QR zawsze weryfikuje kod po stronie API i pilnuje przypisań skanera do wydarzeń.</p>
+              <p>Tryb auto może od razu ustawić status "Odprawiony", ale tylko gdy backend potwierdzi poprawny kod.</p>
             </CardContent>
           </Card>
         </div>
@@ -224,9 +224,9 @@ export default function Scanner() {
                   </Button>
                 )}
                 {scannedParticipant.status !== 'not_checked_in' && (
-                  <Button variant="outline" className="w-full text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => void mutateStatus('not_checked_in', 'Odprawa cofnieta')} disabled={isMutating}>
+                  <Button variant="outline" className="w-full text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => void mutateStatus('not_checked_in', 'Odprawa cofnięta')} disabled={isMutating}>
                     {isMutating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Undo2 className="h-4 w-4 mr-1" />}
-                    Cofnij odprawe
+                    Cofnij odprawę
                   </Button>
                 )}
               </div>
@@ -246,11 +246,11 @@ export default function Scanner() {
               {showRecent && (
                 <div className="space-y-1 mt-2">
                   {recentScans.map(participant => (
-                    <div key={participant.id} className="flex items-center justify-between py-2 px-2 rounded hover:bg-accent/30 cursor-pointer" onClick={() => { setScannedParticipant(participant); setView('detail'); }}>
-                      <span className="font-medium truncate">{participant.name}</span>
-                      <span className="text-xs text-muted-foreground">#{participant.bib_number}</span>
-                    </div>
-                  ))}
+                  <div key={participant.id} className="flex items-center justify-between gap-2 rounded px-2 py-2 hover:bg-accent/30 cursor-pointer" onClick={() => { setScannedParticipant(participant); setView('detail'); }}>
+                    <span className="min-w-0 truncate font-medium">{participant.name}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">#{participant.bib_number}</span>
+                  </div>
+                ))}
                 </div>
               )}
             </CardContent>

@@ -19,13 +19,13 @@ export function Layout({ children }: { children: ReactNode }) {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center justify-between border-b px-4 bg-background shrink-0">
-            <div className="flex items-center gap-3">
+          <header className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 shrink-0">
+            <div className="flex min-w-0 items-center gap-3">
               <SidebarTrigger />
             </div>
-            <div className="hidden md:flex items-center gap-2">
+            <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
               {(currentUser.organization_id || currentRole === 'admin') && (
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="max-w-[12rem] truncate text-[10px] sm:max-w-[18rem]">
                   {organizationLabel}
                 </Badge>
               )}
@@ -34,7 +34,7 @@ export function Layout({ children }: { children: ReactNode }) {
               </Badge>
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-4 md:p-6">
+          <main className="flex-1 overflow-auto p-4 sm:p-5 lg:p-6">
             {children}
           </main>
         </div>

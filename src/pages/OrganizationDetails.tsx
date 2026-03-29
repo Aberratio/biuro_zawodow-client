@@ -113,7 +113,7 @@ export default function OrganizationDetails() {
 
   const handleAddMember = async () => {
     if (!validateEmail(memberForm.email)) {
-      toast({ title: 'Nieprawidlowy email', description: 'Podaj poprawny adres email.', variant: 'destructive' });
+      toast({ title: 'Nieprawidłowy email', description: 'Podaj poprawny adres email.', variant: 'destructive' });
       return;
     }
 
@@ -128,7 +128,7 @@ export default function OrganizationDetails() {
     setIsSubmittingMember(false);
 
     if (!result.ok) {
-      toast({ title: 'Nie udalo sie dodac konta', description: result.error ?? 'Sprobuj ponownie.', variant: 'destructive' });
+      toast({ title: 'Nie udało się dodać konta', description: result.error ?? 'Spróbuj ponownie.', variant: 'destructive' });
       return;
     }
 
@@ -142,23 +142,23 @@ export default function OrganizationDetails() {
   const handleSaveLimit = async () => {
     const parsed = Number(limitDraft || organization.event_limit);
     if (!Number.isInteger(parsed) || parsed < 0) {
-      toast({ title: 'Nieprawidlowy limit', description: 'Podaj liczbe calkowita wieksza lub rowna 0.', variant: 'destructive' });
+      toast({ title: 'Nieprawidłowy limit', description: 'Podaj liczbę całkowitą większą lub równą 0.', variant: 'destructive' });
       return;
     }
 
     const result = await updateOrganizationEventLimit(organization.id, parsed);
     if (!result.ok) {
-      toast({ title: 'Nie udalo sie zapisac limitu', description: result.error ?? 'Sprobuj ponownie.', variant: 'destructive' });
+      toast({ title: 'Nie udało się zapisać limitu', description: result.error ?? 'Spróbuj ponownie.', variant: 'destructive' });
       return;
     }
 
-    toast({ title: 'Zaktualizowano limit wydarzen' });
+    toast({ title: 'Zaktualizowano limit wydarzeń' });
   };
 
   const handleAddEvent = async () => {
     if (!eventForm.name || !eventForm.date || !eventForm.location) return;
     if (!eventForm.office_open_at || !eventForm.office_close_at || !isValidEventOfficeRange(eventForm.office_open_at, eventForm.office_close_at)) {
-      toast({ title: 'Nieprawidlowe godziny biura', description: 'Podaj poprawny zakres otwarcia i zamkniecia biura zawodow.', variant: 'destructive' });
+      toast({ title: 'Nieprawidłowe godziny biura', description: 'Podaj poprawny zakres otwarcia i zamknięcia biura zawodów.', variant: 'destructive' });
       return;
     }
 
@@ -174,7 +174,7 @@ export default function OrganizationDetails() {
     setIsSubmittingEvent(false);
 
     if (!result.ok) {
-      toast({ title: 'Nie udalo sie utworzyc wydarzenia', description: result.error ?? 'Sprobuj ponownie.', variant: 'destructive' });
+      toast({ title: 'Nie udało się utworzyć wydarzenia', description: result.error ?? 'Spróbuj ponownie.', variant: 'destructive' });
       return;
     }
 
@@ -191,7 +191,7 @@ export default function OrganizationDetails() {
     setIsSavingScannerAssignments(false);
 
     if (!result.ok) {
-      toast({ title: 'Nie udalo sie zapisac przypisan skanera', description: result.error ?? 'Sprobuj ponownie.', variant: 'destructive' });
+      toast({ title: 'Nie udało się zapisać przypisań skanera', description: result.error ?? 'Spróbuj ponownie.', variant: 'destructive' });
       return;
     }
 
@@ -201,13 +201,13 @@ export default function OrganizationDetails() {
 
   const getEventNames = (eventIds: string[]) => {
     const names = orgEvents.filter(event => eventIds.includes(event.id)).map(event => event.name);
-    return names.length > 0 ? names.join(', ') : 'Brak przypisanych wydarzen';
+    return names.length > 0 ? names.join(', ') : 'Brak przypisanych wydarzeń';
   };
 
   return (
     <div className="space-y-6">
       <Button variant="ghost" size="sm" onClick={() => navigate('/organizations')} className="touch-manipulation">
-        <ArrowLeft className="mr-1 h-4 w-4" /> Wroc do organizacji
+        <ArrowLeft className="mr-1 h-4 w-4" /> Wróć do organizacji
       </Button>
 
       <Card className="overflow-hidden border-border/70 shadow-sm">
@@ -223,10 +223,10 @@ export default function OrganizationDetails() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">{orgEvents.length}/{organization.event_limit} wydarzen</Badge>
+              <Badge variant="secondary">{orgEvents.length}/{organization.event_limit} wydarzeń</Badge>
               <Badge variant="outline">{remainingSlots} wolnych miejsc</Badge>
-              <Badge variant="outline">{organizers.length} organizatorow</Badge>
-              <Badge variant="outline">{scanners.length} skanerow</Badge>
+              <Badge variant="outline">{organizers.length} organizatorów</Badge>
+              <Badge variant="outline">{scanners.length} skanerów</Badge>
             </div>
           </div>
         </CardHeader>
@@ -236,24 +236,24 @@ export default function OrganizationDetails() {
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="flex-1">
-                  <Label>Limit wydarzen</Label>
+                  <Label>Limit wydarzeń</Label>
                   <Input type="number" min="0" value={limitDraft || String(organization.event_limit)} onChange={e => setLimitDraft(e.target.value)} />
                 </div>
-                <Button onClick={handleSaveLimit}>Zapisz limit</Button>
+                <Button className="w-full sm:w-auto" onClick={handleSaveLimit}>Zapisz limit</Button>
               </div>
             </div>
           )}
 
           <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <CalendarDays className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-semibold">Wydarzenia</h2>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Pozostalo {remainingSlots} miejsc</span>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <span className="text-xs text-muted-foreground">Pozostało {remainingSlots} miejsc</span>
                 {canCreateEvent && (
-                  <Button size="sm" variant="outline" onClick={() => setEventDialogOpen(true)}>
+                  <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => setEventDialogOpen(true)}>
                     <Plus className="mr-1 h-4 w-4" /> Dodaj wydarzenie
                   </Button>
                 )}
@@ -268,25 +268,25 @@ export default function OrganizationDetails() {
                       <div className="text-xs text-muted-foreground">{event.date} • {event.location}</div>
                       <div className="mt-1 text-[11px] text-muted-foreground">Biuro: {formatEventOfficeWindow(event)}</div>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/events/${event.id}`)}>
-                      Wejdz do wydarzenia
+                    <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => navigate(`/events/${event.id}`)}>
+                      Wejdź do wydarzenia
                       <ArrowRight className="ml-1 h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               )) : (
-                <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">Brak wydarzen dla tej organizacji.</div>
+                <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">Brak wydarzeń dla tej organizacji.</div>
               )}
             </div>
           </section>
 
           <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-semibold">Organizatorzy</h2>
               </div>
-              {canManageMembers && <Button size="sm" variant="outline" onClick={() => openMemberDialog('editor')}>Dodaj organizatora</Button>}
+              {canManageMembers && <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => openMemberDialog('editor')}>Dodaj organizatora</Button>}
             </div>
             <div className="grid gap-2">
               {organizers.length > 0 ? organizers.map(organizer => (
@@ -295,17 +295,17 @@ export default function OrganizationDetails() {
                   <div className="text-xs text-muted-foreground">{organizer.email}</div>
                   <div className="mt-1 text-[11px] text-muted-foreground">Organizacja: {organization.name}</div>
                 </div>
-              )) : <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">Brak organizatorow w tej organizacji.</div>}
+              )) : <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">Brak organizatorów w tej organizacji.</div>}
             </div>
           </section>
 
           <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <Radio className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-semibold">Skanerzy</h2>
               </div>
-              {canManageScanners && <Button size="sm" variant="outline" onClick={() => openMemberDialog('scanner')}>Dodaj skanera</Button>}
+              {canManageScanners && <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => openMemberDialog('scanner')}>Dodaj skanera</Button>}
             </div>
             <div className="grid gap-2">
               {scanners.length > 0 ? scanners.map(scanner => (
@@ -317,13 +317,13 @@ export default function OrganizationDetails() {
                       <div className="mt-1 text-[11px] text-muted-foreground">Wydarzenia: {getEventNames(scanner.assigned_events)}</div>
                     </div>
                     {canManageScanners && (
-                      <Button size="sm" variant="outline" onClick={() => openScannerAssignmentsDialog(scanner.id)}>
+                      <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => openScannerAssignmentsDialog(scanner.id)}>
                         Przypisz wydarzenia
                       </Button>
                     )}
                   </div>
                 </div>
-              )) : <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">Brak skanerow w tej organizacji.</div>}
+              )) : <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">Brak skanerów w tej organizacji.</div>}
             </div>
           </section>
         </CardContent>
@@ -333,7 +333,7 @@ export default function OrganizationDetails() {
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader><DialogTitle>{memberForm.role === 'editor' ? 'Dodaj organizatora' : 'Dodaj skanera'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div><Label>Imie i nazwisko</Label><Input value={memberForm.name} onChange={e => setMemberForm(prev => ({ ...prev, name: e.target.value }))} /></div>
+            <div><Label>Imię i nazwisko</Label><Input value={memberForm.name} onChange={e => setMemberForm(prev => ({ ...prev, name: e.target.value }))} /></div>
             <div><Label>Email</Label><Input value={memberForm.email} onChange={e => setMemberForm(prev => ({ ...prev, email: e.target.value }))} /></div>
             <p className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
               Po zapisaniu konto zostanie utworzone, a użytkownik dostanie mail z bezpiecznym linkiem do ustawienia własnego hasła.
@@ -353,7 +353,7 @@ export default function OrganizationDetails() {
             )}
           </div>
           <DialogFooter>
-            <Button onClick={handleAddMember} disabled={!memberForm.name || !memberForm.email || isSubmittingMember}>Zapisz</Button>
+            <Button className="w-full sm:w-auto" onClick={handleAddMember} disabled={!memberForm.name || !memberForm.email || isSubmittingMember}>Zapisz</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -376,7 +376,7 @@ export default function OrganizationDetails() {
             )}
           </div>
           <DialogFooter>
-            <Button onClick={handleSaveScannerAssignments} disabled={isSavingScannerAssignments}>Zapisz przypisania</Button>
+            <Button className="w-full sm:w-auto" onClick={handleSaveScannerAssignments} disabled={isSavingScannerAssignments}>Zapisz przypisania</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -388,12 +388,12 @@ export default function OrganizationDetails() {
             <div><Label>Nazwa</Label><Input value={eventForm.name} onChange={e => setEventForm(prev => ({ ...prev, name: e.target.value }))} /></div>
             <div><Label>Data</Label><Input type="date" value={eventForm.date} onChange={e => setEventForm(prev => ({ ...prev, date: e.target.value }))} /></div>
             <div><Label>Lokalizacja</Label><Input value={eventForm.location} onChange={e => setEventForm(prev => ({ ...prev, location: e.target.value }))} /></div>
-            <div><Label>Otwarcie biura zawodow</Label><Input type="datetime-local" value={eventForm.office_open_at} onChange={e => setEventForm(prev => ({ ...prev, office_open_at: e.target.value }))} /></div>
-            <div><Label>Zamkniecie biura zawodow</Label><Input type="datetime-local" value={eventForm.office_close_at} onChange={e => setEventForm(prev => ({ ...prev, office_close_at: e.target.value }))} /></div>
-            <p className="text-[10px] text-muted-foreground">Limit organizacji: {orgEvents.length}/{organization.event_limit} wydarzen.</p>
+            <div><Label>Otwarcie biura zawodów</Label><Input type="datetime-local" value={eventForm.office_open_at} onChange={e => setEventForm(prev => ({ ...prev, office_open_at: e.target.value }))} /></div>
+            <div><Label>Zamknięcie biura zawodów</Label><Input type="datetime-local" value={eventForm.office_close_at} onChange={e => setEventForm(prev => ({ ...prev, office_close_at: e.target.value }))} /></div>
+            <p className="text-[10px] text-muted-foreground">Limit organizacji: {orgEvents.length}/{organization.event_limit} wydarzeń.</p>
           </div>
           <DialogFooter>
-            <Button onClick={handleAddEvent} disabled={!eventForm.name || !eventForm.date || !eventForm.location || !eventForm.office_open_at || !eventForm.office_close_at || remainingSlots <= 0 || isSubmittingEvent}>Zapisz</Button>
+            <Button className="w-full sm:w-auto" onClick={handleAddEvent} disabled={!eventForm.name || !eventForm.date || !eventForm.location || !eventForm.office_open_at || !eventForm.office_close_at || remainingSlots <= 0 || isSubmittingEvent}>Zapisz</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
