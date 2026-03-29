@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, FileUp, Loader2, Mail, RefreshCcw, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
+import { formatEventOfficeWindow } from '@/lib/events';
 
 type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom';
 
@@ -221,8 +222,10 @@ export default function CsvImport() {
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Wydarzenie: <span className="font-medium text-foreground">{event.name}</span>
           </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Biuro zawodów: {formatEventOfficeWindow(event)}
+          </p>
         </div>
-        <Badge variant="outline" className="self-start">{event.date}</Badge>
       </div>
 
       <Card className="border-dashed">
