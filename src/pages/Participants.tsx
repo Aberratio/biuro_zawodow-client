@@ -82,7 +82,7 @@ export default function Participants() {
 
     if (!result.ok) {
       toast({
-        title: 'Nie udalo sie dodac uczestnika',
+        title: 'Nie udało się dodać uczestnika',
         description: result.error,
         variant: 'destructive',
       });
@@ -92,7 +92,7 @@ export default function Participants() {
     setManualOpen(false);
     setManualEmail('');
     setManualFields(buildEmptyParticipantFieldValues(mappings));
-    toast({ title: 'Dodano uczestnika recznie' });
+    toast({ title: 'Dodano uczestnika ręcznie' });
   };
 
   if (isLoading) return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
@@ -103,12 +103,12 @@ export default function Participants() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Uczestnicy</h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Lista uczestnikow wybranego wydarzenia. Kliknij wiersz, aby zobaczyc szczegoly.
+            Lista uczestników wybranego wydarzenia. Kliknij wiersz, aby zobaczyć szczegóły.
           </p>
         </div>
         {canAddManually && (
-          <Button onClick={() => setManualOpen(true)} className="h-11 sm:h-10">
-            <UserPlus className="h-4 w-4 mr-1" /> Dodaj recznie
+          <Button onClick={() => setManualOpen(true)} className="h-11 w-full sm:h-10 sm:w-auto">
+            <UserPlus className="h-4 w-4 mr-1" /> Dodaj ręcznie
           </Button>
         )}
       </div>
@@ -139,8 +139,8 @@ export default function Participants() {
       {filtered.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-8 text-center">
-            <p className="text-sm font-medium text-muted-foreground">Brak uczestnikow spelniajacych kryteria</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">Sprobuj zmienic filtry lub wyszukaj inna fraze.</p>
+            <p className="text-sm font-medium text-muted-foreground">Brak uczestników spełniających kryteria</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Spróbuj zmienić filtry lub wyszukaj inną frazę.</p>
           </CardContent>
         </Card>
       ) : (
@@ -148,7 +148,7 @@ export default function Participants() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Imie i nazwisko</TableHead>
+                <TableHead>Imię i nazwisko</TableHead>
                 <TableHead className="hidden md:table-cell">Email</TableHead>
                 <TableHead>Numer</TableHead>
                 <TableHead>Status</TableHead>
@@ -184,12 +184,12 @@ export default function Participants() {
           </Table>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">{filtered.length} uczestnikow</p>
+      <p className="text-xs text-muted-foreground">{filtered.length} uczestników</p>
 
       <Dialog open={manualOpen} onOpenChange={setManualOpen}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[calc(100vh-2rem)] overflow-hidden p-0 flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-            <DialogTitle>Dodaj uczestnika recznie</DialogTitle>
+            <DialogTitle>Dodaj uczestnika ręcznie</DialogTitle>
           </DialogHeader>
           <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4 space-y-4">
             <div>
@@ -208,7 +208,7 @@ export default function Participants() {
             ))}
           </div>
           <DialogFooter className="px-6 py-4 border-t shrink-0">
-            <Button onClick={handleManualSubmit} disabled={manualSaving}>
+            <Button className="w-full sm:w-auto" onClick={handleManualSubmit} disabled={manualSaving}>
               {manualSaving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Zapisz uczestnika
             </Button>

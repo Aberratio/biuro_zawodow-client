@@ -3,8 +3,8 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export default function ScannerSkeleton() {
   return (
-    <div className="space-y-3 max-w-lg mx-auto">
-      <div className="flex items-center justify-between px-4 md:px-0">
+    <div className="mx-auto max-w-xl space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 md:px-0">
         <Skeleton className="h-7 w-20" />
         <div className="flex items-center gap-3">
           <Skeleton className="h-5 w-16" />

@@ -156,7 +156,12 @@ export default function EmailSending() {
             <TableBody>
               {eventParticipants.map(participant => (
                 <TableRow key={participant.id}>
-                  <TableCell className="font-medium text-sm">{participant.name}</TableCell>
+                  <TableCell className="font-medium text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate">{participant.name}</p>
+                      <p className="truncate text-xs text-muted-foreground md:hidden">{participant.email}</p>
+                    </div>
+                  </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground text-sm">{participant.email}</TableCell>
                   <TableCell>
                     <Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'} className="gap-1 text-[10px]">
@@ -169,7 +174,7 @@ export default function EmailSending() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-9"
+                      className="h-9 w-full sm:w-auto"
                       disabled={sendingParticipantId === participant.id}
                       onClick={() => void handleSendOne(participant.id, participant.name)}
                     >

@@ -49,14 +49,14 @@ export default function ScannerInfo() {
             <div className="mb-5 rounded-full bg-primary/10 p-4 text-primary">
               {showCountdown ? <TimerReset className="h-10 w-10" /> : <CalendarDays className="h-10 w-10" />}
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">Brak aktywnych zawodow</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Brak aktywnych zawodów</h1>
             <p className="mt-3 text-sm text-muted-foreground">
-              Obecnie nie masz przypisanego zadnego wydarzenia z otwartym biurem zawodow, dlatego zakladki skanera i uczestnikow sa chwilowo ukryte.
+              Obecnie nie masz przypisanego żadnego wydarzenia z otwartym biurem zawodów, dlatego zakładki skanera i uczestników są chwilowo ukryte.
             </p>
 
             {showCountdown && nextUpcoming && millisecondsUntilNext !== null ? (
               <div className="mt-6 w-full rounded-3xl border border-primary/20 bg-primary/5 p-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">Najblizszy start biura</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">Najbliższy start biura</p>
                 <p className="mt-3 text-xl font-bold">{nextUpcoming.event.name}</p>
                 <p className="mt-2 text-sm text-muted-foreground">Otwarcie biura: {formatEventOfficeStart(nextUpcoming.event)}</p>
                 <div className="mt-5 rounded-2xl bg-background px-5 py-4 shadow-sm">
@@ -69,9 +69,9 @@ export default function ScannerInfo() {
                 <div className="flex items-start gap-3">
                   <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                   <div className="space-y-2">
-                    <p className="font-semibold text-foreground">Najblizsze przypisane zawody</p>
+                    <p className="font-semibold text-foreground">Najbliższe przypisane zawody</p>
                     <p className="text-sm text-foreground">{nextUpcoming.event.name}</p>
-                    <p className="text-sm text-muted-foreground">Biuro otwiera sie {formatEventOfficeStart(nextUpcoming.event)}.</p>
+                    <p className="text-sm text-muted-foreground">Biuro otwiera się {formatEventOfficeStart(nextUpcoming.event)}.</p>
                   </div>
                 </div>
               </div>
@@ -82,8 +82,8 @@ export default function ScannerInfo() {
                 <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground">Co to oznacza?</p>
-                  <p>Zobaczysz tu tylko te zawody, do ktorych zostales przypisany bezposrednio i dla ktorych biuro zawodow jest teraz otwarte.</p>
-                  <p>Jesli powinienes widziec zawody, a ich tu nie ma, skonsultuj sie koniecznie z administratorem. Mozliwe, ze nie zostales jeszcze przypisany do tych zawodow albo okno pracy biura nie zostalo ustawione poprawnie.</p>
+                  <p>Zobaczysz tu tylko te zawody, do których zostałeś przypisany bezpośrednio i dla których biuro zawodów jest teraz otwarte.</p>
+                  <p>Jeśli powinieneś widzieć zawody, a ich tu nie ma, skonsultuj się koniecznie z administratorem. Możliwe, że nie zostałeś jeszcze przypisany do tych zawodów albo okno pracy biura nie zostało ustawione poprawnie.</p>
                 </div>
               </div>
             </div>
@@ -96,8 +96,8 @@ export default function ScannerInfo() {
           <CardContent className="px-6 py-6">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold">Nadchodzace przypisania</h2>
-                <p className="text-sm text-muted-foreground">Wydarzenia przypisane do Twojego konta, ktore jeszcze sie nie otworzyly.</p>
+                <h2 className="text-lg font-semibold">Nadchodzące przypisania</h2>
+                <p className="text-sm text-muted-foreground">Wydarzenia przypisane do Twojego konta, które jeszcze się nie otworzyły.</p>
               </div>
               <Badge variant="secondary">{upcomingAssignedEvents.length}</Badge>
             </div>
@@ -110,7 +110,7 @@ export default function ScannerInfo() {
                       <p className="mt-1 text-sm text-muted-foreground">{formatEventOfficeStart(event)}</p>
                     </div>
                     {index === 0 && showCountdown ? (
-                      <Badge variant="default">Najblizsze</Badge>
+                      <Badge variant="default">Najbliższe</Badge>
                     ) : (
                       <Badge variant="outline">Zaplanowane</Badge>
                     )}
@@ -125,7 +125,7 @@ export default function ScannerInfo() {
       {currentRole === 'scanner' && visibleEvents.length > 0 && (
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="px-6 py-4 text-sm text-muted-foreground">
-            Aktywne zawody sa juz dostepne. Mozesz przejsc do skanera lub uczestnikow z menu po lewej stronie.
+            Aktywne zawody są już dostępne. Możesz przejść do skanera lub uczestników z menu.
           </CardContent>
         </Card>
       )}

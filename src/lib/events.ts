@@ -38,7 +38,7 @@ export function getEventOfficeCloseAt(event: Pick<Event, 'office_close_at'>): Da
 export function formatEventOfficeStart(event: Pick<Event, 'office_open_at'>): string {
   const openAt = getEventOfficeOpenAt(event);
   if (!openAt) {
-    return 'Termin otwarcia biura niedostepny';
+    return 'Termin otwarcia biura niedostępny';
   }
 
   const formatter = new Intl.DateTimeFormat('pl-PL', {
@@ -57,7 +57,7 @@ export function formatEventOfficeWindow(event: Pick<Event, 'office_open_at' | 'o
   const closeAt = parseEventDateTime(event.office_close_at);
 
   if (!openAt || !closeAt) {
-    return 'Godziny biura zawodow niedostepne';
+    return 'Godziny biura zawodów niedostępne';
   }
 
   const dayFormatter = new Intl.DateTimeFormat('pl-PL', {

@@ -140,7 +140,7 @@ export default function Profile() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="newPassword">Nowe hasło</Label>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <div className="relative flex-1">
                   <Input
                     id="newPassword"
@@ -159,7 +159,7 @@ export default function Profile() {
                     {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                <Button type="button" variant="outline" onClick={handleGeneratePassword}>
+                <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={handleGeneratePassword}>
                   <RefreshCw className="mr-1 h-4 w-4" /> Generuj
                 </Button>
               </div>
@@ -185,7 +185,7 @@ export default function Profile() {
                 </button>
               </div>
             </div>
-            <Button type="submit" disabled={!currentPassword || !newPassword || !newPasswordConfirmation || isSubmitting}>
+            <Button className="w-full sm:w-auto" type="submit" disabled={!currentPassword || !newPassword || !newPasswordConfirmation || isSubmitting}>
               Zapisz nowe hasło
             </Button>
           </form>

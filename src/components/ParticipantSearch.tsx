@@ -118,7 +118,7 @@ export default function ParticipantSearch({
             </div>
           ) : results.length === 0 ? (
             <div className="px-4 py-3 text-sm text-muted-foreground">
-              Brak wynikow
+              Brak wyników
             </div>
           ) : (
             results.map(participant => {

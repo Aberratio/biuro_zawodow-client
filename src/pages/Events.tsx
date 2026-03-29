@@ -48,8 +48,8 @@ export default function Events() {
     if (!form.name || !form.date || !form.location || !selectedOrganizationId) return;
     if (!form.office_open_at || !form.office_close_at || !isValidEventOfficeRange(form.office_open_at, form.office_close_at)) {
       toast({
-        title: 'Nieprawidlowe godziny biura',
-        description: 'Podaj wymagane daty i godziny otwarcia oraz zamkniecia biura zawodow. Godzina otwarcia musi byc wczesniejsza od zamkniecia.',
+        title: 'Nieprawidłowe godziny biura',
+        description: 'Podaj wymagane daty i godziny otwarcia oraz zamknięcia biura zawodów. Godzina otwarcia musi być wcześniejsza od zamknięcia.',
         variant: 'destructive',
       });
       return;
@@ -68,8 +68,8 @@ export default function Events() {
 
     if (!result.ok) {
       toast({
-        title: 'Nie udalo sie utworzyc wydarzenia',
-        description: result.error ?? 'Sprobuj ponownie.',
+        title: 'Nie udało się utworzyć wydarzenia',
+        description: result.error ?? 'Spróbuj ponownie.',
         variant: 'destructive',
       });
       return;
@@ -95,11 +95,11 @@ export default function Events() {
         <div>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Wydarzenia</h1>
           <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            Lista wydarzen oraz kontrola limitu przypisanego do organizacji.
+            Lista wydarzeń oraz kontrola limitu przypisanego do organizacji.
           </p>
         </div>
         {canCreateEvent && (
-          <Button onClick={() => setOpen(true)} size="sm" className="self-start sm:self-auto">
+          <Button onClick={() => setOpen(true)} size="sm" className="w-full sm:w-auto sm:self-auto">
             <Plus className="mr-1 h-4 w-4" /> Nowe wydarzenie
           </Button>
         )}
@@ -107,15 +107,15 @@ export default function Events() {
 
       {selectedOrganization && (
         <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="flex flex-col gap-2 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <CardContent className="flex flex-col gap-3 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-medium">{selectedOrganization.name}</p>
               <p className="text-xs text-muted-foreground">
-                Wykorzystano {usedSlots} z {selectedOrganization.event_limit} dostepnych wydarzen.
+                Wykorzystano {usedSlots} z {selectedOrganization.event_limit} dostępnych wydarzeń.
               </p>
             </div>
             <div className="text-xs text-muted-foreground">
-              Pozostalo: {Math.max(selectedOrganization.event_limit - usedSlots, 0)}
+              Pozostało: {Math.max(selectedOrganization.event_limit - usedSlots, 0)}
             </div>
           </CardContent>
         </Card>
@@ -124,7 +124,7 @@ export default function Events() {
       {visibleEvents.length === 0 && (
         <Card className="border-dashed">
           <CardContent className="py-8 text-center">
-            <p className="text-sm font-medium text-muted-foreground">Brak wydarzen dla aktualnego zakresu.</p>
+            <p className="text-sm font-medium text-muted-foreground">Brak wydarzeń dla aktualnego zakresu.</p>
           </CardContent>
         </Card>
       )}
@@ -172,7 +172,7 @@ export default function Events() {
               <div>
                 <Label>Organizacja</Label>
                 <Select value={form.organization_id} onValueChange={value => setForm(current => ({ ...current, organization_id: value }))}>
-                  <SelectTrigger><SelectValue placeholder="Wybierz organizacje" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Wybierz organizację" /></SelectTrigger>
                   <SelectContent>
                     {organizations
                       .filter(org => currentRole === 'superadmin' || adminOrganizationIds.includes(org.id))
@@ -185,12 +185,12 @@ export default function Events() {
             )}
             <div><Label>Nazwa</Label><Input value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="np. Bieg Wiosenny" /></div>
             <div><Label>Data</Label><Input type="date" value={form.date} onChange={event => setForm(current => ({ ...current, date: event.target.value }))} /></div>
-            <div><Label>Lokalizacja</Label><Input value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} placeholder="np. Krakow, Blonia" /></div>
-            <div><Label>Otwarcie biura zawodow</Label><Input type="datetime-local" value={form.office_open_at} onChange={event => setForm(current => ({ ...current, office_open_at: event.target.value }))} /></div>
-            <div><Label>Zamkniecie biura zawodow</Label><Input type="datetime-local" value={form.office_close_at} onChange={event => setForm(current => ({ ...current, office_close_at: event.target.value }))} /></div>
+            <div><Label>Lokalizacja</Label><Input value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} placeholder="np. Kraków, Błonia" /></div>
+            <div><Label>Otwarcie biura zawodów</Label><Input type="datetime-local" value={form.office_open_at} onChange={event => setForm(current => ({ ...current, office_open_at: event.target.value }))} /></div>
+            <div><Label>Zamknięcie biura zawodów</Label><Input type="datetime-local" value={form.office_close_at} onChange={event => setForm(current => ({ ...current, office_close_at: event.target.value }))} /></div>
             {selectedOrganization && (
               <p className="text-[10px] text-muted-foreground">
-                Limit organizacji: {usedSlots}/{selectedOrganization.event_limit} wydarzen.
+                Limit organizacji: {usedSlots}/{selectedOrganization.event_limit} wydarzeń.
               </p>
             )}
           </div>
@@ -198,9 +198,9 @@ export default function Events() {
             <Button
               onClick={handleCreate}
               disabled={!form.name || !form.date || !form.location || !form.office_open_at || !form.office_close_at || !selectedOrganizationId || (selectedOrganization ? usedSlots >= selectedOrganization.event_limit : false) || isSubmitting}
-              className="h-11 sm:h-10"
+              className="h-11 w-full sm:h-10 sm:w-auto"
             >
-              Utworz
+              Utwórz
             </Button>
           </DialogFooter>
         </DialogContent>

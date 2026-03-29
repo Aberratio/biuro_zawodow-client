@@ -27,8 +27,8 @@ const allItems = [
   { title: 'Skaner QR', url: '/scanner', icon: ScanLine, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
   { title: 'Informacje', url: '/scanner-info', icon: Info, roles: ['scanner'] as Role[] },
   { title: 'Import CSV', url: '/import', icon: FileUp, roles: ['editor', 'admin', 'superadmin'] as Role[] },
-  { title: 'Wysylka QR', url: '/emails', icon: Mail, roles: ['editor', 'admin', 'superadmin'] as Role[] },
-  { title: 'Moj profil', url: '/profile', icon: UserRound, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Wysyłka QR', url: '/emails', icon: Mail, roles: ['editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Mój profil', url: '/profile', icon: UserRound, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
 ];
 
 const roleIcons: Record<Role, typeof Shield> = { superadmin: Crown, admin: Shield, editor: Pencil, scanner: Eye };
@@ -63,7 +63,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>
             {!collapsed && (
               <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
-                <ScanLine className="h-4 w-4" /> Biuro Zawodow
+                <ScanLine className="h-4 w-4" /> Biuro Zawodów
               </span>
             )}
             {collapsed && <ScanLine className="h-4 w-4" />}
@@ -88,7 +88,7 @@ export function AppSidebar() {
           <SidebarGroup>
             <SidebarGroupLabel>
               <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-sidebar-foreground/70">
-                Praca Na Wydarzeniu
+                Praca na wydarzeniu
               </span>
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -116,12 +116,12 @@ export function AppSidebar() {
                     <div className="mt-2 rounded-xl bg-sidebar px-3 py-3">
                       <p className="text-sm font-medium leading-snug text-sidebar-foreground">{selectedEvent.name}</p>
                       <p className="mt-1 text-[11px] text-sidebar-foreground/65">
-                        Ten kontekst steruje narzedziami pracy dla wydarzenia.
+                        Ten kontekst steruje narzędziami pracy dla wydarzenia.
                       </p>
                     </div>
                   ) : (
                     <div className="mt-2 rounded-xl bg-sidebar px-3 py-3 text-xs text-sidebar-foreground/70">
-                      Brak dostepnych wydarzen w tym kontekscie.
+                      Brak dostępnych wydarzeń w tym kontekście.
                     </div>
                   )}
                 </div>
@@ -132,7 +132,7 @@ export function AppSidebar() {
                       <SidebarMenuButton asChild>
                         <NavLink to={`/events/${selectedEvent.id}`} end className="rounded-xl hover:bg-accent/50" activeClassName="rounded-xl bg-accent font-medium text-accent-foreground">
                           <CalendarDays className="mr-2 h-4 w-4 shrink-0" />
-                          <span>Szczegoly wydarzenia</span>
+                          <span>Szczegóły wydarzenia</span>
                         </NavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

@@ -8,13 +8,13 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Users, CheckCircle, ScanLine, MapPin, Calendar, ArrowLeft, FileUp, UserPlus, Loader2 } from 'lucide-react';
+import { Users, CheckCircle, ScanLine, MapPin, Calendar, ArrowLeft, FileUp, UserPlus, Loader2, Pencil } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
 import { ParticipantFieldMapping, User } from '@/types';
-import { formatEventOfficeWindow } from '@/lib/events';
+import { formatEventOfficeWindow, isValidEventOfficeRange } from '@/lib/events';
 import { buildEmptyParticipantFieldValues, getActiveParticipantMappings } from '@/lib/participant-fields';
-import { getParticipantStatusDefinition, participantCountsAsCheckedIn } from '@/lib/participant-status';
+import { participantCountsAsCheckedIn } from '@/lib/participant-status';
 
 export default function EventDetails() {
   const { id } = useParams<{ id: string }>();
@@ -30,16 +30,26 @@ export default function EventDetails() {
     getParticipantFieldMappings,
     addParticipantManually,
     assignScannerEvents,
+    updateEvent,
   } = useMockData();
   const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
   const [mappingsLoading, setMappingsLoading] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [scannerDialogOpen, setScannerDialogOpen] = useState(false);
   const [scannerSelection, setScannerSelection] = useState<string[]>([]);
   const [scannerSaving, setScannerSaving] = useState(false);
   const [manualEmail, setManualEmail] = useState('');
   const [manualFields, setManualFields] = useState<Record<string, string>>({});
   const [manualSaving, setManualSaving] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    date: '',
+    location: '',
+    office_open_at: '',
+    office_close_at: '',
+  });
 
   const event = events.find(entry => entry.id === id);
   const eventParticipants = participants.filter(participant => participant.event_id === id);
@@ -61,6 +71,8 @@ export default function EventDetails() {
     if (currentRole === 'editor') return currentUser.organization_id === event.organization_id;
     return false;
   }, [currentRole, currentUser, event]);
+  const canEditEvent = canManageScanners;
+  const canViewParticipantMappings = currentRole === 'superadmin';
 
   useEffect(() => {
     if (id) {
@@ -83,6 +95,18 @@ export default function EventDetails() {
       })
       .finally(() => setMappingsLoading(false));
   }, [getParticipantFieldMappings, id]);
+
+  useEffect(() => {
+    if (!event) return;
+
+    setEditForm({
+      name: event.name,
+      date: event.date,
+      location: event.location,
+      office_open_at: event.office_open_at.slice(0, 16),
+      office_close_at: event.office_close_at.slice(0, 16),
+    });
+  }, [event]);
 
   if (isLoading) return <DetailSkeleton />;
   if (!event) return <div className="text-center py-12 text-muted-foreground">Nie znaleziono wydarzenia</div>;
@@ -130,8 +154,8 @@ export default function EventDetails() {
         const result = await assignScannerEvents(scanner.id, nextAssignedEvents);
         if (!result.ok) {
           toast({
-            title: 'Nie udalo sie zapisac przypisan skanerow',
-            description: result.error ?? `Nie udalo sie zaktualizowac skanera ${scanner.name}.`,
+            title: 'Nie udało się zapisać przypisań skanerów',
+            description: result.error ?? `Nie udało się zaktualizować skanera ${scanner.name}.`,
             variant: 'destructive',
           });
           return;
@@ -139,7 +163,7 @@ export default function EventDetails() {
       }
 
       setScannerDialogOpen(false);
-      toast({ title: 'Zapisano przypisania skanerow' });
+      toast({ title: 'Zapisano przypisania skanerów' });
     } finally {
       setScannerSaving(false);
     }
@@ -152,7 +176,7 @@ export default function EventDetails() {
 
     if (!result.ok) {
       toast({
-        title: 'Nie udalo sie dodac uczestnika',
+        title: 'Nie udało się dodać uczestnika',
         description: result.error,
         variant: 'destructive',
       });
@@ -162,22 +186,65 @@ export default function EventDetails() {
     setManualOpen(false);
     setManualEmail('');
     setManualFields(buildEmptyParticipantFieldValues(mappings));
-    toast({ title: 'Dodano uczestnika recznie' });
+    toast({ title: 'Dodano uczestnika ręcznie' });
+  };
+
+  const handleEditSubmit = async () => {
+    if (!event) return;
+    if (!editForm.name || !editForm.date || !editForm.location) return;
+    if (!editForm.office_open_at || !editForm.office_close_at || !isValidEventOfficeRange(editForm.office_open_at, editForm.office_close_at)) {
+      toast({
+        title: 'Nieprawidłowe godziny biura',
+        description: 'Podaj poprawny zakres otwarcia i zamknięcia biura zawodów.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setEditSaving(true);
+    const result = await updateEvent(event.id, {
+      name: editForm.name,
+      date: editForm.date,
+      location: editForm.location,
+      organization_id: event.organization_id,
+      office_open_at: editForm.office_open_at,
+      office_close_at: editForm.office_close_at,
+    });
+    setEditSaving(false);
+
+    if (!result.ok) {
+      toast({
+        title: 'Nie udało się zaktualizować wydarzenia',
+        description: result.error ?? 'Spróbuj ponownie.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setEditOpen(false);
+    toast({ title: 'Zaktualizowano wydarzenie' });
   };
 
   return (
     <div className="space-y-6">
       <Button variant="ghost" size="sm" onClick={() => navigate('/events')} className="touch-manipulation">
-        <ArrowLeft className="h-4 w-4 mr-1" /> Wroc
+        <ArrowLeft className="h-4 w-4 mr-1" /> Wróć
       </Button>
 
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{event.name}</h1>
-        <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2 text-xs sm:text-sm text-muted-foreground">
-          <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{event.date}</span>
-          <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{event.location}</span>
-          <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />Biuro: {formatEventOfficeWindow(event)}</span>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{event.name}</h1>
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2 text-xs sm:text-sm text-muted-foreground">
+            <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{event.date}</span>
+            <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{event.location}</span>
+            <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />Biuro: {formatEventOfficeWindow(event)}</span>
+          </div>
         </div>
+        {canEditEvent && (
+          <Button variant="outline" onClick={() => setEditOpen(true)} className="w-full self-start sm:w-auto">
+            <Pencil className="mr-1 h-4 w-4" /> Edytuj wydarzenie
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-3 sm:gap-4 grid-cols-2">
@@ -206,24 +273,24 @@ export default function EventDetails() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-3">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle className="text-base">Skanerzy wydarzenia</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Skanerzy z organizacji przypisani bezposrednio do tego wydarzenia.
+              Skanerzy z organizacji przypisani bezpośrednio do tego wydarzenia.
             </p>
           </div>
           {canManageScanners && (
-            <Button variant="outline" size="sm" onClick={openScannerDialog}>
-              Zarzadzaj skanerami
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={openScannerDialog}>
+              Zarządzaj skanerami
             </Button>
           )}
         </CardHeader>
         <CardContent>
           {organizationScanners.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Brak skanerow w organizacji tego wydarzenia.</p>
+            <p className="text-sm text-muted-foreground">Brak skanerów w organizacji tego wydarzenia.</p>
           ) : assignedScanners.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Do tego wydarzenia nie przypisano jeszcze zadnego skanera.</p>
+            <p className="text-sm text-muted-foreground">Do tego wydarzenia nie przypisano jeszcze żadnego skanera.</p>
           ) : (
             <div className="space-y-2">
               {assignedScanners.map((scanner: User) => (
@@ -242,79 +309,73 @@ export default function EventDetails() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Button onClick={() => { setSelectedEventId(event.id); navigate('/scanner'); }} className="h-11 sm:h-10 touch-manipulation">
-          <ScanLine className="h-4 w-4 mr-1" /> Otworz skaner
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Button onClick={() => { setSelectedEventId(event.id); navigate('/scanner'); }} className="h-11 w-full sm:h-10 sm:w-auto touch-manipulation">
+          <ScanLine className="h-4 w-4 mr-1" /> Otwórz skaner
         </Button>
-        <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate('/participants'); }} className="h-11 sm:h-10 touch-manipulation">
+        <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate('/participants'); }} className="h-11 w-full sm:h-10 sm:w-auto touch-manipulation">
           <Users className="h-4 w-4 mr-1" /> Uczestnicy
         </Button>
-        <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate(`/events/${event.id}/import`); }} className="h-11 sm:h-10 touch-manipulation">
+        <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate(`/events/${event.id}/import`); }} className="h-11 w-full sm:h-10 sm:w-auto touch-manipulation">
           <FileUp className="h-4 w-4 mr-1" /> Importuj CSV
         </Button>
         {hasSavedMapping && (
-          <Button variant="outline" onClick={() => setManualOpen(true)} className="h-11 sm:h-10 touch-manipulation">
-            <UserPlus className="h-4 w-4 mr-1" /> Dodaj recznie
+          <Button variant="outline" onClick={() => setManualOpen(true)} className="h-11 w-full sm:h-10 sm:w-auto touch-manipulation">
+            <UserPlus className="h-4 w-4 mr-1" /> Dodaj ręcznie
           </Button>
         )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Mapowanie pol uczestnika</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {mappingsLoading ? (
-            <p className="text-sm text-muted-foreground">Ladowanie mapowania...</p>
-          ) : hasSavedMapping ? (
-            <div className="flex flex-wrap gap-2">
-              {mappings.map(mapping => (
-                <Badge key={`${mapping.source_column_name}-${mapping.alias}`} variant="outline">
-                  {mapping.alias} ({mapping.field_role})
-                </Badge>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              To wydarzenie nie ma jeszcze zapisanego mapowania CSV. Po pierwszym imporcie pojawi sie tez reczne dodawanie uczestnikow.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">Uczestnicy</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {eventParticipants.slice(0, 10).map(participant => {
-              const status = getParticipantStatusDefinition(participant.status);
-
-              return (
-                <div
-                  key={participant.id}
-                  className="flex items-center justify-between py-2.5 text-sm border-b last:border-0 cursor-pointer hover:bg-accent/30 active:bg-accent/50 px-2 rounded touch-manipulation"
-                  onClick={() => navigate(`/participants/${participant.id}`)}
-                >
-                  <div className="min-w-0 mr-2">
-                    <span className="font-medium">{participant.name}</span>
-                    <span className="text-muted-foreground ml-2 tabular-nums">#{participant.bib_number}</span>
-                  </div>
-                  <Badge variant={status.badgeVariant} className="text-[10px] shrink-0">
-                    {status.shortLabel}
+      {canViewParticipantMappings && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Mapowanie pól uczestnika</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {mappingsLoading ? (
+              <p className="text-sm text-muted-foreground">Ładowanie mapowania...</p>
+            ) : hasSavedMapping ? (
+              <div className="flex flex-wrap gap-2">
+                {mappings.map(mapping => (
+                  <Badge key={`${mapping.source_column_name}-${mapping.alias}`} variant="outline">
+                    {mapping.alias} ({mapping.field_role})
                   </Badge>
-                </div>
-              );
-            })}
-            {eventParticipants.length > 10 && <p className="text-xs text-muted-foreground text-center pt-2">...i {eventParticipants.length - 10} wiecej</p>}
-            {eventParticipants.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Brak uczestnikow. Zaimportuj liste z CSV.</p>}
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                To wydarzenie nie ma jeszcze zapisanego mapowania CSV. Po pierwszym imporcie pojawi się też ręczne dodawanie uczestników.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edytuj wydarzenie</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div><Label>Nazwa</Label><Input value={editForm.name} onChange={eventValue => setEditForm(current => ({ ...current, name: eventValue.target.value }))} /></div>
+            <div><Label>Data</Label><Input type="date" value={editForm.date} onChange={eventValue => setEditForm(current => ({ ...current, date: eventValue.target.value }))} /></div>
+            <div><Label>Lokalizacja</Label><Input value={editForm.location} onChange={eventValue => setEditForm(current => ({ ...current, location: eventValue.target.value }))} /></div>
+            <div><Label>Otwarcie biura zawodów</Label><Input type="datetime-local" value={editForm.office_open_at} onChange={eventValue => setEditForm(current => ({ ...current, office_open_at: eventValue.target.value }))} /></div>
+            <div><Label>Zamknięcie biura zawodów</Label><Input type="datetime-local" value={editForm.office_close_at} onChange={eventValue => setEditForm(current => ({ ...current, office_close_at: eventValue.target.value }))} /></div>
           </div>
-        </CardContent>
-      </Card>
+          <DialogFooter>
+            <Button className="w-full sm:w-auto" onClick={handleEditSubmit} disabled={!editForm.name || !editForm.date || !editForm.location || !editForm.office_open_at || !editForm.office_close_at || editSaving}>
+              {editSaving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              Zapisz
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={manualOpen} onOpenChange={setManualOpen}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[calc(100vh-2rem)] overflow-hidden p-0 flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-            <DialogTitle>Dodaj uczestnika recznie</DialogTitle>
+            <DialogTitle>Dodaj uczestnika ręcznie</DialogTitle>
           </DialogHeader>
           <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4 space-y-4">
             <div>
@@ -333,7 +394,7 @@ export default function EventDetails() {
             ))}
           </div>
           <DialogFooter className="px-6 py-4 border-t shrink-0">
-            <Button onClick={handleManualSubmit} disabled={manualSaving}>
+            <Button className="w-full sm:w-auto" onClick={handleManualSubmit} disabled={manualSaving}>
               {manualSaving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Zapisz uczestnika
             </Button>
@@ -344,7 +405,7 @@ export default function EventDetails() {
       <Dialog open={scannerDialogOpen} onOpenChange={setScannerDialogOpen}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Przypisz skanerow do wydarzenia</DialogTitle>
+            <DialogTitle>Przypisz skanerów do wydarzenia</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {organizationScanners.length > 0 ? (
@@ -358,12 +419,12 @@ export default function EventDetails() {
               </div>
             ) : (
               <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                Brak skanerow w organizacji tego wydarzenia.
+                Brak skanerów w organizacji tego wydarzenia.
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button onClick={handleSaveScannerAssignments} disabled={scannerSaving || organizationScanners.length === 0}>
+            <Button className="w-full sm:w-auto" onClick={handleSaveScannerAssignments} disabled={scannerSaving || organizationScanners.length === 0}>
               {scannerSaving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               Zapisz przypisania
             </Button>
