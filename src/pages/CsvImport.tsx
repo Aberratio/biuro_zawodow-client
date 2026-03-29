@@ -1,6 +1,6 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -63,7 +63,7 @@ export default function CsvImport() {
     confirmParticipantImportMapping,
     runParticipantImport,
     isLoading,
-  } = useMockData();
+  } = useData();
   const eventId = routeEventId ?? selectedEventId;
   const event = events.find(item => item.id === eventId);
   const fileInputRef = useRef<HTMLInputElement | null>(null);

@@ -5,24 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScanLine, ChevronDown, LogIn, KeyRound } from 'lucide-react';
+import { ScanLine, LogIn, KeyRound } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-
-const demoAccounts = [
-  { role: 'Superadmin', email: 'super@biurozawodow.pl', password: 'demo123' },
-  { role: 'Admin (SportEvents)', email: 'admin@sportevents.pl', password: 'demo123' },
-  { role: 'Admin (RunPoland)', email: 'admin@runpoland.pl', password: 'demo123' },
-  { role: 'Organizator', email: 'org.gniezno@sportevents.pl', password: 'demo123' },
-  { role: 'Skaner', email: 'skaner1@sportevents.pl', password: 'demo123' },
-];
 
 export default function Login() {
   const { login, forgotPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [resetEmail, setResetEmail] = useState('');
-  const [demoOpen, setDemoOpen] = useState(false);
   const [isForgotOpen, setIsForgotOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResetSubmitting, setIsResetSubmitting] = useState(false);
@@ -58,13 +48,6 @@ export default function Login() {
       setIsForgotOpen(false);
     } finally {
       setIsResetSubmitting(false);
-    }
-  };
-
-  const quickLogin = async (nextEmail: string, nextPassword: string) => {
-    const ok = await login(nextEmail, nextPassword);
-    if (!ok) {
-      toast({ title: 'Błąd logowania', description: 'Nieprawidłowy email lub hasło.', variant: 'destructive' });
     }
   };
 
@@ -130,42 +113,6 @@ export default function Login() {
             </Collapsible>
           </CardContent>
         </Card>
-
-        <Collapsible open={demoOpen} onOpenChange={setDemoOpen}>
-          <Card>
-            <CollapsibleTrigger asChild>
-              <button className="w-full flex items-center justify-between p-4 text-sm font-medium hover:bg-muted/50 rounded-lg transition-colors">
-                <span>Konta demo</span>
-                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${demoOpen ? 'rotate-180' : ''}`} />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="pt-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Rola</TableHead>
-                      <TableHead className="text-xs">Email</TableHead>
-                      <TableHead className="text-xs w-[60px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {demoAccounts.map(account => (
-                      <TableRow key={account.email} className="cursor-pointer hover:bg-muted/50" onClick={() => quickLogin(account.email, account.password)}>
-                        <TableCell className="text-xs font-medium py-2">{account.role}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground py-2">{account.email}</TableCell>
-                        <TableCell className="py-2">
-                          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2">Zaloguj</Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <p className="text-[10px] text-muted-foreground mt-2 text-center">Hasło dla wszystkich: <code className="bg-muted px-1 rounded">demo123</code></p>
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
       </div>
     </div>
   );

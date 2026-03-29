@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Clock3, ShieldAlert, TimerReset } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
 import { formatEventOfficeStart, getEventOfficeOpenAt } from '@/lib/events';
 
 function formatCountdown(milliseconds: number): string {
@@ -15,7 +15,7 @@ function formatCountdown(milliseconds: number): string {
 }
 
 export default function ScannerInfo() {
-  const { currentRole, currentUser, events, visibleEvents } = useMockData();
+  const { currentRole, currentUser, events, visibleEvents } = useData();
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
 
   useEffect(() => {

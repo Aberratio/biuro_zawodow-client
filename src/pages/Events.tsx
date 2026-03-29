@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ import { formatEventOfficeWindow, isValidEventOfficeRange } from '@/lib/events';
 import { participantCountsAsCheckedIn } from '@/lib/participant-status';
 
 export default function Events() {
-  const { visibleEvents, participants, organizations, createEvent, currentUser, currentRole, isLoading } = useMockData();
+  const { visibleEvents, participants, organizations, createEvent, currentUser, currentRole, isLoading } = useData();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

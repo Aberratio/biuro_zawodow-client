@@ -1,13 +1,13 @@
 import { ReactNode } from 'react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
 import { Badge } from '@/components/ui/badge';
 
 const roleLabels: Record<string, string> = { superadmin: 'Superadmin', admin: 'Admin', editor: 'Organizator', scanner: 'Skaner' };
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { currentRole, currentUser, organizations } = useMockData();
+  const { currentRole, currentUser, organizations } = useData();
   const currentOrganization = organizations.find(org => org.id === currentUser.organization_id)
     ?? organizations.find(org => (currentUser.organization_ids ?? []).includes(org.id));
   const organizationLabel = currentRole === 'admin'

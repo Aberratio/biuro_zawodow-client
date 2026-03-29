@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Users, CheckCircle, ScanLine, MapPin, Calendar, ArrowLeft, FileUp, UserPlus, Loader2, Pencil } from 'lucide-react';
+import { Users, CheckCircle, ScanLine, MapPin, Calendar, ArrowLeft, FileUp, UserPlus, Loader2, Pencil, Download, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
 import { ParticipantFieldMapping, User } from '@/types';
@@ -31,7 +41,10 @@ export default function EventDetails() {
     addParticipantManually,
     assignScannerEvents,
     updateEvent,
-  } = useMockData();
+    deleteEvent,
+    exportEventCsv,
+    exportEventLogsCsv,
+  } = useData();
   const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
   const [mappingsLoading, setMappingsLoading] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
@@ -43,6 +56,10 @@ export default function EventDetails() {
   const [manualFields, setManualFields] = useState<Record<string, string>>({});
   const [manualSaving, setManualSaving] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportingLogsCsv, setExportingLogsCsv] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
     date: '',
@@ -225,6 +242,59 @@ export default function EventDetails() {
     toast({ title: 'Zaktualizowano wydarzenie' });
   };
 
+  const handleExportCsv = async () => {
+    setExportingCsv(true);
+    const result = await exportEventCsv(event.id);
+    setExportingCsv(false);
+
+    if (!result.ok) {
+      toast({
+        title: 'Nie udało się wyeksportować CSV',
+        description: result.error ?? 'Spróbuj ponownie.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({ title: 'Eksport CSV rozpoczęty' });
+  };
+
+  const handleExportLogsCsv = async () => {
+    setExportingLogsCsv(true);
+    const result = await exportEventLogsCsv(event.id);
+    setExportingLogsCsv(false);
+
+    if (!result.ok) {
+      toast({
+        title: 'Nie udało się wyeksportować logów CSV',
+        description: result.error ?? 'Spróbuj ponownie.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({ title: 'Eksport logów CSV rozpoczęty' });
+  };
+
+  const handleDeleteEvent = async () => {
+    setIsDeletingEvent(true);
+    const result = await deleteEvent(event.id);
+    setIsDeletingEvent(false);
+
+    if (!result.ok) {
+      toast({
+        title: 'Nie udało się usunąć wydarzenia',
+        description: result.error ?? 'Spróbuj ponownie.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setDeleteConfirmOpen(false);
+    toast({ title: 'Wydarzenie usunięte' });
+    navigate('/events');
+  };
+
   return (
     <div className="space-y-6">
       <Button variant="ghost" size="sm" onClick={() => navigate('/events')} className="touch-manipulation">
@@ -241,9 +311,14 @@ export default function EventDetails() {
           </div>
         </div>
         {canEditEvent && (
-          <Button variant="outline" onClick={() => setEditOpen(true)} className="w-full self-start sm:w-auto">
-            <Pencil className="mr-1 h-4 w-4" /> Edytuj wydarzenie
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button variant="outline" onClick={() => setEditOpen(true)} className="w-full self-start sm:w-auto">
+              <Pencil className="mr-1 h-4 w-4" /> Edytuj wydarzenie
+            </Button>
+            <Button variant="destructive" onClick={() => setDeleteConfirmOpen(true)} className="w-full self-start sm:w-auto">
+              <Trash2 className="mr-1 h-4 w-4" /> Usuń wydarzenie
+            </Button>
+          </div>
         )}
       </div>
 
@@ -310,6 +385,14 @@ export default function EventDetails() {
       </Card>
 
       <div className="flex flex-col gap-3 sm:flex-row">
+        <Button variant="outline" onClick={() => void handleExportCsv()} className="h-11 w-full sm:h-10 sm:w-auto touch-manipulation" disabled={exportingCsv}>
+          {exportingCsv ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+          Eksportuj CSV
+        </Button>
+        <Button variant="outline" onClick={() => void handleExportLogsCsv()} className="h-11 w-full sm:h-10 sm:w-auto touch-manipulation" disabled={exportingLogsCsv}>
+          {exportingLogsCsv ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+          Eksportuj logi CSV
+        </Button>
         <Button onClick={() => { setSelectedEventId(event.id); navigate('/scanner'); }} className="h-11 w-full sm:h-10 sm:w-auto touch-manipulation">
           <ScanLine className="h-4 w-4 mr-1" /> Otwórz skaner
         </Button>
@@ -350,6 +433,24 @@ export default function EventDetails() {
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usunąć wydarzenie?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Wydarzenie <span className="font-medium text-foreground">{event.name}</span> zostanie usunięte razem z uczestnikami przypisanymi do tego wydarzenia. Tej operacji nie da się cofnąć.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleDeleteEvent()} disabled={isDeletingEvent} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {isDeletingEvent && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              Usuń wydarzenie
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">

@@ -1,12 +1,22 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Building2, CalendarDays, Users, Radio, ArrowLeft, ArrowRight, Plus } from 'lucide-react';
+import { Building2, CalendarDays, Users, Radio, ArrowLeft, ArrowRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -26,16 +36,22 @@ export default function OrganizationDetails() {
     currentUser,
     addUser,
     createEvent,
+    updateOrganization,
     updateOrganizationEventLimit,
+    deleteOrganization,
     assignScannerEvents,
     isLoading,
-  } = useMockData();
+  } = useData();
 
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [scannerAssignmentsDialogOpen, setScannerAssignmentsDialogOpen] = useState(false);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [organizationEditOpen, setOrganizationEditOpen] = useState(false);
+  const [deleteOrganizationConfirmOpen, setDeleteOrganizationConfirmOpen] = useState(false);
   const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
+  const [isSavingOrganization, setIsSavingOrganization] = useState(false);
+  const [isDeletingOrganization, setIsDeletingOrganization] = useState(false);
   const [isSavingScannerAssignments, setIsSavingScannerAssignments] = useState(false);
   const [selectedScannerId, setSelectedScannerId] = useState<string | null>(null);
   const [memberForm, setMemberForm] = useState({
@@ -53,6 +69,7 @@ export default function OrganizationDetails() {
   });
   const [scannerAssignmentDraft, setScannerAssignmentDraft] = useState<string[]>([]);
   const [limitDraft, setLimitDraft] = useState('');
+  const [organizationNameDraft, setOrganizationNameDraft] = useState('');
 
   const organization = useMemo(() => organizations.find(org => org.id === id), [id, organizations]);
 
@@ -71,8 +88,10 @@ export default function OrganizationDetails() {
   const scanners = users.filter(user => user.organization_id === organization.id && user.role === 'scanner');
   const remainingSlots = Math.max(organization.event_limit - orgEvents.length, 0);
   const canCreateEvent = currentRole !== 'scanner';
+  const canEditOrganization = currentRole === 'superadmin' || currentRole === 'admin';
   const canManageMembers = currentRole === 'superadmin' || currentRole === 'admin';
   const canManageScanners = currentRole === 'superadmin' || currentRole === 'admin' || currentRole === 'editor';
+  const canDeleteOrganization = canEditOrganization && orgEvents.length === 0 && organizers.length === 0 && scanners.length === 0;
   const adminLabel = organization.admin_user_name
     ?? users.find(user => user.id === organization.admin_user_id)?.name
     ?? 'Brak administratora';
@@ -92,6 +111,11 @@ export default function OrganizationDetails() {
     setSelectedScannerId(scannerId);
     setScannerAssignmentDraft(scanner?.assigned_events ?? []);
     setScannerAssignmentsDialogOpen(true);
+  };
+
+  const openOrganizationEditDialog = () => {
+    setOrganizationNameDraft(organization.name);
+    setOrganizationEditOpen(true);
   };
 
   const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -155,6 +179,26 @@ export default function OrganizationDetails() {
     toast({ title: 'Zaktualizowano limit wydarzeń' });
   };
 
+  const handleSaveOrganization = async () => {
+    const name = organizationNameDraft.trim();
+    if (!name) {
+      toast({ title: 'Nazwa jest wymagana', variant: 'destructive' });
+      return;
+    }
+
+    setIsSavingOrganization(true);
+    const result = await updateOrganization(organization.id, { name });
+    setIsSavingOrganization(false);
+
+    if (!result.ok) {
+      toast({ title: 'Nie udało się zaktualizować organizacji', description: result.error ?? 'Spróbuj ponownie.', variant: 'destructive' });
+      return;
+    }
+
+    setOrganizationEditOpen(false);
+    toast({ title: 'Zaktualizowano organizację' });
+  };
+
   const handleAddEvent = async () => {
     if (!eventForm.name || !eventForm.date || !eventForm.location) return;
     if (!eventForm.office_open_at || !eventForm.office_close_at || !isValidEventOfficeRange(eventForm.office_open_at, eventForm.office_close_at)) {
@@ -199,6 +243,21 @@ export default function OrganizationDetails() {
     toast({ title: 'Zapisano przypisania skanera' });
   };
 
+  const handleDeleteOrganization = async () => {
+    setIsDeletingOrganization(true);
+    const result = await deleteOrganization(organization.id);
+    setIsDeletingOrganization(false);
+
+    if (!result.ok) {
+      toast({ title: 'Nie udało się usunąć organizacji', description: result.error ?? 'Usuń najpierw wydarzenia i użytkowników przypisanych do organizacji.', variant: 'destructive' });
+      return;
+    }
+
+    setDeleteOrganizationConfirmOpen(false);
+    toast({ title: 'Organizacja usunięta' });
+    navigate('/organizations');
+  };
+
   const getEventNames = (eventIds: string[]) => {
     const names = orgEvents.filter(event => eventIds.includes(event.id)).map(event => event.name);
     return names.length > 0 ? names.join(', ') : 'Brak przypisanych wydarzeń';
@@ -229,6 +288,18 @@ export default function OrganizationDetails() {
               <Badge variant="outline">{scanners.length} skanerów</Badge>
             </div>
           </div>
+          {canEditOrganization && (
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={openOrganizationEditDialog}>
+                <Pencil className="mr-1 h-4 w-4" />
+                Edytuj organizację
+              </Button>
+              <Button variant="destructive" size="sm" className="w-full sm:w-auto" onClick={() => setDeleteOrganizationConfirmOpen(true)} disabled={!canDeleteOrganization}>
+                <Trash2 className="mr-1 h-4 w-4" />
+                Usuń organizację
+              </Button>
+            </div>
+          )}
         </CardHeader>
 
         <CardContent className="space-y-5 p-5">
@@ -241,6 +312,11 @@ export default function OrganizationDetails() {
                 </div>
                 <Button className="w-full sm:w-auto" onClick={handleSaveLimit}>Zapisz limit</Button>
               </div>
+              {!canDeleteOrganization && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Organizację można usunąć dopiero wtedy, gdy nie ma już przypisanych wydarzeń, organizatorów ani skanerów.
+                </p>
+              )}
             </div>
           )}
 
@@ -328,6 +404,40 @@ export default function OrganizationDetails() {
           </section>
         </CardContent>
       </Card>
+
+      <Dialog open={organizationEditOpen} onOpenChange={setOrganizationEditOpen}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader><DialogTitle>Edytuj organizację</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nazwa organizacji</Label>
+              <Input value={organizationNameDraft} onChange={e => setOrganizationNameDraft(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button className="w-full sm:w-auto" onClick={handleSaveOrganization} disabled={!organizationNameDraft.trim() || isSavingOrganization}>
+              Zapisz zmiany
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteOrganizationConfirmOpen} onOpenChange={setDeleteOrganizationConfirmOpen}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usunąć organizację?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Organizacja <span className="font-medium text-foreground">{organization.name}</span> zostanie usunięta tylko wtedy, gdy nie ma już przypisanych wydarzeń ani użytkowników. Tej operacji nie da się cofnąć.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleDeleteOrganization()} disabled={isDeletingOrganization || !canDeleteOrganization} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Usuń organizację
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={memberDialogOpen} onOpenChange={setMemberDialogOpen}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">

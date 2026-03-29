@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
 import { generateStrongPassword } from '@/lib/password';
 import { toast } from '@/hooks/use-toast';
 
@@ -18,7 +18,7 @@ const roleLabels: Record<string, string> = {
 
 export default function Profile() {
   const { user, changePassword } = useAuth();
-  const { organizations } = useMockData();
+  const { organizations } = useData();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');

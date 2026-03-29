@@ -1,7 +1,7 @@
 import React from 'react';
 import { Building2, CalendarDays, Crown, Eye, FileUp, Info, LayoutDashboard, LogOut, Mail, Pencil, ScanLine, Shield, UserRound, Users } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Sidebar,
@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { Role } from '@/types';
 
 const allItems = [
-  { title: 'Dashboard', url: '/', icon: LayoutDashboard, roles: ['editor', 'admin', 'superadmin'] as Role[] },
+  { title: 'Panel', url: '/', icon: LayoutDashboard, roles: ['editor', 'admin', 'superadmin'] as Role[] },
   { title: 'Organizacje', url: '/organizations', icon: Building2, roles: ['admin', 'superadmin'] as Role[] },
   { title: 'Wydarzenia', url: '/events', icon: CalendarDays, roles: ['editor', 'admin', 'superadmin'] as Role[] },
   { title: 'Uczestnicy', url: '/participants', icon: Users, roles: ['scanner', 'editor', 'admin', 'superadmin'] as Role[] },
@@ -37,7 +37,7 @@ const eventScopedUrls = new Set(['/participants', '/scanner', '/import', '/email
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const { currentRole, currentUser, visibleEvents, selectedEventId, setSelectedEventId } = useMockData();
+  const { currentRole, currentUser, visibleEvents, selectedEventId, setSelectedEventId } = useData();
   const { logout } = useAuth();
 
   const scannerHasActiveEvents = currentRole !== 'scanner' || visibleEvents.length > 0;

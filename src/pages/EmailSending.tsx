@@ -1,19 +1,35 @@
 import { useMemo, useState } from 'react';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertTriangle, CheckCircle, Info, Loader2, Mail, RefreshCcw, Send } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 
+type PendingEmailAction =
+  | { kind: 'send-missing'; count: number }
+  | { kind: 'resend-all'; count: number }
+  | { kind: 'send-one'; participantId: string; participantName: string; participantEmail: string };
+
 export default function EmailSending() {
-  const { participants, events, selectedEventId, sendEventQrEmails, sendParticipantQrEmail, isLoading } = useMockData();
+  const { participants, events, selectedEventId, sendEventQrEmails, sendParticipantQrEmail, isLoading } = useData();
   const [sendingAll, setSendingAll] = useState(false);
   const [resendingAll, setResendingAll] = useState(false);
   const [sendingParticipantId, setSendingParticipantId] = useState<string | null>(null);
   const [lastErrors, setLastErrors] = useState<Array<{ participant_name: string; error: string }>>([]);
+  const [pendingAction, setPendingAction] = useState<PendingEmailAction | null>(null);
 
   const eventParticipants = useMemo(
     () => participants.filter(participant => participant.event_id === selectedEventId),
@@ -22,10 +38,12 @@ export default function EmailSending() {
   const selectedEvent = events.find(event => event.id === selectedEventId);
   const sent = eventParticipants.filter(participant => participant.email_status === 'sent').length;
   const pending = eventParticipants.length - sent;
+  const isConfirmingAction = sendingAll || resendingAll || sendingParticipantId !== null;
 
   if (isLoading) return <TableSkeleton rows={5} cols={4} subtitle="" />;
 
   const handleSendAll = async (resendAll: boolean) => {
+    setPendingAction(null);
     if (resendAll) {
       setResendingAll(true);
     } else {
@@ -60,6 +78,7 @@ export default function EmailSending() {
   };
 
   const handleSendOne = async (participantId: string, participantName: string) => {
+    setPendingAction(null);
     setSendingParticipantId(participantId);
     try {
       const result = await sendParticipantQrEmail(participantId);
@@ -105,11 +124,11 @@ export default function EmailSending() {
               <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${eventParticipants.length ? (sent / eventParticipants.length) * 100 : 0}%` }} />
             </div>
             <div className="grid gap-2 mt-4">
-              <Button className="w-full h-11 sm:h-10" onClick={() => void handleSendAll(false)} disabled={sendingAll || pending === 0}>
+              <Button className="w-full h-11 sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || pending === 0}>
                 {sendingAll ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
                 {pending === 0 ? 'Brak zaległych wiadomości' : `Wyślij brakujące (${pending})`}
               </Button>
-              <Button variant="outline" className="w-full h-11 sm:h-10" onClick={() => void handleSendAll(true)} disabled={resendingAll || eventParticipants.length === 0}>
+              <Button variant="outline" className="w-full h-11 sm:h-10" onClick={() => setPendingAction({ kind: 'resend-all', count: eventParticipants.length })} disabled={resendingAll || eventParticipants.length === 0}>
                 {resendingAll ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-1" />}
                 Wyślij ponownie wszystkim
               </Button>
@@ -176,7 +195,12 @@ export default function EmailSending() {
                       size="sm"
                       className="h-9 w-full sm:w-auto"
                       disabled={sendingParticipantId === participant.id}
-                      onClick={() => void handleSendOne(participant.id, participant.name)}
+                      onClick={() => setPendingAction({
+                        kind: 'send-one',
+                        participantId: participant.id,
+                        participantName: participant.name,
+                        participantEmail: participant.email,
+                      })}
                     >
                       {sendingParticipantId === participant.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Wyślij ponownie'}
                     </Button>
@@ -187,6 +211,39 @@ export default function EmailSending() {
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog open={pendingAction !== null} onOpenChange={open => !open && setPendingAction(null)}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Potwierdź wysyłkę maili z kodem QR</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAction?.kind === 'send-one'
+                ? <>Do uczestnika <span className="font-medium text-foreground">{pendingAction.participantName}</span> zostanie wysłany mail na adres <span className="font-medium text-foreground">{pendingAction.participantEmail}</span>.</>
+                : pendingAction?.kind === 'resend-all'
+                  ? <>Ta operacja ponownie wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestników wydarzenia.</>
+                  : <>Ta operacja wyśle brakujące maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia.</>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingAction) return;
+                if (pendingAction.kind === 'send-one') {
+                  void handleSendOne(pendingAction.participantId, pendingAction.participantName);
+                  return;
+                }
+
+                void handleSendAll(pendingAction.kind === 'resend-all');
+              }}
+              disabled={isConfirmingAction}
+            >
+              {isConfirmingAction && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Wyślij mail
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Info, Loader2, Undo2, UserX2 } from 'lucide-react';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -16,7 +16,7 @@ import { Navigate } from 'react-router-dom';
 type ScannerView = 'idle' | 'success' | 'error' | 'detail';
 
 export default function Scanner() {
-  const { participants, selectedEventId, updateParticipantStatus, currentRole, scanParticipantQr, isLoading, visibleEvents } = useMockData();
+  const { participants, selectedEventId, updateParticipantStatus, currentRole, scanParticipantQr, isLoading, visibleEvents } = useData();
   const [view, setView] = useState<ScannerView>('idle');
   const [scannedParticipant, setScannedParticipant] = useState<Participant | null>(null);
   const [recentScans, setRecentScans] = useState<Participant[]>([]);

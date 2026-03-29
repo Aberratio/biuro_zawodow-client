@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MockDataProvider, useMockData } from '@/contexts/MockDataContext';
+import { DataProvider, useData } from '@/contexts/DataContext';
 import type { Event, User } from '@/types';
 
 const authState: {
@@ -20,7 +20,7 @@ vi.mock('@/contexts/AuthContext', () => ({
 }));
 
 function TestConsumer() {
-  const { selectedEventId, visibleEvents, setSelectedEventId } = useMockData();
+  const { selectedEventId, visibleEvents, setSelectedEventId } = useData();
 
   return (
     <div>
@@ -69,7 +69,7 @@ async function flushEffects() {
   });
 }
 
-describe('MockDataProvider bootstrap loading', () => {
+describe('DataProvider bootstrap loading', () => {
   beforeEach(() => {
     authState.user = null;
     authState.token = 'token';
@@ -100,9 +100,9 @@ describe('MockDataProvider bootstrap loading', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(
-      <MockDataProvider>
+      <DataProvider>
         <TestConsumer />
-      </MockDataProvider>
+      </DataProvider>
     );
 
     await waitFor(() => expect(screen.getByTestId('visible-events-count').textContent).toBe('0'));
@@ -130,9 +130,9 @@ describe('MockDataProvider bootstrap loading', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(
-      <MockDataProvider>
+      <DataProvider>
         <TestConsumer />
-      </MockDataProvider>
+      </DataProvider>
     );
 
     await waitFor(() => expect(screen.getByTestId('selected-event').textContent).toBe('event-1'));
