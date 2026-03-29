@@ -25,6 +25,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { buildParticipantFieldValues, getActiveParticipantMappings } from '@/lib/participant-fields';
 import { getParticipantStatusDefinition, PARTICIPANT_STATUS_DEFINITIONS } from '@/lib/participant-status';
 
+function formatParticipantDateTime(value: string): string {
+  const normalizedValue = value.includes(' ') ? value.replace(' ', 'T') : value;
+  const parsed = new Date(normalizedValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('pl-PL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(parsed);
+}
+
 export default function ParticipantDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -99,7 +115,7 @@ export default function ParticipantDetails() {
     return [
       { time: 'Rejestracja', desc: 'Uczestnik znajduje się na liście startowej', icon: Clock },
       ...(participant.email_status === 'sent' ? [{ time: 'QR wysłany', desc: 'Kod QR został wysłany mailem', icon: Mail }] : []),
-      ...(participant.checked_in_at ? [{ time: 'Status', desc: `${status.label}${participant.checked_in_at ? ` o ${new Date(participant.checked_in_at).toLocaleTimeString('pl-PL')}` : ''}`, icon: CheckCircle }] : []),
+      ...(participant.checked_in_at ? [{ time: 'Status', desc: `${status.label} - ${formatParticipantDateTime(participant.checked_in_at)}`, icon: CheckCircle }] : []),
     ];
   }, [participant]);
 

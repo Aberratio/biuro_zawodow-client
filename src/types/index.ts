@@ -15,7 +15,6 @@ export interface Organization {
 export interface Event {
   id: string;
   name: string;
-  date: string;
   location: string;
   organization_id: string;
   office_open_at: string;

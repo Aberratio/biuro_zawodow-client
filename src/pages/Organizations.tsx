@@ -57,6 +57,9 @@ export default function Organizations() {
     setForm({ name: '', event_limit: '1', admin_user_id: '' });
     setOpen(false);
     toast({ title: 'Organizacja utworzona' });
+    if (result.entityId) {
+      navigate(`/organizations/${result.entityId}`);
+    }
   };
 
   return (

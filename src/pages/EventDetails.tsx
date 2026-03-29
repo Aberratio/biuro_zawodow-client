@@ -62,7 +62,6 @@ export default function EventDetails() {
   const [isDeletingEvent, setIsDeletingEvent] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
-    date: '',
     location: '',
     office_open_at: '',
     office_close_at: '',
@@ -118,7 +117,6 @@ export default function EventDetails() {
 
     setEditForm({
       name: event.name,
-      date: event.date,
       location: event.location,
       office_open_at: event.office_open_at.slice(0, 16),
       office_close_at: event.office_close_at.slice(0, 16),
@@ -208,11 +206,11 @@ export default function EventDetails() {
 
   const handleEditSubmit = async () => {
     if (!event) return;
-    if (!editForm.name || !editForm.date || !editForm.location) return;
+    if (!editForm.name || !editForm.location) return;
     if (!editForm.office_open_at || !editForm.office_close_at || !isValidEventOfficeRange(editForm.office_open_at, editForm.office_close_at)) {
       toast({
         title: 'Nieprawidłowe godziny biura',
-        description: 'Podaj poprawny zakres otwarcia i zamknięcia biura zawodów.',
+        description: 'Podaj poprawną datę i godzinę otwarcia oraz zamknięcia biura zawodów.',
         variant: 'destructive',
       });
       return;
@@ -221,7 +219,6 @@ export default function EventDetails() {
     setEditSaving(true);
     const result = await updateEvent(event.id, {
       name: editForm.name,
-      date: editForm.date,
       location: editForm.location,
       organization_id: event.organization_id,
       office_open_at: editForm.office_open_at,
@@ -305,7 +302,6 @@ export default function EventDetails() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{event.name}</h1>
           <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-2 text-xs sm:text-sm text-muted-foreground">
-            <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{event.date}</span>
             <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{event.location}</span>
             <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />Biuro: {formatEventOfficeWindow(event)}</span>
           </div>
@@ -459,13 +455,12 @@ export default function EventDetails() {
           </DialogHeader>
           <div className="space-y-4">
             <div><Label>Nazwa</Label><Input value={editForm.name} onChange={eventValue => setEditForm(current => ({ ...current, name: eventValue.target.value }))} /></div>
-            <div><Label>Data</Label><Input type="date" value={editForm.date} onChange={eventValue => setEditForm(current => ({ ...current, date: eventValue.target.value }))} /></div>
             <div><Label>Lokalizacja</Label><Input value={editForm.location} onChange={eventValue => setEditForm(current => ({ ...current, location: eventValue.target.value }))} /></div>
-            <div><Label>Otwarcie biura zawodów</Label><Input type="datetime-local" value={editForm.office_open_at} onChange={eventValue => setEditForm(current => ({ ...current, office_open_at: eventValue.target.value }))} /></div>
-            <div><Label>Zamknięcie biura zawodów</Label><Input type="datetime-local" value={editForm.office_close_at} onChange={eventValue => setEditForm(current => ({ ...current, office_close_at: eventValue.target.value }))} /></div>
+            <div><Label>Data i godzina otwarcia biura zawodów</Label><Input type="datetime-local" value={editForm.office_open_at} onChange={eventValue => setEditForm(current => ({ ...current, office_open_at: eventValue.target.value }))} /></div>
+            <div><Label>Data i godzina zamknięcia biura zawodów</Label><Input type="datetime-local" value={editForm.office_close_at} onChange={eventValue => setEditForm(current => ({ ...current, office_close_at: eventValue.target.value }))} /></div>
           </div>
           <DialogFooter>
-            <Button className="w-full sm:w-auto" onClick={handleEditSubmit} disabled={!editForm.name || !editForm.date || !editForm.location || !editForm.office_open_at || !editForm.office_close_at || editSaving}>
+            <Button className="w-full sm:w-auto" onClick={handleEditSubmit} disabled={!editForm.name || !editForm.location || !editForm.office_open_at || !editForm.office_close_at || editSaving}>
               {editSaving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               Zapisz
             </Button>

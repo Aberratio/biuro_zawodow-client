@@ -62,7 +62,6 @@ export default function OrganizationDetails() {
   });
   const [eventForm, setEventForm] = useState({
     name: '',
-    date: '',
     location: '',
     office_open_at: '',
     office_close_at: '',
@@ -169,6 +168,14 @@ export default function OrganizationDetails() {
       toast({ title: 'Nieprawidłowy limit', description: 'Podaj liczbę całkowitą większą lub równą 0.', variant: 'destructive' });
       return;
     }
+    if (parsed < orgEvents.length) {
+      toast({
+        title: 'Nieprawidłowy limit',
+        description: `Limit wydarzeń nie może być mniejszy niż ${orgEvents.length}, bo tyle wydarzeń jest już przypisanych do tej organizacji.`,
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const result = await updateOrganizationEventLimit(organization.id, parsed);
     if (!result.ok) {
@@ -200,16 +207,15 @@ export default function OrganizationDetails() {
   };
 
   const handleAddEvent = async () => {
-    if (!eventForm.name || !eventForm.date || !eventForm.location) return;
+    if (!eventForm.name || !eventForm.location) return;
     if (!eventForm.office_open_at || !eventForm.office_close_at || !isValidEventOfficeRange(eventForm.office_open_at, eventForm.office_close_at)) {
-      toast({ title: 'Nieprawidłowe godziny biura', description: 'Podaj poprawny zakres otwarcia i zamknięcia biura zawodów.', variant: 'destructive' });
+      toast({ title: 'Nieprawidłowe godziny biura', description: 'Podaj poprawną datę i godzinę otwarcia oraz zamknięcia biura zawodów.', variant: 'destructive' });
       return;
     }
 
     setIsSubmittingEvent(true);
     const result = await createEvent({
       name: eventForm.name,
-      date: eventForm.date,
       location: eventForm.location,
       organization_id: organization.id,
       office_open_at: eventForm.office_open_at,
@@ -223,7 +229,7 @@ export default function OrganizationDetails() {
     }
 
     setEventDialogOpen(false);
-    setEventForm({ name: '', date: '', location: '', office_open_at: '', office_close_at: '' });
+    setEventForm({ name: '', location: '', office_open_at: '', office_close_at: '' });
     toast({ title: 'Wydarzenie utworzone' });
   };
 
@@ -308,7 +314,10 @@ export default function OrganizationDetails() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="flex-1">
                   <Label>Limit wydarzeń</Label>
-                  <Input type="number" min="0" value={limitDraft || String(organization.event_limit)} onChange={e => setLimitDraft(e.target.value)} />
+                  <Input type="number" min={String(orgEvents.length)} value={limitDraft || String(organization.event_limit)} onChange={e => setLimitDraft(e.target.value)} />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Minimalny dozwolony limit to <span className="font-medium text-foreground">{orgEvents.length}</span>, bo tyle wydarzeń jest już przypisanych do tej organizacji.
+                  </p>
                 </div>
                 <Button className="w-full sm:w-auto" onClick={handleSaveLimit}>Zapisz limit</Button>
               </div>
@@ -341,7 +350,7 @@ export default function OrganizationDetails() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-sm font-medium">{event.name}</div>
-                      <div className="text-xs text-muted-foreground">{event.date} • {event.location}</div>
+                      <div className="text-xs text-muted-foreground">{event.location}</div>
                       <div className="mt-1 text-[11px] text-muted-foreground">Biuro: {formatEventOfficeWindow(event)}</div>
                     </div>
                     <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => navigate(`/events/${event.id}`)}>
@@ -496,14 +505,13 @@ export default function OrganizationDetails() {
           <DialogHeader><DialogTitle>Dodaj wydarzenie</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div><Label>Nazwa</Label><Input value={eventForm.name} onChange={e => setEventForm(prev => ({ ...prev, name: e.target.value }))} /></div>
-            <div><Label>Data</Label><Input type="date" value={eventForm.date} onChange={e => setEventForm(prev => ({ ...prev, date: e.target.value }))} /></div>
             <div><Label>Lokalizacja</Label><Input value={eventForm.location} onChange={e => setEventForm(prev => ({ ...prev, location: e.target.value }))} /></div>
-            <div><Label>Otwarcie biura zawodów</Label><Input type="datetime-local" value={eventForm.office_open_at} onChange={e => setEventForm(prev => ({ ...prev, office_open_at: e.target.value }))} /></div>
-            <div><Label>Zamknięcie biura zawodów</Label><Input type="datetime-local" value={eventForm.office_close_at} onChange={e => setEventForm(prev => ({ ...prev, office_close_at: e.target.value }))} /></div>
+            <div><Label>Data i godzina otwarcia biura zawodów</Label><Input type="datetime-local" value={eventForm.office_open_at} onChange={e => setEventForm(prev => ({ ...prev, office_open_at: e.target.value }))} /></div>
+            <div><Label>Data i godzina zamknięcia biura zawodów</Label><Input type="datetime-local" value={eventForm.office_close_at} onChange={e => setEventForm(prev => ({ ...prev, office_close_at: e.target.value }))} /></div>
             <p className="text-[10px] text-muted-foreground">Limit organizacji: {orgEvents.length}/{organization.event_limit} wydarzeń.</p>
           </div>
           <DialogFooter>
-            <Button className="w-full sm:w-auto" onClick={handleAddEvent} disabled={!eventForm.name || !eventForm.date || !eventForm.location || !eventForm.office_open_at || !eventForm.office_close_at || remainingSlots <= 0 || isSubmittingEvent}>Zapisz</Button>
+            <Button className="w-full sm:w-auto" onClick={handleAddEvent} disabled={!eventForm.name || !eventForm.location || !eventForm.office_open_at || !eventForm.office_close_at || remainingSlots <= 0 || isSubmittingEvent}>Zapisz</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

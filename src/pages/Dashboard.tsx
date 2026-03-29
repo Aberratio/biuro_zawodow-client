@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, CalendarDays, CheckCircle, Clock, Info, ScanLine, Users } from 'lucide-react';
+import { ArrowRight, Info, ScanLine } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import DashboardSkeleton from '@/components/skeletons/DashboardSkeleton';
@@ -16,10 +16,6 @@ export default function Dashboard() {
   const { currentRole, events, visibleEvents, participants, activityLog, selectedEventId, isLoading, organizations } = useData();
   const navigate = useNavigate();
 
-  if (isLoading) return <DashboardSkeleton />;
-
-  const eventParticipants = participants.filter(participant => participant.event_id === selectedEventId);
-  const checkedIn = eventParticipants.filter(participantCountsAsCheckedIn).length;
   const currentEvent = visibleEvents.find(event => event.id === selectedEventId);
   const dashboardEvents = currentRole === 'superadmin' ? events : visibleEvents;
 
@@ -28,9 +24,10 @@ export default function Dashboard() {
     [organizations]
   );
 
+  if (isLoading) return <DashboardSkeleton />;
+
   if (currentRole === 'admin' || currentRole === 'superadmin') {
     const now = new Date();
-    const scopedParticipants = participants.filter(participant => dashboardEvents.some(event => event.id === participant.event_id));
     const activeEvents = dashboardEvents
       .filter(event => isEventOfficeOpen(event, now))
       .sort((left, right) => (getEventOfficeCloseAt(left)?.getTime() ?? Number.MAX_SAFE_INTEGER) - (getEventOfficeCloseAt(right)?.getTime() ?? Number.MAX_SAFE_INTEGER));
@@ -47,8 +44,6 @@ export default function Dashboard() {
       })
       .sort((left, right) => (getEventOfficeCloseAt(right)?.getTime() ?? 0) - (getEventOfficeCloseAt(left)?.getTime() ?? 0))
       .slice(0, 5);
-    const totalCheckedIn = scopedParticipants.filter(participantCountsAsCheckedIn).length;
-
     return (
       <div className="space-y-6">
         <div>
@@ -56,12 +51,6 @@ export default function Dashboard() {
           <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
             Szybki podgląd aktualnie otwartych biur zawodów, nadchodzących startów i ostatnio zakończonych wydarzeń.
           </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-          <StatCard icon={CalendarDays} label="Aktywne teraz" value={activeEvents.length} />
-          <StatCard icon={Users} label="Uczestnicy" value={scopedParticipants.length} />
-          <StatCard icon={CheckCircle} label="Odprawieni" value={totalCheckedIn} />
         </div>
 
         <section className="space-y-4">
@@ -176,7 +165,6 @@ export default function Dashboard() {
 
   if (currentRole === 'editor') {
     const now = new Date();
-    const scopedParticipants = participants.filter(participant => visibleEvents.some(event => event.id === participant.event_id));
     const activeEvents = visibleEvents
       .filter(event => isEventOfficeOpen(event, now))
       .sort((left, right) => (getEventOfficeCloseAt(left)?.getTime() ?? Number.MAX_SAFE_INTEGER) - (getEventOfficeCloseAt(right)?.getTime() ?? Number.MAX_SAFE_INTEGER));
@@ -193,9 +181,6 @@ export default function Dashboard() {
       })
       .sort((left, right) => (getEventOfficeCloseAt(right)?.getTime() ?? 0) - (getEventOfficeCloseAt(left)?.getTime() ?? 0))
       .slice(0, 5);
-    const totalParticipants = scopedParticipants.length;
-    const totalCheckedIn = scopedParticipants.filter(participantCountsAsCheckedIn).length;
-
     return (
       <div className="space-y-6">
         <div>
@@ -204,12 +189,6 @@ export default function Dashboard() {
             Podgląd wydarzeń Twojej organizacji: aktywnych, nadchodzących i ostatnio zakończonych.
           </p>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-          <StatCard icon={CalendarDays} label="Aktywne teraz" value={activeEvents.length} />
-          <StatCard icon={Users} label="Uczestnicy" value={totalParticipants} />
-          <StatCard icon={CheckCircle} label="Odprawieni" value={totalCheckedIn} />
-        </div>
-
         <section className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -325,7 +304,7 @@ export default function Dashboard() {
       <div>
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Panel</h1>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-          Twój panel skanera - statystyki aktualnego wydarzenia.
+          Panel skanera dla aktualnego wydarzenia.
         </p>
       </div>
 
@@ -333,7 +312,8 @@ export default function Dashboard() {
         <Card className="border-2">
           <CardContent className="pt-6">
             <p className="text-base sm:text-lg font-semibold break-words">{currentEvent.name}</p>
-            <p className="text-xs sm:text-sm text-muted-foreground">{currentEvent.date} · {currentEvent.location}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">{currentEvent.location}</p>
+            <p className="mt-1 text-xs sm:text-sm text-muted-foreground">Biuro: {formatEventOfficeWindow(currentEvent)}</p>
           </CardContent>
         </Card>
       )}
@@ -350,10 +330,6 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-3 sm:gap-4 grid-cols-2">
-        <StatCard icon={Users} label="Uczestnicy" value={eventParticipants.length} />
-        <StatCard icon={CheckCircle} label="Odprawieni" value={checkedIn} />
-      </div>
 
       <Button size="lg" className="w-full h-14 sm:h-16 text-base sm:text-lg gap-3 touch-manipulation active:scale-[0.98]" onClick={() => navigate('/scanner')}>
         <ScanLine className="h-5 w-5 sm:h-6 sm:w-6" /> Przejdź do skanera
@@ -485,20 +461,6 @@ function EmptyState({ title, description, compact = false }: { title: string; de
       <CardContent className={`text-center ${compact ? 'py-8' : 'py-12'}`}>
         <p className="font-medium">{title}</p>
         <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function StatCard({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: number }) {
-  return (
-    <Card>
-      <CardContent className="flex flex-col items-center gap-1 pt-4 sm:pt-6 pb-4 sm:pb-6 px-2 sm:px-6">
-        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-          <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-        </div>
-        <p className="text-lg sm:text-2xl font-bold tabular-nums">{value}</p>
-        <p className="text-[10px] sm:text-xs text-muted-foreground text-center leading-tight">{label}</p>
       </CardContent>
     </Card>
   );

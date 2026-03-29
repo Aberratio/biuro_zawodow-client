@@ -5,7 +5,7 @@ import { isEventOfficeOpen } from '@/lib/events';
 import { normalizeParticipantStatus } from '@/lib/participant-status';
 
 type UserCreateInput = Omit<User, 'id' | 'password'>;
-interface MutationResult { ok: boolean; error?: string; }
+interface MutationResult { ok: boolean; error?: string; entityId?: string; }
 interface EventQrEmailResult { ok: boolean; sent_count: number; error_count: number; errors: Array<{ participant_id: number; participant_name: string; error: string }>; error?: string; }
 interface ParticipantImportAnalysis { headers: string[]; sample_rows: Record<string, string>[]; email_candidates: { column: string; matched_count: number }[]; has_mapping: boolean; mappings: ParticipantFieldMapping[]; missing_required_columns: string[]; row_count: number; }
 interface ParticipantImportMappingFieldInput { source_column_name: string; alias: string; field_role: Exclude<ParticipantFieldRole, 'email'>; is_active: boolean; }
@@ -30,7 +30,7 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080').r
 const SELECTED_EVENT_STORAGE_KEY_PREFIX = 'selected_event_context';
 interface ApiParticipant { id: number | string; event_id: string | null; first_name: string; last_name: string; display_name?: string | null; email: string; bib_number: string | null; qr_code: string | null; custom_fields?: Record<string, string> | null; status: ParticipantStatus | 'pending' | null; email_status: 'not_sent' | 'sent' | null; checked_in_at: string | null; }
 interface ApiUser { id: string; name: string; email: string; password?: string; role: Role; organization_id?: string | null; organization_ids?: string[]; assigned_events: string[]; }
-interface ApiEvent { id: string; name: string; date: string; location: string; organization_id: string; office_open_at: string; office_close_at: string; }
+type ApiEvent = Event;
 interface BootstrapResponse { data: { organizations: Organization[]; events: ApiEvent[]; users: ApiUser[]; participants: ApiParticipant[]; activityLog: ActivityLog[]; }; }
 interface ParticipantQrPreviewResponse { data?: { participant?: ApiParticipant; event?: ApiEvent; qr_code_svg_data_uri?: string; qr_code_image_url?: string; }; error?: string; }
 interface ParticipantScanApiResponse { data?: { participant?: ApiParticipant; event?: ApiEvent; access?: { allowed?: boolean; }; }; error?: string; }
@@ -243,7 +243,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try { const createdUser = await createUserInApi(userData); setUsers(previous => [...previous, createdUser]); addLog(`Dodano użytkownika: ${createdUser.name}`); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się utworzyć użytkownika' }; }
   }, [addLog, createUserInApi]);
   const createOrganization = useCallback(async (data: { name: string; event_limit: number; admin_user_id?: string }): Promise<MutationResult> => {
-    try { const createdOrganization = await createOrganizationInApi(data); setOrganizations(previous => [...previous, createdOrganization]); if (currentRole === 'admin') { setUsers(previous => previous.map(user => user.id === currentUser.id ? { ...user, organization_ids: [...new Set([...(user.organization_ids ?? []), createdOrganization.id])] } : user)); syncStoredAuthUser(user => ({ ...user, organization_ids: [...new Set([...(user.organization_ids ?? []), createdOrganization.id])] })); } return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się utworzyć organizacji' }; }
+    try { const createdOrganization = await createOrganizationInApi(data); setOrganizations(previous => [...previous, createdOrganization]); if (currentRole === 'admin') { setUsers(previous => previous.map(user => user.id === currentUser.id ? { ...user, organization_ids: [...new Set([...(user.organization_ids ?? []), createdOrganization.id])] } : user)); syncStoredAuthUser(user => ({ ...user, organization_ids: [...new Set([...(user.organization_ids ?? []), createdOrganization.id])] })); } return { ok: true, entityId: createdOrganization.id }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się utworzyć organizacji' }; }
   }, [createOrganizationInApi, currentRole, currentUser.id, syncStoredAuthUser]);
   const updateOrganization = useCallback(async (organizationId: string, data: OrganizationUpdateInput): Promise<MutationResult> => {
     try { const updatedOrganization = await updateOrganizationInApi(organizationId, data); setOrganizations(previous => previous.map(organization => organization.id === organizationId ? updatedOrganization : organization)); if (data.name) addLog(`Zaktualizowano organizację: ${updatedOrganization.name}`); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zaktualizować organizacji' }; }
@@ -252,8 +252,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try { const updatedUser = await assignScannerEventsInApi(userId, eventIds); setUsers(previous => previous.map(user => user.id === userId ? updatedUser : user)); syncStoredAuthUser(user => user.id === userId ? updatedUser : user); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zapisać przypisań skanera' }; }
   }, [assignScannerEventsInApi, syncStoredAuthUser]);
   const updateOrganizationEventLimit = useCallback(async (organizationId: string, eventLimit: number): Promise<MutationResult> => {
+    const assignedEventsCount = events.filter(event => event.organization_id === organizationId).length;
+    if (eventLimit < assignedEventsCount) {
+      return {
+        ok: false,
+        error: `Limit wydarzeń nie może być mniejszy niż ${assignedEventsCount}, bo tyle wydarzeń jest już przypisanych do tej organizacji.`,
+      };
+    }
+
     try { const updatedOrganization = await updateOrganizationEventLimitInApi(organizationId, eventLimit); setOrganizations(previous => previous.map(organization => organization.id === organizationId ? updatedOrganization : organization)); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zaktualizować limitu wydarzeń' }; }
-  }, [updateOrganizationEventLimitInApi]);
+  }, [events, updateOrganizationEventLimitInApi]);
   const deleteOrganization = useCallback(async (organizationId: string): Promise<MutationResult> => {
     const existingOrganization = organizations.find(organization => organization.id === organizationId);
     try { await deleteOrganizationInApi(organizationId); setOrganizations(previous => previous.filter(organization => organization.id !== organizationId)); setUsers(previous => previous.map(user => user.id === currentUser.id ? { ...user, organization_ids: (user.organization_ids ?? []).filter(id => id !== organizationId) } : user)); if (currentUser.id) { syncStoredAuthUser(user => user.id === currentUser.id ? { ...user, organization_ids: (user.organization_ids ?? []).filter(id => id !== organizationId) } : user); } if (existingOrganization) addLog(`Usunięto organizację: ${existingOrganization.name}`); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się usunąć organizacji' }; }

@@ -22,7 +22,6 @@ export default function Events() {
   const canCreateEvent = currentRole !== 'scanner';
   const [form, setForm] = useState({
     name: '',
-    date: '',
     location: '',
     office_open_at: '',
     office_close_at: '',
@@ -45,11 +44,11 @@ export default function Events() {
   if (isLoading) return <EventsSkeleton />;
 
   const handleCreate = async () => {
-    if (!form.name || !form.date || !form.location || !selectedOrganizationId) return;
+    if (!form.name || !form.location || !selectedOrganizationId) return;
     if (!form.office_open_at || !form.office_close_at || !isValidEventOfficeRange(form.office_open_at, form.office_close_at)) {
       toast({
         title: 'Nieprawidłowe godziny biura',
-        description: 'Podaj wymagane daty i godziny otwarcia oraz zamknięcia biura zawodów. Godzina otwarcia musi być wcześniejsza od zamknięcia.',
+        description: 'Podaj wymaganą datę i godzinę otwarcia oraz zamknięcia biura zawodów. Otwarcie musi być wcześniejsze od zamknięcia.',
         variant: 'destructive',
       });
       return;
@@ -58,7 +57,6 @@ export default function Events() {
     setIsSubmitting(true);
     const result = await createEvent({
       name: form.name,
-      date: form.date,
       location: form.location,
       organization_id: selectedOrganizationId,
       office_open_at: form.office_open_at,
@@ -77,7 +75,6 @@ export default function Events() {
 
     setForm({
       name: '',
-      date: '',
       location: '',
       office_open_at: '',
       office_close_at: '',
@@ -141,13 +138,10 @@ export default function Events() {
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{event.date}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <MapPin className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{event.location}</span>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  Biuro: {formatEventOfficeWindow(event)}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Biuro: {formatEventOfficeWindow(event)}</span>
                 </div>
                 <div className="pt-2">
                   <div className="mb-1 flex justify-between text-xs">
@@ -184,10 +178,9 @@ export default function Events() {
               </div>
             )}
             <div><Label>Nazwa</Label><Input value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="np. Bieg Wiosenny" /></div>
-            <div><Label>Data</Label><Input type="date" value={form.date} onChange={event => setForm(current => ({ ...current, date: event.target.value }))} /></div>
             <div><Label>Lokalizacja</Label><Input value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} placeholder="np. Kraków, Błonia" /></div>
-            <div><Label>Otwarcie biura zawodów</Label><Input type="datetime-local" value={form.office_open_at} onChange={event => setForm(current => ({ ...current, office_open_at: event.target.value }))} /></div>
-            <div><Label>Zamknięcie biura zawodów</Label><Input type="datetime-local" value={form.office_close_at} onChange={event => setForm(current => ({ ...current, office_close_at: event.target.value }))} /></div>
+            <div><Label>Data i godzina otwarcia biura zawodów</Label><Input type="datetime-local" value={form.office_open_at} onChange={event => setForm(current => ({ ...current, office_open_at: event.target.value }))} /></div>
+            <div><Label>Data i godzina zamknięcia biura zawodów</Label><Input type="datetime-local" value={form.office_close_at} onChange={event => setForm(current => ({ ...current, office_close_at: event.target.value }))} /></div>
             {selectedOrganization && (
               <p className="text-[10px] text-muted-foreground">
                 Limit organizacji: {usedSlots}/{selectedOrganization.event_limit} wydarzeń.
@@ -197,7 +190,7 @@ export default function Events() {
           <DialogFooter>
             <Button
               onClick={handleCreate}
-              disabled={!form.name || !form.date || !form.location || !form.office_open_at || !form.office_close_at || !selectedOrganizationId || (selectedOrganization ? usedSlots >= selectedOrganization.event_limit : false) || isSubmitting}
+              disabled={!form.name || !form.location || !form.office_open_at || !form.office_close_at || !selectedOrganizationId || (selectedOrganization ? usedSlots >= selectedOrganization.event_limit : false) || isSubmitting}
               className="h-11 w-full sm:h-10 sm:w-auto"
             >
               Utwórz

@@ -37,7 +37,6 @@ function createEvent(id: string, organizationId = 'org-1'): Event {
   return {
     id,
     name: `Event ${id}`,
-    date: '2026-04-12',
     location: 'Warsaw',
     organization_id: organizationId,
     office_open_at: '2099-04-12T07:00:00',
