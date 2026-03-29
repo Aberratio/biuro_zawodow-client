@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { MockDataProvider, useMockData } from "@/contexts/MockDataContext";
+import { DataProvider, useData } from "@/contexts/DataContext";
 import { Layout } from "@/components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Events from "./pages/Events";
@@ -25,7 +25,7 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 function HomeRoute() {
-  const { currentRole, visibleEvents } = useMockData();
+  const { currentRole, visibleEvents } = useData();
 
   if (currentRole === "scanner") {
     return <Navigate to={visibleEvents.length > 0 ? "/scanner" : "/scanner-info"} replace />;
@@ -35,7 +35,7 @@ function HomeRoute() {
 }
 
 function ScannerParticipantsRoute() {
-  const { currentRole, visibleEvents } = useMockData();
+  const { currentRole, visibleEvents } = useData();
 
   if (currentRole === "scanner" && visibleEvents.length === 0) {
     return <Navigate to="/scanner-info" replace />;
@@ -45,7 +45,7 @@ function ScannerParticipantsRoute() {
 }
 
 function ScannerRoute() {
-  const { currentRole, visibleEvents } = useMockData();
+  const { currentRole, visibleEvents } = useData();
 
   if (currentRole === "scanner" && visibleEvents.length === 0) {
     return <Navigate to="/scanner-info" replace />;
@@ -55,7 +55,7 @@ function ScannerRoute() {
 }
 
 function ScannerInfoRoute() {
-  const { currentRole, visibleEvents } = useMockData();
+  const { currentRole, visibleEvents } = useData();
 
   if (currentRole !== "scanner") {
     return <Navigate to="/" replace />;
@@ -69,13 +69,13 @@ function ScannerInfoRoute() {
 }
 
 function ImportRedirect() {
-  const { selectedEventId } = useMockData();
+  const { selectedEventId } = useData();
   return <Navigate to={`/events/${selectedEventId}/import`} replace />;
 }
 
 function ProtectedAppRoutes() {
   return (
-    <MockDataProvider>
+    <DataProvider>
       <Layout>
         <Routes>
           <Route path="/" element={<HomeRoute />} />
@@ -95,7 +95,7 @@ function ProtectedAppRoutes() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>
-    </MockDataProvider>
+    </DataProvider>
   );
 }
 

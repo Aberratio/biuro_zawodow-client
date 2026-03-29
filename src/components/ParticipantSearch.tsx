@@ -10,28 +10,6 @@ interface ParticipantSearchProps {
   autoFocus?: boolean;
 }
 
-function simulateApiSearch(participants: Participant[], query: string): Promise<Participant[]> {
-  return new Promise(resolve => {
-    const delay = 300 + Math.random() * 200;
-    setTimeout(() => {
-      const q = query.toLowerCase().trim();
-      if (!q) {
-        resolve([]);
-        return;
-      }
-
-      const results = participants.filter(
-        participant =>
-          participant.name.toLowerCase().includes(q) ||
-          participant.email.toLowerCase().includes(q) ||
-          participant.bib_number === q
-      );
-
-      resolve(results.slice(0, 5));
-    }, delay);
-  });
-}
-
 export default function ParticipantSearch({
   participants,
   onSelect,
@@ -73,9 +51,15 @@ export default function ParticipantSearch({
 
     setLoading(true);
     setOpen(true);
-    debounceRef.current = setTimeout(async () => {
-      const response = await simulateApiSearch(participants, nextQuery);
-      setResults(response);
+    debounceRef.current = setTimeout(() => {
+      const q = nextQuery.toLowerCase().trim();
+      const response = participants.filter(
+        participant =>
+          participant.name.toLowerCase().includes(q) ||
+          participant.email.toLowerCase().includes(q) ||
+          participant.bib_number === q
+      );
+      setResults(response.slice(0, 5));
       setLoading(false);
     }, 300);
   }, [participants]);

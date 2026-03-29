@@ -74,6 +74,7 @@ export interface User {
 
 export interface ActivityLog {
   id: string;
+  event_id?: string;
   timestamp: string;
   action: string;
   participant_name?: string;

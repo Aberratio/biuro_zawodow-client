@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,7 +23,7 @@ export default function Participants() {
     isLoading,
     getParticipantFieldMappings,
     addParticipantManually,
-  } = useMockData();
+  } = useData();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');

@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useMockData } from '@/contexts/MockDataContext';
+import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle, Clock, Loader2, Mail, QrCode, Repeat, UserRoundCog } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, Loader2, Mail, QrCode, Repeat, Trash2, UserRoundCog } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
 import type { ParticipantFieldMapping, ParticipantQrPreview, ParticipantStatus } from '@/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -26,21 +36,25 @@ export default function ParticipantDetails() {
     reassignParticipantPackage,
     getParticipantFieldMappings,
     sendParticipantQrEmail,
+    deleteParticipant,
     getParticipantQrPreview,
     isLoading,
-  } = useMockData();
+  } = useData();
   const participant = participants.find(entry => entry.id === id);
   const event = events.find(entry => entry.id === participant?.event_id);
   const [qrPreview, setQrPreview] = useState<ParticipantQrPreview | null>(null);
   const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
   const [statusValue, setStatusValue] = useState<ParticipantStatus>('not_checked_in');
   const [transferOpen, setTransferOpen] = useState(false);
+  const [sendQrConfirmOpen, setSendQrConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [transferEmail, setTransferEmail] = useState('');
   const [transferFields, setTransferFields] = useState<Record<string, string>>({});
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [isSendingQr, setIsSendingQr] = useState(false);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSavingTransfer, setIsSavingTransfer] = useState(false);
+  const [isDeletingParticipant, setIsDeletingParticipant] = useState(false);
   const canManage = currentRole === 'editor' || currentRole === 'admin' || currentRole === 'superadmin';
 
   useEffect(() => {
@@ -95,6 +109,7 @@ export default function ParticipantDetails() {
   const statusDefinition = getParticipantStatusDefinition(participant.status);
 
   const handleSendQr = async () => {
+    setSendQrConfirmOpen(false);
     setIsSendingQr(true);
     try {
       const result = await sendParticipantQrEmail(participant.id);
@@ -160,6 +175,21 @@ export default function ParticipantDetails() {
     }
   };
 
+  const handleDeleteParticipant = async () => {
+    setIsDeletingParticipant(true);
+    const result = await deleteParticipant(participant.id);
+    setIsDeletingParticipant(false);
+
+    if (!result.ok) {
+      toast({ title: 'Nie udało się usunąć uczestnika', description: result.error, variant: 'destructive' });
+      return;
+    }
+
+    setDeleteConfirmOpen(false);
+    toast({ title: 'Uczestnik usunięty' });
+    navigate('/participants');
+  };
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="touch-manipulation">
@@ -178,13 +208,22 @@ export default function ParticipantDetails() {
               <UserRoundCog className="h-4 w-4 mr-1" />
               Przepisz pakiet na inną osobę
             </Button>
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => void handleSendQr()} disabled={isSendingQr}>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setSendQrConfirmOpen(true)} disabled={isSendingQr}>
               {isSendingQr ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Repeat className="h-4 w-4 mr-1" />}
               Wyślij ponownie QR
             </Button>
           </div>
         )}
       </div>
+
+      {canManage && (
+        <div className="flex justify-end">
+          <Button variant="destructive" size="sm" className="w-full sm:w-auto" onClick={() => setDeleteConfirmOpen(true)}>
+            <Trash2 className="h-4 w-4 mr-1" />
+            Usuń uczestnika
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <Card>
@@ -296,6 +335,42 @@ export default function ParticipantDetails() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={sendQrConfirmOpen} onOpenChange={setSendQrConfirmOpen}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Potwierdź wysyłkę maila z kodem QR</AlertDialogTitle>
+            <AlertDialogDescription>
+              Do uczestnika <span className="font-medium text-foreground">{participant.name}</span> zostanie wysłany mail na adres <span className="font-medium text-foreground">{participant.email}</span>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleSendQr()} disabled={isSendingQr}>
+              {isSendingQr && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Wyślij mail
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usunąć uczestnika?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Uczestnik <span className="font-medium text-foreground">{participant.name}</span> zostanie trwale usunięty z wydarzenia. Tej operacji nie da się cofnąć.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleDeleteParticipant()} disabled={isDeletingParticipant} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {isDeletingParticipant && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Usuń uczestnika
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
