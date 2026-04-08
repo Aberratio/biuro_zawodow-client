@@ -1,4 +1,4 @@
-import { DoorClosedLocked, KeyRound } from "lucide-react";
+import { DoorClosed, KeyRound } from "lucide-react";
 import { StatusPage } from "@/components/StatusPage";
 
 export default function Unauthorized() {
@@ -13,7 +13,7 @@ export default function Unauthorized() {
       primaryTo="/login"
       icon={
         <div className="relative">
-          <DoorClosedLocked className="h-8 w-8" />
+          <DoorClosed className="h-8 w-8" />
           <KeyRound className="absolute -bottom-2 -right-2 h-4 w-4 text-primary-foreground/85" />
         </div>
       }

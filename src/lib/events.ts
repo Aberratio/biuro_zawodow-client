@@ -52,6 +52,23 @@ export function formatEventOfficeStart(event: Pick<Event, 'office_open_at'>): st
   return formatter.format(openAt);
 }
 
+export function formatEventOfficeEnd(event: Pick<Event, 'office_close_at'>): string {
+  const closeAt = getEventOfficeCloseAt(event);
+  if (!closeAt) {
+    return 'Termin zamknięcia biura niedostępny';
+  }
+
+  const formatter = new Intl.DateTimeFormat('pl-PL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  return formatter.format(closeAt);
+}
+
 export function formatEventOfficeWindow(event: Pick<Event, 'office_open_at' | 'office_close_at'>): string {
   const openAt = parseEventDateTime(event.office_open_at);
   const closeAt = parseEventDateTime(event.office_close_at);
