@@ -18,10 +18,13 @@ export function Layout({ children }: { children: ReactNode }) {
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
-        <div className="flex-1 flex flex-col min-w-0">
-          <header className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 shrink-0">
+        <div className="relative flex-1 flex min-w-0 flex-col">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="page-gradient absolute inset-x-0 top-0 h-72 opacity-90" />
+          </div>
+          <header className="surface-panel sticky top-0 z-20 flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-5 lg:px-6">
             <div className="flex min-w-0 items-center gap-3">
-              <SidebarTrigger />
+              <SidebarTrigger className="rounded-xl border border-border/60 bg-background/35 backdrop-blur-sm hover:bg-accent/70" />
             </div>
             <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
               {(currentUser.organization_id || currentRole === 'admin') && (
@@ -29,13 +32,16 @@ export function Layout({ children }: { children: ReactNode }) {
                   {organizationLabel}
                 </Badge>
               )}
-              <Badge variant="secondary" className="text-xs uppercase tracking-wider">
+              <Badge variant="secondary" className="text-xs uppercase tracking-[0.18em]">
                 {roleLabels[currentRole]}
               </Badge>
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-4 sm:p-5 lg:p-6">
-            {children}
+          <main className="relative flex-1 overflow-auto p-4 sm:p-5 lg:p-6">
+            <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-primary/25 to-transparent" />
+            <div className="relative z-10 mx-auto w-full max-w-[1600px]">
+              {children}
+            </div>
           </main>
         </div>
       </div>

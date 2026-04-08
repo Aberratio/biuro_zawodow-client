@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -21,7 +21,9 @@ import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
 import ScannerInfo from "./pages/ScannerInfo";
+import Forbidden from "./pages/Forbidden";
 import NotFound from "./pages/NotFound";
+import Unauthorized from "./pages/Unauthorized";
 
 const queryClient = new QueryClient();
 
@@ -59,7 +61,7 @@ function ScannerInfoRoute() {
   const { currentRole, visibleEvents } = useData();
 
   if (currentRole !== "scanner") {
-    return <Navigate to="/" replace />;
+    return <Forbidden />;
   }
 
   if (visibleEvents.length > 0) {
@@ -71,7 +73,76 @@ function ScannerInfoRoute() {
 
 function ImportRedirect() {
   const { selectedEventId } = useData();
+
+  if (!selectedEventId) {
+    return <NotFound />;
+  }
+
   return <Navigate to={`/events/${selectedEventId}/import`} replace />;
+}
+
+function EventAccessRoute({ children }: { children: JSX.Element }) {
+  const { id } = useParams<{ id: string }>();
+  const { events, canAccessEvent, isLoading } = useData();
+
+  if (isLoading) {
+    return <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">Sprawdzamy trasę do wydarzenia...</div>;
+  }
+
+  if (!id || !events.some(event => event.id === id)) {
+    return <NotFound />;
+  }
+
+  if (!canAccessEvent(id)) {
+    return <Forbidden />;
+  }
+
+  return children;
+}
+
+function ParticipantAccessRoute({ children }: { children: JSX.Element }) {
+  const { id } = useParams<{ id: string }>();
+  const { participants, canAccessEvent, isLoading } = useData();
+
+  if (isLoading) {
+    return <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">Szukamy zawodnika na liście...</div>;
+  }
+
+  const participant = participants.find(entry => entry.id === id);
+  if (!participant) {
+    return <NotFound />;
+  }
+
+  if (!participant.event_id || !canAccessEvent(participant.event_id)) {
+    return <Forbidden />;
+  }
+
+  return children;
+}
+
+function OrganizationAccessRoute({ children }: { children: JSX.Element }) {
+  const { id } = useParams<{ id: string }>();
+  const { organizations, currentRole, currentUser, isLoading } = useData();
+
+  if (isLoading) {
+    return <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">Sprawdzamy organizację...</div>;
+  }
+
+  const organization = organizations.find(entry => entry.id === id);
+  if (!organization) {
+    return <NotFound />;
+  }
+
+  const allowed =
+    currentRole === "superadmin" ||
+    (currentRole === "admin" && (currentUser.organization_ids ?? []).includes(organization.id)) ||
+    currentUser.organization_id === organization.id;
+
+  if (!allowed) {
+    return <Forbidden />;
+  }
+
+  return children;
 }
 
 function ProtectedAppRoutes() {
@@ -81,18 +152,20 @@ function ProtectedAppRoutes() {
         <Routes>
           <Route path="/" element={<HomeRoute />} />
           <Route path="/events" element={<Events />} />
-          <Route path="/events/:id" element={<EventDetails />} />
-          <Route path="/events/:id/import" element={<CsvImport />} />
+          <Route path="/events/:id" element={<EventAccessRoute><EventDetails /></EventAccessRoute>} />
+          <Route path="/events/:id/import" element={<EventAccessRoute><CsvImport /></EventAccessRoute>} />
           <Route path="/participants" element={<ScannerParticipantsRoute />} />
-          <Route path="/participants/:id" element={<ParticipantDetails />} />
+          <Route path="/participants/:id" element={<ParticipantAccessRoute><ParticipantDetails /></ParticipantAccessRoute>} />
           <Route path="/scanner" element={<ScannerRoute />} />
           <Route path="/scanner-info" element={<ScannerInfoRoute />} />
           <Route path="/import" element={<ImportRedirect />} />
           <Route path="/emails" element={<EmailSending />} />
           <Route path="/organizations" element={<Organizations />} />
-          <Route path="/organizations/:id" element={<OrganizationDetails />} />
+          <Route path="/organizations/:id" element={<OrganizationAccessRoute><OrganizationDetails /></OrganizationAccessRoute>} />
           <Route path="/users" element={<Organizations />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/403" element={<Forbidden />} />
+          <Route path="/404" element={<NotFound />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>
@@ -109,12 +182,15 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/401" element={<Unauthorized />} />
+      <Route path="/403" element={<Forbidden />} />
+      <Route path="/404" element={<NotFound />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
       {isAuthenticated ? (
         <Route path="/*" element={<ProtectedAppRoutes />} />
       ) : (
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Unauthorized />} />
       )}
     </Routes>
   );

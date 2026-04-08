@@ -94,7 +94,7 @@ export default function ParticipantSearch({
       </div>
 
       {open && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-lg border bg-popover shadow-lg overflow-hidden">
+        <div className="surface-popover absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border">
           {loading && results.length === 0 ? (
             <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -123,8 +123,10 @@ export default function ParticipantSearch({
                       #{participant.bib_number}
                     </span>
                     <span
-                      className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                        status.countsAsCheckedIn ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-600'
+                      className={`rounded-full border px-2 py-0.5 text-xs font-bold ${
+                        status.countsAsCheckedIn
+                          ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300'
+                          : 'border-primary/20 bg-primary/10 text-primary'
                       }`}
                       title={status.label}
                     >

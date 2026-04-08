@@ -49,9 +49,11 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+      <div className="pointer-events-none absolute inset-0 page-gradient" />
+      <div className="pointer-events-none absolute right-[-8rem] top-[-6rem] h-[24rem] w-[24rem] rounded-full bg-primary/5 blur-3xl" />
+      <Card className="relative z-10 w-full max-w-md overflow-hidden">
+        <CardHeader className="border-b border-border/70 bg-muted/20">
           <CardTitle>Ustaw nowe hasło</CardTitle>
           <CardDescription>Link resetujący jest ważny przez 60 minut.</CardDescription>
         </CardHeader>

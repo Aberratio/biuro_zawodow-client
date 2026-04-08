@@ -38,6 +38,27 @@ function getSeoConfig(pathname: string): SeoConfig {
     };
   }
 
+  if (pathname === "/401") {
+    return {
+      title: `401 | ${APP_NAME}`,
+      description: "Logowanie jest wymagane, aby uzyskać dostęp do tej części panelu.",
+    };
+  }
+
+  if (pathname === "/403") {
+    return {
+      title: `403 | ${APP_NAME}`,
+      description: "Brak uprawnień do wyświetlenia tej sekcji panelu Biuro Zawodów.",
+    };
+  }
+
+  if (pathname === "/404") {
+    return {
+      title: `404 | ${APP_NAME}`,
+      description: "Strona nie istnieje lub została przeniesiona do innej części aplikacji.",
+    };
+  }
+
   if (pathname === "/") {
     return {
       title: `Panel | ${APP_NAME}`,
