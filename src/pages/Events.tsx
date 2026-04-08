@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import EventsSkeleton from '@/components/skeletons/EventsSkeleton';
 import { toast } from '@/hooks/use-toast';
 import { formatEventOfficeWindow, isValidEventOfficeRange } from '@/lib/events';
@@ -33,7 +34,12 @@ export default function Events() {
     () => organizations.filter(org => adminOrganizationIds.includes(org.id)),
     [adminOrganizationIds, organizations],
   );
+  const organizationNames = useMemo(
+    () => Object.fromEntries(organizations.map(org => [org.id, org.name])),
+    [organizations],
+  );
   const canCreateEvent = currentRole !== 'scanner';
+  const showOrganizationColumn = currentRole === 'superadmin';
   const [form, setForm] = useState({
     name: '',
     location: '',
@@ -68,6 +74,20 @@ export default function Events() {
       ? visibleEvents.filter(event => event.organization_id === selectedOrganizationId)
       : visibleEvents,
     [currentRole, selectedOrganizationId, visibleEvents],
+  );
+  const eventRows = useMemo(
+    () => filteredEvents.map(event => {
+      const eventParticipants = participants.filter(participant => participant.event_id === event.id);
+      const checkedInCount = eventParticipants.filter(participantCountsAsCheckedIn).length;
+
+      return {
+        ...event,
+        checkedInCount,
+        participantCount: eventParticipants.length,
+        organizationName: organizationNames[event.organization_id] ?? 'Nieznana organizacja',
+      };
+    }),
+    [filteredEvents, organizationNames, participants],
   );
   const usedSlots = filteredEvents.length;
   const formOrganization = useMemo(
@@ -126,7 +146,7 @@ export default function Events() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 justify-between sm:flex-row sm:items-center">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Wydarzenia</h1>
           <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
@@ -172,45 +192,75 @@ export default function Events() {
         </Card>
       )}
 
-      {filteredEvents.length === 0 && (
+      {eventRows.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-8 text-center">
             <p className="text-sm font-medium text-muted-foreground">Brak wydarzeń dla aktualnego zakresu.</p>
           </CardContent>
         </Card>
+      ) : (
+        <>
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nazwa</TableHead>
+                  {showOrganizationColumn && <TableHead className="hidden lg:table-cell">Organizacja</TableHead>}
+                  <TableHead className="hidden md:table-cell">Lokalizacja</TableHead>
+                  <TableHead>Biuro</TableHead>
+                  <TableHead className="hidden sm:table-cell">Odprawieni</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {eventRows.map(event => (
+                  <TableRow
+                    key={event.id}
+                    className="cursor-pointer active:bg-accent/50"
+                    onClick={() => navigate(`/events/${event.id}`)}
+                    onKeyDown={keyboardEvent => {
+                      if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
+                        keyboardEvent.preventDefault();
+                        navigate(`/events/${event.id}`);
+                      }
+                    }}
+                    tabIndex={0}
+                    aria-label={`Otwórz wydarzenie ${event.name}`}
+                  >
+                    <TableCell>
+                      <div>
+                        <span className="font-medium text-sm">{event.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground md:hidden">
+                          {event.location}
+                        </span>
+                        {showOrganizationColumn && (
+                          <span className="block truncate text-xs text-muted-foreground lg:hidden">
+                            {event.organizationName}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    {showOrganizationColumn && (
+                      <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
+                        {event.organizationName}
+                      </TableCell>
+                    )}
+                    <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                      {event.location}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatEventOfficeWindow(event)}
+                    </TableCell>
+                    <TableCell className="hidden text-sm tabular-nums sm:table-cell">
+                      {event.checkedInCount}/{event.participantCount}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <p className="text-xs text-muted-foreground">{eventRows.length} wydarzeń</p>
+        </>
       )}
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredEvents.map(event => {
-          const eventParticipants = participants.filter(participant => participant.event_id === event.id);
-          const checkedIn = eventParticipants.filter(participantCountsAsCheckedIn).length;
-
-          return (
-            <Card key={event.id} className="cursor-pointer transition-shadow hover:shadow-md active:scale-[0.98]" onClick={() => navigate(`/events/${event.id}`)}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">{event.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{event.location}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Biuro: {formatEventOfficeWindow(event)}</span>
-                </div>
-                <div className="pt-2">
-                  <div className="mb-1 flex justify-between text-xs">
-                    <span>Odprawieni</span>
-                    <span className="tabular-nums font-semibold">{checkedIn}/{eventParticipants.length}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${eventParticipants.length ? (checkedIn / eventParticipants.length) * 100 : 0}%` }} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
@@ -247,6 +297,7 @@ export default function Events() {
               disabled={!form.name || !form.location || !form.office_open_at || !form.office_close_at || !form.organization_id || (formOrganization ? formOrganizationUsedSlots >= formOrganization.event_limit : false) || isSubmitting}
               className="h-11 w-full sm:h-10 sm:w-auto"
             >
+              <Plus className="mr-1 h-4 w-4" />
               Utwórz
             </Button>
           </DialogFooter>

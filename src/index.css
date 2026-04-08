@@ -201,6 +201,14 @@ All colors MUST be HSL.
       radial-gradient(circle at top right, hsl(var(--surface-warm) / 0.05), transparent 28%),
       linear-gradient(180deg, hsl(var(--foreground) / 0.02), transparent 75%);
   }
+
+  .app-page-gradient {
+    background-image:
+      radial-gradient(circle at 10% 6%, hsl(var(--surface-glow) / 0.05), transparent 26rem),
+      radial-gradient(circle at 88% 4%, hsl(var(--surface-warm) / 0.035), transparent 24rem),
+      radial-gradient(circle at 50% 18%, hsl(var(--foreground) / 0.018), transparent 38rem),
+      linear-gradient(180deg, hsl(var(--foreground) / 0.015), transparent 42%);
+  }
 }
 
 @layer utilities {
