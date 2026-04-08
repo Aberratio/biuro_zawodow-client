@@ -20,7 +20,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <AppSidebar />
         <div className="relative flex-1 flex min-w-0 flex-col">
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="page-gradient absolute inset-x-0 top-0 h-72 opacity-90" />
+            <div className="app-page-gradient absolute inset-0" />
           </div>
           <header className="surface-panel sticky top-0 z-20 flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-5 lg:px-6">
             <div className="flex min-w-0 items-center gap-3">

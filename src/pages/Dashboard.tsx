@@ -3,13 +3,14 @@ import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Info, ScanLine } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import DashboardSkeleton from '@/components/skeletons/DashboardSkeleton';
 import { participantCountsAsCheckedIn } from '@/lib/participant-status';
-import { formatEventOfficeWindow, getEventOfficeCloseAt, getEventOfficeOpenAt, isEventOfficeOpen } from '@/lib/events';
+import { formatEventOfficeEnd, formatEventOfficeStart, formatEventOfficeWindow, getEventOfficeCloseAt, getEventOfficeOpenAt, isEventOfficeOpen } from '@/lib/events';
 import type { Event } from '@/types';
 
 export default function Dashboard() {
@@ -44,10 +45,11 @@ export default function Dashboard() {
       })
       .sort((left, right) => (getEventOfficeCloseAt(right)?.getTime() ?? 0) - (getEventOfficeCloseAt(left)?.getTime() ?? 0))
       .slice(0, 5);
+
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Panel</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Panel</h1>
           <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
             Szybki podgląd aktualnie otwartych biur zawodów, nadchodzących startów i ostatnio zakończonych wydarzeń.
           </p>
@@ -98,26 +100,23 @@ export default function Dashboard() {
                 <Badge variant="secondary">{upcomingEvents.length}</Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3 p-5">
+            <CardContent className="p-0">
               {upcomingEvents.length === 0 ? (
-                <EmptyState
-                  title="Brak nadchodzących wydarzeń"
-                  description="Po dodaniu kolejnych zawodów zobaczysz tutaj ich uporządkowaną listę."
-                  compact
-                />
-              ) : (
-                upcomingEvents.map(event => (
-                  <EventListItem
-                    key={event.id}
-                    event={event}
-                    organizationName={organizationNames[event.organization_id] ?? 'Nieznana organizacja'}
-                    statusLabel="Nadchodzące"
-                    statusVariant="secondary"
-                    metaLabel="Start biura"
-                    metaValue={formatEventOfficeWindow(event)}
-                    onOpen={() => navigate(`/events/${event.id}`)}
+                <div className="p-5">
+                  <EmptyState
+                    title="Brak nadchodzących wydarzeń"
+                    description="Po dodaniu kolejnych zawodów zobaczysz tutaj ich uporządkowaną listę."
+                    compact
                   />
-                ))
+                </div>
+              ) : (
+                <EventOverviewTable
+                  events={upcomingEvents}
+                  organizationNames={organizationNames}
+                  metaColumnLabel="Start biura"
+                  getMetaValue={event => formatEventOfficeStart(event)}
+                  onOpen={eventId => navigate(`/events/${eventId}`)}
+                />
               )}
             </CardContent>
           </Card>
@@ -134,27 +133,23 @@ export default function Dashboard() {
                 <Badge variant="outline">{finishedEvents.length}</Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3 p-5">
+            <CardContent className="p-0">
               {finishedEvents.length === 0 ? (
-                <EmptyState
-                  title="Brak zakończonych wydarzeń"
-                  description="Zamknięte wydarzenia pojawią się tutaj automatycznie po upływie czasu pracy biura."
-                  compact
-                />
-              ) : (
-                finishedEvents.map(event => (
-                  <EventListItem
-                    key={event.id}
-                    event={event}
-                    organizationName={organizationNames[event.organization_id] ?? 'Nieznana organizacja'}
-                    statusLabel="Zakończone"
-                    statusVariant="outline"
-                    metaLabel="Zamknięto"
-                    metaValue={formatEventOfficeWindow(event)}
-                    onOpen={() => navigate(`/events/${event.id}`)}
-                    subdued
+                <div className="p-5">
+                  <EmptyState
+                    title="Brak zakończonych wydarzeń"
+                    description="Zamknięte wydarzenia pojawią się tutaj automatycznie po upływie czasu pracy biura."
+                    compact
                   />
-                ))
+                </div>
+              ) : (
+                <EventOverviewTable
+                  events={finishedEvents}
+                  organizationNames={organizationNames}
+                  metaColumnLabel="Zamknięto"
+                  getMetaValue={event => formatEventOfficeEnd(event)}
+                  onOpen={eventId => navigate(`/events/${eventId}`)}
+                />
               )}
             </CardContent>
           </Card>
@@ -181,14 +176,16 @@ export default function Dashboard() {
       })
       .sort((left, right) => (getEventOfficeCloseAt(right)?.getTime() ?? 0) - (getEventOfficeCloseAt(left)?.getTime() ?? 0))
       .slice(0, 5);
+
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Panel</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Panel</h1>
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
             Podgląd wydarzeń Twojej organizacji: aktywnych, nadchodzących i ostatnio zakończonych.
           </p>
         </div>
+
         <section className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -234,26 +231,23 @@ export default function Dashboard() {
                 <Badge variant="secondary">{upcomingEvents.length}</Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3 p-5">
+            <CardContent className="p-0">
               {upcomingEvents.length === 0 ? (
-                <EmptyState
-                  title="Brak nadchodzących wydarzeń"
-                  description="Po dodaniu kolejnych wydarzeń w Twojej organizacji zobaczysz je tutaj."
-                  compact
-                />
-              ) : (
-                upcomingEvents.map(event => (
-                  <EventListItem
-                    key={event.id}
-                    event={event}
-                    organizationName={organizationNames[event.organization_id] ?? 'Nieznana organizacja'}
-                    statusLabel="Nadchodzące"
-                    statusVariant="secondary"
-                    metaLabel="Start biura"
-                    metaValue={formatEventOfficeWindow(event)}
-                    onOpen={() => navigate(`/events/${event.id}`)}
+                <div className="p-5">
+                  <EmptyState
+                    title="Brak nadchodzących wydarzeń"
+                    description="Po dodaniu kolejnych wydarzeń w Twojej organizacji zobaczysz je tutaj."
+                    compact
                   />
-                ))
+                </div>
+              ) : (
+                <EventOverviewTable
+                  events={upcomingEvents}
+                  organizationNames={organizationNames}
+                  metaColumnLabel="Start biura"
+                  getMetaValue={event => formatEventOfficeStart(event)}
+                  onOpen={eventId => navigate(`/events/${eventId}`)}
+                />
               )}
             </CardContent>
           </Card>
@@ -270,27 +264,23 @@ export default function Dashboard() {
                 <Badge variant="outline">{finishedEvents.length}</Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3 p-5">
+            <CardContent className="p-0">
               {finishedEvents.length === 0 ? (
-                <EmptyState
-                  title="Brak zakończonych wydarzeń"
-                  description="Po zakończeniu wydarzeń z Twojej organizacji pojawią się tutaj."
-                  compact
-                />
-              ) : (
-                finishedEvents.map(event => (
-                  <EventListItem
-                    key={event.id}
-                    event={event}
-                    organizationName={organizationNames[event.organization_id] ?? 'Nieznana organizacja'}
-                    statusLabel="Zakończone"
-                    statusVariant="outline"
-                    metaLabel="Zamknięto"
-                    metaValue={formatEventOfficeWindow(event)}
-                    onOpen={() => navigate(`/events/${event.id}`)}
-                    subdued
+                <div className="p-5">
+                  <EmptyState
+                    title="Brak zakończonych wydarzeń"
+                    description="Po zakończeniu wydarzeń z Twojej organizacji pojawią się tutaj."
+                    compact
                   />
-                ))
+                </div>
+              ) : (
+                <EventOverviewTable
+                  events={finishedEvents}
+                  organizationNames={organizationNames}
+                  metaColumnLabel="Zamknięto"
+                  getMetaValue={event => formatEventOfficeEnd(event)}
+                  onOpen={eventId => navigate(`/events/${eventId}`)}
+                />
               )}
             </CardContent>
           </Card>
@@ -302,8 +292,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Panel</h1>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Panel</h1>
+        <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
           Panel skanera dla aktualnego wydarzenia.
         </p>
       </div>
@@ -311,9 +301,9 @@ export default function Dashboard() {
       {currentEvent && (
         <Card className="border-2">
           <CardContent className="pt-6">
-            <p className="text-base sm:text-lg font-semibold break-words">{currentEvent.name}</p>
-            <p className="text-xs sm:text-sm text-muted-foreground">{currentEvent.location}</p>
-            <p className="mt-1 text-xs sm:text-sm text-muted-foreground">Biuro: {formatEventOfficeWindow(currentEvent)}</p>
+            <p className="break-words text-base font-semibold sm:text-lg">{currentEvent.name}</p>
+            <p className="text-xs text-muted-foreground sm:text-sm">{currentEvent.location}</p>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Biuro: {formatEventOfficeWindow(currentEvent)}</p>
           </CardContent>
         </Card>
       )}
@@ -321,8 +311,8 @@ export default function Dashboard() {
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="py-3">
           <div className="flex items-start gap-2">
-            <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-            <div className="text-xs text-muted-foreground space-y-1">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <div className="space-y-1 text-xs text-muted-foreground">
               <p>Witaj! Kliknij <strong>"Przejdź do skanera"</strong>, aby rozpocząć odprawę uczestników.</p>
               <p>Możesz skanować kody QR kamerą lub wyszukać zawodnika ręcznie po nazwisku albo numerze.</p>
             </div>
@@ -330,8 +320,7 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-
-      <Button size="lg" className="w-full h-14 sm:h-16 text-base sm:text-lg gap-3 touch-manipulation active:scale-[0.98]" onClick={() => navigate('/scanner')}>
+      <Button size="lg" className="h-14 w-full gap-3 text-base touch-manipulation active:scale-[0.98] sm:h-16 sm:text-lg" onClick={() => navigate('/scanner')}>
         <ScanLine className="h-5 w-5 sm:h-6 sm:w-6" /> Przejdź do skanera
       </Button>
 
@@ -345,7 +334,7 @@ export default function Dashboard() {
             </div>
           ))}
           {activityLog.filter(log => log.action === 'Check-in').length === 0 && (
-            <p className="text-sm text-muted-foreground py-4 text-center">Brak skanów - przejdź do skanera, aby rozpocząć odprawę</p>
+            <p className="py-4 text-center text-sm text-muted-foreground">Brak skanów - przejdź do skanera, aby rozpocząć odprawę</p>
           )}
         </CardContent>
       </Card>
@@ -413,44 +402,54 @@ function ActiveEventCard({
   );
 }
 
-function EventListItem({
-  event,
-  organizationName,
-  statusLabel,
-  statusVariant,
-  metaLabel,
-  metaValue,
+function EventOverviewTable({
+  events,
+  organizationNames,
+  metaColumnLabel,
+  getMetaValue,
   onOpen,
-  subdued = false,
 }: {
-  event: Event;
-  organizationName: string;
-  statusLabel: string;
-  statusVariant: 'default' | 'secondary' | 'outline';
-  metaLabel: string;
-  metaValue: string;
-  onOpen: () => void;
-  subdued?: boolean;
+  events: Event[];
+  organizationNames: Record<string, string>;
+  metaColumnLabel: string;
+  getMetaValue: (event: Event) => string;
+  onOpen: (eventId: string) => void;
 }) {
   return (
-    <div className={`rounded-xl border p-4 ${subdued ? 'bg-muted/20 border-border/60' : 'bg-background'}`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className={`truncate text-sm font-semibold ${subdued ? 'text-muted-foreground' : 'text-foreground'}`}>{event.name}</p>
-            <Badge variant={statusVariant}>{statusLabel}</Badge>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">{organizationName}</p>
-          <p className="mt-2 text-sm text-muted-foreground">{event.location}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            <span className="font-medium">{metaLabel}:</span> {metaValue}
-          </p>
-        </div>
-        <Button variant={subdued ? 'outline' : 'ghost'} className="h-10 w-full shrink-0 gap-2 sm:w-auto" onClick={onOpen}>
-          Szczegóły
-          <ArrowRight className="h-4 w-4" />
-        </Button>
-      </div>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Wydarzenie</TableHead>
+            <TableHead className="hidden md:table-cell">Organizacja</TableHead>
+            <TableHead>{metaColumnLabel}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {events.map(event => (
+            <TableRow
+              key={event.id}
+              className="cursor-pointer active:bg-accent/50"
+              onClick={() => onOpen(event.id)}
+            >
+              <TableCell>
+                <div>
+                  <span className="font-medium text-sm">{event.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground md:hidden">
+                    {organizationNames[event.organization_id] ?? 'Nieznana organizacja'}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                {organizationNames[event.organization_id] ?? 'Nieznana organizacja'}
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {getMetaValue(event)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

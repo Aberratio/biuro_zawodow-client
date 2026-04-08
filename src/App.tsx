@@ -190,7 +190,7 @@ function AppRoutes() {
       {isAuthenticated ? (
         <Route path="/*" element={<ProtectedAppRoutes />} />
       ) : (
-        <Route path="*" element={<Unauthorized />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       )}
     </Routes>
   );
