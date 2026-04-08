@@ -3,7 +3,6 @@ import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Info, Loader2, Undo
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { Participant } from '@/types';
@@ -20,7 +19,6 @@ export default function Scanner() {
   const [view, setView] = useState<ScannerView>('idle');
   const [scannedParticipant, setScannedParticipant] = useState<Participant | null>(null);
   const [recentScans, setRecentScans] = useState<Participant[]>([]);
-  const [autoCheckIn, setAutoCheckIn] = useState(true);
   const [showRecent, setShowRecent] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
@@ -34,7 +32,6 @@ export default function Scanner() {
     [activeEventId, participants]
   );
   const checkedIn = eventParticipants.filter(participantCountsAsCheckedIn).length;
-  const canToggleAuto = currentRole !== 'scanner';
   const hasActiveEvents = visibleEvents.length > 0;
 
   useEffect(() => () => {
@@ -58,7 +55,7 @@ export default function Scanner() {
   }, [addToRecent]);
 
   const handleQrScan = useCallback(async (decodedText: string) => {
-    const result = await scanParticipantQr(decodedText, autoCheckIn);
+    const result = await scanParticipantQr(decodedText);
     if (!result.ok || !result.data) {
       setErrorMessage(result.error ?? 'Nie znaleziono uczestnika dla tego kodu QR.');
       setView('error');
@@ -67,15 +64,10 @@ export default function Scanner() {
     }
 
     const participant = result.data.participant;
-    if (autoCheckIn && participant.status === 'checked_in') {
-      showSuccessScreen(participant);
-      return;
-    }
-
     setScannedParticipant(participant);
     addToRecent(participant);
     setView('detail');
-  }, [addToRecent, autoCheckIn, scanParticipantQr, showSuccessScreen]);
+  }, [addToRecent, scanParticipantQr]);
 
   const handleSearchSelect = useCallback((participant: Participant) => {
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
@@ -182,12 +174,6 @@ export default function Scanner() {
           </button>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          {canToggleAuto && (
-            <label className="flex items-center gap-2 cursor-pointer">
-              <span className="text-xs font-medium text-muted-foreground">Auto</span>
-              <Switch checked={autoCheckIn} onCheckedChange={setAutoCheckIn} />
-            </label>
-          )}
           <div className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 tabular-nums text-xs sm:text-sm font-bold">
             {checkedIn}/{eventParticipants.length}
           </div>
@@ -200,7 +186,7 @@ export default function Scanner() {
             <CardContent className="py-3 space-y-2 text-xs text-muted-foreground">
               <p className="font-semibold text-foreground">Jak korzystać ze skanera</p>
               <p>Skan QR zawsze weryfikuje kod po stronie API i pilnuje przypisań skanera do wydarzeń.</p>
-              <p>Tryb auto może od razu ustawić status "Odprawiony", ale tylko gdy backend potwierdzi poprawny kod.</p>
+              <p>Po skanie zobaczysz kartę uczestnika i dopiero z niej wykonasz odpowiednią akcję.</p>
             </CardContent>
           </Card>
         </div>
