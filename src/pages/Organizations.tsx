@@ -1,15 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Building2, CalendarDays, Plus, Radio, ShieldCheck, Users } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
 
 export default function Organizations() {
@@ -17,6 +16,7 @@ export default function Organizations() {
   const { organizations, events, users, currentRole, currentUser, createOrganization, isLoading } = useData();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [form, setForm] = useState({ name: '', event_limit: '1', admin_user_id: '' });
   const admins = users.filter(user => user.role === 'admin');
 
@@ -26,7 +26,32 @@ export default function Organizations() {
     return organizations.filter(org => org.id === currentUser.organization_id);
   }, [currentRole, currentUser, organizations]);
 
-  if (isLoading) return <TableSkeleton rows={4} cols={4} subtitle="" />;
+  const shouldShowSearch = visibleOrganizations.length > 5;
+  const normalizedQuery = shouldShowSearch ? searchQuery.trim().toLocaleLowerCase('pl-PL') : '';
+
+  const filteredOrganizations = useMemo(() => {
+    return visibleOrganizations
+      .filter(org => !normalizedQuery || org.name.toLocaleLowerCase('pl-PL').includes(normalizedQuery))
+      .map(org => {
+        const orgEvents = events.filter(event => event.organization_id === org.id);
+        const organizers = users.filter(user => user.organization_id === org.id && user.role === 'editor');
+        const scanners = users.filter(user => user.organization_id === org.id && user.role === 'scanner');
+        const remainingSlots = Math.max(org.event_limit - orgEvents.length, 0);
+        const adminLabel = org.admin_user_name ?? users.find(user => user.id === org.admin_user_id)?.name ?? 'Brak admina';
+
+        return {
+          ...org,
+          adminLabel,
+          eventCount: orgEvents.length,
+          organizerCount: organizers.length,
+          scannerCount: scanners.length,
+          teamCount: organizers.length + scanners.length,
+          remainingSlots,
+        };
+      });
+  }, [events, normalizedQuery, users, visibleOrganizations]);
+
+  if (isLoading) return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
 
   const handleCreate = async () => {
     const parsedLimit = Number(form.event_limit);
@@ -63,20 +88,16 @@ export default function Organizations() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-3">
-            <Building2 className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
-            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Organizacje</h1>
-          </div>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Organizacje</h1>
           <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            Przegląd organizacji. Otwórz wybraną kartę, aby zarządzać wydarzeniami, zespołem i limitami.
+            Lista organizacji. Kliknij wiersz, aby otworzyć szczegóły.
           </p>
         </div>
         {(currentRole === 'admin' || currentRole === 'superadmin') && (
           <Button onClick={() => setOpen(true)} size="sm" className="w-full sm:w-auto sm:self-auto">
-            <Plus className="mr-1 h-4 w-4" />
             Nowa organizacja
           </Button>
         )}
@@ -85,109 +106,82 @@ export default function Organizations() {
       {visibleOrganizations.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
-              <Building2 className="h-6 w-6 text-muted-foreground" />
-            </div>
             <div>
               <p className="font-medium">Brak organizacji do wyświetlenia</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Gdy organizacje będą dostępne, pojawią się tutaj jako osobne karty.
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground">Gdy organizacje będą dostępne, pojawią się tutaj w tabeli.</p>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-5 xl:grid-cols-2">
-          {visibleOrganizations.map(org => {
-            const orgEvents = events.filter(event => event.organization_id === org.id);
-            const organizers = users.filter(user => user.organization_id === org.id && user.role === 'editor');
-            const scanners = users.filter(user => user.organization_id === org.id && user.role === 'scanner');
-            const remainingSlots = Math.max(org.event_limit - orgEvents.length, 0);
-            const adminLabel = org.admin_user_name ?? users.find(user => user.id === org.admin_user_id)?.name ?? 'Brak admina';
+        <>
+          {shouldShowSearch && (
+            <Input
+              value={searchQuery}
+              onChange={event => setSearchQuery(event.target.value)}
+              placeholder="Szukaj po nazwie organizacji..."
+              aria-label="Szukaj organizacji"
+              className="h-11 sm:h-10 max-w-md"
+            />
+          )}
 
-            return (
-              <Card
-                key={org.id}
-                className="overflow-hidden border-border/70 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <CardHeader className="border-b bg-muted/20 pb-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <CardTitle className="truncate text-lg">{org.name}</CardTitle>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Centrum zarządzania wydarzeniami, zespołem i dostępami organizacji.
-                      </p>
+          {filteredOrganizations.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-10 text-center">
+                <p className="font-medium">Nie znaleziono organizacji</p>
+                <p className="mt-1 text-sm text-muted-foreground">Spróbuj wpisać inną frazę lub wyczyść wyszukiwanie.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="rounded-lg border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nazwa</TableHead>
+                    <TableHead className="hidden md:table-cell">Administrator</TableHead>
+                    <TableHead>Wydarzenia</TableHead>
+                    <TableHead className="hidden sm:table-cell">Zespół</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+              {filteredOrganizations.map(org => (
+                <TableRow
+                  key={org.id}
+                  className="cursor-pointer active:bg-accent/50"
+                  onClick={() => navigate(`/organizations/${org.id}`)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      navigate(`/organizations/${org.id}`);
+                    }
+                  }}
+                  tabIndex={0}
+                  aria-label={`Otwórz organizację ${org.name}`}
+                >
+                  <TableCell>
+                    <div>
+                      <span className="font-medium text-sm">{org.name}</span>
+                      <span className="block md:hidden text-xs text-muted-foreground truncate">
+                        {org.adminLabel}
+                      </span>
                     </div>
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center self-start rounded-2xl bg-primary/10">
-                      <Building2 className="h-5 w-5 text-primary" />
-                    </div>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="space-y-4 p-5">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl border bg-background px-4 py-3">
-                      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                        <CalendarDays className="h-3.5 w-3.5" />
-                        Wydarzenia
-                      </div>
-                      <div className="mt-2 flex items-end justify-between gap-3">
-                        <span className="text-2xl font-semibold tabular-nums">{orgEvents.length}/{org.event_limit}</span>
-                        <Badge variant={remainingSlots > 0 ? 'secondary' : 'outline'}>
-                          {remainingSlots} wolnych
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border bg-background px-4 py-3">
-                      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                        <Users className="h-3.5 w-3.5" />
-                        Zespół
-                      </div>
-                      <div className="mt-2 flex items-end justify-between gap-3">
-                        <span className="text-2xl font-semibold tabular-nums">{organizers.length + scanners.length}</span>
-                        <span className="text-xs text-muted-foreground">łącznie osób</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className="gap-1.5">
-                      <ShieldCheck className="h-3 w-3" />
-                      Admin: {adminLabel}
-                    </Badge>
-                    <Badge variant="outline" className="gap-1.5">
-                      <Users className="h-3 w-3" />
-                      {organizers.length} organizatorów
-                    </Badge>
-                    <Badge variant="outline" className="gap-1.5">
-                      <Radio className="h-3 w-3" />
-                      {scanners.length} skanerów
-                    </Badge>
-                  </div>
-
-                  <div className="rounded-xl border bg-muted/20 px-4 py-3">
-                    <div className="text-sm font-medium">Administrator organizacji</div>
-                    <div className="mt-1 text-sm text-muted-foreground">{adminLabel}</div>
-                  </div>
-
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-muted-foreground">
-                      Otwórz szczegóły, aby zarządzać limitami, wydarzeniami i użytkownikami tej organizacji.
-                    </p>
-                    <Button
-                      className="h-11 w-full shrink-0 gap-2 sm:h-10 sm:w-auto"
-                      onClick={() => navigate(`/organizations/${org.id}`)}
-                    >
-                      Otwórz organizację
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                    {org.adminLabel}
+                  </TableCell>
+                  <TableCell className="text-sm tabular-nums">
+                    {org.eventCount}/{org.event_limit}
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell text-sm tabular-nums">
+                    {org.teamCount}
+                  </TableCell>
+                </TableRow>
+              ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">{filteredOrganizations.length} organizacji</p>
+        </>
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
