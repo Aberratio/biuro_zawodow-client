@@ -15,7 +15,7 @@ interface ParticipantUpdatePayload { status?: ParticipantStatus; email?: string;
 type EventMutationInput = Omit<Event, 'id'>;
 interface OrganizationUpdateInput { name?: string; event_limit?: number; }
 interface DataContextType {
-  organizations: Organization[]; events: Event[]; participants: Participant[]; users: User[]; activityLog: ActivityLog[]; currentRole: Role; currentUser: User; selectedEventId: string; setSelectedEventId: (id: string) => void;
+  organizations: Organization[]; events: Event[]; participants: Participant[]; users: User[]; activityLog: ActivityLog[]; currentRole: Role; currentUser: User; selectedOrganizationId: string; setSelectedOrganizationId: (id: string) => void; selectedEventId: string; setSelectedEventId: (id: string) => void;
   updateParticipantStatus: (participantId: string, status: ParticipantStatus) => Promise<MutationResult>; reassignParticipantPackage: (participantId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
   analyzeParticipantImport: (eventId: string, csvContent: string) => Promise<ParticipantImportAnalysis>; confirmParticipantImportMapping: (eventId: string, payload: ParticipantImportMappingPayload) => Promise<ParticipantFieldMapping[]>; runParticipantImport: (eventId: string, csvContent: string) => Promise<ParticipantImportRunResult>; getParticipantFieldMappings: (eventId: string) => Promise<ParticipantFieldMapping[]>; addParticipantManually: (eventId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
   createEvent: (e: EventMutationInput) => Promise<MutationResult>; updateEvent: (eventId: string, data: EventMutationInput) => Promise<MutationResult>; deleteEvent: (eventId: string) => Promise<MutationResult>; addUser: (u: UserCreateInput) => Promise<MutationResult>; createOrganization: (data: { name: string; event_limit: number; admin_user_id?: string }) => Promise<MutationResult>; updateOrganization: (organizationId: string, data: OrganizationUpdateInput) => Promise<MutationResult>; updateOrganizationEventLimit: (organizationId: string, eventLimit: number) => Promise<MutationResult>; deleteOrganization: (organizationId: string) => Promise<MutationResult>; removeUser: (id: string) => Promise<MutationResult>; changeRole: (userId: string, role: Role) => Promise<MutationResult>; assignScannerEvents: (userId: string, eventIds: string[]) => Promise<MutationResult>;
@@ -27,6 +27,7 @@ interface DataContextType {
 }
 const DataContext = createContext<DataContextType | null>(null);
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080').replace(/\/+$/, '');
+const SELECTED_ORGANIZATION_STORAGE_KEY_PREFIX = 'selected_organization_context';
 const SELECTED_EVENT_STORAGE_KEY_PREFIX = 'selected_event_context';
 interface ApiParticipant { id: number | string; event_id: string | null; first_name: string; last_name: string; display_name?: string | null; email: string; bib_number: string | null; qr_code: string | null; custom_fields?: Record<string, string> | null; status: ParticipantStatus | 'pending' | null; email_status: 'not_sent' | 'sent' | null; checked_in_at: string | null; }
 interface ApiUser { id: string; name: string; email: string; password?: string; role: Role; organization_id?: string | null; organization_ids?: string[]; assigned_events: string[]; }
@@ -34,6 +35,15 @@ type ApiEvent = Event;
 interface BootstrapResponse { data: { organizations: Organization[]; events: ApiEvent[]; users: ApiUser[]; participants: ApiParticipant[]; activityLog: ActivityLog[]; }; }
 interface ParticipantQrPreviewResponse { data?: { participant?: ApiParticipant; event?: ApiEvent; qr_code_svg_data_uri?: string; qr_code_image_url?: string; }; error?: string; }
 interface ParticipantScanApiResponse { data?: { participant?: ApiParticipant; event?: ApiEvent; access?: { allowed?: boolean; }; }; error?: string; }
+function getSelectedOrganizationStorageKey(userId: string) { return `${SELECTED_ORGANIZATION_STORAGE_KEY_PREFIX}:${userId}`; }
+function readStoredSelectedOrganizationId(userId?: string | null): string {
+  if (!userId) return '';
+  try {
+    return localStorage.getItem(getSelectedOrganizationStorageKey(userId)) ?? '';
+  } catch {
+    return '';
+  }
+}
 function getSelectedEventStorageKey(userId: string) { return `${SELECTED_EVENT_STORAGE_KEY_PREFIX}:${userId}`; }
 function readStoredSelectedEventId(userId?: string | null): string {
   if (!userId) return '';
@@ -47,19 +57,28 @@ function mapApiParticipantToUi(participant: ApiParticipant, fallbackEventId: str
 function participantUiIdToApiId(participantId: string): string { return participantId.startsWith('p-') ? participantId.slice(2) : participantId; }
 function mapApiUserToUi(user: ApiUser): User { return { ...user, password: '', organization_id: user.organization_id ?? undefined, organization_ids: Array.isArray(user.organization_ids) ? user.organization_ids : [], assigned_events: Array.isArray(user.assigned_events) ? user.assigned_events : [] }; }
 function getDefaultCurrentUser(): User { return { id: '', name: '', email: '', password: '', role: 'scanner', assigned_events: [] }; }
+function getSelectableOrganizationsForUser(allOrganizations: Organization[], user: User): Organization[] {
+  if (user.role !== 'admin') return [];
+  return allOrganizations.filter(organization => (user.organization_ids ?? []).includes(organization.id));
+}
 function getVisibleEventsForUser(allEvents: Event[], user: User, now = new Date()): Event[] {
   if (user.role === 'superadmin') return allEvents;
   if (user.role === 'admin') return allEvents.filter(event => (user.organization_ids ?? []).includes(event.organization_id));
   if (user.role === 'editor') return allEvents.filter(event => event.organization_id === user.organization_id);
   return allEvents.filter(event => user.assigned_events.includes(event.id) && isEventOfficeOpen(event, now));
 }
+function resolveSelectedOrganizationId(availableOrganizations: Organization[], preferredSelectedOrganizationId: string): string {
+  return availableOrganizations.some(organization => organization.id === preferredSelectedOrganizationId) ? preferredSelectedOrganizationId : availableOrganizations[0]?.id ?? '';
+}
 function resolveSelectedEventId(availableEvents: Event[], preferredSelectedEventId: string): string {
   return availableEvents.some(event => event.id === preferredSelectedEventId) ? preferredSelectedEventId : availableEvents[0]?.id ?? '';
 }
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user: authUser, token, getAuthHeaders, clearSession } = useAuth();
-  const [organizations, setOrganizations] = useState<Organization[]>([]); const [events, setEvents] = useState<Event[]>([]); const [participants, setParticipants] = useState<Participant[]>([]); const [users, setUsers] = useState<User[]>([]); const [activityLog, setActivityLog] = useState<ActivityLog[]>([]); const [selectedEventId, setSelectedEventIdState] = useState<string>(''); const [isLoading, setIsLoading] = useState(true); const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
-  const resetState = useCallback(() => { setOrganizations([]); setEvents([]); setParticipants([]); setUsers([]); setActivityLog([]); setSelectedEventIdState(''); }, []);
+  const [organizations, setOrganizations] = useState<Organization[]>([]); const [events, setEvents] = useState<Event[]>([]); const [participants, setParticipants] = useState<Participant[]>([]); const [users, setUsers] = useState<User[]>([]); const [activityLog, setActivityLog] = useState<ActivityLog[]>([]); const [selectedOrganizationId, setSelectedOrganizationIdState] = useState<string>(''); const [selectedEventId, setSelectedEventIdState] = useState<string>(''); const [isLoading, setIsLoading] = useState(true); const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
+  const resetState = useCallback(() => { setOrganizations([]); setEvents([]); setParticipants([]); setUsers([]); setActivityLog([]); setSelectedOrganizationIdState(''); setSelectedEventIdState(''); }, []);
+  const persistSelectedOrganizationId = useCallback((organizationId: string, userId?: string | null) => { if (!userId) return; try { const key = getSelectedOrganizationStorageKey(userId); if (organizationId) { localStorage.setItem(key, organizationId); return; } localStorage.removeItem(key); } catch {} }, []);
+  const setSelectedOrganizationId = useCallback((organizationId: string) => { setSelectedOrganizationIdState(organizationId); persistSelectedOrganizationId(organizationId, authUser?.id); }, [authUser?.id, persistSelectedOrganizationId]);
   const persistSelectedEventId = useCallback((eventId: string, userId?: string | null) => { if (!userId) return; try { const key = getSelectedEventStorageKey(userId); if (eventId) { localStorage.setItem(key, eventId); return; } localStorage.removeItem(key); } catch {} }, []);
   const setSelectedEventId = useCallback((eventId: string) => { setSelectedEventIdState(eventId); persistSelectedEventId(eventId, authUser?.id); }, [authUser?.id, persistSelectedEventId]);
   const syncStoredAuthUser = useCallback((updater: (user: User) => User) => { try { const raw = sessionStorage.getItem('auth_user'); if (!raw) return; const parsed = JSON.parse(raw) as User; sessionStorage.setItem('auth_user', JSON.stringify(updater(parsed))); } catch {} }, []);
@@ -68,23 +87,37 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!authUser || !token) { resetState(); setIsLoading(false); return; }
     try {
       const response = await fetch(`${API_BASE_URL}/bootstrap`, { headers: getAuthHeaders() }); if (response.status === 401) { clearSession(); throw new Error('Unauthorized'); } if (!response.ok) throw new Error(`API bootstrap failed: ${response.status}`);
-      const payload = (await response.json()) as BootstrapResponse; const data = payload?.data; if (!data) throw new Error('API bootstrap returned empty payload'); const apiEvents = Array.isArray(data.events) ? data.events : []; const nextUsers = (data.users ?? []).map(mapApiUserToUi); const nextCurrentUser = nextUsers.find(user => user.id === authUser.id) ?? authUser; const availableEvents = getVisibleEventsForUser(apiEvents, nextCurrentUser); const storedSelectedEventId = readStoredSelectedEventId(authUser.id); const nextSelectedEvent = resolveSelectedEventId(availableEvents, storedSelectedEventId);
-      setOrganizations(Array.isArray(data.organizations) ? data.organizations : []); setEvents(apiEvents); setUsers(nextUsers); setParticipants((data.participants ?? []).map(participant => mapApiParticipantToUi(participant, nextSelectedEvent))); setActivityLog(Array.isArray(data.activityLog) ? data.activityLog : []); setSelectedEventIdState(nextSelectedEvent); persistSelectedEventId(nextSelectedEvent, authUser.id);
+      const payload = (await response.json()) as BootstrapResponse; const data = payload?.data; if (!data) throw new Error('API bootstrap returned empty payload'); const nextOrganizations = Array.isArray(data.organizations) ? data.organizations : []; const apiEvents = Array.isArray(data.events) ? data.events : []; const nextUsers = (data.users ?? []).map(mapApiUserToUi); const nextCurrentUser = nextUsers.find(user => user.id === authUser.id) ?? authUser; const availableEvents = getVisibleEventsForUser(apiEvents, nextCurrentUser); const selectableOrganizations = getSelectableOrganizationsForUser(nextOrganizations, nextCurrentUser); const storedSelectedOrganizationId = readStoredSelectedOrganizationId(authUser.id); const nextSelectedOrganization = nextCurrentUser.role === 'admin' ? resolveSelectedOrganizationId(selectableOrganizations, storedSelectedOrganizationId) : ''; const eventSelectionScope = nextCurrentUser.role === 'admin' ? availableEvents.filter(event => event.organization_id === nextSelectedOrganization) : availableEvents; const storedSelectedEventId = readStoredSelectedEventId(authUser.id); const nextSelectedEvent = resolveSelectedEventId(eventSelectionScope, storedSelectedEventId);
+      setOrganizations(nextOrganizations); setEvents(apiEvents); setUsers(nextUsers); setParticipants((data.participants ?? []).map(participant => mapApiParticipantToUi(participant, nextSelectedEvent))); setActivityLog(Array.isArray(data.activityLog) ? data.activityLog : []); setSelectedOrganizationIdState(nextSelectedOrganization); setSelectedEventIdState(nextSelectedEvent); persistSelectedOrganizationId(nextSelectedOrganization, authUser.id); persistSelectedEventId(nextSelectedEvent, authUser.id);
     } catch (error) {
       resetState();
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [authUser, clearSession, getAuthHeaders, persistSelectedEventId, resetState, token]);
+  }, [authUser, clearSession, getAuthHeaders, persistSelectedEventId, persistSelectedOrganizationId, resetState, token]);
   useEffect(() => { void loadBootstrap().catch(() => undefined); }, [loadBootstrap]);
-  useEffect(() => { if (!authUser?.id) { setSelectedEventIdState(''); return; } setSelectedEventIdState(readStoredSelectedEventId(authUser.id)); }, [authUser?.id]);
+  useEffect(() => {
+    if (!authUser?.id) {
+      setSelectedOrganizationIdState('');
+      setSelectedEventIdState('');
+      return;
+    }
+
+    setSelectedOrganizationIdState(readStoredSelectedOrganizationId(authUser.id));
+    setSelectedEventIdState(readStoredSelectedEventId(authUser.id));
+  }, [authUser?.id]);
   useEffect(() => {
     if (!authUser?.id) return undefined;
-    const storageKey = getSelectedEventStorageKey(authUser.id);
+    const organizationStorageKey = getSelectedOrganizationStorageKey(authUser.id);
+    const eventStorageKey = getSelectedEventStorageKey(authUser.id);
     const handleStorage = (event: StorageEvent) => {
-      if (event.key !== storageKey) return;
-      setSelectedEventIdState(event.newValue ?? '');
+      if (event.key === organizationStorageKey) {
+        setSelectedOrganizationIdState(event.newValue ?? '');
+      }
+      if (event.key === eventStorageKey) {
+        setSelectedEventIdState(event.newValue ?? '');
+      }
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
@@ -96,14 +129,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const currentUser = useMemo(() => { if (!authUser) return getDefaultCurrentUser(); return users.find(user => user.id === authUser.id) || authUser; }, [users, authUser]);
   const currentRole = currentUser.role;
   const visibleEvents = useMemo(() => getVisibleEventsForUser(events, currentUser, new Date(nowTimestamp)), [currentUser, events, nowTimestamp]);
+  const selectableOrganizations = useMemo(() => getSelectableOrganizationsForUser(organizations, currentUser), [currentUser, organizations]);
+  const eventSelectionScope = useMemo(() => {
+    if (currentRole !== 'admin') return visibleEvents;
+    if (!selectedOrganizationId) return [];
+    return visibleEvents.filter(event => event.organization_id === selectedOrganizationId);
+  }, [currentRole, selectedOrganizationId, visibleEvents]);
   useEffect(() => {
-    const nextVisibleEventId = visibleEvents[0]?.id ?? '';
-    if (visibleEvents.some(event => event.id === selectedEventId) || nextVisibleEventId === selectedEventId) {
+    if (currentRole !== 'admin') {
+      if (selectedOrganizationId !== '') {
+        setSelectedOrganizationId('');
+      }
+      return;
+    }
+
+    const nextSelectedOrganizationId = resolveSelectedOrganizationId(selectableOrganizations, selectedOrganizationId);
+    if (nextSelectedOrganizationId !== selectedOrganizationId) {
+      setSelectedOrganizationId(nextSelectedOrganizationId);
+    }
+  }, [currentRole, selectableOrganizations, selectedOrganizationId, setSelectedOrganizationId]);
+  useEffect(() => {
+    const nextVisibleEventId = eventSelectionScope[0]?.id ?? '';
+    if (eventSelectionScope.some(event => event.id === selectedEventId) || nextVisibleEventId === selectedEventId) {
       return;
     }
 
     setSelectedEventId(nextVisibleEventId);
-  }, [selectedEventId, setSelectedEventId, visibleEvents]);
+  }, [eventSelectionScope, selectedEventId, setSelectedEventId]);
   const canAccessEvent = useCallback((eventId: string) => { if (currentRole === 'superadmin') return true; const event = events.find(entry => entry.id === eventId); if (!event) return false; if (currentRole === 'admin') return (currentUser.organization_ids ?? []).includes(event.organization_id); if (currentRole === 'editor') return event.organization_id === currentUser.organization_id; return currentUser.assigned_events.includes(eventId) && isEventOfficeOpen(event, new Date(nowTimestamp)); }, [currentRole, currentUser, events, nowTimestamp]);
   const addLog = useCallback((action: string, participantName?: string) => { setActivityLog(previous => [{ id: `log-${Date.now()}`, timestamp: new Date().toISOString(), action, participant_name: participantName, user_name: currentUser.name }, ...previous]); }, [currentUser.name]);
   const replaceParticipant = useCallback((participant: Participant) => { setParticipants(previous => previous.map(existing => existing.id === participant.id ? participant : existing)); }, []);
@@ -357,7 +409,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [getAuthHeaders]);
   return (
-    <DataContext.Provider value={{ organizations, events, participants, users, activityLog, currentRole, currentUser, selectedEventId, setSelectedEventId, updateParticipantStatus, reassignParticipantPackage, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, deleteEvent, addUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, visibleEvents, canAccessEvent, isLoading }}>
+    <DataContext.Provider value={{ organizations, events, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, updateParticipantStatus, reassignParticipantPackage, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, deleteEvent, addUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, visibleEvents, canAccessEvent, isLoading }}>
       {children}
     </DataContext.Provider>
   );

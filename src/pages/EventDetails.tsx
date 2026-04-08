@@ -18,7 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Users, CheckCircle, ScanLine, MapPin, Calendar, ArrowLeft, FileUp, UserPlus, Loader2, Pencil, Download, Trash2 } from 'lucide-react';
+import { Users, CheckCircle, ScanLine, MapPin, Calendar, ArrowLeft, FileUp, UserPlus, Loader2, Pencil, Download, Plus, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
 import { ParticipantFieldMapping, User } from '@/types';
@@ -492,6 +492,7 @@ export default function EventDetails() {
           <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button className="w-full sm:w-auto" onClick={handleManualSubmit} disabled={manualSaving}>
               {manualSaving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              {!manualSaving && <Plus className="h-4 w-4 mr-1" />}
               Zapisz uczestnika
             </Button>
           </DialogFooter>

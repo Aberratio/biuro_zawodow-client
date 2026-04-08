@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent } from '@/components/ui/card';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
@@ -125,6 +126,7 @@ export default function Organizations() {
         </div>
         {(currentRole === 'admin' || currentRole === 'superadmin') && (
           <Button onClick={() => setOpen(true)} size="sm" className="w-full sm:w-auto sm:self-auto">
+            <Plus className="mr-1 h-4 w-4" />
             Nowa organizacja
           </Button>
         )}
@@ -249,6 +251,7 @@ export default function Organizations() {
               onClick={handleCreate}
               disabled={!form.name || !form.event_limit || (currentRole === 'superadmin' && !form.admin_user_id) || isSubmitting}
             >
+              <Plus className="mr-1 h-4 w-4" />
               Utwórz organizację
             </Button>
           </DialogFooter>

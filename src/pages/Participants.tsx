@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Search, UserPlus } from 'lucide-react';
+import { Loader2, Plus, Search, UserPlus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { ParticipantFieldMapping } from '@/types';
@@ -210,6 +210,7 @@ export default function Participants() {
           <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button className="w-full sm:w-auto" onClick={handleManualSubmit} disabled={manualSaving}>
               {manualSaving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              {!manualSaving && <Plus className="h-4 w-4 mr-1" />}
               Zapisz uczestnika
             </Button>
           </DialogFooter>

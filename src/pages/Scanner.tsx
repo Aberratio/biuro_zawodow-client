@@ -16,7 +16,7 @@ import { Navigate } from 'react-router-dom';
 type ScannerView = 'idle' | 'success' | 'error' | 'detail';
 
 export default function Scanner() {
-  const { participants, selectedEventId, updateParticipantStatus, currentRole, scanParticipantQr, isLoading, visibleEvents } = useData();
+  const { participants, selectedEventId, selectedOrganizationId, updateParticipantStatus, currentRole, scanParticipantQr, isLoading, visibleEvents } = useData();
   const [view, setView] = useState<ScannerView>('idle');
   const [scannedParticipant, setScannedParticipant] = useState<Participant | null>(null);
   const [recentScans, setRecentScans] = useState<Participant[]>([]);
@@ -26,7 +26,7 @@ export default function Scanner() {
   const [isMutating, setIsMutating] = useState(false);
   const [errorMessage, setErrorMessage] = useState('Nie znaleziono uczestnika dla tego kodu QR.');
   const successTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const selectedEvent = visibleEvents.find(event => event.id === selectedEventId) ?? visibleEvents[0] ?? null;
+  const selectedEvent = visibleEvents.find(event => event.id === selectedEventId) ?? null;
   const activeEventId = selectedEvent?.id ?? selectedEventId;
 
   const eventParticipants = useMemo(
@@ -121,8 +121,25 @@ export default function Scanner() {
 
   if (isLoading) return <ScannerSkeleton />;
 
-  if (!hasActiveEvents || !selectedEvent) {
+  if (!hasActiveEvents && currentRole === 'scanner') {
     return <Navigate to="/scanner-info" replace />;
+  }
+
+  if (!selectedEvent) {
+    return (
+      <div className="mx-auto max-w-xl px-4 md:px-0">
+        <Card className="border-dashed">
+          <CardContent className="py-10 text-center">
+            <p className="text-base font-semibold">Brak wybranego wydarzenia</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {currentRole === 'admin' && selectedOrganizationId
+                ? 'Do wybranej organizacji nie dodano jeszcze wydarzeń. Dodaj je w zakładce Wydarzenia.'
+                : 'Wybierz wydarzenie z menu bocznego, aby uruchomić skaner.'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (view === 'success' && scannedParticipant) {

@@ -14,7 +14,17 @@ import { formatEventOfficeWindow, isValidEventOfficeRange } from '@/lib/events';
 import { participantCountsAsCheckedIn } from '@/lib/participant-status';
 
 export default function Events() {
-  const { visibleEvents, participants, organizations, createEvent, currentUser, currentRole, isLoading } = useData();
+  const {
+    visibleEvents,
+    participants,
+    organizations,
+    createEvent,
+    currentUser,
+    currentRole,
+    selectedOrganizationId,
+    setSelectedOrganizationId,
+    isLoading,
+  } = useData();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -24,47 +34,30 @@ export default function Events() {
     [adminOrganizationIds, organizations],
   );
   const canCreateEvent = currentRole !== 'scanner';
-  const [activeOrganizationId, setActiveOrganizationId] = useState(
-    currentRole === 'admin'
-      ? (adminOrganizationIds[0] || currentUser.organization_id || '')
-      : (currentUser.organization_id || ''),
-  );
   const [form, setForm] = useState({
     name: '',
     location: '',
     office_open_at: '',
     office_close_at: '',
     organization_id: currentRole === 'admin'
-      ? (adminOrganizationIds[0] || currentUser.organization_id || organizations[0]?.id || '')
+      ? (selectedOrganizationId || adminOrganizationIds[0] || currentUser.organization_id || organizations[0]?.id || '')
       : (currentUser.organization_id || organizations[0]?.id || ''),
   });
 
   useEffect(() => {
     if (currentRole !== 'admin') return;
 
-    const nextOrganizationId = activeOrganizationId && adminOrganizationIds.includes(activeOrganizationId)
-      ? activeOrganizationId
-      : (adminOrganizationIds[0] || currentUser.organization_id || '');
-
-    if (nextOrganizationId !== activeOrganizationId) {
-      setActiveOrganizationId(nextOrganizationId);
-    }
-  }, [activeOrganizationId, adminOrganizationIds, currentRole, currentUser.organization_id]);
-
-  useEffect(() => {
-    if (currentRole !== 'admin') return;
-
     const nextOrganizationId = form.organization_id && adminOrganizationIds.includes(form.organization_id)
       ? form.organization_id
-      : (adminOrganizationIds[0] || currentUser.organization_id || organizations[0]?.id || '');
+      : (selectedOrganizationId || adminOrganizationIds[0] || currentUser.organization_id || organizations[0]?.id || '');
 
     if (nextOrganizationId !== form.organization_id) {
       setForm(current => ({ ...current, organization_id: nextOrganizationId }));
     }
-  }, [adminOrganizationIds, currentRole, currentUser.organization_id, form.organization_id, organizations]);
+  }, [adminOrganizationIds, currentRole, currentUser.organization_id, form.organization_id, organizations, selectedOrganizationId]);
 
   const pageOrganizationId = currentRole === 'admin'
-    ? activeOrganizationId
+    ? selectedOrganizationId
     : currentUser.organization_id || '';
   const pageOrganization = useMemo(
     () => organizations.find(org => org.id === pageOrganizationId),
@@ -72,9 +65,9 @@ export default function Events() {
   );
   const filteredEvents = useMemo(
     () => currentRole === 'admin'
-      ? visibleEvents.filter(event => event.organization_id === activeOrganizationId)
+      ? visibleEvents.filter(event => event.organization_id === selectedOrganizationId)
       : visibleEvents,
-    [activeOrganizationId, currentRole, visibleEvents],
+    [currentRole, selectedOrganizationId, visibleEvents],
   );
   const usedSlots = filteredEvents.length;
   const formOrganization = useMemo(
@@ -124,7 +117,7 @@ export default function Events() {
       office_open_at: '',
       office_close_at: '',
       organization_id: currentRole === 'admin'
-        ? (activeOrganizationId || adminOrganizationIds[0] || organizations[0]?.id || '')
+        ? (selectedOrganizationId || adminOrganizationIds[0] || organizations[0]?.id || '')
         : (currentUser.organization_id || organizations[0]?.id || ''),
     });
     setOpen(false);
@@ -150,7 +143,7 @@ export default function Events() {
       {currentRole === 'admin' && adminOrganizations.length > 0 && (
         <div className="max-w-md space-y-2">
           <Label htmlFor="events-organization-filter">Organizacja</Label>
-          <Select value={activeOrganizationId} onValueChange={setActiveOrganizationId}>
+          <Select value={selectedOrganizationId} onValueChange={setSelectedOrganizationId}>
             <SelectTrigger id="events-organization-filter">
               <SelectValue placeholder="Wybierz organizację" />
             </SelectTrigger>

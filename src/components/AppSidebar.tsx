@@ -46,7 +46,16 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const navigate = useNavigate();
-  const { currentRole, currentUser, visibleEvents, selectedEventId, setSelectedEventId } = useData();
+  const {
+    currentRole,
+    currentUser,
+    organizations,
+    visibleEvents,
+    selectedOrganizationId,
+    setSelectedOrganizationId,
+    selectedEventId,
+    setSelectedEventId,
+  } = useData();
   const { logout } = useAuth();
 
   const scannerHasActiveEvents = currentRole !== 'scanner' || visibleEvents.length > 0;
@@ -61,8 +70,17 @@ export function AppSidebar() {
   const generalItems = items.filter(item => !eventScopedUrls.has(item.url));
   const eventScopedItems = items.filter(item => eventScopedUrls.has(item.url));
   const RoleIcon = roleIcons[currentRole];
-  const selectedEvent = visibleEvents.find(event => event.id === selectedEventId) ?? visibleEvents[0] ?? null;
-  const showEventSelectControl = visibleEvents.length > 1 || currentRole !== 'scanner';
+  const adminOrganizations = currentRole === 'admin'
+    ? organizations.filter(organization => (currentUser.organization_ids ?? []).includes(organization.id))
+    : [];
+  const selectedOrganization = adminOrganizations.find(organization => organization.id === selectedOrganizationId) ?? null;
+  const scopedVisibleEvents = currentRole === 'admin'
+    ? visibleEvents.filter(event => event.organization_id === selectedOrganizationId)
+    : visibleEvents;
+  const selectedEvent = scopedVisibleEvents.find(event => event.id === selectedEventId) ?? null;
+  const showOrganizationSelectControl = adminOrganizations.length > 1;
+  const showEventSelectControl = scopedVisibleEvents.length > 1 || currentRole !== 'scanner';
+  const showEventWorkspace = !collapsed && eventScopedItems.length > 0 && (currentRole === 'admin' ? adminOrganizations.length > 0 : visibleEvents.length > 0);
 
   return (
     <Sidebar collapsible="icon">
@@ -92,7 +110,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {!collapsed && eventScopedItems.length > 0 && visibleEvents.length > 0 && (
+        {showEventWorkspace && (
           <SidebarGroup>
             <SidebarGroupLabel>
               <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-sidebar-foreground/70">
@@ -101,18 +119,57 @@ export function AppSidebar() {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <div className="mx-2 rounded-2xl border border-sidebar-border/70 bg-sidebar-accent/35 p-2">
+                {currentRole === 'admin' && (
+                  <div className="mb-2 rounded-xl border border-sidebar-border/60 bg-sidebar-accent/50 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-sidebar-foreground/60">
+                      Wybrana organizacja
+                    </p>
+                    {showOrganizationSelectControl ? (
+                      <div className="mt-2">
+                        <Select value={selectedOrganizationId} onValueChange={setSelectedOrganizationId}>
+                          <SelectTrigger className="h-10 border-sidebar-border bg-sidebar text-xs text-sidebar-foreground">
+                            <SelectValue placeholder="Wybierz organizację" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {adminOrganizations.map(organization => (
+                              <SelectItem key={organization.id} value={organization.id} className="text-xs">
+                                {organization.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : selectedOrganization ? (
+                      <div className="mt-2 rounded-xl bg-sidebar px-3 py-3">
+                        <p className="text-sm font-medium leading-snug text-sidebar-foreground">{selectedOrganization.name}</p>
+                        <p className="mt-1 text-[11px] text-sidebar-foreground/65">
+                          Ten kontekst zawęża wydarzenia i narzędzia pracy.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mt-2 rounded-xl bg-sidebar px-3 py-3 text-xs text-sidebar-foreground/70">
+                        Brak przypisanych organizacji w tym kontekście.
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="rounded-xl border border-sidebar-border/60 bg-sidebar-accent/50 p-3">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-sidebar-foreground/60">
                     Wybrane wydarzenie
                   </p>
-                  {showEventSelectControl ? (
+                  {scopedVisibleEvents.length === 0 ? (
+                    <div className="mt-2 rounded-xl bg-sidebar px-3 py-3 text-xs text-sidebar-foreground/70">
+                      Do tej organizacji nie dodano jeszcze wydarzeń. Dodaj je w zakładce Wydarzenia.
+                    </div>
+                  ) : showEventSelectControl ? (
                     <div className="mt-2">
                       <Select value={selectedEventId} onValueChange={setSelectedEventId}>
                         <SelectTrigger className="h-10 border-sidebar-border bg-sidebar text-xs text-sidebar-foreground">
                           <SelectValue placeholder="Wybierz wydarzenie" />
                         </SelectTrigger>
                         <SelectContent>
-                          {visibleEvents.map(event => (
+                          {scopedVisibleEvents.map(event => (
                             <SelectItem key={event.id} value={event.id} className="text-xs">
                               {event.name}
                             </SelectItem>
@@ -134,8 +191,8 @@ export function AppSidebar() {
                   )}
                 </div>
 
-                <SidebarMenu className="mt-2">
-                  {selectedEvent && (
+                {selectedEvent && (
+                  <SidebarMenu className="mt-2">
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild>
                         <NavLink to={`/events/${selectedEvent.id}`} end className="rounded-xl hover:bg-accent/60" activeClassName="rounded-xl bg-sidebar-accent/80 font-medium text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-primary)/0.14)]">
@@ -144,18 +201,18 @@ export function AppSidebar() {
                         </NavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                  )}
-                  {eventScopedItems.map(item => (
-                    <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton asChild>
-                        <NavLink to={item.url === '/import' && selectedEvent ? `/events/${selectedEvent.id}/import` : item.url} end={item.url !== '/import'} className="rounded-xl hover:bg-accent/60" activeClassName="rounded-xl bg-sidebar-accent/80 font-medium text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-primary)/0.14)]">
-                          <item.icon className="mr-2 h-4 w-4 shrink-0" />
-                          <span>{item.title}</span>
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
+                    {eventScopedItems.map(item => (
+                      <SidebarMenuItem key={item.url}>
+                        <SidebarMenuButton asChild>
+                          <NavLink to={item.url === '/import' ? `/events/${selectedEvent.id}/import` : item.url} end={item.url !== '/import'} className="rounded-xl hover:bg-accent/60" activeClassName="rounded-xl bg-sidebar-accent/80 font-medium text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-primary)/0.14)]">
+                            <item.icon className="mr-2 h-4 w-4 shrink-0" />
+                            <span>{item.title}</span>
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                )}
               </div>
             </SidebarGroupContent>
           </SidebarGroup>
