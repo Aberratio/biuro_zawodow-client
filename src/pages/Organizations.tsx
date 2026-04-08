@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,15 +10,45 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
+import { formatEventOfficeEnd, formatEventOfficeStart, getEventOfficeCloseAt, getEventOfficeOpenAt, isEventOfficeOpen } from '@/lib/events';
+import type { Event } from '@/types';
+
+function getClosestOrganizationEventLabel(organizationEvents: Event[], now: Date): string {
+  const activeEvent = organizationEvents
+    .map(event => ({ event, closeAt: getEventOfficeCloseAt(event) }))
+    .filter((entry): entry is { event: Event; closeAt: Date } => entry.closeAt !== null && isEventOfficeOpen(entry.event, now))
+    .sort((left, right) => left.closeAt.getTime() - right.closeAt.getTime())[0];
+
+  if (activeEvent) {
+    return `W trakcie do ${formatEventOfficeEnd(activeEvent.event)}`;
+  }
+
+  const upcomingEvent = organizationEvents
+    .map(event => ({ event, openAt: getEventOfficeOpenAt(event) }))
+    .filter((entry): entry is { event: Event; openAt: Date } => entry.openAt !== null && entry.openAt.getTime() > now.getTime())
+    .sort((left, right) => left.openAt.getTime() - right.openAt.getTime())[0];
+
+  if (upcomingEvent) {
+    return formatEventOfficeStart(upcomingEvent.event);
+  }
+
+  return 'Brak zaplanowanego';
+}
 
 export default function Organizations() {
   const navigate = useNavigate();
   const { organizations, events, users, currentRole, currentUser, createOrganization, isLoading } = useData();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState('');
   const [form, setForm] = useState({ name: '', event_limit: '1', admin_user_id: '' });
   const admins = users.filter(user => user.role === 'admin');
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowTimestamp(Date.now()), 30_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const visibleOrganizations = useMemo(() => {
     if (currentRole === 'superadmin') return organizations;
@@ -28,28 +58,25 @@ export default function Organizations() {
 
   const shouldShowSearch = visibleOrganizations.length > 5;
   const normalizedQuery = shouldShowSearch ? searchQuery.trim().toLocaleLowerCase('pl-PL') : '';
+  const now = useMemo(() => new Date(nowTimestamp), [nowTimestamp]);
 
   const filteredOrganizations = useMemo(() => {
     return visibleOrganizations
       .filter(org => !normalizedQuery || org.name.toLocaleLowerCase('pl-PL').includes(normalizedQuery))
       .map(org => {
-        const orgEvents = events.filter(event => event.organization_id === org.id);
-        const organizers = users.filter(user => user.organization_id === org.id && user.role === 'editor');
-        const scanners = users.filter(user => user.organization_id === org.id && user.role === 'scanner');
-        const remainingSlots = Math.max(org.event_limit - orgEvents.length, 0);
-        const adminLabel = org.admin_user_name ?? users.find(user => user.id === org.admin_user_id)?.name ?? 'Brak admina';
+        const organizationEvents = events.filter(event => event.organization_id === org.id);
+        const teamCount = users.filter(
+          user => user.organization_id === org.id && (user.role === 'editor' || user.role === 'scanner')
+        ).length;
 
         return {
           ...org,
-          adminLabel,
-          eventCount: orgEvents.length,
-          organizerCount: organizers.length,
-          scannerCount: scanners.length,
-          teamCount: organizers.length + scanners.length,
-          remainingSlots,
+          eventCount: organizationEvents.length,
+          nextEventLabel: getClosestOrganizationEventLabel(organizationEvents, now),
+          teamCount,
         };
       });
-  }, [events, normalizedQuery, users, visibleOrganizations]);
+  }, [events, normalizedQuery, now, users, visibleOrganizations]);
 
   if (isLoading) return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
 
@@ -120,7 +147,7 @@ export default function Organizations() {
               onChange={event => setSearchQuery(event.target.value)}
               placeholder="Szukaj po nazwie organizacji..."
               aria-label="Szukaj organizacji"
-              className="h-11 sm:h-10 max-w-md"
+              className="h-11 max-w-md sm:h-10"
             />
           )}
 
@@ -132,50 +159,50 @@ export default function Organizations() {
               </CardContent>
             </Card>
           ) : (
-            <div className="rounded-lg border overflow-x-auto">
+            <div className="overflow-x-auto rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nazwa</TableHead>
-                    <TableHead className="hidden md:table-cell">Administrator</TableHead>
+                    <TableHead className="hidden md:table-cell">Najbliższe wydarzenie</TableHead>
                     <TableHead>Wydarzenia</TableHead>
                     <TableHead className="hidden sm:table-cell">Zespół</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-              {filteredOrganizations.map(org => (
-                <TableRow
-                  key={org.id}
-                  className="cursor-pointer active:bg-accent/50"
-                  onClick={() => navigate(`/organizations/${org.id}`)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      navigate(`/organizations/${org.id}`);
-                    }
-                  }}
-                  tabIndex={0}
-                  aria-label={`Otwórz organizację ${org.name}`}
-                >
-                  <TableCell>
-                    <div>
-                      <span className="font-medium text-sm">{org.name}</span>
-                      <span className="block md:hidden text-xs text-muted-foreground truncate">
-                        {org.adminLabel}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                    {org.adminLabel}
-                  </TableCell>
-                  <TableCell className="text-sm tabular-nums">
-                    {org.eventCount}/{org.event_limit}
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell text-sm tabular-nums">
-                    {org.teamCount}
-                  </TableCell>
-                </TableRow>
-              ))}
+                  {filteredOrganizations.map(org => (
+                    <TableRow
+                      key={org.id}
+                      className="cursor-pointer active:bg-accent/50"
+                      onClick={() => navigate(`/organizations/${org.id}`)}
+                      onKeyDown={event => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          navigate(`/organizations/${org.id}`);
+                        }
+                      }}
+                      tabIndex={0}
+                      aria-label={`Otwórz organizację ${org.name}`}
+                    >
+                      <TableCell>
+                        <div>
+                          <span className="font-medium text-sm">{org.name}</span>
+                          <span className="block truncate text-xs text-muted-foreground md:hidden">
+                            {org.nextEventLabel}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                        {org.nextEventLabel}
+                      </TableCell>
+                      <TableCell className="text-sm tabular-nums">
+                        {org.eventCount}/{org.event_limit}
+                      </TableCell>
+                      <TableCell className="hidden text-sm tabular-nums sm:table-cell">
+                        {org.teamCount}
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
@@ -192,11 +219,11 @@ export default function Organizations() {
           <div className="space-y-4">
             <div>
               <Label>Nazwa</Label>
-              <Input value={form.name} onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))} />
+              <Input value={form.name} onChange={event => setForm(prev => ({ ...prev, name: event.target.value }))} />
             </div>
             <div>
               <Label>Limit wydarzeń</Label>
-              <Input type="number" min="0" value={form.event_limit} onChange={e => setForm(prev => ({ ...prev, event_limit: e.target.value }))} />
+              <Input type="number" min="0" value={form.event_limit} onChange={event => setForm(prev => ({ ...prev, event_limit: event.target.value }))} />
             </div>
             {currentRole === 'superadmin' && (
               <div>

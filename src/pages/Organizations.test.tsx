@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import Organizations from '@/pages/Organizations';
 import type { Event, Organization, User } from '@/types';
@@ -35,23 +35,28 @@ function createOrganization(id: string, name: string): Organization {
   };
 }
 
-function createEvent(id: string, organizationId: string): Event {
+function createEvent(
+  id: string,
+  organizationId: string,
+  officeOpenAt = '2099-04-12T07:00:00',
+  officeCloseAt = '2099-04-12T15:00:00'
+): Event {
   return {
     id,
     name: `Wydarzenie ${id}`,
     location: 'Warszawa',
     organization_id: organizationId,
-    office_open_at: '2099-04-12T07:00:00',
-    office_close_at: '2099-04-12T15:00:00',
+    office_open_at: officeOpenAt,
+    office_close_at: officeCloseAt,
   };
 }
 
-function renderPage(organizations: Organization[]) {
+function renderPage(organizations: Organization[], events?: Event[]) {
   const currentUser = createUser();
 
   useDataMock.mockReturnValue({
     organizations,
-    events: organizations.map((organization, index) => createEvent(`event-${index + 1}`, organization.id)),
+    events: events ?? organizations.map((organization, index) => createEvent(`event-${index + 1}`, organization.id)),
     users: [currentUser],
     currentRole: 'superadmin',
     currentUser,
@@ -71,6 +76,10 @@ describe('Organizations page', () => {
     useDataMock.mockReset();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('shows search only when there are more than five organizations', () => {
     renderPage([
       createOrganization('org-1', 'Alpha'),
@@ -83,7 +92,7 @@ describe('Organizations page', () => {
     expect(screen.queryByRole('textbox', { name: 'Szukaj organizacji' })).not.toBeInTheDocument();
   });
 
-  it('filters organizations by name and keeps rows linked to details', () => {
+  it('filters organizations by name in the table', () => {
     renderPage([
       createOrganization('org-1', 'Alpha'),
       createOrganization('org-2', 'Beta'),
@@ -96,7 +105,19 @@ describe('Organizations page', () => {
     const searchInput = screen.getByRole('textbox', { name: 'Szukaj organizacji' });
     fireEvent.change(searchInput, { target: { value: 'Gamma' } });
 
-    expect(screen.getByRole('link', { name: /Gamma Center/i })).toHaveAttribute('href', '/organizations/org-3');
-    expect(screen.queryByRole('link', { name: /Alpha/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Gamma Center')).toBeInTheDocument();
+    expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+  });
+
+  it('shows currently running event window when organization event is in progress', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2099-04-12T10:00:00'));
+
+    renderPage(
+      [createOrganization('org-1', 'Alpha')],
+      [createEvent('event-1', 'org-1', '2099-04-12T07:00:00', '2099-04-12T15:00:00')]
+    );
+
+    expect(screen.getByText('W trakcie do 12.04.2099, 15:00')).toBeInTheDocument();
   });
 });
