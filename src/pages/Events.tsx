@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, MapPin, Plus } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useNavigate } from 'react-router-dom';
-import { Plus, MapPin, Calendar } from 'lucide-react';
 import EventsSkeleton from '@/components/skeletons/EventsSkeleton';
 import { toast } from '@/hooks/use-toast';
 import { formatEventOfficeWindow, isValidEventOfficeRange } from '@/lib/events';
@@ -19,7 +19,16 @@ export default function Events() {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const adminOrganizationIds = currentUser.organization_ids ?? [];
+  const adminOrganizations = useMemo(
+    () => organizations.filter(org => adminOrganizationIds.includes(org.id)),
+    [adminOrganizationIds, organizations],
+  );
   const canCreateEvent = currentRole !== 'scanner';
+  const [activeOrganizationId, setActiveOrganizationId] = useState(
+    currentRole === 'admin'
+      ? (adminOrganizationIds[0] || currentUser.organization_id || '')
+      : (currentUser.organization_id || ''),
+  );
   const [form, setForm] = useState({
     name: '',
     location: '',
@@ -30,21 +39,57 @@ export default function Events() {
       : (currentUser.organization_id || organizations[0]?.id || ''),
   });
 
-  const selectedOrganizationId = currentRole === 'superadmin'
-    ? form.organization_id
-    : currentRole === 'admin'
+  useEffect(() => {
+    if (currentRole !== 'admin') return;
+
+    const nextOrganizationId = activeOrganizationId && adminOrganizationIds.includes(activeOrganizationId)
+      ? activeOrganizationId
+      : (adminOrganizationIds[0] || currentUser.organization_id || '');
+
+    if (nextOrganizationId !== activeOrganizationId) {
+      setActiveOrganizationId(nextOrganizationId);
+    }
+  }, [activeOrganizationId, adminOrganizationIds, currentRole, currentUser.organization_id]);
+
+  useEffect(() => {
+    if (currentRole !== 'admin') return;
+
+    const nextOrganizationId = form.organization_id && adminOrganizationIds.includes(form.organization_id)
       ? form.organization_id
-      : currentUser.organization_id || '';
-  const selectedOrganization = useMemo(
-    () => organizations.find(org => org.id === selectedOrganizationId),
-    [organizations, selectedOrganizationId],
+      : (adminOrganizationIds[0] || currentUser.organization_id || organizations[0]?.id || '');
+
+    if (nextOrganizationId !== form.organization_id) {
+      setForm(current => ({ ...current, organization_id: nextOrganizationId }));
+    }
+  }, [adminOrganizationIds, currentRole, currentUser.organization_id, form.organization_id, organizations]);
+
+  const pageOrganizationId = currentRole === 'admin'
+    ? activeOrganizationId
+    : currentUser.organization_id || '';
+  const pageOrganization = useMemo(
+    () => organizations.find(org => org.id === pageOrganizationId),
+    [organizations, pageOrganizationId],
   );
-  const usedSlots = visibleEvents.filter(event => event.organization_id === selectedOrganizationId).length;
+  const filteredEvents = useMemo(
+    () => currentRole === 'admin'
+      ? visibleEvents.filter(event => event.organization_id === activeOrganizationId)
+      : visibleEvents,
+    [activeOrganizationId, currentRole, visibleEvents],
+  );
+  const usedSlots = filteredEvents.length;
+  const formOrganization = useMemo(
+    () => organizations.find(org => org.id === form.organization_id),
+    [form.organization_id, organizations],
+  );
+  const formOrganizationUsedSlots = useMemo(
+    () => visibleEvents.filter(event => event.organization_id === form.organization_id).length,
+    [form.organization_id, visibleEvents],
+  );
 
   if (isLoading) return <EventsSkeleton />;
 
   const handleCreate = async () => {
-    if (!form.name || !form.location || !selectedOrganizationId) return;
+    if (!form.name || !form.location || !form.organization_id) return;
     if (!form.office_open_at || !form.office_close_at || !isValidEventOfficeRange(form.office_open_at, form.office_close_at)) {
       toast({
         title: 'Nieprawidłowe godziny biura',
@@ -58,7 +103,7 @@ export default function Events() {
     const result = await createEvent({
       name: form.name,
       location: form.location,
-      organization_id: selectedOrganizationId,
+      organization_id: form.organization_id,
       office_open_at: form.office_open_at,
       office_close_at: form.office_close_at,
     });
@@ -79,7 +124,7 @@ export default function Events() {
       office_open_at: '',
       office_close_at: '',
       organization_id: currentRole === 'admin'
-        ? (adminOrganizationIds[0] || organizations[0]?.id || '')
+        ? (activeOrganizationId || adminOrganizationIds[0] || organizations[0]?.id || '')
         : (currentUser.organization_id || organizations[0]?.id || ''),
     });
     setOpen(false);
@@ -102,23 +147,39 @@ export default function Events() {
         )}
       </div>
 
-      {selectedOrganization && (
+      {currentRole === 'admin' && adminOrganizations.length > 0 && (
+        <div className="max-w-md space-y-2">
+          <Label htmlFor="events-organization-filter">Organizacja</Label>
+          <Select value={activeOrganizationId} onValueChange={setActiveOrganizationId}>
+            <SelectTrigger id="events-organization-filter">
+              <SelectValue placeholder="Wybierz organizację" />
+            </SelectTrigger>
+            <SelectContent>
+              {adminOrganizations.map(org => (
+                <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {pageOrganization && (
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="flex flex-col gap-3 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-medium">{selectedOrganization.name}</p>
+              <p className="font-medium">{pageOrganization.name}</p>
               <p className="text-xs text-muted-foreground">
-                Wykorzystano {usedSlots} z {selectedOrganization.event_limit} dostępnych wydarzeń.
+                Wykorzystano {usedSlots} z {pageOrganization.event_limit} dostępnych wydarzeń.
               </p>
             </div>
             <div className="text-xs text-muted-foreground">
-              Pozostało: {Math.max(selectedOrganization.event_limit - usedSlots, 0)}
+              Pozostało: {Math.max(pageOrganization.event_limit - usedSlots, 0)}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {visibleEvents.length === 0 && (
+      {filteredEvents.length === 0 && (
         <Card className="border-dashed">
           <CardContent className="py-8 text-center">
             <p className="text-sm font-medium text-muted-foreground">Brak wydarzeń dla aktualnego zakresu.</p>
@@ -127,7 +188,7 @@ export default function Events() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {visibleEvents.map(event => {
+        {filteredEvents.map(event => {
           const eventParticipants = participants.filter(participant => participant.event_id === event.id);
           const checkedIn = eventParticipants.filter(participantCountsAsCheckedIn).length;
 
@@ -181,16 +242,16 @@ export default function Events() {
             <div><Label>Lokalizacja</Label><Input value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} placeholder="np. Kraków, Błonia" /></div>
             <div><Label>Data i godzina otwarcia biura zawodów</Label><Input type="datetime-local" value={form.office_open_at} onChange={event => setForm(current => ({ ...current, office_open_at: event.target.value }))} /></div>
             <div><Label>Data i godzina zamknięcia biura zawodów</Label><Input type="datetime-local" value={form.office_close_at} onChange={event => setForm(current => ({ ...current, office_close_at: event.target.value }))} /></div>
-            {selectedOrganization && (
+            {formOrganization && (
               <p className="text-[10px] text-muted-foreground">
-                Limit organizacji: {usedSlots}/{selectedOrganization.event_limit} wydarzeń.
+                Limit organizacji: {formOrganizationUsedSlots}/{formOrganization.event_limit} wydarzeń.
               </p>
             )}
           </div>
           <DialogFooter>
             <Button
               onClick={handleCreate}
-              disabled={!form.name || !form.location || !form.office_open_at || !form.office_close_at || !selectedOrganizationId || (selectedOrganization ? usedSlots >= selectedOrganization.event_limit : false) || isSubmitting}
+              disabled={!form.name || !form.location || !form.office_open_at || !form.office_close_at || !form.organization_id || (formOrganization ? formOrganizationUsedSlots >= formOrganization.event_limit : false) || isSubmitting}
               className="h-11 w-full sm:h-10 sm:w-auto"
             >
               Utwórz

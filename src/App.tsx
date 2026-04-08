@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider, useData } from "@/contexts/DataContext";
 import { Layout } from "@/components/Layout";
+import { RouteSeo } from "@/components/RouteSeo";
 import Dashboard from "./pages/Dashboard";
 import Events from "./pages/Events";
 import EventDetails from "./pages/EventDetails";
@@ -126,6 +127,7 @@ const App = () => (
       <Sonner />
       <AuthProvider>
         <BrowserRouter>
+          <RouteSeo />
           <AppRoutes />
         </BrowserRouter>
       </AuthProvider>
