@@ -50,6 +50,7 @@ All colors MUST be HSL.
     --surface-glow: 2 76% 52%;
     --surface-warm: 12 74% 44%;
     --surface-shadow: 0 0% 3%;
+    --button-highlight: 43 74% 63%;
   }
 }
 
@@ -163,6 +164,35 @@ All colors MUST be HSL.
       18px 0 40px hsl(var(--surface-shadow) / 0.28),
       inset -1px 0 0 hsl(var(--sidebar-border) / 0.85);
     backdrop-filter: blur(26px);
+  }
+
+  .surface-button {
+    border-color: hsl(var(--button-highlight) / 0.34);
+    background-color: hsl(var(--secondary) / 0.96);
+    background-image:
+      radial-gradient(circle at top left, hsl(var(--button-highlight) / 0.12), transparent 58%),
+      linear-gradient(180deg, hsl(var(--foreground) / 0.07), transparent 16%),
+      linear-gradient(
+        120deg,
+        hsl(0 0% 18%) 0%,
+        hsl(0 0% 16%) 28%,
+        hsl(38 18% 20%) 48%,
+        hsl(0 0% 15%) 62%,
+        hsl(0 0% 13%) 100%
+      );
+    background-size: 140% 140%, 100% 100%, 220% 100%;
+    background-position: 0% 0%, 0% 0%, 0% 50%;
+    box-shadow:
+      0 14px 30px hsl(var(--surface-shadow) / 0.38),
+      inset 0 1px 0 hsl(var(--foreground) / 0.05);
+  }
+
+  .surface-button:hover {
+    background-position: 8% 10%, 0% 0%, 100% 50%;
+    box-shadow:
+      0 16px 34px hsl(var(--surface-shadow) / 0.42),
+      0 0 0 1px hsl(var(--button-highlight) / 0.12),
+      inset 0 1px 0 hsl(var(--foreground) / 0.06);
   }
 
   .page-gradient {
