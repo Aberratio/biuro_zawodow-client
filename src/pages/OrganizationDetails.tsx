@@ -371,7 +371,7 @@ export default function OrganizationDetails() {
                 <Users className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-semibold">Organizatorzy</h2>
               </div>
-              {canManageMembers && <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => openMemberDialog('editor')}>Dodaj organizatora</Button>}
+              {canManageMembers && <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => openMemberDialog('editor')}><Plus className="mr-1 h-4 w-4" />Dodaj organizatora</Button>}
             </div>
             <div className="grid gap-2">
               {organizers.length > 0 ? organizers.map(organizer => (
@@ -390,7 +390,7 @@ export default function OrganizationDetails() {
                 <Radio className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-semibold">Skanerzy</h2>
               </div>
-              {canManageScanners && <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => openMemberDialog('scanner')}>Dodaj skanera</Button>}
+              {canManageScanners && <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => openMemberDialog('scanner')}><Plus className="mr-1 h-4 w-4" />Dodaj skanera</Button>}
             </div>
             <div className="grid gap-2">
               {scanners.length > 0 ? scanners.map(scanner => (
@@ -472,7 +472,7 @@ export default function OrganizationDetails() {
             )}
           </div>
           <DialogFooter>
-            <Button className="w-full sm:w-auto" onClick={handleAddMember} disabled={!memberForm.name || !memberForm.email || isSubmittingMember}>Zapisz</Button>
+            <Button className="w-full sm:w-auto" onClick={handleAddMember} disabled={!memberForm.name || !memberForm.email || isSubmittingMember}><Plus className="mr-1 h-4 w-4" />Zapisz</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -511,7 +511,7 @@ export default function OrganizationDetails() {
             <p className="text-[10px] text-muted-foreground">Limit organizacji: {orgEvents.length}/{organization.event_limit} wydarzeń.</p>
           </div>
           <DialogFooter>
-            <Button className="w-full sm:w-auto" onClick={handleAddEvent} disabled={!eventForm.name || !eventForm.location || !eventForm.office_open_at || !eventForm.office_close_at || remainingSlots <= 0 || isSubmittingEvent}>Zapisz</Button>
+            <Button className="w-full sm:w-auto" onClick={handleAddEvent} disabled={!eventForm.name || !eventForm.location || !eventForm.office_open_at || !eventForm.office_close_at || remainingSlots <= 0 || isSubmittingEvent}><Plus className="mr-1 h-4 w-4" />Zapisz</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
