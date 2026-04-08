@@ -83,9 +83,9 @@ export default function Profile() {
           <CardDescription>Podstawowe informacje o koncie i dostępach.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-foreground/90 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)]">
             <div className="flex items-start gap-2">
-              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <p>Dane profilu poniżej nie są edytowalne ręcznie. Jeśli chcesz zmienić nazwę, email, rolę lub organizację, skontaktuj się z administratorem.</p>
             </div>
           </div>
