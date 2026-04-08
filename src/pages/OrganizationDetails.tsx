@@ -35,10 +35,12 @@ import {
 import TableSkeleton from "@/components/skeletons/TableSkeleton";
 import { toast } from "@/hooks/use-toast";
 import { formatEventOfficeWindow, isValidEventOfficeRange } from "@/lib/events";
+import type { User } from "@/types";
 import {
   ArrowLeft,
   Building2,
   CalendarDays,
+  KeyRound,
   Pencil,
   Plus,
   Radio,
@@ -62,6 +64,8 @@ export default function OrganizationDetails() {
     updateOrganization,
     updateOrganizationEventLimit,
     deleteOrganization,
+    removeUser,
+    triggerUserPasswordReset,
     assignScannerEvents,
     isLoading,
   } = useData();
@@ -74,12 +78,20 @@ export default function OrganizationDetails() {
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
   const [deleteOrganizationConfirmOpen, setDeleteOrganizationConfirmOpen] =
     useState(false);
+  const [archiveUserConfirmOpen, setArchiveUserConfirmOpen] = useState(false);
+  const [passwordResetConfirmOpen, setPasswordResetConfirmOpen] =
+    useState(false);
   const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
   const [isSavingOrganization, setIsSavingOrganization] = useState(false);
   const [isDeletingOrganization, setIsDeletingOrganization] = useState(false);
+  const [isArchivingUser, setIsArchivingUser] = useState(false);
+  const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
   const [isSavingScannerAssignments, setIsSavingScannerAssignments] =
     useState(false);
+  const [selectedActionUser, setSelectedActionUser] = useState<User | null>(
+    null,
+  );
   const [selectedScannerId, setSelectedScannerId] = useState<string | null>(
     null,
   );
@@ -158,6 +170,8 @@ export default function OrganizationDetails() {
   const canCreateEvent = currentRole !== "scanner";
   const canEditOrganization =
     currentRole === "superadmin" || currentRole === "admin";
+  const canManageMemberAccounts =
+    currentRole === "superadmin" || currentRole === "admin";
   const canManageMembers =
     currentRole === "superadmin" || currentRole === "admin";
   const canManageScanners =
@@ -189,6 +203,16 @@ export default function OrganizationDetails() {
     setSelectedScannerId(scannerId);
     setScannerAssignmentDraft(scanner?.assigned_events ?? []);
     setScannerAssignmentsDialogOpen(true);
+  };
+
+  const openArchiveUserDialog = (user: User) => {
+    setSelectedActionUser(user);
+    setArchiveUserConfirmOpen(true);
+  };
+
+  const openPasswordResetDialog = (user: User) => {
+    setSelectedActionUser(user);
+    setPasswordResetConfirmOpen(true);
   };
 
   const validateEmail = (email: string) =>
@@ -392,6 +416,60 @@ export default function OrganizationDetails() {
     navigate("/organizations");
   };
 
+  const handleArchiveUser = async () => {
+    if (!selectedActionUser) return;
+
+    setIsArchivingUser(true);
+    const result = await removeUser(selectedActionUser.id);
+    setIsArchivingUser(false);
+
+    if (!result.ok) {
+      toast({
+        title: "Nie udalo sie usunac konta",
+        description: result.error ?? "Sprobuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const archivedUser = selectedActionUser;
+    setArchiveUserConfirmOpen(false);
+    setSelectedActionUser(null);
+    toast({
+      title:
+        archivedUser.role === "editor"
+          ? "Usunieto organizatora"
+          : "Usunieto skanera",
+      description:
+        "Konto zostalo zarchiwizowane. Ta osoba nie zaloguje sie juz na stare konto, a ten email mozna wykorzystac ponownie.",
+    });
+  };
+
+  const handleTriggerPasswordReset = async () => {
+    if (!selectedActionUser) return;
+
+    setIsSendingPasswordReset(true);
+    const result = await triggerUserPasswordReset(selectedActionUser.id);
+    setIsSendingPasswordReset(false);
+
+    if (!result.ok) {
+      toast({
+        title: "Nie udalo sie wyslac resetu hasla",
+        description: result.error ?? "Sprobuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const targetUser = selectedActionUser;
+    setPasswordResetConfirmOpen(false);
+    setSelectedActionUser(null);
+    toast({
+      title: "Wyslano reset hasla",
+      description: `Email z resetem hasla zostal wyslany do ${targetUser.email}.`,
+    });
+  };
+
   return (
     <div className="space-y-6">
       <Button
@@ -440,15 +518,16 @@ export default function OrganizationDetails() {
           </div>
           {canEditOrganization && (
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                variant="destructive"
-                className="w-full sm:w-auto"
-                onClick={() => setDeleteOrganizationConfirmOpen(true)}
-                disabled={!canDeleteOrganization}
-              >
-                <Trash2 className="mr-1 h-4 w-4" />
-                Usun organizacje
-              </Button>
+              {canDeleteOrganization && (
+                <Button
+                  variant="destructive"
+                  className="w-full sm:w-auto"
+                  onClick={() => setDeleteOrganizationConfirmOpen(true)}
+                >
+                  <Trash2 className="mr-1 h-4 w-4" />
+                  Usun organizacje
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -491,7 +570,7 @@ export default function OrganizationDetails() {
           icon={<Building2 className="h-4 w-4 text-primary" />}
           label="Administrator"
           value={adminLabel}
-          hint="Osoba odpowiedzialna za organizacje"
+          hint="Osoba opiekująca się tą organizacją"
         />
       </div>
 
@@ -613,6 +692,9 @@ export default function OrganizationDetails() {
                     <TableHead>Imie i nazwisko</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead className="w-[140px]">Rola</TableHead>
+                    {canManageMemberAccounts && (
+                      <TableHead className="w-[250px]">Akcje</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -629,6 +711,30 @@ export default function OrganizationDetails() {
                           Organizator
                         </Badge>
                       </TableCell>
+                      {canManageMemberAccounts && (
+                        <TableCell>
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-full rounded-lg px-2.5 text-xs sm:w-auto"
+                              onClick={() => openPasswordResetDialog(organizer)}
+                            >
+                              <KeyRound className="mr-1 h-3.5 w-3.5" />
+                              Reset hasla
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-8 w-full rounded-lg px-2.5 text-xs sm:w-auto"
+                              onClick={() => openArchiveUserDialog(organizer)}
+                            >
+                              <Trash2 className="mr-1 h-3.5 w-3.5" />
+                              Usun
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -675,7 +781,9 @@ export default function OrganizationDetails() {
                       Email
                     </TableHead>
                     <TableHead>Przypisane wydarzenia</TableHead>
-                    <TableHead className="w-[180px]">Akcja</TableHead>
+                    {canManageScanners && (
+                      <TableHead className="w-[300px]">Akcje</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -697,24 +805,46 @@ export default function OrganizationDetails() {
                       <TableCell className="text-sm text-muted-foreground">
                         {getEventNames(scanner.assigned_events)}
                       </TableCell>
-                      <TableCell>
-                        {canManageScanners ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="w-full"
-                            onClick={() =>
-                              openScannerAssignmentsDialog(scanner.id)
-                            }
-                          >
-                            Przypisz wydarzenia
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            Podglad
-                          </span>
-                        )}
-                      </TableCell>
+                      {canManageScanners && (
+                        <TableCell>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-full rounded-lg px-2.5 text-xs sm:w-auto"
+                              onClick={() =>
+                                openScannerAssignmentsDialog(scanner.id)
+                              }
+                            >
+                              Przypisz wydarzenia
+                            </Button>
+                            {canManageMemberAccounts && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 w-full rounded-lg px-2.5 text-xs sm:w-auto"
+                                  onClick={() =>
+                                    openPasswordResetDialog(scanner)
+                                  }
+                                >
+                                  <KeyRound className="mr-1 h-3.5 w-3.5" />
+                                  Reset hasla
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-8 w-full rounded-lg px-2.5 text-xs sm:w-auto"
+                                  onClick={() => openArchiveUserDialog(scanner)}
+                                >
+                                  <Trash2 className="mr-1 h-3.5 w-3.5" />
+                                  Usun
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -812,6 +942,78 @@ export default function OrganizationDetails() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Usun organizacje
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={archiveUserConfirmOpen}
+        onOpenChange={(open) => {
+          setArchiveUserConfirmOpen(open);
+          if (!open) {
+            setSelectedActionUser(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usunac konto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Konto{" "}
+              <span className="font-medium text-foreground">
+                {selectedActionUser?.name}
+              </span>{" "}
+              zostanie usuniete z widoku organizacji. W backendzie konto
+              zostanie zarchiwizowane, ta osoba nie zaloguje sie juz na stare
+              konto, a ten email bedzie mozna wykorzystac ponownie.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleArchiveUser()}
+              disabled={isArchivingUser || !selectedActionUser}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Usun konto
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={passwordResetConfirmOpen}
+        onOpenChange={(open) => {
+          setPasswordResetConfirmOpen(open);
+          if (!open) {
+            setSelectedActionUser(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Wyslac reset hasla?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Do{" "}
+              <span className="font-medium text-foreground">
+                {selectedActionUser?.email}
+              </span>{" "}
+              zostanie wyslany email z linkiem do ustawienia nowego hasla dla
+              konta{" "}
+              <span className="font-medium text-foreground">
+                {selectedActionUser?.name}
+              </span>
+              .
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleTriggerPasswordReset()}
+              disabled={isSendingPasswordReset || !selectedActionUser}
+            >
+              Wyslij reset hasla
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
