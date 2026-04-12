@@ -5,6 +5,7 @@ import { pl } from 'date-fns/locale';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -19,14 +20,17 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FieldError } from '@/components/ui/field-error';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowLeft, Calendar, CheckCircle, Clock3, Download, FileUp, Loader2, MapPin, Pencil, Plus, ScanLine, Shield, Trash2, UserPlus, Users } from 'lucide-react';
+import { Archive, ArrowLeft, Calendar, CheckCircle, Clock3, Download, FileUp, Loader2, MapPin, Pencil, Plus, ScanLine, Shield, UserPlus, Users } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
 import { ParticipantFieldMapping, User } from '@/types';
 import { formatEventOfficeEnd, formatEventOfficeStart, formatEventOfficeWindow, getEventOfficeCloseAt, getEventOfficeOpenAt, isEventOfficeOpen, isValidEventOfficeRange } from '@/lib/events';
 import { buildEmptyParticipantFieldValues, getActiveParticipantMappings } from '@/lib/participant-fields';
 import { participantCountsAsCheckedIn } from '@/lib/participant-status';
+import { validateEmail, validateRequired } from '@/lib/form-validation';
+import { getScannerPermissionLabel, isScannerRole } from '@/lib/roles';
 
 type OfficeStatusTone = 'open' | 'upcoming' | 'closed';
 
@@ -113,19 +117,33 @@ function getOfficeToneClasses(tone: OfficeStatusTone) {
   };
 }
 
-function getRoleCapabilities(role: 'admin' | 'editor' | 'scanner') {
+function getRoleCapabilities(role: 'admin' | 'editor' | 'scanner', isFinishedEvent: boolean) {
   if (role === 'admin') {
+    if (isFinishedEvent) {
+      return 'Ustawienia wydarzenia, godziny biura, eksport danych i przypisania skanerów.';
+    }
+
     return 'Ustawienia wydarzenia, godziny biura, eksport danych i przypisywanie skanerów.';
   }
 
   if (role === 'editor') {
+    if (isFinishedEvent) {
+      return 'Obsługa uczestników, import CSV, wysyłka QR i praca operacyjna wykonana przy wydarzeniu.';
+    }
+
     return 'Obsługa uczestników, import CSV, wysyłka QR i praca operacyjna na wydarzeniu.';
+  }
+
+  if (isFinishedEvent) {
+    return 'Skanowanie QR i odprawa uczestników podczas pracy biura zawodów.';
   }
 
   return 'Skanowanie QR i odprawa uczestników podczas pracy biura zawodów.';
 }
 
-function TeamMemberRow({ user, badgeLabel }: { user: User; badgeLabel: string }) {
+function TeamMemberRow({ user, badgeLabel }: { user: User; badgeLabel: string | ((user: User) => string) }) {
+  const resolvedBadgeLabel = typeof badgeLabel === 'function' ? badgeLabel(user) : badgeLabel;
+
   return (
     <div className="rounded-2xl border border-border/70 bg-background/80 px-4 py-3">
       <div className="flex items-start justify-between gap-3">
@@ -133,7 +151,7 @@ function TeamMemberRow({ user, badgeLabel }: { user: User; badgeLabel: string })
           <p className="truncate text-sm font-semibold">{user.name}</p>
           <p className="truncate text-xs text-muted-foreground">{user.email}</p>
         </div>
-        <Badge variant="secondary" className="shrink-0">{badgeLabel}</Badge>
+        <Badge variant={user.role === 'scanner_plus' ? 'default' : 'secondary'} className="shrink-0">{resolvedBadgeLabel}</Badge>
       </div>
     </div>
   );
@@ -151,7 +169,7 @@ function TeamRoleCard({
   description: string;
   users: User[];
   emptyText: string;
-  badgeLabel: string;
+  badgeLabel: string | ((user: User) => string);
   action?: ReactNode;
 }) {
   return (
@@ -212,6 +230,7 @@ export default function EventDetails() {
   const navigate = useNavigate();
   const {
     events,
+    archivedEvents,
     participants,
     users,
     organizations,
@@ -236,8 +255,16 @@ export default function EventDetails() {
   const [scannerSaving, setScannerSaving] = useState(false);
   const [manualEmail, setManualEmail] = useState('');
   const [manualFields, setManualFields] = useState<Record<string, string>>({});
+  const [manualErrors, setManualErrors] = useState<{ email?: string; fields: Record<string, string>; form?: string }>({ fields: {} });
   const [manualSaving, setManualSaving] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
+  const [editErrors, setEditErrors] = useState<{
+    name?: string;
+    location?: string;
+    office_open_at?: string;
+    office_close_at?: string;
+    form?: string;
+  }>({});
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingLogsCsv, setExportingLogsCsv] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -250,14 +277,15 @@ export default function EventDetails() {
     office_close_at: '',
   });
 
-  const event = events.find(entry => entry.id === id);
+  const event = events.find(entry => entry.id === id) ?? archivedEvents.find(entry => entry.id === id);
+  const isArchivedEvent = Boolean(event?.archived_at);
   const eventParticipants = participants.filter(participant => participant.event_id === id);
   const checkedIn = eventParticipants.filter(participantCountsAsCheckedIn).length;
   const checkInProgress = eventParticipants.length > 0 ? Math.round((checkedIn / eventParticipants.length) * 100) : 0;
   const activeMappings = useMemo(() => getActiveParticipantMappings(mappings), [mappings]);
   const organizationName = organizations.find(organization => organization.id === event?.organization_id)?.name ?? 'Nieznana organizacja';
   const organizationScanners = useMemo(
-    () => users.filter(user => user.role === 'scanner' && user.organization_id === event?.organization_id),
+    () => users.filter(user => isScannerRole(user.role) && user.organization_id === event?.organization_id),
     [event?.organization_id, users],
   );
   const assignedScanners = useMemo(
@@ -279,14 +307,16 @@ export default function EventDetails() {
     if (currentRole === 'editor') return currentUser.organization_id === event.organization_id;
     return false;
   }, [currentRole, currentUser, event]);
-  const canEditEvent = canManageScanners;
+  const canEditEvent = isArchivedEvent ? currentRole === 'superadmin' : canManageScanners;
+  const canOperateOnEvent = !isArchivedEvent || currentRole === 'superadmin';
+  const canUseActiveEventTools = !isArchivedEvent && event !== undefined && isEventOfficeOpen(event, new Date(nowTimestamp));
   const canViewParticipantMappings = currentRole === 'superadmin';
 
   useEffect(() => {
-    if (id) {
+    if (id && events.some(entry => entry.id === id)) {
       setSelectedEventId(id);
     }
-  }, [id, setSelectedEventId]);
+  }, [events, id, setSelectedEventId]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNowTimestamp(Date.now()), 30_000);
@@ -328,9 +358,13 @@ export default function EventDetails() {
   const officeStatus = getOfficeStatusSummary(event, now);
   const officeToneClasses = getOfficeToneClasses(officeStatus.tone);
   const hasAnyTeamMembers = organizationAdmins.length > 0 || organizationEditors.length > 0 || assignedScanners.length > 0;
+  const officeCloseAt = getEventOfficeCloseAt(event);
+  const isFinishedEvent = officeCloseAt !== null && now > officeCloseAt;
+  const canArchiveEvent = canEditEvent && !isArchivedEvent && officeCloseAt !== null && now > officeCloseAt;
 
   const handleManualFieldChange = (alias: string, value: string) => {
     setManualFields(previous => ({ ...previous, [alias]: value }));
+    setManualErrors(previous => ({ ...previous, fields: { ...previous.fields, [alias]: '' }, form: undefined }));
   };
 
   const toggleScannerSelection = (scannerId: string, checked: boolean) => {
@@ -384,11 +418,28 @@ export default function EventDetails() {
   };
 
   const handleManualSubmit = async () => {
+    const fieldErrors = activeMappings.reduce<Record<string, string>>((accumulator, mapping) => {
+      const error = validateRequired(manualFields[mapping.alias] ?? '', `Uzupełnij pole: ${mapping.alias}.`);
+      if (error) accumulator[mapping.alias] = error;
+      return accumulator;
+    }, {});
+    const nextErrors = {
+      email: validateEmail(manualEmail),
+      fields: fieldErrors,
+    };
+
+    if (nextErrors.email || Object.values(fieldErrors).some(Boolean)) {
+      setManualErrors(nextErrors);
+      return;
+    }
+
+    setManualErrors({ fields: {} });
     setManualSaving(true);
     const result = await addParticipantManually(event.id, manualEmail, manualFields);
     setManualSaving(false);
 
     if (!result.ok) {
+      setManualErrors({ fields: {}, form: result.error ?? 'Nie udało się dodać uczestnika.' });
       toast({
         title: 'Nie udało się dodać uczestnika',
         description: result.error,
@@ -400,12 +451,27 @@ export default function EventDetails() {
     setManualOpen(false);
     setManualEmail('');
     setManualFields(buildEmptyParticipantFieldValues(mappings));
+    setManualErrors({ fields: {} });
     toast({ title: 'Dodano uczestnika ręcznie' });
   };
 
   const handleEditSubmit = async () => {
-    if (!editForm.name || !editForm.location) return;
-    if (!editForm.office_open_at || !editForm.office_close_at || !isValidEventOfficeRange(editForm.office_open_at, editForm.office_close_at)) {
+    const submittedOfficeOpenAt = isFinishedEvent ? event.office_open_at : editForm.office_open_at;
+    const submittedOfficeCloseAt = isFinishedEvent ? event.office_close_at : editForm.office_close_at;
+    const nextErrors = {
+      name: validateRequired(editForm.name, 'Podaj nazwę wydarzenia.'),
+      location: validateRequired(editForm.location, 'Podaj lokalizację wydarzenia.'),
+      office_open_at: validateRequired(submittedOfficeOpenAt, 'Podaj datę i godzinę otwarcia biura.'),
+      office_close_at: validateRequired(submittedOfficeCloseAt, 'Podaj datę i godzinę zamknięcia biura.'),
+    };
+
+    if (nextErrors.name || nextErrors.location || nextErrors.office_open_at || nextErrors.office_close_at) {
+      setEditErrors(nextErrors);
+      return;
+    }
+
+    if (!submittedOfficeOpenAt || !submittedOfficeCloseAt || !isValidEventOfficeRange(submittedOfficeOpenAt, submittedOfficeCloseAt)) {
+      setEditErrors({ office_close_at: 'Zamknięcie biura musi być później niż otwarcie.' });
       toast({
         title: 'Nieprawidłowe godziny biura',
         description: 'Podaj poprawną datę i godzinę otwarcia oraz zamknięcia biura zawodów.',
@@ -414,17 +480,19 @@ export default function EventDetails() {
       return;
     }
 
+    setEditErrors({});
     setEditSaving(true);
     const result = await updateEvent(event.id, {
       name: editForm.name,
       location: editForm.location,
       organization_id: event.organization_id,
-      office_open_at: editForm.office_open_at,
-      office_close_at: editForm.office_close_at,
+      office_open_at: submittedOfficeOpenAt,
+      office_close_at: submittedOfficeCloseAt,
     });
     setEditSaving(false);
 
     if (!result.ok) {
+      setEditErrors({ form: result.error ?? 'Nie udało się zaktualizować wydarzenia.' });
       toast({
         title: 'Nie udało się zaktualizować wydarzenia',
         description: result.error ?? 'Spróbuj ponownie.',
@@ -434,6 +502,7 @@ export default function EventDetails() {
     }
 
     setEditOpen(false);
+    setEditErrors({});
     toast({ title: 'Zaktualizowano wydarzenie' });
   };
 
@@ -478,7 +547,7 @@ export default function EventDetails() {
 
     if (!result.ok) {
       toast({
-        title: 'Nie udało się usunąć wydarzenia',
+        title: 'Nie udało się zarchiwizować wydarzenia',
         description: result.error ?? 'Spróbuj ponownie.',
         variant: 'destructive',
       });
@@ -486,15 +555,29 @@ export default function EventDetails() {
     }
 
     setDeleteConfirmOpen(false);
-    toast({ title: 'Wydarzenie usunięte' });
+    toast({ title: 'Wydarzenie zarchiwizowane' });
     navigate('/events');
   };
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate('/events')} className="touch-manipulation">
-        <ArrowLeft className="mr-1 h-4 w-4" /> Wróć do wydarzeń
+      <Button variant="ghost" size="sm" onClick={() => navigate(isArchivedEvent ? `/organizations/${event.organization_id}/archived-events` : '/events')} className="touch-manipulation">
+        <ArrowLeft className="mr-1 h-4 w-4" /> {isArchivedEvent ? 'Wróć do archiwum' : 'Wróć do wydarzeń'}
       </Button>
+
+      {isArchivedEvent && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900">
+          <div className="flex items-start gap-3">
+            <Archive className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold">To wydarzenie jest zarchiwizowane.</p>
+              <p className="mt-1 text-amber-900/80">
+                Jest ukryte z aktywnych list i przypisań. Dane są dostępne do podglądu, a zmiany w archiwum może wykonywać tylko superadmin.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Card className={`overflow-hidden shadow-sm ${officeToneClasses.hero}`}>
         <CardContent className="p-5 sm:p-6">
@@ -523,9 +606,11 @@ export default function EventDetails() {
                   <Button variant="outline" onClick={() => setEditOpen(true)} className="w-full sm:w-auto">
                     <Pencil className="mr-1 h-4 w-4" /> Edytuj
                   </Button>
-                  <Button variant="destructive" onClick={() => setDeleteConfirmOpen(true)} className="w-full sm:w-auto">
-                    <Trash2 className="mr-1 h-4 w-4" /> Usuń
-                  </Button>
+                  {canArchiveEvent && (
+                    <Button variant="destructive" onClick={() => setDeleteConfirmOpen(true)} className="w-full sm:w-auto">
+                      <Archive className="mr-1 h-4 w-4" /> Archiwizuj
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -572,9 +657,13 @@ export default function EventDetails() {
                 <div>
                   <p className="text-sm font-semibold">Postęp odprawy</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {eventParticipants.length > 0
-                      ? `${checkedIn} z ${eventParticipants.length} osób jest już odprawionych.`
-                      : 'Po dodaniu uczestników tutaj od razu zobaczysz postęp odprawy.'}
+                    {eventParticipants.length > 0 && isFinishedEvent
+                      ? `Odprawiono ${checkedIn} z ${eventParticipants.length} osób.`
+                      : eventParticipants.length > 0
+                        ? `${checkedIn} z ${eventParticipants.length} osób jest już odprawionych.`
+                        : isFinishedEvent
+                          ? 'Nie dodano uczestników do tego wydarzenia.'
+                          : 'Po dodaniu uczestników tutaj od razu zobaczysz postęp odprawy.'}
                   </p>
                 </div>
                 <div className="text-3xl font-black tracking-tight">{checkInProgress}%</div>
@@ -584,6 +673,7 @@ export default function EventDetails() {
               </div>
             </div>
 
+            {canUseActiveEventTools && (
             <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
               <Button onClick={() => { setSelectedEventId(event.id); navigate('/scanner'); }} className="h-11 md:w-auto">
                 <ScanLine className="mr-1 h-4 w-4" /> Otwórz skaner
@@ -600,24 +690,33 @@ export default function EventDetails() {
                 </Button>
               )}
             </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight">Kto pracuje przy wydarzeniu</h2>
+          <h2 className="text-xl font-bold tracking-tight">
+            {isFinishedEvent ? 'Kto pracował przy tym wydarzeniu' : 'Kto pracuje przy wydarzeniu'}
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Prosty podgląd zespołu i zakresu odpowiedzialności dla tego wydarzenia.
+            {isFinishedEvent
+              ? 'Podgląd zespołu i zakresu odpowiedzialności podczas tego wydarzenia.'
+              : 'Prosty podgląd zespołu i zakresu odpowiedzialności dla tego wydarzenia.'}
           </p>
         </div>
 
         {!hasAnyTeamMembers && (
           <Card className="border-dashed">
             <CardContent className="py-10 text-center">
-              <p className="text-base font-semibold">Nie ma jeszcze przypisanego zespołu</p>
+              <p className="text-base font-semibold">
+                {isFinishedEvent ? 'Nie było przypisanego zespołu' : 'Nie ma jeszcze przypisanego zespołu'}
+              </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Dodaj skanerów lub sprawdź, czy organizacja ma przypisanych organizatorów i administratorów.
+                {isFinishedEvent
+                  ? 'Sprawdź, czy organizacja miała przypisanych organizatorów, administratorów lub skanerów.'
+                  : 'Dodaj skanerów lub sprawdź, czy organizacja ma przypisanych organizatorów i administratorów.'}
               </p>
             </CardContent>
           </Card>
@@ -626,25 +725,25 @@ export default function EventDetails() {
         <div className="grid gap-4 xl:grid-cols-3">
           <TeamRoleCard
             title="Administracja"
-            description={getRoleCapabilities('admin')}
+            description={getRoleCapabilities('admin', isFinishedEvent)}
             users={organizationAdmins}
             emptyText="Brak administratorów przypisanych do tej organizacji."
             badgeLabel="Admin"
           />
           <TeamRoleCard
             title="Organizatorzy"
-            description={getRoleCapabilities('editor')}
+            description={getRoleCapabilities('editor', isFinishedEvent)}
             users={organizationEditors}
             emptyText="Brak organizatorów przypisanych do tej organizacji."
             badgeLabel="Organizator"
           />
           <TeamRoleCard
-            title="Skanerzy wydarzenia"
-            description={getRoleCapabilities('scanner')}
+            title={isFinishedEvent ? 'Skanerzy pracujący przy wydarzeniu' : 'Skanerzy wydarzenia'}
+            description={getRoleCapabilities('scanner', isFinishedEvent)}
             users={assignedScanners}
-            emptyText="Do tego wydarzenia nie przypisano jeszcze żadnego skanera."
-            badgeLabel="Skaner"
-            action={canManageScanners ? (
+            emptyText={isFinishedEvent ? 'Do tego wydarzenia nie przypisano żadnego skanera.' : 'Do tego wydarzenia nie przypisano jeszcze żadnego skanera.'}
+            badgeLabel={(user) => getScannerPermissionLabel(user.role)}
+            action={canManageScanners && canUseActiveEventTools ? (
               <Button variant="outline" size="sm" onClick={openScannerDialog}>
                 Zarządzaj
               </Button>
@@ -653,29 +752,36 @@ export default function EventDetails() {
         </div>
       </section>
 
+      {(canOperateOnEvent || canViewParticipantMappings) && (
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-border/70 shadow-sm">
           <CardHeader className="border-b border-border/60 bg-muted/20">
             <CardTitle className="text-base">Dane i eksporty</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Miejsce na operacje administracyjne i szybkie pobranie danych wydarzenia.
+              {isFinishedEvent
+                ? 'Dane administracyjne i eksporty po zakończeniu wydarzenia.'
+                : 'Miejsce na operacje administracyjne i szybkie pobranie danych wydarzenia.'}
             </p>
           </CardHeader>
           <CardContent className="grid gap-3 p-5 sm:grid-cols-2">
+            {canOperateOnEvent && (
             <Button variant="outline" onClick={() => void handleExportCsv()} className="h-11 justify-start" disabled={exportingCsv}>
               {exportingCsv ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
               Eksport uczestników CSV
             </Button>
+            )}
+            {canOperateOnEvent && (
             <Button variant="outline" onClick={() => void handleExportLogsCsv()} className="h-11 justify-start" disabled={exportingLogsCsv}>
               {exportingLogsCsv ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
               Eksport logów CSV
             </Button>
+            )}
             {canEditEvent && (
               <Button variant="outline" onClick={() => setEditOpen(true)} className="h-11 justify-start">
                 <Pencil className="mr-1 h-4 w-4" /> Edytuj dane wydarzenia
               </Button>
             )}
-            {canManageScanners && (
+            {canManageScanners && canUseActiveEventTools && (
               <Button variant="outline" onClick={openScannerDialog} className="h-11 justify-start">
                 <ScanLine className="mr-1 h-4 w-4" /> Zarządzaj skanerami
               </Button>
@@ -685,9 +791,11 @@ export default function EventDetails() {
 
         <Card className="border-border/70 shadow-sm">
           <CardHeader className="border-b border-border/60 bg-muted/20">
-            <CardTitle className="text-base">Konfiguracja uczestników</CardTitle>
+            <CardTitle className="text-base">{isFinishedEvent ? 'Uczestnicy i mapowanie' : 'Konfiguracja uczestników'}</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Stan mapowania CSV i możliwość ręcznego dodania uczestnika.
+              {isFinishedEvent
+                ? 'Zapisane mapowanie CSV i dane używane przy obsłudze uczestników.'
+                : 'Stan mapowania CSV i możliwość ręcznego dodania uczestnika.'}
             </p>
           </CardHeader>
           <CardContent className="space-y-4 p-5">
@@ -702,9 +810,11 @@ export default function EventDetails() {
                     </Badge>
                   ))}
                 </div>
+                {canOperateOnEvent && (
                 <Button variant="outline" onClick={() => setManualOpen(true)} className="h-11 w-full justify-start">
                   <Plus className="mr-1 h-4 w-4" /> Dodaj uczestnika ręcznie
                 </Button>
+                )}
               </>
             ) : (
               <div className="rounded-2xl border border-dashed px-4 py-6 text-sm text-muted-foreground">
@@ -725,38 +835,107 @@ export default function EventDetails() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Usunąć wydarzenie?</AlertDialogTitle>
+            <AlertDialogTitle>Zarchiwizować wydarzenie?</AlertDialogTitle>
             <AlertDialogDescription>
-              Wydarzenie <span className="font-medium text-foreground">{event.name}</span> zostanie usunięte razem z uczestnikami przypisanymi do tego wydarzenia. Tej operacji nie da się cofnąć.
+              Wydarzenie <span className="font-medium text-foreground">{event.name}</span> zniknie z aktywnych list i przypisań. Dane zostaną zachowane w archiwum organizacji.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Anuluj</AlertDialogCancel>
             <AlertDialogAction onClick={() => void handleDeleteEvent()} disabled={isDeletingEvent} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {isDeletingEvent && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-              Usuń wydarzenie
+              Archiwizuj wydarzenie
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog
+        open={editOpen}
+        onOpenChange={nextOpen => {
+          setEditOpen(nextOpen);
+          if (!nextOpen) setEditErrors({});
+        }}
+      >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edytuj wydarzenie</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div><Label>Nazwa</Label><Input value={editForm.name} onChange={eventValue => setEditForm(current => ({ ...current, name: eventValue.target.value }))} /></div>
-            <div><Label>Lokalizacja</Label><Input value={editForm.location} onChange={eventValue => setEditForm(current => ({ ...current, location: eventValue.target.value }))} /></div>
-            <div><Label>Data i godzina otwarcia biura zawodów</Label><Input type="datetime-local" value={editForm.office_open_at} onChange={eventValue => setEditForm(current => ({ ...current, office_open_at: eventValue.target.value }))} /></div>
-            <div><Label>Data i godzina zamknięcia biura zawodów</Label><Input type="datetime-local" value={editForm.office_close_at} onChange={eventValue => setEditForm(current => ({ ...current, office_close_at: eventValue.target.value }))} /></div>
+            <div>
+              <Label htmlFor="event-edit-name">Nazwa</Label>
+              <Input
+                id="event-edit-name"
+                value={editForm.name}
+                onChange={eventValue => {
+                  setEditForm(current => ({ ...current, name: eventValue.target.value }));
+                  setEditErrors(current => ({ ...current, name: undefined, form: undefined }));
+                }}
+                required
+                aria-invalid={Boolean(editErrors.name)}
+                aria-describedby={editErrors.name ? 'event-edit-name-error' : undefined}
+              />
+              <FieldError id="event-edit-name-error" className="mt-2">{editErrors.name}</FieldError>
+            </div>
+            <div>
+              <Label htmlFor="event-edit-location">Lokalizacja</Label>
+              <Input
+                id="event-edit-location"
+                value={editForm.location}
+                onChange={eventValue => {
+                  setEditForm(current => ({ ...current, location: eventValue.target.value }));
+                  setEditErrors(current => ({ ...current, location: undefined, form: undefined }));
+                }}
+                required
+                aria-invalid={Boolean(editErrors.location)}
+                aria-describedby={editErrors.location ? 'event-edit-location-error' : undefined}
+              />
+              <FieldError id="event-edit-location-error" className="mt-2">{editErrors.location}</FieldError>
+            </div>
+            <div>
+              <Label htmlFor="event-edit-office-open">Data i godzina otwarcia biura zawodów</Label>
+              <DateTimePicker
+                id="event-edit-office-open"
+                value={editForm.office_open_at}
+                disabled={isFinishedEvent}
+                onChange={value => {
+                  setEditForm(current => ({ ...current, office_open_at: value }));
+                  setEditErrors(current => ({ ...current, office_open_at: undefined, office_close_at: undefined, form: undefined }));
+                }}
+                aria-invalid={Boolean(editErrors.office_open_at)}
+                aria-describedby={editErrors.office_open_at ? 'event-edit-office-open-error' : undefined}
+              />
+              {isFinishedEvent && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Dat zakończonego wydarzenia nie można już edytować.
+                </p>
+              )}
+              <FieldError id="event-edit-office-open-error" className="mt-2">{editErrors.office_open_at}</FieldError>
+            </div>
+            <div>
+              <Label htmlFor="event-edit-office-close">Data i godzina zamknięcia biura zawodów</Label>
+              <DateTimePicker
+                id="event-edit-office-close"
+                value={editForm.office_close_at}
+                disabled={isFinishedEvent}
+                onChange={value => {
+                  setEditForm(current => ({ ...current, office_close_at: value }));
+                  setEditErrors(current => ({ ...current, office_close_at: undefined, form: undefined }));
+                }}
+                aria-invalid={Boolean(editErrors.office_close_at)}
+                aria-describedby={editErrors.office_close_at ? 'event-edit-office-close-error' : undefined}
+              />
+              <FieldError id="event-edit-office-close-error" className="mt-2">{editErrors.office_close_at}</FieldError>
+            </div>
+            <FieldError id="event-edit-form-error">{editErrors.form}</FieldError>
           </div>
           <DialogFooter>
-            <Button className="w-full sm:w-auto" onClick={handleEditSubmit} disabled={!editForm.name || !editForm.location || !editForm.office_open_at || !editForm.office_close_at || editSaving}>
+            <Button className="w-full sm:w-auto" onClick={handleEditSubmit} disabled={editSaving}>
               {editSaving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               Zapisz
             </Button>
@@ -764,26 +943,57 @@ export default function EventDetails() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={manualOpen} onOpenChange={setManualOpen}>
-        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-lg">
+      <Dialog
+        open={manualOpen}
+        onOpenChange={nextOpen => {
+          setManualOpen(nextOpen);
+          if (!nextOpen) setManualErrors({ fields: {} });
+        }}
+      >
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl lg:max-w-3xl">
           <DialogHeader className="shrink-0 px-6 pb-2 pt-6">
             <DialogTitle>Dodaj uczestnika ręcznie</DialogTitle>
           </DialogHeader>
-          <div className="themed-scrollbar flex-1 space-y-4 overflow-y-auto px-6 py-4">
-            <div>
-              <Label>Email</Label>
-              <Input value={manualEmail} onChange={eventValue => setManualEmail(eventValue.target.value)} className="mt-2" />
+          <div className="themed-scrollbar grid flex-1 gap-4 overflow-y-auto px-6 py-4 lg:grid-cols-2">
+            <div className="lg:col-span-2">
+              <Label htmlFor="event-manual-participant-email">Email</Label>
+              <Input
+                id="event-manual-participant-email"
+                type="email"
+                value={manualEmail}
+                onChange={eventValue => {
+                  setManualEmail(eventValue.target.value);
+                  setManualErrors(previous => ({ ...previous, email: undefined, form: undefined }));
+                }}
+                className="mt-2"
+                required
+                aria-invalid={Boolean(manualErrors.email)}
+                aria-describedby={manualErrors.email ? 'event-manual-participant-email-error' : undefined}
+              />
+              <FieldError id="event-manual-participant-email-error" className="mt-2">{manualErrors.email}</FieldError>
             </div>
-            {activeMappings.map(mapping => (
-              <div key={`${mapping.alias}-${mapping.source_column_name}`}>
-                <Label>{mapping.alias}</Label>
-                <Input
-                  value={manualFields[mapping.alias] ?? ''}
-                  onChange={eventValue => handleManualFieldChange(mapping.alias, eventValue.target.value)}
-                  className="mt-2"
-                />
-              </div>
-            ))}
+            {activeMappings.map((mapping, index) => {
+              const fieldId = `event-manual-participant-field-${index}`;
+              const errorId = `${fieldId}-error`;
+              const fieldError = manualErrors.fields[mapping.alias];
+
+              return (
+                <div key={`${mapping.alias}-${mapping.source_column_name}`}>
+                  <Label htmlFor={fieldId}>{mapping.alias}</Label>
+                  <Input
+                    id={fieldId}
+                    value={manualFields[mapping.alias] ?? ''}
+                    onChange={eventValue => handleManualFieldChange(mapping.alias, eventValue.target.value)}
+                    className="mt-2"
+                    required
+                    aria-invalid={Boolean(fieldError)}
+                    aria-describedby={fieldError ? errorId : undefined}
+                  />
+                  <FieldError id={errorId} className="mt-2">{fieldError}</FieldError>
+                </div>
+              );
+            })}
+            <FieldError id="event-manual-participant-form-error" className="lg:col-span-2">{manualErrors.form}</FieldError>
           </div>
           <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button className="w-full sm:w-auto" onClick={handleManualSubmit} disabled={manualSaving}>
@@ -806,7 +1016,10 @@ export default function EventDetails() {
                 {organizationScanners.map(scanner => (
                   <label key={scanner.id} className="flex items-center gap-3 text-sm">
                     <Checkbox checked={scannerSelection.includes(scanner.id)} onCheckedChange={checked => toggleScannerSelection(scanner.id, checked === true)} />
-                    <span>{scanner.name}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate">{scanner.name}</span>
+                      <span className="block text-xs text-muted-foreground">{getScannerPermissionLabel(scanner.role)}</span>
+                    </span>
                   </label>
                 ))}
               </div>

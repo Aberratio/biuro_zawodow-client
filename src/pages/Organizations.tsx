@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FieldError } from '@/components/ui/field-error';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
 import { formatEventOfficeEnd, formatEventOfficeStart, getEventOfficeCloseAt, getEventOfficeOpenAt, isEventOfficeOpen } from '@/lib/events';
+import { validateNonNegativeInteger, validateRequired } from '@/lib/form-validation';
 import type { Event } from '@/types';
 
 function getClosestOrganizationEventLabel(organizationEvents: Event[], now: Date): string {
@@ -44,6 +46,7 @@ export default function Organizations() {
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState('');
   const [form, setForm] = useState({ name: '', event_limit: '1', admin_user_id: '' });
+  const [errors, setErrors] = useState<{ name?: string; event_limit?: string; admin_user_id?: string; form?: string }>({});
   const admins = users.filter(user => user.role === 'admin');
 
   useEffect(() => {
@@ -67,7 +70,7 @@ export default function Organizations() {
       .map(org => {
         const organizationEvents = events.filter(event => event.organization_id === org.id);
         const teamCount = users.filter(
-          user => user.organization_id === org.id && (user.role === 'editor' || user.role === 'scanner')
+          user => user.organization_id === org.id && (user.role === 'editor' || user.role === 'scanner' || user.role === 'scanner_plus')
         ).length;
 
         return {
@@ -82,14 +85,28 @@ export default function Organizations() {
   if (isLoading) return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
 
   const handleCreate = async () => {
+    const nextErrors = {
+      name: validateRequired(form.name, 'Podaj nazwę organizacji.'),
+      event_limit: validateNonNegativeInteger(form.event_limit, 'Podaj poprawny limit wydarzeń.'),
+      admin_user_id: currentRole === 'superadmin' ? validateRequired(form.admin_user_id, 'Wybierz admina organizacji.') : '',
+    };
+
+    if (nextErrors.name || nextErrors.event_limit || nextErrors.admin_user_id) {
+      setErrors(nextErrors);
+      return;
+    }
+
     const parsedLimit = Number(form.event_limit);
     if (!form.name || !Number.isInteger(parsedLimit) || parsedLimit < 0) {
+      setErrors(previous => ({ ...previous, form: 'Podaj nazwę i poprawny limit wydarzeń.' }));
       toast({ title: 'Nieprawidłowe dane', description: 'Podaj nazwę i poprawny limit wydarzeń.', variant: 'destructive' });
       return;
     }
 
+    setErrors({});
     setIsSubmitting(true);
     if (currentRole === 'superadmin' && !form.admin_user_id) {
+      setErrors({ admin_user_id: 'Wybierz admina organizacji.' });
       toast({ title: 'Brak administratora', description: 'Wybierz admina dla nowej organizacji.', variant: 'destructive' });
       setIsSubmitting(false);
       return;
@@ -103,11 +120,13 @@ export default function Organizations() {
     setIsSubmitting(false);
 
     if (!result.ok) {
+      setErrors({ form: result.error ?? 'Nie udało się utworzyć organizacji.' });
       toast({ title: 'Nie udało się utworzyć organizacji', description: result.error ?? 'Spróbuj ponownie.', variant: 'destructive' });
       return;
     }
 
     setForm({ name: '', event_limit: '1', admin_user_id: '' });
+    setErrors({});
     setOpen(false);
     toast({ title: 'Organizacja utworzona' });
     if (result.entityId) {
@@ -213,25 +232,65 @@ export default function Organizations() {
         </>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={nextOpen => {
+          setOpen(nextOpen);
+          if (!nextOpen) setErrors({});
+        }}
+      >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Nowa organizacja</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Nazwa</Label>
-              <Input value={form.name} onChange={event => setForm(prev => ({ ...prev, name: event.target.value }))} />
+              <Label htmlFor="organization-name">Nazwa</Label>
+              <Input
+                id="organization-name"
+                value={form.name}
+                onChange={event => {
+                  setForm(prev => ({ ...prev, name: event.target.value }));
+                  setErrors(prev => ({ ...prev, name: undefined, form: undefined }));
+                }}
+                required
+                aria-invalid={Boolean(errors.name)}
+                aria-describedby={errors.name ? 'organization-name-error' : undefined}
+              />
+              <FieldError id="organization-name-error" className="mt-2">{errors.name}</FieldError>
             </div>
             <div>
-              <Label>Limit wydarzeń</Label>
-              <Input type="number" min="0" value={form.event_limit} onChange={event => setForm(prev => ({ ...prev, event_limit: event.target.value }))} />
+              <Label htmlFor="organization-event-limit">Limit wydarzeń</Label>
+              <Input
+                id="organization-event-limit"
+                type="number"
+                min="0"
+                value={form.event_limit}
+                onChange={event => {
+                  setForm(prev => ({ ...prev, event_limit: event.target.value }));
+                  setErrors(prev => ({ ...prev, event_limit: undefined, form: undefined }));
+                }}
+                required
+                aria-invalid={Boolean(errors.event_limit)}
+                aria-describedby={errors.event_limit ? 'organization-event-limit-error' : undefined}
+              />
+              <FieldError id="organization-event-limit-error" className="mt-2">{errors.event_limit}</FieldError>
             </div>
             {currentRole === 'superadmin' && (
               <div>
-                <Label>Administrator organizacji</Label>
-                <Select value={form.admin_user_id} onValueChange={value => setForm(prev => ({ ...prev, admin_user_id: value }))}>
-                  <SelectTrigger>
+                <Label htmlFor="organization-admin">Administrator organizacji</Label>
+                <Select
+                  value={form.admin_user_id}
+                  onValueChange={value => {
+                    setForm(prev => ({ ...prev, admin_user_id: value }));
+                    setErrors(prev => ({ ...prev, admin_user_id: undefined, form: undefined }));
+                  }}
+                >
+                  <SelectTrigger
+                    id="organization-admin"
+                    aria-invalid={Boolean(errors.admin_user_id)}
+                    aria-describedby={errors.admin_user_id ? 'organization-admin-error' : undefined}
+                  >
                     <SelectValue placeholder="Wybierz admina" />
                   </SelectTrigger>
                   <SelectContent>
@@ -242,14 +301,16 @@ export default function Organizations() {
                     ))}
                   </SelectContent>
                 </Select>
+                <FieldError id="organization-admin-error" className="mt-2">{errors.admin_user_id}</FieldError>
               </div>
             )}
+            <FieldError id="organization-form-error">{errors.form}</FieldError>
           </div>
           <DialogFooter>
             <Button
               className="w-full sm:w-auto"
               onClick={handleCreate}
-              disabled={!form.name || !form.event_limit || (currentRole === 'superadmin' && !form.admin_user_id) || isSubmitting}
+              disabled={isSubmitting}
             >
               <Plus className="mr-1 h-4 w-4" />
               Utwórz organizację

@@ -5,8 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { FieldError } from '@/components/ui/field-error';
 import { useAuth } from '@/contexts/AuthContext';
 import { generateStrongPassword } from '@/lib/password';
+import { validatePasswordConfirmation, validateStrongPassword } from '@/lib/form-validation';
 import { toast } from '@/hooks/use-toast';
 
 export default function ResetPassword() {
@@ -19,6 +21,7 @@ export default function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<{ password?: string; passwordConfirmation?: string; form?: string }>({});
 
   const handleGeneratePassword = () => {
     const generatedPassword = generateStrongPassword();
@@ -26,14 +29,27 @@ export default function ResetPassword() {
     setPasswordConfirmation(generatedPassword);
     setShowPassword(true);
     setShowPasswordConfirmation(true);
+    setErrors({});
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const nextErrors = {
+      password: validateStrongPassword(password),
+      passwordConfirmation: validatePasswordConfirmation(password, passwordConfirmation),
+    };
+
+    if (nextErrors.password || nextErrors.passwordConfirmation) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    setErrors({});
     setIsSubmitting(true);
     try {
       const result = await resetPassword(token, password, passwordConfirmation);
       if (!result.ok) {
+        setErrors({ form: result.error ?? 'Nie udało się ustawić hasła.' });
         toast({ title: 'Nie udało się ustawić hasła', description: result.error, variant: 'destructive' });
         return;
       }
@@ -64,7 +80,7 @@ export default function ResetPassword() {
               <Button variant="outline" onClick={() => navigate('/login', { replace: true })}>Wróć do logowania</Button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div className="space-y-1.5">
                 <Label htmlFor="password">Nowe hasło</Label>
                 <div className="flex gap-2">
@@ -73,8 +89,15 @@ export default function ResetPassword() {
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       value={password}
-                      onChange={event => setPassword(event.target.value)}
+                      onChange={event => {
+                        setPassword(event.target.value);
+                        setErrors(previous => ({ ...previous, password: undefined, form: undefined }));
+                      }}
                       autoComplete="new-password"
+                      required
+                      minLength={10}
+                      aria-invalid={Boolean(errors.password || errors.form)}
+                      aria-describedby={errors.password ? 'reset-password-error' : undefined}
                       className="pr-10"
                     />
                     <button
@@ -90,6 +113,7 @@ export default function ResetPassword() {
                     <RefreshCw className="mr-1 h-4 w-4" /> Generuj
                   </Button>
                 </div>
+                <FieldError id="reset-password-error">{errors.password}</FieldError>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="passwordConfirmation">Powtórz nowe hasło</Label>
@@ -98,8 +122,14 @@ export default function ResetPassword() {
                     id="passwordConfirmation"
                     type={showPasswordConfirmation ? 'text' : 'password'}
                     value={passwordConfirmation}
-                    onChange={event => setPasswordConfirmation(event.target.value)}
+                    onChange={event => {
+                      setPasswordConfirmation(event.target.value);
+                      setErrors(previous => ({ ...previous, passwordConfirmation: undefined, form: undefined }));
+                    }}
                     autoComplete="new-password"
+                    required
+                    aria-invalid={Boolean(errors.passwordConfirmation || errors.form)}
+                    aria-describedby={errors.passwordConfirmation ? 'reset-password-confirmation-error' : undefined}
                     className="pr-10"
                   />
                   <button
@@ -111,11 +141,13 @@ export default function ResetPassword() {
                     {showPasswordConfirmation ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                <FieldError id="reset-password-confirmation-error">{errors.passwordConfirmation}</FieldError>
               </div>
               <p className="text-xs text-muted-foreground">
                 Minimum 10 znaków, wielka i mała litera, cyfra oraz znak specjalny.
               </p>
-              <Button type="submit" className="w-full" disabled={!password || !passwordConfirmation || isSubmitting}>
+              <FieldError id="reset-password-form-error">{errors.form}</FieldError>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
                 Zapisz nowe hasło
               </Button>
             </form>

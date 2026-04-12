@@ -1,21 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpDown, ListFilter, Plus, Search } from 'lucide-react';
+import { ArrowUpDown, ListFilter, Pencil, Plus, Search } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FieldError } from '@/components/ui/field-error';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
-import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import EventsSkeleton from '@/components/skeletons/EventsSkeleton';
 import { toast } from '@/hooks/use-toast';
 import { formatEventOfficeWindow, getEventOfficeOpenAt, isEventOfficeOpen, isValidEventOfficeRange } from '@/lib/events';
+import { validateNonNegativeInteger, validateRequired } from '@/lib/form-validation';
 import { participantCountsAsCheckedIn } from '@/lib/participant-status';
+import { isScannerRole } from '@/lib/roles';
 
 const EVENTS_PAGE_SIZE = 20;
 
@@ -64,6 +67,7 @@ export default function Events() {
     participants,
     organizations,
     createEvent,
+    updateOrganizationEventLimit,
     currentUser,
     currentRole,
     selectedOrganizationId,
@@ -77,7 +81,11 @@ export default function Events() {
   const [statusFilter, setStatusFilter] = useState<EventStatusFilter>('all');
   const [sortBy, setSortBy] = useState<EventSortOption>('office_open_asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const adminOrganizationIds = currentUser.organization_ids ?? [];
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const [limitDraft, setLimitDraft] = useState('');
+  const [isSavingLimit, setIsSavingLimit] = useState(false);
+  const [limitErrors, setLimitErrors] = useState<{ event_limit?: string; form?: string }>({});
+  const adminOrganizationIds = useMemo(() => currentUser.organization_ids ?? [], [currentUser.organization_ids]);
   const adminOrganizations = useMemo(
     () => organizations.filter(org => adminOrganizationIds.includes(org.id)),
     [adminOrganizationIds, organizations],
@@ -86,7 +94,7 @@ export default function Events() {
     () => Object.fromEntries(organizations.map(org => [org.id, org.name])),
     [organizations],
   );
-  const canCreateEvent = currentRole !== 'scanner';
+  const canCreateEvent = !isScannerRole(currentRole);
   const showOrganizationColumn = currentRole === 'superadmin';
   const [form, setForm] = useState({
     name: '',
@@ -97,6 +105,14 @@ export default function Events() {
       ? (selectedOrganizationId || adminOrganizationIds[0] || currentUser.organization_id || organizations[0]?.id || '')
       : (currentUser.organization_id || organizations[0]?.id || ''),
   });
+  const [formErrors, setFormErrors] = useState<{
+    name?: string;
+    location?: string;
+    organization_id?: string;
+    office_open_at?: string;
+    office_close_at?: string;
+    form?: string;
+  }>({});
 
   useEffect(() => {
     if (currentRole !== 'admin') return;
@@ -202,9 +218,6 @@ export default function Events() {
   }, [currentPage, processedRows, shouldShowFiltersAndPagination]);
   const usedSlots = scopedEvents.length;
   const remainingSlots = pageOrganization ? Math.max(pageOrganization.event_limit - usedSlots, 0) : 0;
-  const usageProgress = pageOrganization && pageOrganization.event_limit > 0
-    ? Math.min((usedSlots / pageOrganization.event_limit) * 100, 100)
-    : 0;
   const formOrganization = useMemo(
     () => organizations.find(org => org.id === form.organization_id),
     [form.organization_id, organizations],
@@ -218,9 +231,29 @@ export default function Events() {
 
   if (isLoading) return <EventsSkeleton />;
 
+  const openLimitDialog = () => {
+    if (!pageOrganization) return;
+    setLimitDraft(String(pageOrganization.event_limit + 1));
+    setLimitErrors({});
+    setLimitDialogOpen(true);
+  };
+
   const handleCreate = async () => {
-    if (!form.name || !form.location || !form.organization_id) return;
+    const nextErrors = {
+      name: validateRequired(form.name, 'Podaj nazwę wydarzenia.'),
+      location: validateRequired(form.location, 'Podaj lokalizację wydarzenia.'),
+      organization_id: validateRequired(form.organization_id, 'Wybierz organizację.'),
+      office_open_at: validateRequired(form.office_open_at, 'Podaj datę i godzinę otwarcia biura.'),
+      office_close_at: validateRequired(form.office_close_at, 'Podaj datę i godzinę zamknięcia biura.'),
+    };
+
+    if (nextErrors.name || nextErrors.location || nextErrors.organization_id || nextErrors.office_open_at || nextErrors.office_close_at) {
+      setFormErrors(nextErrors);
+      return;
+    }
+
     if (!form.office_open_at || !form.office_close_at || !isValidEventOfficeRange(form.office_open_at, form.office_close_at)) {
+      setFormErrors({ office_close_at: 'Zamknięcie biura musi być później niż otwarcie.' });
       toast({
         title: 'Nieprawidłowe godziny biura',
         description: 'Podaj wymaganą datę i godzinę otwarcia oraz zamknięcia biura zawodów. Otwarcie musi być wcześniejsze od zamknięcia.',
@@ -229,6 +262,7 @@ export default function Events() {
       return;
     }
 
+    setFormErrors({});
     setIsSubmitting(true);
     const result = await createEvent({
       name: form.name,
@@ -240,6 +274,7 @@ export default function Events() {
     setIsSubmitting(false);
 
     if (!result.ok) {
+      setFormErrors({ form: result.error ?? 'Nie udało się utworzyć wydarzenia.' });
       toast({
         title: 'Nie udało się utworzyć wydarzenia',
         description: result.error ?? 'Spróbuj ponownie.',
@@ -257,8 +292,47 @@ export default function Events() {
         ? (selectedOrganizationId || adminOrganizationIds[0] || organizations[0]?.id || '')
         : (currentUser.organization_id || organizations[0]?.id || ''),
     });
+    setFormErrors({});
     setOpen(false);
     toast({ title: 'Wydarzenie utworzone' });
+  };
+
+  const handleIncreaseLimit = async () => {
+    if (!pageOrganization) return;
+
+    const limitValue = limitDraft || String(pageOrganization.event_limit + 1);
+    const parsed = Number(limitValue);
+    const limitError = validateNonNegativeInteger(limitValue, 'Podaj liczbę całkowitą większą od obecnego limitu.');
+
+    if (limitError || !Number.isInteger(parsed) || parsed <= pageOrganization.event_limit) {
+      setLimitErrors({ event_limit: limitError || `Nowy limit musi być większy niż ${pageOrganization.event_limit}.` });
+      toast({
+        title: 'Nieprawidłowy limit',
+        description: `Nowy limit musi być większy niż ${pageOrganization.event_limit}.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLimitErrors({});
+    setIsSavingLimit(true);
+    const result = await updateOrganizationEventLimit(pageOrganization.id, parsed);
+    setIsSavingLimit(false);
+
+    if (!result.ok) {
+      setLimitErrors({ form: result.error ?? 'Nie udało się zwiększyć limitu wydarzeń.' });
+      toast({
+        title: 'Nie udało się zwiększyć limitu',
+        description: result.error ?? 'Spróbuj ponownie.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLimitDialogOpen(false);
+    setLimitDraft('');
+    setLimitErrors({});
+    toast({ title: 'Zwiększono limit wydarzeń' });
   };
 
   return (
@@ -277,43 +351,41 @@ export default function Events() {
         )}
       </div>
 
+      <Card className="border-border/70 bg-muted/25 shadow-sm">
+        <CardContent className="px-4 py-3 text-sm text-muted-foreground">
+          Wydarzenia są automatycznie przenoszone do archiwum miesiąc po zamknięciu biura zawodów.
+        </CardContent>
+      </Card>
+
       {pageOrganization && (
-        <Card className="border-white/10 bg-white/[0.03] shadow-[0_18px_42px_hsl(var(--surface-shadow)/0.24)]">
-          <CardContent className="space-y-4 py-5">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="space-y-1">
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-foreground/55">
-                  Limit wydarzeń
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-base font-semibold text-foreground">{pageOrganization.name}</h2>
-                  <Badge variant="outline" className="border-white/10 bg-white/[0.03] text-[11px] text-foreground/75">
-                    {usedSlots}/{pageOrganization.event_limit}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {remainingSlots > 0
-                    ? `Możesz dodać jeszcze ${remainingSlots} ${remainingSlots === 1 ? 'wydarzenie' : 'wydarzeń'}.`
-                    : 'Limit został wykorzystany. Aby dodać kolejne wydarzenie, zwiększ limit w organizacji.'}
-                </p>
-              </div>
-
-              <div className="min-w-[12rem] rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-sm">
-                <p className="text-[0.7rem] uppercase tracking-[0.2em] text-foreground/50">Pozostały zapas</p>
-                <p className="mt-1 text-2xl font-semibold text-foreground">{remainingSlots}</p>
-                <p className="mt-1 text-xs text-muted-foreground">wolnych slotów na wydarzenia</p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Wykorzystanie limitu</span>
-                <span>{Math.round(usageProgress)}%</span>
-              </div>
-              <Progress value={usageProgress} className="h-2.5 rounded-full bg-white/8 [&>div]:bg-[linear-gradient(90deg,hsl(var(--primary)/0.82),hsl(var(--button-highlight)/0.45))]" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.025] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="font-medium text-foreground">Limit wydarzeń</span>
+            <span className="truncate text-muted-foreground">{pageOrganization.name}</span>
+            <Badge variant="outline" className="border-white/10 bg-white/[0.03] text-[11px] text-foreground/75">
+              {usedSlots}/{pageOrganization.event_limit}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2 sm:justify-end">
+            <p className="text-xs text-muted-foreground sm:text-right">
+              {remainingSlots > 0
+                ? `${remainingSlots} ${remainingSlots === 1 ? 'wolne miejsce' : 'wolnych miejsc'} na wydarzenia.`
+                : 'Limit wykorzystany. Zwiększ limit w organizacji, aby dodać kolejne wydarzenie.'}
+            </p>
+            {currentRole === 'admin' && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
+                onClick={openLimitDialog}
+                aria-label="Zwiększ limit wydarzeń"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
       )}
 
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
@@ -522,15 +594,33 @@ export default function Events() {
         </>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={nextOpen => {
+          setOpen(nextOpen);
+          if (!nextOpen) setFormErrors({});
+        }}
+      >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader><DialogTitle>Nowe wydarzenie</DialogTitle></DialogHeader>
           <div className="space-y-4">
             {(currentRole === 'superadmin' || currentRole === 'admin') && (
               <div>
-                <Label>Organizacja</Label>
-                <Select value={form.organization_id} onValueChange={value => setForm(current => ({ ...current, organization_id: value }))}>
-                  <SelectTrigger><SelectValue placeholder="Wybierz organizację" /></SelectTrigger>
+                <Label htmlFor="event-create-organization">Organizacja</Label>
+                <Select
+                  value={form.organization_id}
+                  onValueChange={value => {
+                    setForm(current => ({ ...current, organization_id: value }));
+                    setFormErrors(current => ({ ...current, organization_id: undefined, form: undefined }));
+                  }}
+                >
+                  <SelectTrigger
+                    id="event-create-organization"
+                    aria-invalid={Boolean(formErrors.organization_id)}
+                    aria-describedby={formErrors.organization_id ? 'event-create-organization-error' : undefined}
+                  >
+                    <SelectValue placeholder="Wybierz organizację" />
+                  </SelectTrigger>
                   <SelectContent>
                     {organizations
                       .filter(org => currentRole === 'superadmin' || adminOrganizationIds.includes(org.id))
@@ -539,26 +629,132 @@ export default function Events() {
                       ))}
                   </SelectContent>
                 </Select>
+                <FieldError id="event-create-organization-error" className="mt-2">{formErrors.organization_id}</FieldError>
               </div>
             )}
-            <div><Label>Nazwa</Label><Input value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="np. Bieg Wiosenny" /></div>
-            <div><Label>Lokalizacja</Label><Input value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} placeholder="np. Kraków, Błonia" /></div>
-            <div><Label>Data i godzina otwarcia biura zawodów</Label><Input type="datetime-local" value={form.office_open_at} onChange={event => setForm(current => ({ ...current, office_open_at: event.target.value }))} /></div>
-            <div><Label>Data i godzina zamknięcia biura zawodów</Label><Input type="datetime-local" value={form.office_close_at} onChange={event => setForm(current => ({ ...current, office_close_at: event.target.value }))} /></div>
+            <div>
+              <Label htmlFor="event-create-name">Nazwa</Label>
+              <Input
+                id="event-create-name"
+                value={form.name}
+                onChange={event => {
+                  setForm(current => ({ ...current, name: event.target.value }));
+                  setFormErrors(current => ({ ...current, name: undefined, form: undefined }));
+                }}
+                placeholder="np. Bieg Wiosenny"
+                required
+                aria-invalid={Boolean(formErrors.name)}
+                aria-describedby={formErrors.name ? 'event-create-name-error' : undefined}
+              />
+              <FieldError id="event-create-name-error" className="mt-2">{formErrors.name}</FieldError>
+            </div>
+            <div>
+              <Label htmlFor="event-create-location">Lokalizacja</Label>
+              <Input
+                id="event-create-location"
+                value={form.location}
+                onChange={event => {
+                  setForm(current => ({ ...current, location: event.target.value }));
+                  setFormErrors(current => ({ ...current, location: undefined, form: undefined }));
+                }}
+                placeholder="np. Kraków, Błonia"
+                required
+                aria-invalid={Boolean(formErrors.location)}
+                aria-describedby={formErrors.location ? 'event-create-location-error' : undefined}
+              />
+              <FieldError id="event-create-location-error" className="mt-2">{formErrors.location}</FieldError>
+            </div>
+            <div>
+              <Label htmlFor="event-create-office-open">Data i godzina otwarcia biura zawodów</Label>
+              <DateTimePicker
+                id="event-create-office-open"
+                value={form.office_open_at}
+                onChange={value => {
+                  setForm(current => ({ ...current, office_open_at: value }));
+                  setFormErrors(current => ({ ...current, office_open_at: undefined, office_close_at: undefined, form: undefined }));
+                }}
+                aria-invalid={Boolean(formErrors.office_open_at)}
+                aria-describedby={formErrors.office_open_at ? 'event-create-office-open-error' : undefined}
+              />
+              <FieldError id="event-create-office-open-error" className="mt-2">{formErrors.office_open_at}</FieldError>
+            </div>
+            <div>
+              <Label htmlFor="event-create-office-close">Data i godzina zamknięcia biura zawodów</Label>
+              <DateTimePicker
+                id="event-create-office-close"
+                value={form.office_close_at}
+                onChange={value => {
+                  setForm(current => ({ ...current, office_close_at: value }));
+                  setFormErrors(current => ({ ...current, office_close_at: undefined, form: undefined }));
+                }}
+                aria-invalid={Boolean(formErrors.office_close_at)}
+                aria-describedby={formErrors.office_close_at ? 'event-create-office-close-error' : undefined}
+              />
+              <FieldError id="event-create-office-close-error" className="mt-2">{formErrors.office_close_at}</FieldError>
+            </div>
             {formOrganization && (
               <p className="text-[10px] text-muted-foreground">
                 Limit organizacji: {formOrganizationUsedSlots}/{formOrganization.event_limit} wydarzeń.
               </p>
             )}
+            <FieldError id="event-create-form-error">{formErrors.form}</FieldError>
           </div>
           <DialogFooter>
             <Button
               onClick={handleCreate}
-              disabled={!form.name || !form.location || !form.office_open_at || !form.office_close_at || !form.organization_id || (formOrganization ? formOrganizationUsedSlots >= formOrganization.event_limit : false) || isSubmitting}
+              disabled={(formOrganization ? formOrganizationUsedSlots >= formOrganization.event_limit : false) || isSubmitting}
               className="h-11 w-full sm:h-10 sm:w-auto"
             >
               <Plus className="mr-1 h-4 w-4" />
               Utwórz
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={limitDialogOpen}
+        onOpenChange={nextOpen => {
+          setLimitDialogOpen(nextOpen);
+          if (!nextOpen) {
+            setLimitDraft('');
+            setLimitErrors({});
+          }
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Zwiększ limit wydarzeń</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="events-organization-event-limit">Nowy limit wydarzeń</Label>
+              <Input
+                id="events-organization-event-limit"
+                type="number"
+                min={pageOrganization ? String(pageOrganization.event_limit + 1) : '1'}
+                value={limitDraft}
+                onChange={event => {
+                  setLimitDraft(event.target.value);
+                  setLimitErrors(current => ({ ...current, event_limit: undefined, form: undefined }));
+                }}
+                className="mt-2"
+                required
+                aria-invalid={Boolean(limitErrors.event_limit)}
+                aria-describedby={limitErrors.event_limit ? 'events-organization-event-limit-error' : undefined}
+              />
+              <FieldError id="events-organization-event-limit-error" className="mt-2">{limitErrors.event_limit}</FieldError>
+            </div>
+            {pageOrganization && (
+              <p className="text-xs text-muted-foreground">
+                Obecny limit organizacji {pageOrganization.name}: {pageOrganization.event_limit}. Z tego miejsca możesz tylko zwiększyć limit.
+              </p>
+            )}
+            <FieldError id="events-organization-limit-form-error">{limitErrors.form}</FieldError>
+          </div>
+          <DialogFooter>
+            <Button className="w-full sm:w-auto" onClick={handleIncreaseLimit} disabled={isSavingLimit}>
+              Zapisz limit
             </Button>
           </DialogFooter>
         </DialogContent>

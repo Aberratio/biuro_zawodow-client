@@ -34,7 +34,7 @@ All colors MUST be HSL.
 
     --border: 0 0% 18%;
     --input: 0 0% 18%;
-    --ring: 2 76% 52%;
+    --ring: 43 74% 63%;
 
     --radius: 1rem;
 
@@ -143,6 +143,26 @@ All colors MUST be HSL.
       inset 0 1px 0 hsl(var(--foreground) / 0.03),
       0 0 0 1px hsl(var(--background) / 0.24);
     backdrop-filter: blur(12px);
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .surface-field:not([aria-invalid="true"]):hover {
+    border-color: hsl(var(--button-highlight) / 0.52);
+    background-color: hsl(var(--background) / 0.8);
+  }
+
+  .surface-field:not([aria-invalid="true"]):focus,
+  .surface-field:not([aria-invalid="true"]):focus-visible,
+  .surface-field:not([aria-invalid="true"]):focus-within,
+  .surface-field:not([aria-invalid="true"])[data-state="open"] {
+    border-color: hsl(var(--button-highlight) / 0.82);
+  }
+
+  .surface-field[aria-invalid="true"] {
+    border-color: hsl(var(--destructive) / 0.86);
   }
 
   .surface-popover {

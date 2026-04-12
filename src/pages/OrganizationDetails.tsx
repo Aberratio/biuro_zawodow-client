@@ -4,6 +4,7 @@ import { useData } from "@/contexts/DataContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldError } from "@/components/ui/field-error";
 import {
   Table,
   TableBody,
@@ -35,9 +37,20 @@ import {
 import TableSkeleton from "@/components/skeletons/TableSkeleton";
 import { toast } from "@/hooks/use-toast";
 import { formatEventOfficeWindow, isValidEventOfficeRange } from "@/lib/events";
+import {
+  validateEmail,
+  validateNonNegativeInteger,
+  validateRequired,
+} from "@/lib/form-validation";
+import {
+  getRoleLabel,
+  getScannerPermissionLabel,
+  isScannerRole,
+} from "@/lib/roles";
 import type { User } from "@/types";
 import {
   ArrowLeft,
+  Archive,
   Building2,
   CalendarDays,
   KeyRound,
@@ -48,7 +61,7 @@ import {
   Users,
 } from "lucide-react";
 
-type MemberRole = "editor" | "scanner";
+type MemberRole = "editor" | "scanner" | "scanner_plus";
 
 export default function OrganizationDetails() {
   const { id } = useParams<{ id: string }>();
@@ -56,6 +69,7 @@ export default function OrganizationDetails() {
   const {
     organizations,
     events,
+    archivedEvents,
     users,
     currentRole,
     currentUser,
@@ -66,6 +80,7 @@ export default function OrganizationDetails() {
     deleteOrganization,
     removeUser,
     triggerUserPasswordReset,
+    changeRole,
     assignScannerEvents,
     isLoading,
   } = useData();
@@ -112,6 +127,26 @@ export default function OrganizationDetails() {
   >([]);
   const [limitDraft, setLimitDraft] = useState("");
   const [organizationNameDraft, setOrganizationNameDraft] = useState("");
+  const [memberErrors, setMemberErrors] = useState<{
+    name?: string;
+    email?: string;
+    form?: string;
+  }>({});
+  const [limitErrors, setLimitErrors] = useState<{
+    event_limit?: string;
+    form?: string;
+  }>({});
+  const [organizationErrors, setOrganizationErrors] = useState<{
+    name?: string;
+    form?: string;
+  }>({});
+  const [eventErrors, setEventErrors] = useState<{
+    name?: string;
+    location?: string;
+    office_open_at?: string;
+    office_close_at?: string;
+    form?: string;
+  }>({});
 
   const organization = useMemo(
     () => organizations.find((org) => org.id === id),
@@ -129,9 +164,19 @@ export default function OrganizationDetails() {
   const orgEvents = useMemo(
     () =>
       events
-        .filter((event) => event.organization_id === organization?.id)
+        .filter(
+          (event) =>
+            event.organization_id === organization?.id && !event.archived_at,
+        )
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
     [events, organization?.id],
+  );
+  const orgArchivedEvents = useMemo(
+    () =>
+      archivedEvents
+        .filter((event) => event.organization_id === organization?.id)
+        .sort((a, b) => a.name.localeCompare(b.name, "pl")),
+    [archivedEvents, organization?.id],
   );
   const organizers = useMemo(
     () =>
@@ -149,7 +194,7 @@ export default function OrganizationDetails() {
         .filter(
           (user) =>
             user.organization_id === organization?.id &&
-            user.role === "scanner",
+            isScannerRole(user.role),
         )
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
     [users, organization?.id],
@@ -167,7 +212,7 @@ export default function OrganizationDetails() {
     organization.event_limit - orgEvents.length,
     0,
   );
-  const canCreateEvent = currentRole !== "scanner";
+  const canCreateEvent = !isScannerRole(currentRole);
   const canEditOrganization =
     currentRole === "superadmin" || currentRole === "admin";
   const canManageMemberAccounts =
@@ -181,6 +226,7 @@ export default function OrganizationDetails() {
   const canDeleteOrganization =
     canEditOrganization &&
     orgEvents.length === 0 &&
+    orgArchivedEvents.length === 0 &&
     organizers.length === 0 &&
     scanners.length === 0;
   const adminLabel =
@@ -215,9 +261,6 @@ export default function OrganizationDetails() {
     setPasswordResetConfirmOpen(true);
   };
 
-  const validateEmail = (email: string) =>
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
   const toggleScannerEvent = (eventId: string, checked: boolean) => {
     setMemberForm((prev) => ({
       ...prev,
@@ -237,21 +280,23 @@ export default function OrganizationDetails() {
 
   const getEventNames = (eventIds: string[]) => {
     const names = orgEvents
-      .filter((event) => eventIds.includes(event.id))
+      .filter((event) => eventIds.includes(event.id) && !event.archived_at)
       .map((event) => event.name);
-    return names.length > 0 ? names.join(", ") : "Brak przypisanych wydarzen";
+    return names.length > 0 ? names.join(", ") : "Brak przypisanych wydarzeń";
   };
 
   const handleAddMember = async () => {
-    if (!validateEmail(memberForm.email)) {
-      toast({
-        title: "Nieprawidlowy email",
-        description: "Podaj poprawny adres email.",
-        variant: "destructive",
-      });
+    const nextErrors = {
+      name: validateRequired(memberForm.name, "Podaj imię i nazwisko."),
+      email: validateEmail(memberForm.email),
+    };
+
+    if (nextErrors.name || nextErrors.email) {
+      setMemberErrors(nextErrors);
       return;
     }
 
+    setMemberErrors({});
     setIsSubmittingMember(true);
     const result = await addUser({
       name: memberForm.name,
@@ -259,82 +304,124 @@ export default function OrganizationDetails() {
       role: memberForm.role,
       organization_id: organization.id,
       assigned_events:
-        memberForm.role === "scanner" ? memberForm.assigned_events : [],
+        isScannerRole(memberForm.role) ? memberForm.assigned_events : [],
     });
     setIsSubmittingMember(false);
 
     if (!result.ok) {
+      setMemberErrors({ form: result.error ?? "Nie udało się dodać konta." });
       toast({
-        title: "Nie udalo sie dodac konta",
-        description: result.error ?? "Sprobuj ponownie.",
+        title: "Nie udało się dodać konta",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
     }
 
     setMemberDialogOpen(false);
+    setMemberErrors({});
     toast({
       title:
-        memberForm.role === "editor" ? "Dodano organizatora" : "Dodano skanera",
-      description: "Uzytkownik otrzyma mail z linkiem do ustawienia hasla.",
+        memberForm.role === "editor"
+          ? "Dodano organizatora"
+          : `Dodano ${getRoleLabel(memberForm.role).toLocaleLowerCase("pl-PL")}`,
+      description: "Użytkownik otrzyma mail z linkiem do ustawienia hasła.",
     });
   };
 
   const handleSaveLimit = async () => {
     const parsed = Number(limitDraft || organization.event_limit);
-    if (!Number.isInteger(parsed) || parsed < 0) {
+    const limitError = validateNonNegativeInteger(
+      limitDraft || String(organization.event_limit),
+      "Podaj liczbę całkowitą większą lub równą 0.",
+    );
+    if (limitError || !Number.isInteger(parsed) || parsed < 0) {
+      setLimitErrors({ event_limit: limitError || "Podaj liczbę całkowitą większą lub równą 0." });
       toast({
-        title: "Nieprawidlowy limit",
-        description: "Podaj liczbe calkowita wieksza lub rowna 0.",
+        title: "Nieprawidłowy limit",
+        description: "Podaj liczbę całkowitą większą lub równą 0.",
         variant: "destructive",
       });
       return;
     }
     if (parsed < orgEvents.length) {
+      setLimitErrors({
+        event_limit: `Limit wydarzeń nie może być mniejszy niż ${orgEvents.length}.`,
+      });
       toast({
-        title: "Nieprawidlowy limit",
-        description: `Limit wydarzen nie moze byc mniejszy niz ${orgEvents.length}.`,
+        title: "Nieprawidłowy limit",
+        description: `Limit wydarzeń nie może być mniejszy niż ${orgEvents.length}.`,
         variant: "destructive",
       });
       return;
     }
+    setLimitErrors({});
     const result = await updateOrganizationEventLimit(organization.id, parsed);
     if (!result.ok) {
+      setLimitErrors({ form: result.error ?? "Nie udało się zapisać limitu." });
       toast({
-        title: "Nie udalo sie zapisac limitu",
-        description: result.error ?? "Sprobuj ponownie.",
+        title: "Nie udało się zapisać limitu",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
     }
     setLimitDialogOpen(false);
     setLimitDraft("");
-    toast({ title: "Zaktualizowano limit wydarzen" });
+    setLimitErrors({});
+    toast({ title: "Zaktualizowano limit wydarzeń" });
   };
 
   const handleSaveOrganization = async () => {
     const name = organizationNameDraft.trim();
-    if (!name) {
+    const nameError = validateRequired(name, "Podaj nazwę organizacji.");
+    if (nameError) {
+      setOrganizationErrors({ name: nameError });
       toast({ title: "Nazwa jest wymagana", variant: "destructive" });
       return;
     }
+    setOrganizationErrors({});
     setIsSavingOrganization(true);
     const result = await updateOrganization(organization.id, { name });
     setIsSavingOrganization(false);
     if (!result.ok) {
+      setOrganizationErrors({ form: result.error ?? "Nie udało się zaktualizować organizacji." });
       toast({
-        title: "Nie udalo sie zaktualizowac organizacji",
-        description: result.error ?? "Sprobuj ponownie.",
+        title: "Nie udało się zaktualizować organizacji",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
     }
     setOrganizationEditOpen(false);
-    toast({ title: "Zaktualizowano organizacje" });
+    setOrganizationErrors({});
+    toast({ title: "Zaktualizowano organizację" });
   };
 
   const handleAddEvent = async () => {
-    if (!eventForm.name || !eventForm.location) return;
+    const nextErrors = {
+      name: validateRequired(eventForm.name, "Podaj nazwę wydarzenia."),
+      location: validateRequired(eventForm.location, "Podaj lokalizację wydarzenia."),
+      office_open_at: validateRequired(
+        eventForm.office_open_at,
+        "Podaj datę i godzinę otwarcia biura.",
+      ),
+      office_close_at: validateRequired(
+        eventForm.office_close_at,
+        "Podaj datę i godzinę zamknięcia biura.",
+      ),
+    };
+
+    if (
+      nextErrors.name ||
+      nextErrors.location ||
+      nextErrors.office_open_at ||
+      nextErrors.office_close_at
+    ) {
+      setEventErrors(nextErrors);
+      return;
+    }
+
     if (
       !eventForm.office_open_at ||
       !eventForm.office_close_at ||
@@ -343,13 +430,17 @@ export default function OrganizationDetails() {
         eventForm.office_close_at,
       )
     ) {
+      setEventErrors({
+        office_close_at: "Zamknięcie biura musi być później niż otwarcie.",
+      });
       toast({
-        title: "Nieprawidlowe godziny biura",
-        description: "Podaj poprawny czas otwarcia i zamkniecia biura zawodow.",
+        title: "Nieprawidłowe godziny biura",
+        description: "Podaj poprawny czas otwarcia i zamknięcia biura zawodów.",
         variant: "destructive",
       });
       return;
     }
+    setEventErrors({});
     setIsSubmittingEvent(true);
     const result = await createEvent({
       name: eventForm.name,
@@ -360,14 +451,16 @@ export default function OrganizationDetails() {
     });
     setIsSubmittingEvent(false);
     if (!result.ok) {
+      setEventErrors({ form: result.error ?? "Nie udało się utworzyć wydarzenia." });
       toast({
-        title: "Nie udalo sie utworzyc wydarzenia",
-        description: result.error ?? "Sprobuj ponownie.",
+        title: "Nie udało się utworzyć wydarzenia",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
     }
     setEventDialogOpen(false);
+    setEventErrors({});
     setEventForm({
       name: "",
       location: "",
@@ -387,8 +480,8 @@ export default function OrganizationDetails() {
     setIsSavingScannerAssignments(false);
     if (!result.ok) {
       toast({
-        title: "Nie udalo sie zapisac przypisan skanera",
-        description: result.error ?? "Sprobuj ponownie.",
+        title: "Nie udało się zapisać przypisań skanera",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
@@ -397,22 +490,39 @@ export default function OrganizationDetails() {
     toast({ title: "Zapisano przypisania skanera" });
   };
 
+  const handleChangeScannerRole = async (scanner: User, role: "scanner" | "scanner_plus") => {
+    const result = await changeRole(scanner.id, role);
+    if (!result.ok) {
+      toast({
+        title: "Nie udało się zmienić uprawnień skanera",
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: role === "scanner" ? "Skaner ma ograniczone uprawnienia" : "Skaner ma rozszerzone uprawnienia",
+      description: scanner.name,
+    });
+  };
+
   const handleDeleteOrganization = async () => {
     setIsDeletingOrganization(true);
     const result = await deleteOrganization(organization.id);
     setIsDeletingOrganization(false);
     if (!result.ok) {
       toast({
-        title: "Nie udalo sie usunac organizacji",
+        title: "Nie udało się usunąć organizacji",
         description:
           result.error ??
-          "Usun najpierw wydarzenia i uzytkownikow przypisanych do organizacji.",
+          "Usuń najpierw wydarzenia i użytkowników przypisanych do organizacji.",
         variant: "destructive",
       });
       return;
     }
     setDeleteOrganizationConfirmOpen(false);
-    toast({ title: "Organizacja usunieta" });
+    toast({ title: "Organizacja usunięta" });
     navigate("/organizations");
   };
 
@@ -425,8 +535,8 @@ export default function OrganizationDetails() {
 
     if (!result.ok) {
       toast({
-        title: "Nie udalo sie usunac konta",
-        description: result.error ?? "Sprobuj ponownie.",
+        title: "Nie udało się usunąć konta",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
@@ -438,10 +548,10 @@ export default function OrganizationDetails() {
     toast({
       title:
         archivedUser.role === "editor"
-          ? "Usunieto organizatora"
-          : "Usunieto skanera",
+          ? "Usunięto organizatora"
+          : "Usunięto skanera",
       description:
-        "Konto zostalo zarchiwizowane. Ta osoba nie zaloguje sie juz na stare konto, a ten email mozna wykorzystac ponownie.",
+        "Konto zostało zarchiwizowane. Ta osoba nie zaloguje się już na stare konto, a ten email można wykorzystać ponownie.",
     });
   };
 
@@ -454,8 +564,8 @@ export default function OrganizationDetails() {
 
     if (!result.ok) {
       toast({
-        title: "Nie udalo sie wyslac resetu hasla",
-        description: result.error ?? "Sprobuj ponownie.",
+        title: "Nie udało się wysłać resetu hasła",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
@@ -465,8 +575,8 @@ export default function OrganizationDetails() {
     setPasswordResetConfirmOpen(false);
     setSelectedActionUser(null);
     toast({
-      title: "Wyslano reset hasla",
-      description: `Email z resetem hasla zostal wyslany do ${targetUser.email}.`,
+      title: "Wysłano reset hasła",
+      description: `Email z resetem hasła został wysłany do ${targetUser.email}.`,
     });
   };
 
@@ -479,7 +589,7 @@ export default function OrganizationDetails() {
         className="w-fit touch-manipulation"
       >
         <ArrowLeft className="mr-1 h-4 w-4" />
-        Wroc do organizacji
+        Wróć do organizacji
       </Button>
 
       <div className="space-y-2">
@@ -504,7 +614,7 @@ export default function OrganizationDetails() {
                         setOrganizationNameDraft(organization.name);
                         setOrganizationEditOpen(true);
                       }}
-                      aria-label="Edytuj organizacje"
+                      aria-label="Edytuj organizację"
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -525,7 +635,7 @@ export default function OrganizationDetails() {
                   onClick={() => setDeleteOrganizationConfirmOpen(true)}
                 >
                   <Trash2 className="mr-1 h-4 w-4" />
-                  Usun organizacje
+                  Usuń organizację
                 </Button>
               )}
             </div>
@@ -547,7 +657,7 @@ export default function OrganizationDetails() {
                 size="icon"
                 className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
                 onClick={openLimitDialog}
-                aria-label="Edytuj limit wydarzen"
+                aria-label="Edytuj limit wydarzeń"
               >
                 <Pencil className="h-4 w-4" />
               </Button>
@@ -558,13 +668,13 @@ export default function OrganizationDetails() {
           icon={<Users className="h-4 w-4 text-primary" />}
           label="Organizatorzy"
           value={String(organizers.length)}
-          hint="Konta organizatorow"
+          hint="Konta organizatorów"
         />
         <SummaryStat
           icon={<Radio className="h-4 w-4 text-primary" />}
           label="Skanerzy"
           value={String(scanners.length)}
-          hint="Konta skanerow"
+          hint="Konta skanerów"
         />
         <SummaryStat
           icon={<Building2 className="h-4 w-4 text-primary" />}
@@ -580,7 +690,7 @@ export default function OrganizationDetails() {
             <h2 className="text-lg font-semibold tracking-tight">Wydarzenia</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Wszystkie wydarzenia przypisane do tej organizacji. Kliknij
-              wiersz, aby otworzyc szczegoly.
+              wiersz, aby otworzyć szczegóły.
             </p>
           </div>
           {canCreateEvent && (
@@ -596,8 +706,8 @@ export default function OrganizationDetails() {
         </div>
         {orgEvents.length === 0 ? (
           <EmptyTableState
-            title="Brak wydarzen"
-            description="Po dodaniu wydarzen pojawia sie tutaj ich lista."
+            title="Brak wydarzeń"
+            description="Po dodaniu wydarzeń pojawi się tutaj ich lista."
           />
         ) : (
           <>
@@ -628,7 +738,7 @@ export default function OrganizationDetails() {
                         }
                       }}
                       tabIndex={0}
-                      aria-label={`Otworz wydarzenie ${event.name}`}
+                      aria-label={`Otwórz wydarzenie ${event.name}`}
                     >
                       <TableCell>
                         <div>
@@ -652,7 +762,7 @@ export default function OrganizationDetails() {
               </Table>
             </div>
             <p className="text-xs text-muted-foreground">
-              {orgEvents.length} wydarzen
+              {orgEvents.length} wydarzeń
             </p>
           </>
         )}
@@ -665,7 +775,7 @@ export default function OrganizationDetails() {
               Organizatorzy
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Osoby, ktore zarzadzaja wydarzeniami tej organizacji.
+              Osoby, które zarządzają wydarzeniami tej organizacji.
             </p>
           </div>
           {canManageMembers && (
@@ -680,8 +790,8 @@ export default function OrganizationDetails() {
         </div>
         {organizers.length === 0 ? (
           <EmptyTableState
-            title="Brak organizatorow"
-            description="Po dodaniu organizatorow pojawia sie tutaj ich lista."
+            title="Brak organizatorów"
+            description="Po dodaniu organizatorów pojawi się tutaj ich lista."
           />
         ) : (
           <>
@@ -689,7 +799,7 @@ export default function OrganizationDetails() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Imie i nazwisko</TableHead>
+                    <TableHead>Imię i nazwisko</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead className="w-[140px]">Rola</TableHead>
                     {canManageMemberAccounts && (
@@ -721,7 +831,7 @@ export default function OrganizationDetails() {
                               onClick={() => openPasswordResetDialog(organizer)}
                             >
                               <KeyRound className="mr-1 h-3.5 w-3.5" />
-                              Reset hasla
+                              Reset hasła
                             </Button>
                             <Button
                               size="sm"
@@ -730,7 +840,7 @@ export default function OrganizationDetails() {
                               onClick={() => openArchiveUserDialog(organizer)}
                             >
                               <Trash2 className="mr-1 h-3.5 w-3.5" />
-                              Usun
+                              Usuń
                             </Button>
                           </div>
                         </TableCell>
@@ -741,7 +851,7 @@ export default function OrganizationDetails() {
               </Table>
             </div>
             <p className="text-xs text-muted-foreground">
-              {organizers.length} organizatorow
+              {organizers.length} organizatorów
             </p>
           </>
         )}
@@ -752,23 +862,33 @@ export default function OrganizationDetails() {
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Skanerzy</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Osoby, ktore pracuja na skanerze i maja przypisane wydarzenia.
+              Osoby, które pracują na skanerze i mają przypisane wydarzenia.
             </p>
           </div>
           {canManageScanners && (
-            <Button
-              onClick={() => openMemberDialog("scanner")}
-              className="h-11 w-full sm:h-10 sm:w-auto"
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              Dodaj skanera
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                onClick={() => openMemberDialog("scanner")}
+                className="h-11 w-full sm:h-10 sm:w-auto"
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Dodaj skanera
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => openMemberDialog("scanner_plus")}
+                className="h-11 w-full sm:h-10 sm:w-auto"
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Dodaj skanera plus
+              </Button>
+            </div>
           )}
         </div>
         {scanners.length === 0 ? (
           <EmptyTableState
-            title="Brak skanerow"
-            description="Po dodaniu skanerow pojawia sie tutaj ich lista."
+            title="Brak skanerów"
+            description="Po dodaniu skanerów pojawi się tutaj ich lista."
           />
         ) : (
           <>
@@ -776,10 +896,11 @@ export default function OrganizationDetails() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Imie i nazwisko</TableHead>
+                    <TableHead>Imię i nazwisko</TableHead>
                     <TableHead className="hidden md:table-cell">
                       Email
                     </TableHead>
+                    <TableHead>Uprawnienia</TableHead>
                     <TableHead>Przypisane wydarzenia</TableHead>
                     {canManageScanners && (
                       <TableHead className="w-[300px]">Akcje</TableHead>
@@ -802,6 +923,11 @@ export default function OrganizationDetails() {
                       <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
                         {scanner.email}
                       </TableCell>
+                      <TableCell>
+                        <Badge variant={scanner.role === "scanner_plus" ? "default" : "secondary"}>
+                          {getScannerPermissionLabel(scanner.role)}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {getEventNames(scanner.assigned_events)}
                       </TableCell>
@@ -818,6 +944,16 @@ export default function OrganizationDetails() {
                             >
                               Przypisz wydarzenia
                             </Button>
+                            {scanner.role === "scanner_plus" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 w-full rounded-lg px-2.5 text-xs sm:w-auto"
+                                onClick={() => void handleChangeScannerRole(scanner, "scanner")}
+                              >
+                                Zmień na zwykły skaner
+                              </Button>
+                            )}
                             {canManageMemberAccounts && (
                               <>
                                 <Button
@@ -829,7 +965,7 @@ export default function OrganizationDetails() {
                                   }
                                 >
                                   <KeyRound className="mr-1 h-3.5 w-3.5" />
-                                  Reset hasla
+                                  Reset hasła
                                 </Button>
                                 <Button
                                   size="sm"
@@ -838,7 +974,7 @@ export default function OrganizationDetails() {
                                   onClick={() => openArchiveUserDialog(scanner)}
                                 >
                                   <Trash2 className="mr-1 h-3.5 w-3.5" />
-                                  Usun
+                                  Usuń
                                 </Button>
                               </>
                             )}
@@ -851,37 +987,83 @@ export default function OrganizationDetails() {
               </Table>
             </div>
             <p className="text-xs text-muted-foreground">
-              {scanners.length} skanerow
+              {scanners.length} skanerów
             </p>
           </>
         )}
       </section>
 
+      <section className="rounded-xl border border-dashed px-4 py-5 sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Archive className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-base font-semibold tracking-tight">
+                Archiwum wydarzeń
+              </h2>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Zamknięte wydarzenia tej organizacji są ukryte z aktywnych list i
+              dostępne tutaj do podglądu.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            className="h-11 w-full sm:h-10 sm:w-auto"
+            onClick={() => navigate(`/organizations/${organization.id}/archived-events`)}
+          >
+            Otwórz archiwum ({orgArchivedEvents.length})
+          </Button>
+        </div>
+      </section>
+
       <Dialog
         open={organizationEditOpen}
-        onOpenChange={setOrganizationEditOpen}
+        onOpenChange={(open) => {
+          setOrganizationEditOpen(open);
+          if (!open) setOrganizationErrors({});
+        }}
       >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edytuj organizacje</DialogTitle>
+            <DialogTitle>Edytuj organizację</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Nazwa organizacji</Label>
+              <Label htmlFor="organization-edit-name">Nazwa organizacji</Label>
               <Input
+                id="organization-edit-name"
                 value={organizationNameDraft}
-                onChange={(event) =>
-                  setOrganizationNameDraft(event.target.value)
-                }
+                onChange={(event) => {
+                  setOrganizationNameDraft(event.target.value);
+                  setOrganizationErrors((prev) => ({
+                    ...prev,
+                    name: undefined,
+                    form: undefined,
+                  }));
+                }}
                 className="mt-2"
+                required
+                aria-invalid={Boolean(organizationErrors.name)}
+                aria-describedby={
+                  organizationErrors.name
+                    ? "organization-edit-name-error"
+                    : undefined
+                }
               />
+              <FieldError id="organization-edit-name-error" className="mt-2">
+                {organizationErrors.name}
+              </FieldError>
             </div>
+            <FieldError id="organization-edit-form-error">
+              {organizationErrors.form}
+            </FieldError>
           </div>
           <DialogFooter>
             <Button
               className="w-full sm:w-auto"
               onClick={handleSaveOrganization}
-              disabled={!organizationNameDraft.trim() || isSavingOrganization}
+              disabled={isSavingOrganization}
             >
               Zapisz zmiany
             </Button>
@@ -889,26 +1071,55 @@ export default function OrganizationDetails() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={limitDialogOpen} onOpenChange={setLimitDialogOpen}>
+      <Dialog
+        open={limitDialogOpen}
+        onOpenChange={(open) => {
+          setLimitDialogOpen(open);
+          if (!open) setLimitErrors({});
+        }}
+      >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Limit wydarzen</DialogTitle>
+            <DialogTitle>Limit wydarzeń</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Limit wydarzen dla organizacji</Label>
+              <Label htmlFor="organization-event-limit">
+                Limit wydarzeń dla organizacji
+              </Label>
               <Input
+                id="organization-event-limit"
                 type="number"
                 min={String(orgEvents.length)}
                 value={limitDraft || String(organization.event_limit)}
-                onChange={(event) => setLimitDraft(event.target.value)}
+                onChange={(event) => {
+                  setLimitDraft(event.target.value);
+                  setLimitErrors((prev) => ({
+                    ...prev,
+                    event_limit: undefined,
+                    form: undefined,
+                  }));
+                }}
                 className="mt-2"
+                required
+                aria-invalid={Boolean(limitErrors.event_limit)}
+                aria-describedby={
+                  limitErrors.event_limit
+                    ? "organization-event-limit-error"
+                    : undefined
+                }
               />
+              <FieldError id="organization-event-limit-error" className="mt-2">
+                {limitErrors.event_limit}
+              </FieldError>
             </div>
             <p className="text-xs text-muted-foreground">
-              Minimalny dozwolony limit to {orgEvents.length}, bo tyle wydarzen
-              jest juz przypisanych do tej organizacji.
+              Minimalny dozwolony limit to {orgEvents.length}, bo tyle wydarzeń
+              jest już przypisanych do tej organizacji.
             </p>
+            <FieldError id="organization-limit-form-error">
+              {limitErrors.form}
+            </FieldError>
           </div>
           <DialogFooter>
             <Button className="w-full sm:w-auto" onClick={handleSaveLimit}>
@@ -924,14 +1135,14 @@ export default function OrganizationDetails() {
       >
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Usunac organizacje?</AlertDialogTitle>
+            <AlertDialogTitle>Usunąć organizację?</AlertDialogTitle>
             <AlertDialogDescription>
               Organizacja{" "}
               <span className="font-medium text-foreground">
                 {organization.name}
               </span>{" "}
-              zostanie usunieta tylko wtedy, gdy nie ma juz przypisanych
-              wydarzen ani uzytkownikow. Tej operacji nie da sie cofnac.
+              zostanie usunięta tylko wtedy, gdy nie ma już przypisanych
+              wydarzeń ani użytkowników. Tej operacji nie da się cofnąć.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -941,7 +1152,7 @@ export default function OrganizationDetails() {
               disabled={isDeletingOrganization || !canDeleteOrganization}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Usun organizacje
+              Usuń organizację
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -958,15 +1169,15 @@ export default function OrganizationDetails() {
       >
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Usunac konto?</AlertDialogTitle>
+            <AlertDialogTitle>Usunąć konto?</AlertDialogTitle>
             <AlertDialogDescription>
               Konto{" "}
               <span className="font-medium text-foreground">
                 {selectedActionUser?.name}
               </span>{" "}
-              zostanie usuniete z widoku organizacji. W backendzie konto
-              zostanie zarchiwizowane, ta osoba nie zaloguje sie juz na stare
-              konto, a ten email bedzie mozna wykorzystac ponownie.
+              zostanie usunięte z widoku organizacji. W backendzie konto
+              zostanie zarchiwizowane, ta osoba nie zaloguje się już na stare
+              konto, a ten email będzie można wykorzystać ponownie.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -976,7 +1187,7 @@ export default function OrganizationDetails() {
               disabled={isArchivingUser || !selectedActionUser}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Usun konto
+              Usuń konto
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -993,13 +1204,13 @@ export default function OrganizationDetails() {
       >
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Wyslac reset hasla?</AlertDialogTitle>
+            <AlertDialogTitle>Wysłać reset hasła?</AlertDialogTitle>
             <AlertDialogDescription>
               Do{" "}
               <span className="font-medium text-foreground">
                 {selectedActionUser?.email}
               </span>{" "}
-              zostanie wyslany email z linkiem do ustawienia nowego hasla dla
+              zostanie wysłany email z linkiem do ustawienia nowego hasła dla
               konta{" "}
               <span className="font-medium text-foreground">
                 {selectedActionUser?.name}
@@ -1013,53 +1224,92 @@ export default function OrganizationDetails() {
               onClick={() => void handleTriggerPasswordReset()}
               disabled={isSendingPasswordReset || !selectedActionUser}
             >
-              Wyslij reset hasla
+              Wyślij reset hasła
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={memberDialogOpen} onOpenChange={setMemberDialogOpen}>
+      <Dialog
+        open={memberDialogOpen}
+        onOpenChange={(open) => {
+          setMemberDialogOpen(open);
+          if (!open) setMemberErrors({});
+        }}
+      >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {memberForm.role === "editor"
                 ? "Dodaj organizatora"
-                : "Dodaj skanera"}
+                : `Dodaj ${getRoleLabel(memberForm.role).toLocaleLowerCase("pl-PL")}`}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Imie i nazwisko</Label>
+              <Label htmlFor="organization-member-name">Imię i nazwisko</Label>
               <Input
+                id="organization-member-name"
                 value={memberForm.name}
-                onChange={(event) =>
+                onChange={(event) => {
                   setMemberForm((prev) => ({
                     ...prev,
                     name: event.target.value,
-                  }))
-                }
+                  }));
+                  setMemberErrors((prev) => ({
+                    ...prev,
+                    name: undefined,
+                    form: undefined,
+                  }));
+                }}
                 className="mt-2"
+                required
+                aria-invalid={Boolean(memberErrors.name)}
+                aria-describedby={
+                  memberErrors.name
+                    ? "organization-member-name-error"
+                    : undefined
+                }
               />
+              <FieldError id="organization-member-name-error" className="mt-2">
+                {memberErrors.name}
+              </FieldError>
             </div>
             <div>
-              <Label>Email</Label>
+              <Label htmlFor="organization-member-email">Email</Label>
               <Input
+                id="organization-member-email"
+                type="email"
                 value={memberForm.email}
-                onChange={(event) =>
+                onChange={(event) => {
                   setMemberForm((prev) => ({
                     ...prev,
                     email: event.target.value,
-                  }))
-                }
+                  }));
+                  setMemberErrors((prev) => ({
+                    ...prev,
+                    email: undefined,
+                    form: undefined,
+                  }));
+                }}
                 className="mt-2"
+                required
+                aria-invalid={Boolean(memberErrors.email)}
+                aria-describedby={
+                  memberErrors.email
+                    ? "organization-member-email-error"
+                    : undefined
+                }
               />
+              <FieldError id="organization-member-email-error" className="mt-2">
+                {memberErrors.email}
+              </FieldError>
             </div>
             <p className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              Po zapisaniu konto zostanie utworzone, a uzytkownik dostanie mail
-              z linkiem do ustawienia hasla.
+              Po zapisaniu konto zostanie utworzone, a użytkownik dostanie mail
+              z linkiem do ustawienia hasła.
             </p>
-            {memberForm.role === "scanner" && orgEvents.length > 0 && (
+            {isScannerRole(memberForm.role) && orgEvents.length > 0 && (
               <div className="space-y-2">
                 <Label>Przypisane wydarzenia</Label>
                 <div className="space-y-2 rounded-xl border p-3">
@@ -1080,14 +1330,15 @@ export default function OrganizationDetails() {
                 </div>
               </div>
             )}
+            <FieldError id="organization-member-form-error">
+              {memberErrors.form}
+            </FieldError>
           </div>
           <DialogFooter>
             <Button
               className="w-full sm:w-auto"
               onClick={handleAddMember}
-              disabled={
-                !memberForm.name || !memberForm.email || isSubmittingMember
-              }
+              disabled={isSubmittingMember}
             >
               <Plus className="mr-1 h-4 w-4" />
               Zapisz
@@ -1140,80 +1391,157 @@ export default function OrganizationDetails() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
+      <Dialog
+        open={eventDialogOpen}
+        onOpenChange={(open) => {
+          setEventDialogOpen(open);
+          if (!open) setEventErrors({});
+        }}
+      >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Dodaj wydarzenie</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Nazwa</Label>
+              <Label htmlFor="organization-event-name">Nazwa</Label>
               <Input
+                id="organization-event-name"
                 value={eventForm.name}
-                onChange={(event) =>
+                onChange={(event) => {
                   setEventForm((prev) => ({
                     ...prev,
                     name: event.target.value,
-                  }))
-                }
+                  }));
+                  setEventErrors((prev) => ({
+                    ...prev,
+                    name: undefined,
+                    form: undefined,
+                  }));
+                }}
                 className="mt-2"
+                required
+                aria-invalid={Boolean(eventErrors.name)}
+                aria-describedby={
+                  eventErrors.name ? "organization-event-name-error" : undefined
+                }
               />
+              <FieldError id="organization-event-name-error" className="mt-2">
+                {eventErrors.name}
+              </FieldError>
             </div>
             <div>
-              <Label>Lokalizacja</Label>
+              <Label htmlFor="organization-event-location">Lokalizacja</Label>
               <Input
+                id="organization-event-location"
                 value={eventForm.location}
-                onChange={(event) =>
+                onChange={(event) => {
                   setEventForm((prev) => ({
                     ...prev,
                     location: event.target.value,
-                  }))
-                }
+                  }));
+                  setEventErrors((prev) => ({
+                    ...prev,
+                    location: undefined,
+                    form: undefined,
+                  }));
+                }}
                 className="mt-2"
+                required
+                aria-invalid={Boolean(eventErrors.location)}
+                aria-describedby={
+                  eventErrors.location
+                    ? "organization-event-location-error"
+                    : undefined
+                }
               />
+              <FieldError
+                id="organization-event-location-error"
+                className="mt-2"
+              >
+                {eventErrors.location}
+              </FieldError>
             </div>
             <div>
-              <Label>Data i godzina otwarcia biura zawodow</Label>
-              <Input
-                type="datetime-local"
+              <Label htmlFor="organization-event-office-open">
+                Data i godzina otwarcia biura zawodów
+              </Label>
+              <DateTimePicker
+                id="organization-event-office-open"
                 value={eventForm.office_open_at}
-                onChange={(event) =>
+                onChange={(value) => {
                   setEventForm((prev) => ({
                     ...prev,
-                    office_open_at: event.target.value,
-                  }))
-                }
+                    office_open_at: value,
+                  }));
+                  setEventErrors((prev) => ({
+                    ...prev,
+                    office_open_at: undefined,
+                    office_close_at: undefined,
+                    form: undefined,
+                  }));
+                }}
                 className="mt-2"
+                aria-invalid={Boolean(eventErrors.office_open_at)}
+                aria-describedby={
+                  eventErrors.office_open_at
+                    ? "organization-event-office-open-error"
+                    : undefined
+                }
               />
+              <FieldError
+                id="organization-event-office-open-error"
+                className="mt-2"
+              >
+                {eventErrors.office_open_at}
+              </FieldError>
             </div>
             <div>
-              <Label>Data i godzina zamkniecia biura zawodow</Label>
-              <Input
-                type="datetime-local"
+              <Label htmlFor="organization-event-office-close">
+                Data i godzina zamknięcia biura zawodów
+              </Label>
+              <DateTimePicker
+                id="organization-event-office-close"
                 value={eventForm.office_close_at}
-                onChange={(event) =>
+                onChange={(value) => {
                   setEventForm((prev) => ({
                     ...prev,
-                    office_close_at: event.target.value,
-                  }))
-                }
+                    office_close_at: value,
+                  }));
+                  setEventErrors((prev) => ({
+                    ...prev,
+                    office_close_at: undefined,
+                    form: undefined,
+                  }));
+                }}
                 className="mt-2"
+                aria-invalid={Boolean(eventErrors.office_close_at)}
+                aria-describedby={
+                  eventErrors.office_close_at
+                    ? "organization-event-office-close-error"
+                    : undefined
+                }
               />
+              <FieldError
+                id="organization-event-office-close-error"
+                className="mt-2"
+              >
+                {eventErrors.office_close_at}
+              </FieldError>
             </div>
             <p className="text-xs text-muted-foreground">
               Limit organizacji: {orgEvents.length}/{organization.event_limit}{" "}
-              wydarzen.
+              wydarzeń.
             </p>
+            <FieldError id="organization-event-form-error">
+              {eventErrors.form}
+            </FieldError>
           </div>
           <DialogFooter>
             <Button
               className="w-full sm:w-auto"
               onClick={handleAddEvent}
               disabled={
-                !eventForm.name ||
-                !eventForm.location ||
-                !eventForm.office_open_at ||
-                !eventForm.office_close_at ||
                 remainingSlots <= 0 ||
                 isSubmittingEvent
               }

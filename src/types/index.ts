@@ -1,4 +1,4 @@
-export type Role = 'superadmin' | 'admin' | 'editor' | 'scanner';
+export type Role = 'superadmin' | 'admin' | 'editor' | 'scanner' | 'scanner_plus';
 
 export type ParticipantStatus = 'not_checked_in' | 'checked_in' | 'checked_in_not_starting';
 export type EmailStatus = 'not_sent' | 'sent';
@@ -19,6 +19,7 @@ export interface Event {
   organization_id: string;
   office_open_at: string;
   office_close_at: string;
+  archived_at?: string | null;
 }
 
 export interface Participant {
