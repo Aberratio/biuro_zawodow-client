@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FieldError } from '@/components/ui/field-error';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, FileUp, Loader2, Mail, RefreshCcw, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { formatEventOfficeWindow } from '@/lib/events';
+import { validateRequired } from '@/lib/form-validation';
 
 type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom';
 
@@ -76,6 +78,7 @@ export default function CsvImport() {
   const [mappingDrafts, setMappingDrafts] = useState<MappingDraft[]>([]);
   const [runningAction, setRunningAction] = useState<'analyze' | 'confirm' | 'run' | ''>('');
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof runParticipantImport>> | null>(null);
+  const [mappingErrors, setMappingErrors] = useState<{ emailColumn?: string; aliases: Record<string, string>; form?: string }>({ aliases: {} });
 
   useEffect(() => {
     if (routeEventId) {
@@ -126,6 +129,7 @@ export default function CsvImport() {
     setFileName(file.name);
     setCsvContent(text);
     setSummary(null);
+    setMappingErrors({ aliases: {} });
 
     try {
       setRunningAction('analyze');
@@ -146,24 +150,38 @@ export default function CsvImport() {
 
   const handleFieldChange = (sourceColumnName: string, patch: Partial<MappingDraft>) => {
     setMappingDrafts(prev => prev.map(field => field.source_column_name === sourceColumnName ? { ...field, ...patch } : field));
+    setMappingErrors(prev => ({
+      ...prev,
+      aliases: { ...prev.aliases, [sourceColumnName]: '' },
+      form: undefined,
+    }));
   };
 
   const handleSaveMappingAndImport = async () => {
     if (!analysis) return;
     if (!selectedEmailColumn) {
+      setMappingErrors(prev => ({ ...prev, emailColumn: 'Wybierz kolumnę email.' }));
       toast({ title: 'Wybierz kolumnę email', variant: 'destructive' });
       return;
     }
     if (displayNamePartsCount === 0) {
+      setMappingErrors(prev => ({ ...prev, form: 'Wskaż przynajmniej jedną część nazwy uczestnika.' }));
       toast({ title: 'Wskaż przynajmniej jedną część nazwy uczestnika', variant: 'destructive' });
       return;
     }
-    if (activeDrafts.some(field => field.alias.trim() === '')) {
+    const aliasErrors = activeDrafts.reduce<Record<string, string>>((accumulator, field) => {
+      const error = validateRequired(field.alias, 'Alias jest wymagany.');
+      if (error) accumulator[field.source_column_name] = error;
+      return accumulator;
+    }, {});
+    if (Object.values(aliasErrors).some(Boolean)) {
+      setMappingErrors({ aliases: aliasErrors });
       toast({ title: 'Uzupełnij aliasy aktywnych kolumn', variant: 'destructive' });
       return;
     }
 
     try {
+      setMappingErrors({ aliases: {} });
       setRunningAction('confirm');
       await confirmParticipantImportMapping(eventId, {
         csv_columns: analysis.headers,
@@ -181,6 +199,10 @@ export default function CsvImport() {
       setSummary(result);
       toast({ title: `Dodano ${result.created_count} uczestników` });
     } catch (error) {
+      setMappingErrors({
+        aliases: {},
+        form: error instanceof Error ? error.message : 'Nie udało się zapisać mapowania lub zaimportować danych.',
+      });
       toast({
         title: 'Import nie powiódł się',
         description: error instanceof Error ? error.message : 'Nie udało się zapisać mapowania lub zaimportować danych.',
@@ -284,9 +306,20 @@ export default function CsvImport() {
               </div>
               {!analysis.has_mapping && multipleEmailCandidates && (
                 <div className="max-w-sm">
-                  <Label>Wskaż kolumnę email użytkownika</Label>
-                  <Select value={selectedEmailColumn} onValueChange={setSelectedEmailColumn}>
-                    <SelectTrigger className="mt-2">
+                  <Label htmlFor="csv-email-column">Wskaż kolumnę email użytkownika</Label>
+                  <Select
+                    value={selectedEmailColumn}
+                    onValueChange={value => {
+                      setSelectedEmailColumn(value);
+                      setMappingErrors(prev => ({ ...prev, emailColumn: undefined, form: undefined }));
+                    }}
+                  >
+                    <SelectTrigger
+                      id="csv-email-column"
+                      className="mt-2"
+                      aria-invalid={Boolean(mappingErrors.emailColumn)}
+                      aria-describedby={mappingErrors.emailColumn ? 'csv-email-column-error' : undefined}
+                    >
                       <SelectValue placeholder="Wybierz kolumnę email" />
                     </SelectTrigger>
                     <SelectContent>
@@ -295,6 +328,7 @@ export default function CsvImport() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <FieldError id="csv-email-column-error" className="mt-2">{mappingErrors.emailColumn}</FieldError>
                 </div>
               )}
               {!analysis.has_mapping && !multipleEmailCandidates && selectedEmailColumn && (
@@ -315,27 +349,32 @@ export default function CsvImport() {
                   Dla każdej istotnej kolumny wpisz alias i przypisz rolę. Przynajmniej jedna kolumna musi budować nazwę uczestnika.
                 </p>
                 <div className="space-y-3">
-                  {mappingDrafts.map(field => (
+                  {mappingDrafts.map((field, index) => (
                     <div key={field.source_column_name} className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr] items-end border rounded-lg p-3">
                       <div>
-                        <Label>Nazwa w CSV</Label>
-                        <Input value={field.source_column_name} disabled className="mt-2" />
+                        <Label htmlFor={`csv-source-column-${index}`}>Nazwa w CSV</Label>
+                        <Input id={`csv-source-column-${index}`} value={field.source_column_name} disabled className="mt-2" />
                       </div>
                       <div>
-                        <Label>Alias</Label>
+                        <Label htmlFor={`csv-alias-${index}`}>Alias</Label>
                         <Input
+                          id={`csv-alias-${index}`}
                           value={field.alias}
                           onChange={eventValue => handleFieldChange(field.source_column_name, { alias: eventValue.target.value })}
                           className="mt-2"
+                          required={field.field_role !== 'ignore'}
+                          aria-invalid={Boolean(mappingErrors.aliases[field.source_column_name])}
+                          aria-describedby={mappingErrors.aliases[field.source_column_name] ? `csv-alias-${index}-error` : undefined}
                         />
+                        <FieldError id={`csv-alias-${index}-error`} className="mt-2">{mappingErrors.aliases[field.source_column_name]}</FieldError>
                       </div>
                       <div>
-                        <Label>Rola</Label>
+                        <Label htmlFor={`csv-role-${index}`}>Rola</Label>
                         <Select
                           value={field.field_role}
                           onValueChange={value => handleFieldChange(field.source_column_name, { field_role: value as EditableFieldRole })}
                         >
-                          <SelectTrigger className="mt-2">
+                          <SelectTrigger id={`csv-role-${index}`} className="mt-2">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -349,6 +388,7 @@ export default function CsvImport() {
                     </div>
                   ))}
                 </div>
+                <FieldError id="csv-mapping-form-error">{mappingErrors.form}</FieldError>
               </CardContent>
             </Card>
           )}

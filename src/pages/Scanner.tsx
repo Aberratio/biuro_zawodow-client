@@ -11,6 +11,8 @@ import ParticipantSearch from '@/components/ParticipantSearch';
 import ScannerSkeleton from '@/components/skeletons/ScannerSkeleton';
 import { getParticipantStatusDefinition, participantCountsAsCheckedIn } from '@/lib/participant-status';
 import { Navigate } from 'react-router-dom';
+import { formatEventOfficeWindow, isEventOfficeOpen } from '@/lib/events';
+import { isScannerRole } from '@/lib/roles';
 
 type ScannerView = 'idle' | 'success' | 'error' | 'detail';
 
@@ -25,6 +27,7 @@ export default function Scanner() {
   const [errorMessage, setErrorMessage] = useState('Nie znaleziono uczestnika dla tego kodu QR.');
   const successTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const selectedEvent = visibleEvents.find(event => event.id === selectedEventId) ?? null;
+  const scannerAvailable = selectedEvent !== null && isEventOfficeOpen(selectedEvent);
   const activeEventId = selectedEvent?.id ?? selectedEventId;
 
   const eventParticipants = useMemo(
@@ -113,7 +116,7 @@ export default function Scanner() {
 
   if (isLoading) return <ScannerSkeleton />;
 
-  if (!hasActiveEvents && currentRole === 'scanner') {
+  if (!hasActiveEvents && isScannerRole(currentRole)) {
     return <Navigate to="/scanner-info" replace />;
   }
 
@@ -128,6 +131,25 @@ export default function Scanner() {
                 ? 'Do wybranej organizacji nie dodano jeszcze wydarzeń. Dodaj je w zakładce Wydarzenia.'
                 : 'Wybierz wydarzenie z menu bocznego, aby uruchomić skaner.'}
             </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!scannerAvailable) {
+    return (
+      <div className="mx-auto max-w-xl px-4 md:px-0">
+        <Card className="border-dashed">
+          <CardContent className="py-10 text-center">
+            <p className="text-base font-semibold">Skaner jest teraz niedostępny</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Skaner można uruchomić tylko w godzinach otwarcia biura zawodów dla wybranego wydarzenia.
+            </p>
+            <div className="mt-5 rounded-xl border bg-muted/30 px-4 py-3 text-left text-sm">
+              <p className="font-medium text-foreground">{selectedEvent.name}</p>
+              <p className="mt-1 text-muted-foreground">Biuro: {formatEventOfficeWindow(selectedEvent)}</p>
+            </div>
           </CardContent>
         </Card>
       </div>

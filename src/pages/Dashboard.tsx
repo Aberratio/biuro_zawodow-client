@@ -18,6 +18,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   const currentEvent = visibleEvents.find(event => event.id === selectedEventId);
+  const currentEventOfficeOpen = currentEvent ? isEventOfficeOpen(currentEvent) : false;
   const dashboardEvents = currentRole === 'superadmin' ? events : visibleEvents;
 
   const organizationNames = useMemo(
@@ -308,21 +309,34 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="py-3">
-          <div className="flex items-start gap-2">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <p>Witaj! Kliknij <strong>"Przejdź do skanera"</strong>, aby rozpocząć odprawę uczestników.</p>
-              <p>Możesz skanować kody QR kamerą lub wyszukać zawodnika ręcznie po nazwisku albo numerze.</p>
+      {currentEvent && (
+        <Card className={currentEventOfficeOpen ? 'border-primary/20 bg-primary/5' : 'border-dashed bg-muted/30'}>
+          <CardContent className="py-3">
+            <div className="flex items-start gap-2">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <div className="space-y-1 text-xs text-muted-foreground">
+                {currentEventOfficeOpen ? (
+                  <>
+                    <p>Witaj! Kliknij <strong>"Przejdź do skanera"</strong>, aby rozpocząć odprawę uczestników.</p>
+                    <p>Możesz skanować kody QR kamerą lub wyszukać zawodnika ręcznie po nazwisku albo numerze.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-foreground">Skaner jest dostępny tylko w godzinach otwarcia biura zawodów.</p>
+                    <p>Dla wybranego wydarzenia biuro nie jest teraz otwarte, więc wejście do skanera jest ukryte.</p>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      <Button size="lg" className="h-14 w-full gap-3 text-base touch-manipulation active:scale-[0.98] sm:h-16 sm:text-lg" onClick={() => navigate('/scanner')}>
-        <ScanLine className="h-5 w-5 sm:h-6 sm:w-6" /> Przejdź do skanera
-      </Button>
+      {currentEventOfficeOpen && (
+        <Button size="lg" className="h-14 w-full gap-3 text-base touch-manipulation active:scale-[0.98] sm:h-16 sm:text-lg" onClick={() => navigate('/scanner')}>
+          <ScanLine className="h-5 w-5 sm:h-6 sm:w-6" /> Przejdź do skanera
+        </Button>
+      )}
 
       <Card>
         <CardHeader><CardTitle className="text-base">Ostatnie skany</CardTitle></CardHeader>
@@ -334,7 +348,9 @@ export default function Dashboard() {
             </div>
           ))}
           {activityLog.filter(log => log.action === 'Check-in').length === 0 && (
-            <p className="py-4 text-center text-sm text-muted-foreground">Brak skanów - przejdź do skanera, aby rozpocząć odprawę</p>
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              {currentEventOfficeOpen ? 'Brak skanów - przejdź do skanera, aby rozpocząć odprawę' : 'Brak skanów dla aktualnego zakresu.'}
+            </p>
           )}
         </CardContent>
       </Card>

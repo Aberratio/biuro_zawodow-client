@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useData } from '@/contexts/DataContext';
 import { formatEventOfficeStart, getEventOfficeOpenAt } from '@/lib/events';
+import { isScannerRole } from '@/lib/roles';
 
 function formatCountdown(milliseconds: number): string {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
@@ -24,7 +25,7 @@ export default function ScannerInfo() {
   }, []);
 
   const upcomingAssignedEvents = useMemo(() => {
-    if (currentRole !== 'scanner') return [];
+    if (!isScannerRole(currentRole)) return [];
 
     const now = new Date(nowTimestamp);
     return events
@@ -122,7 +123,7 @@ export default function ScannerInfo() {
         </Card>
       )}
 
-      {currentRole === 'scanner' && visibleEvents.length > 0 && (
+      {isScannerRole(currentRole) && visibleEvents.length > 0 && (
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="px-6 py-4 text-sm text-muted-foreground">
             Aktywne zawody są już dostępne. Możesz przejść do skanera lub uczestników z menu.

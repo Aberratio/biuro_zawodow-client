@@ -21,9 +21,11 @@ import {
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { FieldError } from '@/components/ui/field-error';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { buildParticipantFieldValues, getActiveParticipantMappings } from '@/lib/participant-fields';
 import { getParticipantStatusDefinition, PARTICIPANT_STATUS_DEFINITIONS } from '@/lib/participant-status';
+import { validateEmail, validateRequired } from '@/lib/form-validation';
 
 function formatParticipantDateTime(value: string): string {
   const normalizedValue = value.includes(' ') ? value.replace(' ', 'T') : value;
@@ -66,12 +68,14 @@ export default function ParticipantDetails() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [transferEmail, setTransferEmail] = useState('');
   const [transferFields, setTransferFields] = useState<Record<string, string>>({});
+  const [transferErrors, setTransferErrors] = useState<{ email?: string; fields: Record<string, string>; form?: string }>({ fields: {} });
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [isSendingQr, setIsSendingQr] = useState(false);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSavingTransfer, setIsSavingTransfer] = useState(false);
   const [isDeletingParticipant, setIsDeletingParticipant] = useState(false);
-  const canManage = currentRole === 'editor' || currentRole === 'admin' || currentRole === 'superadmin';
+  const canManageParticipantData = currentRole === 'editor' || currentRole === 'admin' || currentRole === 'superadmin' || currentRole === 'scanner_plus';
+  const canUseAdminActions = currentRole === 'editor' || currentRole === 'admin' || currentRole === 'superadmin';
 
   useEffect(() => {
     if (!participant) return;
@@ -80,7 +84,7 @@ export default function ParticipantDetails() {
   }, [participant]);
 
   useEffect(() => {
-    if (!participant?.event_id || !canManage) return;
+    if (!participant?.event_id || !canManageParticipantData) return;
 
     void getParticipantFieldMappings(participant.event_id)
       .then(data => {
@@ -91,10 +95,10 @@ export default function ParticipantDetails() {
         setMappings([]);
         setTransferFields({});
       });
-  }, [canManage, getParticipantFieldMappings, participant]);
+  }, [canManageParticipantData, getParticipantFieldMappings, participant]);
 
   useEffect(() => {
-    if (!participant?.id || !canManage) return;
+    if (!participant?.id || !canUseAdminActions) return;
 
     setIsQrLoading(true);
     void getParticipantQrPreview(participant.id)
@@ -103,7 +107,7 @@ export default function ParticipantDetails() {
         toast({ title: 'Nie udało się pobrać podglądu QR', description: error instanceof Error ? error.message : 'Błąd API', variant: 'destructive' });
       })
       .finally(() => setIsQrLoading(false));
-  }, [canManage, getParticipantQrPreview, participant?.id]);
+  }, [canUseAdminActions, getParticipantQrPreview, participant?.id]);
 
   const activeMappings = useMemo(() => getActiveParticipantMappings(mappings), [mappings]);
 
@@ -159,32 +163,38 @@ export default function ParticipantDetails() {
 
   const handleTransferFieldChange = (alias: string, value: string) => {
     setTransferFields(previous => ({ ...previous, [alias]: value }));
+    setTransferErrors(previous => ({ ...previous, fields: { ...previous.fields, [alias]: '' }, form: undefined }));
   };
 
   const handleTransferSubmit = async () => {
-    const missingFields = activeMappings
-      .filter(mapping => (mapping.field_role !== 'bib_number') && !(transferFields[mapping.alias] ?? '').trim())
-      .map(mapping => mapping.alias);
+    const fieldErrors = activeMappings.reduce<Record<string, string>>((accumulator, mapping) => {
+      if (mapping.field_role === 'bib_number') return accumulator;
+      const error = validateRequired(transferFields[mapping.alias] ?? '', `Uzupełnij pole: ${mapping.alias}.`);
+      if (error) accumulator[mapping.alias] = error;
+      return accumulator;
+    }, {});
+    const nextErrors = {
+      email: validateEmail(transferEmail),
+      fields: fieldErrors,
+    };
 
-    if (!transferEmail.trim()) {
-      toast({ title: 'Email jest wymagany', variant: 'destructive' });
+    if (nextErrors.email || Object.values(fieldErrors).some(Boolean)) {
+      setTransferErrors(nextErrors);
       return;
     }
 
-    if (missingFields.length > 0) {
-      toast({ title: 'Uzupełnij wszystkie pola uczestnika', description: missingFields.join(', '), variant: 'destructive' });
-      return;
-    }
-
+    setTransferErrors({ fields: {} });
     setIsSavingTransfer(true);
     try {
       const result = await reassignParticipantPackage(participant.id, transferEmail, transferFields);
       if (!result.ok) {
+        setTransferErrors({ fields: {}, form: result.error ?? 'Nie udało się przepisać pakietu.' });
         toast({ title: 'Nie udało się przepisać pakietu', description: result.error, variant: 'destructive' });
         return;
       }
 
       setTransferOpen(false);
+      setTransferErrors({ fields: {} });
       toast({ title: 'Pakiet przepisany na nową osobę' });
     } finally {
       setIsSavingTransfer(false);
@@ -218,21 +228,23 @@ export default function ParticipantDetails() {
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">{participant.email}</p>
           {event && <p className="text-xs text-muted-foreground mt-1">{event.name}</p>}
         </div>
-        {canManage && (
+        {canManageParticipantData && (
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
             <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setTransferOpen(true)}>
               <UserRoundCog className="h-4 w-4 mr-1" />
               Przepisz pakiet na inną osobę
             </Button>
+            {canUseAdminActions && (
             <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setSendQrConfirmOpen(true)} disabled={isSendingQr}>
               {isSendingQr ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Repeat className="h-4 w-4 mr-1" />}
               Wyślij ponownie QR
             </Button>
+            )}
           </div>
         )}
       </div>
 
-      {canManage && (
+      {canUseAdminActions && (
         <div className="flex justify-end">
           <Button variant="destructive" size="sm" className="w-full sm:w-auto" onClick={() => setDeleteConfirmOpen(true)}>
             <Trash2 className="h-4 w-4 mr-1" />
@@ -249,7 +261,7 @@ export default function ParticipantDetails() {
             <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Status</span><Badge variant={statusDefinition.badgeVariant}>{statusDefinition.label}</Badge></div>
             <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Mail z QR</span><Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'}>{participant.email_status === 'sent' ? 'Wysłany' : 'Oczekuje'}</Badge></div>
             <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-start sm:justify-between"><span className="text-muted-foreground">Token QR</span><span className="font-mono text-xs break-all sm:max-w-[18rem] sm:text-right">{participant.qr_code}</span></div>
-            {canManage && (
+            {canManageParticipantData && (
               <div className="space-y-2 pt-2">
                 <Label>Zmień status</Label>
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -321,27 +333,58 @@ export default function ParticipantDetails() {
         </CardContent>
       </Card>
 
-      <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
+      <Dialog
+        open={transferOpen}
+        onOpenChange={nextOpen => {
+          setTransferOpen(nextOpen);
+          if (!nextOpen) setTransferErrors({ fields: {} });
+        }}
+      >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[calc(100vh-2rem)] overflow-hidden p-0 flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
             <DialogTitle>Przepisz pakiet na inną osobę</DialogTitle>
           </DialogHeader>
           <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4 space-y-4">
             <div>
-              <Label>Email</Label>
-              <Input value={transferEmail} onChange={event => setTransferEmail(event.target.value)} className="mt-2" />
+              <Label htmlFor="transfer-participant-email">Email</Label>
+              <Input
+                id="transfer-participant-email"
+                type="email"
+                value={transferEmail}
+                onChange={event => {
+                  setTransferEmail(event.target.value);
+                  setTransferErrors(previous => ({ ...previous, email: undefined, form: undefined }));
+                }}
+                className="mt-2"
+                required
+                aria-invalid={Boolean(transferErrors.email)}
+                aria-describedby={transferErrors.email ? 'transfer-participant-email-error' : undefined}
+              />
+              <FieldError id="transfer-participant-email-error" className="mt-2">{transferErrors.email}</FieldError>
             </div>
-            {activeMappings.map(mapping => (
-              <div key={`${mapping.alias}-${mapping.source_column_name}`}>
-                <Label>{mapping.alias}</Label>
-                <Input
-                  value={mapping.field_role === 'bib_number' ? participant.bib_number : (transferFields[mapping.alias] ?? '')}
-                  onChange={event => handleTransferFieldChange(mapping.alias, event.target.value)}
-                  className="mt-2"
-                  readOnly={mapping.field_role === 'bib_number'}
-                />
-              </div>
-            ))}
+            {activeMappings.map((mapping, index) => {
+              const fieldId = `transfer-participant-field-${index}`;
+              const errorId = `${fieldId}-error`;
+              const fieldError = transferErrors.fields[mapping.alias];
+
+              return (
+                <div key={`${mapping.alias}-${mapping.source_column_name}`}>
+                  <Label htmlFor={fieldId}>{mapping.alias}</Label>
+                  <Input
+                    id={fieldId}
+                    value={mapping.field_role === 'bib_number' ? participant.bib_number : (transferFields[mapping.alias] ?? '')}
+                    onChange={event => handleTransferFieldChange(mapping.alias, event.target.value)}
+                    className="mt-2"
+                    readOnly={mapping.field_role === 'bib_number'}
+                    required={mapping.field_role !== 'bib_number'}
+                    aria-invalid={Boolean(fieldError)}
+                    aria-describedby={fieldError ? errorId : undefined}
+                  />
+                  <FieldError id={errorId} className="mt-2">{fieldError}</FieldError>
+                </div>
+              );
+            })}
+            <FieldError id="transfer-participant-form-error">{transferErrors.form}</FieldError>
           </div>
           <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button className="w-full sm:w-auto" onClick={() => void handleTransferSubmit()} disabled={isSavingTransfer}>

@@ -47,6 +47,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Role } from "@/types";
+import { isEventOfficeOpen } from "@/lib/events";
+import { getRoleLabel, isScannerRole } from "@/lib/roles";
 
 const allItems = [
   {
@@ -71,19 +73,19 @@ const allItems = [
     title: "Uczestnicy",
     url: "/participants",
     icon: Users,
-    roles: ["scanner", "editor", "admin", "superadmin"] as Role[],
+    roles: ["scanner", "scanner_plus", "editor", "admin", "superadmin"] as Role[],
   },
   {
     title: "Skaner QR",
     url: "/scanner",
     icon: ScanLine,
-    roles: ["scanner", "editor", "admin", "superadmin"] as Role[],
+    roles: ["scanner", "scanner_plus", "editor", "admin", "superadmin"] as Role[],
   },
   {
     title: "Informacje",
     url: "/scanner-info",
     icon: Info,
-    roles: ["scanner"] as Role[],
+    roles: ["scanner", "scanner_plus"] as Role[],
   },
   {
     title: "Import CSV",
@@ -104,12 +106,7 @@ const roleIcons: Record<Role, typeof Shield> = {
   admin: Shield,
   editor: Pencil,
   scanner: Eye,
-};
-const roleLabels: Record<Role, string> = {
-  superadmin: "Superadmin",
-  admin: "Admin",
-  editor: "Organizator",
-  scanner: "Skaner",
+  scanner_plus: Eye,
 };
 const eventScopedUrls = new Set([
   "/participants",
@@ -138,12 +135,20 @@ export function AppSidebar() {
     logout();
     navigate("/login", { replace: true });
   };
+  const handleOrganizationChange = (organizationId: string) => {
+    setSelectedOrganizationId(organizationId);
+    navigate(`/organizations/${organizationId}`);
+  };
+  const handleEventChange = (eventId: string) => {
+    setSelectedEventId(eventId);
+    navigate(`/events/${eventId}`);
+  };
 
   const scannerHasActiveEvents =
-    currentRole !== "scanner" || visibleEvents.length > 0;
+    !isScannerRole(currentRole) || visibleEvents.length > 0;
   const items = allItems.filter((item) => {
     if (!item.roles.includes(currentRole)) return false;
-    if (currentRole !== "scanner") return true;
+    if (!isScannerRole(currentRole)) return true;
     if (item.url === "/participants" || item.url === "/scanner")
       return scannerHasActiveEvents;
     if (item.url === "/scanner-info") return !scannerHasActiveEvents;
@@ -151,9 +156,6 @@ export function AppSidebar() {
   });
 
   const generalItems = items.filter((item) => !eventScopedUrls.has(item.url));
-  const eventScopedItems = items.filter((item) =>
-    eventScopedUrls.has(item.url),
-  );
   const RoleIcon = roleIcons[currentRole];
   const adminOrganizations =
     currentRole === "admin"
@@ -173,9 +175,14 @@ export function AppSidebar() {
       : visibleEvents;
   const selectedEvent =
     scopedVisibleEvents.find((event) => event.id === selectedEventId) ?? null;
+  const selectedEventOfficeOpen =
+    selectedEvent !== null && isEventOfficeOpen(selectedEvent);
+  const eventScopedItems = items
+    .filter((item) => eventScopedUrls.has(item.url))
+    .filter((item) => item.url !== "/scanner" || selectedEventOfficeOpen);
   const showOrganizationSelectControl = adminOrganizations.length > 1;
   const showEventSelectControl =
-    scopedVisibleEvents.length > 1 || currentRole !== "scanner";
+    scopedVisibleEvents.length > 1 || !isScannerRole(currentRole);
   const showEventWorkspace =
     !collapsed &&
     eventScopedItems.length > 0 &&
@@ -234,7 +241,7 @@ export function AppSidebar() {
                       <div className="mt-2">
                         <Select
                           value={selectedOrganizationId}
-                          onValueChange={setSelectedOrganizationId}
+                          onValueChange={handleOrganizationChange}
                         >
                           <SelectTrigger className="h-10 border-sidebar-border bg-sidebar text-xs text-sidebar-foreground">
                             <SelectValue placeholder="Wybierz organizację" />
@@ -286,7 +293,7 @@ export function AppSidebar() {
                       <div className="mt-2">
                         <Select
                           value={selectedEventId}
-                          onValueChange={setSelectedEventId}
+                          onValueChange={handleEventChange}
                         >
                           <SelectTrigger className="h-10 border-sidebar-border bg-sidebar text-xs text-sidebar-foreground">
                             <SelectValue placeholder="Wybierz wydarzenie" />
@@ -377,7 +384,7 @@ export function AppSidebar() {
                     {currentUser.name}
                   </p>
                   <p className="text-[10px] text-sidebar-foreground/60">
-                    {roleLabels[currentRole]}
+                    {getRoleLabel(currentRole)}
                   </p>
                 </div>
               </div>

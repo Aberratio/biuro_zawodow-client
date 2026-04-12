@@ -17,6 +17,7 @@ import CsvImport from "./pages/CsvImport";
 import EmailSending from "./pages/EmailSending";
 import Organizations from "./pages/Organizations";
 import OrganizationDetails from "./pages/OrganizationDetails";
+import ArchivedEvents from "./pages/ArchivedEvents";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
@@ -24,13 +25,14 @@ import ScannerInfo from "./pages/ScannerInfo";
 import Forbidden from "./pages/Forbidden";
 import NotFound from "./pages/NotFound";
 import Unauthorized from "./pages/Unauthorized";
+import { isScannerRole } from "@/lib/roles";
 
 const queryClient = new QueryClient();
 
 function HomeRoute() {
   const { currentRole, visibleEvents } = useData();
 
-  if (currentRole === "scanner") {
+  if (isScannerRole(currentRole)) {
     return <Navigate to={visibleEvents.length > 0 ? "/scanner" : "/scanner-info"} replace />;
   }
 
@@ -40,7 +42,7 @@ function HomeRoute() {
 function ScannerParticipantsRoute() {
   const { currentRole, visibleEvents } = useData();
 
-  if (currentRole === "scanner" && visibleEvents.length === 0) {
+  if (isScannerRole(currentRole) && visibleEvents.length === 0) {
     return <Navigate to="/scanner-info" replace />;
   }
 
@@ -50,7 +52,7 @@ function ScannerParticipantsRoute() {
 function ScannerRoute() {
   const { currentRole, visibleEvents } = useData();
 
-  if (currentRole === "scanner" && visibleEvents.length === 0) {
+  if (isScannerRole(currentRole) && visibleEvents.length === 0) {
     return <Navigate to="/scanner-info" replace />;
   }
 
@@ -60,7 +62,7 @@ function ScannerRoute() {
 function ScannerInfoRoute() {
   const { currentRole, visibleEvents } = useData();
 
-  if (currentRole !== "scanner") {
+  if (!isScannerRole(currentRole)) {
     return <Forbidden />;
   }
 
@@ -81,19 +83,19 @@ function ImportRedirect() {
   return <Navigate to={`/events/${selectedEventId}/import`} replace />;
 }
 
-function EventAccessRoute({ children }: { children: JSX.Element }) {
+function EventAccessRoute({ children, allowArchivedView = false }: { children: JSX.Element; allowArchivedView?: boolean }) {
   const { id } = useParams<{ id: string }>();
-  const { events, canAccessEvent, isLoading } = useData();
+  const { events, archivedEvents, canAccessEvent, canViewEvent, isLoading } = useData();
 
   if (isLoading) {
     return <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">Sprawdzamy trasę do wydarzenia...</div>;
   }
 
-  if (!id || !events.some(event => event.id === id)) {
+  if (!id || (!events.some(event => event.id === id) && !archivedEvents.some(event => event.id === id))) {
     return <NotFound />;
   }
 
-  if (!canAccessEvent(id)) {
+  if (allowArchivedView ? !canViewEvent(id) : !canAccessEvent(id)) {
     return <Forbidden />;
   }
 
@@ -152,7 +154,7 @@ function ProtectedAppRoutes() {
         <Routes>
           <Route path="/" element={<HomeRoute />} />
           <Route path="/events" element={<Events />} />
-          <Route path="/events/:id" element={<EventAccessRoute><EventDetails /></EventAccessRoute>} />
+          <Route path="/events/:id" element={<EventAccessRoute allowArchivedView><EventDetails /></EventAccessRoute>} />
           <Route path="/events/:id/import" element={<EventAccessRoute><CsvImport /></EventAccessRoute>} />
           <Route path="/participants" element={<ScannerParticipantsRoute />} />
           <Route path="/participants/:id" element={<ParticipantAccessRoute><ParticipantDetails /></ParticipantAccessRoute>} />
@@ -162,6 +164,7 @@ function ProtectedAppRoutes() {
           <Route path="/emails" element={<EmailSending />} />
           <Route path="/organizations" element={<Organizations />} />
           <Route path="/organizations/:id" element={<OrganizationAccessRoute><OrganizationDetails /></OrganizationAccessRoute>} />
+          <Route path="/organizations/:id/archived-events" element={<OrganizationAccessRoute><ArchivedEvents /></OrganizationAccessRoute>} />
           <Route path="/users" element={<Organizations />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/403" element={<Forbidden />} />

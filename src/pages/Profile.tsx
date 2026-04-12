@@ -4,9 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { FieldError } from '@/components/ui/field-error';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { generateStrongPassword } from '@/lib/password';
+import { validatePasswordConfirmation, validateRequired, validateStrongPassword } from '@/lib/form-validation';
 import { toast } from '@/hooks/use-toast';
 
 const roleLabels: Record<string, string> = {
@@ -14,6 +16,7 @@ const roleLabels: Record<string, string> = {
   admin: 'Admin',
   editor: 'Organizator',
   scanner: 'Skaner',
+  scanner_plus: 'Skaner plus',
 };
 
 export default function Profile() {
@@ -26,6 +29,12 @@ export default function Profile() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showNewPasswordConfirmation, setShowNewPasswordConfirmation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<{
+    currentPassword?: string;
+    newPassword?: string;
+    newPasswordConfirmation?: string;
+    form?: string;
+  }>({});
 
   const organizationLabel = useMemo(() => {
     if (!user) return 'Brak';
@@ -47,14 +56,28 @@ export default function Profile() {
     setNewPasswordConfirmation(generatedPassword);
     setShowNewPassword(true);
     setShowNewPasswordConfirmation(true);
+    setErrors(previous => ({ ...previous, newPassword: undefined, newPasswordConfirmation: undefined, form: undefined }));
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const nextErrors = {
+      currentPassword: validateRequired(currentPassword, 'Podaj aktualne hasło.'),
+      newPassword: validateStrongPassword(newPassword),
+      newPasswordConfirmation: validatePasswordConfirmation(newPassword, newPasswordConfirmation),
+    };
+
+    if (nextErrors.currentPassword || nextErrors.newPassword || nextErrors.newPasswordConfirmation) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    setErrors({});
     setIsSubmitting(true);
     try {
       const result = await changePassword(currentPassword, newPassword, newPasswordConfirmation);
       if (!result.ok) {
+        setErrors({ form: result.error ?? 'Nie udało się zmienić hasła.' });
         toast({ title: 'Nie udało się zmienić hasła', description: result.error, variant: 'destructive' });
         return;
       }
@@ -66,6 +89,7 @@ export default function Profile() {
       setCurrentPassword('');
       setNewPassword('');
       setNewPasswordConfirmation('');
+      setErrors({});
     } finally {
       setIsSubmitting(false);
     }
@@ -116,7 +140,7 @@ export default function Profile() {
           <CardDescription>Hasło musi mieć minimum 10 znaków, wielką i małą literę, cyfrę oraz znak specjalny.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="space-y-1.5">
               <Label htmlFor="currentPassword">Aktualne hasło</Label>
               <div className="relative">
@@ -124,8 +148,14 @@ export default function Profile() {
                   id="currentPassword"
                   type={showCurrentPassword ? 'text' : 'password'}
                   value={currentPassword}
-                  onChange={event => setCurrentPassword(event.target.value)}
+                  onChange={event => {
+                    setCurrentPassword(event.target.value);
+                    setErrors(previous => ({ ...previous, currentPassword: undefined, form: undefined }));
+                  }}
                   autoComplete="current-password"
+                  required
+                  aria-invalid={Boolean(errors.currentPassword || errors.form)}
+                  aria-describedby={errors.currentPassword ? 'profile-current-password-error' : undefined}
                   className="pr-10"
                 />
                 <button
@@ -137,6 +167,7 @@ export default function Profile() {
                   {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              <FieldError id="profile-current-password-error">{errors.currentPassword}</FieldError>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="newPassword">Nowe hasło</Label>
@@ -146,8 +177,15 @@ export default function Profile() {
                     id="newPassword"
                     type={showNewPassword ? 'text' : 'password'}
                     value={newPassword}
-                    onChange={event => setNewPassword(event.target.value)}
+                    onChange={event => {
+                      setNewPassword(event.target.value);
+                      setErrors(previous => ({ ...previous, newPassword: undefined, form: undefined }));
+                    }}
                     autoComplete="new-password"
+                    required
+                    minLength={10}
+                    aria-invalid={Boolean(errors.newPassword || errors.form)}
+                    aria-describedby={errors.newPassword ? 'profile-new-password-error' : undefined}
                     className="pr-10"
                   />
                   <button
@@ -163,6 +201,7 @@ export default function Profile() {
                   <RefreshCw className="mr-1 h-4 w-4" /> Generuj
                 </Button>
               </div>
+              <FieldError id="profile-new-password-error">{errors.newPassword}</FieldError>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="newPasswordConfirmation">Powtórz nowe hasło</Label>
@@ -171,8 +210,14 @@ export default function Profile() {
                   id="newPasswordConfirmation"
                   type={showNewPasswordConfirmation ? 'text' : 'password'}
                   value={newPasswordConfirmation}
-                  onChange={event => setNewPasswordConfirmation(event.target.value)}
+                  onChange={event => {
+                    setNewPasswordConfirmation(event.target.value);
+                    setErrors(previous => ({ ...previous, newPasswordConfirmation: undefined, form: undefined }));
+                  }}
                   autoComplete="new-password"
+                  required
+                  aria-invalid={Boolean(errors.newPasswordConfirmation || errors.form)}
+                  aria-describedby={errors.newPasswordConfirmation ? 'profile-new-password-confirmation-error' : undefined}
                   className="pr-10"
                 />
                 <button
@@ -184,8 +229,10 @@ export default function Profile() {
                   {showNewPasswordConfirmation ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              <FieldError id="profile-new-password-confirmation-error">{errors.newPasswordConfirmation}</FieldError>
             </div>
-            <Button className="w-full sm:w-auto" type="submit" disabled={!currentPassword || !newPassword || !newPasswordConfirmation || isSubmitting}>
+            <FieldError id="profile-password-form-error">{errors.form}</FieldError>
+            <Button className="w-full sm:w-auto" type="submit" disabled={isSubmitting}>
               Zapisz nowe hasło
             </Button>
           </form>
