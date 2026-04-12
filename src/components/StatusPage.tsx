@@ -36,7 +36,7 @@ export function StatusPage({
       <Card className="relative w-full max-w-3xl border-border/70 bg-card/95 shadow-2xl backdrop-blur">
         <CardContent className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-6">
-            <div className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-white/70">
+            <div className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[11px] font-heading font-bold uppercase tracking-[0.24em] text-white/70">
               {eyebrow}
             </div>
             <div className="flex min-h-[220px] flex-col justify-between">
@@ -44,7 +44,7 @@ export function StatusPage({
                 {icon}
               </div>
               <div>
-                <p className="text-6xl font-black tracking-[-0.06em] text-white sm:text-7xl">{code}</p>
+                <p className="font-heading text-6xl font-black tracking-[-0.06em] text-white sm:text-7xl">{code}</p>
                 <p className="mt-2 max-w-xs text-sm leading-6 text-white/75">
                   Zegar tyka, ale ta ścieżka właśnie pobiegła nie w tę stronę.
                 </p>
@@ -54,8 +54,8 @@ export function StatusPage({
 
           <div className="space-y-5">
             <div className="space-y-3">
-              <p className="text-xs font-bold uppercase tracking-[0.28em] text-primary/80">{eyebrow}</p>
-              <h1 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl">{title}</h1>
+              <p className="font-heading text-xs font-bold uppercase tracking-[0.28em] text-primary/80">{eyebrow}</p>
+              <h1 className="font-heading text-3xl font-black tracking-tight text-foreground sm:text-4xl">{title}</h1>
               <p className="max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">{description}</p>
             </div>
 
