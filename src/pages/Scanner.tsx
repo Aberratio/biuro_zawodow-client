@@ -163,9 +163,9 @@ export default function Scanner() {
       <div className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-emerald-600 animate-in fade-in duration-200" onClick={resetToIdle}>
         <div className="max-w-md space-y-4 px-6 text-center text-white">
           <CheckCircle className="mx-auto h-16 w-16 sm:h-20 sm:w-20" strokeWidth={2.5} />
-          <p className="text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">{status.shortLabel.toUpperCase()}</p>
+          <p className="font-heading text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">{status.shortLabel.toUpperCase()}</p>
           <p className="break-words text-xl font-bold sm:text-2xl md:text-3xl">{scannedParticipant.name}</p>
-          <p className="text-4xl font-black tabular-nums sm:text-5xl md:text-7xl">#{scannedParticipant.bib_number}</p>
+          <p className="font-mono text-4xl font-black tabular-nums sm:text-5xl md:text-7xl">#{scannedParticipant.bib_number}</p>
           {scannedParticipant.status === 'checked_in_not_starting' && (
             <p className="text-base opacity-80 mt-4">Pakiet odebrany, uczestnik nie wystartuje</p>
           )}
@@ -190,13 +190,13 @@ export default function Scanner() {
     <div className="mx-auto max-w-xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 md:px-0">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg md:text-2xl font-bold tracking-tight">Skaner</h1>
+          <h1 className="font-heading text-lg md:text-2xl font-bold tracking-tight">Skaner</h1>
           <button className="text-muted-foreground hover:text-foreground transition-colors touch-manipulation" onClick={() => setShowHelp(previous => !previous)} aria-label="Pokaż instrukcję">
             <Info className="h-4 w-4" />
           </button>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 tabular-nums text-xs sm:text-sm font-bold">
+          <div className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 font-mono tabular-nums text-xs sm:text-sm font-bold">
             {checkedIn}/{eventParticipants.length}
           </div>
         </div>

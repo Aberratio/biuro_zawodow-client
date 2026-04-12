@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,6 +10,10 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+    --font-heading: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
     --background: 0 0% 6%;
     --foreground: 40 10% 96%;
 
@@ -61,6 +67,7 @@ All colors MUST be HSL.
 
   body {
     @apply min-h-screen bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
     background-image:
       radial-gradient(circle at top left, hsl(var(--surface-glow) / 0.08), transparent 30rem),
       radial-gradient(circle at top right, hsl(var(--surface-warm) / 0.05), transparent 28rem),
@@ -68,6 +75,22 @@ All colors MUST be HSL.
       linear-gradient(180deg, hsl(0 0% 9%) 0%, hsl(var(--background)) 34%, hsl(0 0% 5%) 100%);
     background-attachment: fixed;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
   }
 
   input[type="date"],
@@ -113,6 +136,10 @@ All colors MUST be HSL.
   ::selection {
     background: hsl(var(--primary) / 0.4);
     color: hsl(var(--foreground));
+  }
+
+  .font-heading {
+    font-family: var(--font-heading);
   }
 }
 

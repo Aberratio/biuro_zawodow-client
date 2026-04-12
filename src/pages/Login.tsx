@@ -109,18 +109,18 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div className="relative flex min-h-screen flex-col overflow-hidden">
       <div className="pointer-events-none absolute inset-0 page-gradient" />
       <div className="pointer-events-none absolute left-[-8rem] top-[-10rem] h-[28rem] w-[28rem] rounded-full bg-primary/12 blur-3xl" />
       <div className="pointer-events-none absolute right-[-6rem] top-[14%] h-[24rem] w-[24rem] rounded-full bg-[hsl(var(--button-highlight)/0.08)] blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-10rem] left-1/2 h-[24rem] w-[42rem] -translate-x-1/2 rounded-full bg-white/5 blur-3xl" />
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-xl items-start justify-center px-4 py-4 sm:px-6 sm:py-6 lg:items-center lg:px-8">
+      <div className="relative z-10 mx-auto flex w-full max-w-xl flex-1 items-start justify-center px-4 py-4 sm:px-6 sm:py-6 lg:items-center lg:px-8">
         <div className="w-full max-w-[30rem]">
           <Card className="overflow-hidden rounded-[1.75rem] border-white/10 bg-[linear-gradient(180deg,hsl(var(--card)/0.96),hsl(var(--background)/0.92))] lg:rounded-[2rem]">
             <CardHeader className="border-b border-white/10 bg-white/[0.03] px-6 pb-5 pt-6 sm:px-7">
               <CardTitle className="text-[1.9rem] tracking-tight">
-                Zaloguj się
+                Logowanie
               </CardTitle>
             </CardHeader>
 
@@ -198,8 +198,7 @@ export default function Login() {
                   className="h-12 w-full rounded-2xl text-sm"
                   disabled={isSubmitting}
                 >
-                  <LogIn className="h-4 w-4" />
-                  Zaloguj do panelu
+                  Zaloguj
                 </Button>
               </form>
 
@@ -281,7 +280,7 @@ export default function Login() {
         </div>
       </div>
 
-      <footer className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-6 text-center text-xs leading-6 text-muted-foreground sm:px-6 lg:px-8">
+      <footer className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-4 pt-2 text-center text-xs leading-6 text-muted-foreground sm:px-6 lg:px-8">
         <p>
           © {copyrightYears}{" "}
           <a
