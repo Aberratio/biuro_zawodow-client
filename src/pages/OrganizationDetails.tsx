@@ -50,13 +50,10 @@ import {
   ArrowLeft,
   Archive,
   Building2,
-  CalendarDays,
   KeyRound,
   Pencil,
   Plus,
-  Radio,
   Trash2,
-  Users,
 } from "lucide-react";
 
 type MemberRole = "editor" | "scanner" | "scanner_plus";
@@ -641,55 +638,43 @@ export default function OrganizationDetails() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryStat
-          icon={<CalendarDays className="h-4 w-4 text-primary" />}
-          label="Wydarzenia"
-          value={`${orgEvents.length}/${organization.event_limit}`}
-          hint={`${remainingSlots} wolnych miejsc`}
-          action={
-            canEditOrganization ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
-                onClick={openLimitDialog}
-                aria-label="Edytuj limit wydarzeń"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-            ) : undefined
-          }
-        />
-        <SummaryStat
-          icon={<Users className="h-4 w-4 text-primary" />}
-          label="Organizatorzy"
-          value={String(organizers.length)}
-          hint="Konta organizatorów"
-        />
-        <SummaryStat
-          icon={<Radio className="h-4 w-4 text-primary" />}
-          label="Skanerzy"
-          value={String(scanners.length)}
-          hint="Konta skanerów"
-        />
-        <SummaryStat
-          icon={<Building2 className="h-4 w-4 text-primary" />}
-          label="Administrator"
-          value={adminLabel}
-          hint="Osoba opiekująca się tą organizacją"
-        />
-      </div>
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-4 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div>
+            <span className="text-muted-foreground">Wydarzenia</span>
+            <span className="ml-2 font-medium">{orgEvents.length}/{organization.event_limit}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Organizatorzy</span>
+            <span className="ml-2 font-medium">{organizers.length}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Skanerzy</span>
+            <span className="ml-2 font-medium">{scanners.length}</span>
+          </div>
+          <div className="min-w-0">
+            <span className="text-muted-foreground">Administrator</span>
+            <span className="ml-2 font-medium">{adminLabel}</span>
+          </div>
+          {canEditOrganization && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+              onClick={openLimitDialog}
+              aria-label="Edytuj limit wydarzeń"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <section className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Wydarzenia</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Wszystkie wydarzenia przypisane do tej organizacji. Kliknij
-              wiersz, aby otworzyć szczegóły.
-            </p>
           </div>
           {canCreateEvent && (
             <Button
@@ -759,9 +744,6 @@ export default function OrganizationDetails() {
                 </TableBody>
               </Table>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {orgEvents.length} wydarzeń
-            </p>
           </>
         )}
       </section>
@@ -772,9 +754,6 @@ export default function OrganizationDetails() {
             <h2 className="text-lg font-semibold tracking-tight">
               Organizatorzy
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Osoby, które zarządzają wydarzeniami tej organizacji.
-            </p>
           </div>
           {canManageMembers && (
             <Button
@@ -842,9 +821,6 @@ export default function OrganizationDetails() {
                 </TableBody>
               </Table>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {organizers.length} organizatorów
-            </p>
           </>
         )}
       </section>
@@ -853,9 +829,6 @@ export default function OrganizationDetails() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Skanerzy</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Osoby, które pracują na skanerze i mają przypisane wydarzenia.
-            </p>
           </div>
           {canManageScanners && (
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -972,9 +945,6 @@ export default function OrganizationDetails() {
                 </TableBody>
               </Table>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {scanners.length} skanerów
-            </p>
           </>
         )}
       </section>
@@ -988,17 +958,13 @@ export default function OrganizationDetails() {
                 Archiwum wydarzeń
               </h2>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Zamknięte wydarzenia tej organizacji są ukryte z aktywnych list i
-              dostępne tutaj do podglądu.
-            </p>
           </div>
           <Button
             variant="outline"
             className="h-11 w-full sm:h-10 sm:w-auto"
             onClick={() => navigate(`/organizations/${organization.id}/archived-events`)}
           >
-            Otwórz archiwum ({orgArchivedEvents.length})
+            Otwórz archiwum
           </Button>
         </div>
       </section>
@@ -1539,38 +1505,6 @@ export default function OrganizationDetails() {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function SummaryStat({
-  icon,
-  label,
-  value,
-  hint,
-  action,
-}: {
-  icon: JSX.Element;
-  label: string;
-  value: string;
-  hint: string;
-  action?: JSX.Element;
-}) {
-  return (
-    <Card className="border-border/70 shadow-sm">
-      <CardContent className="flex items-start justify-between gap-3 p-5">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="rounded-xl bg-primary/10 p-2.5">{icon}</div>
-          <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-              {label}
-            </p>
-            <p className="mt-2 truncate text-lg font-semibold">{value}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-          </div>
-        </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
-      </CardContent>
-    </Card>
   );
 }
 

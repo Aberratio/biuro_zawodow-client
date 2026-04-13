@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldError } from '@/components/ui/field-error';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Archive, ArrowLeft, Calendar, CheckCircle, Clock3, Download, FileUp, Loader2, MapPin, Pencil, Plus, ScanLine, Shield, UserPlus, Users } from 'lucide-react';
+import { Archive, ArrowLeft, Calendar, Download, FileUp, Loader2, Mail, MapPin, Pencil, Plus, ScanLine, Users } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
 import { ParticipantFieldMapping, User } from '@/types';
@@ -117,30 +117,6 @@ function getOfficeToneClasses(tone: OfficeStatusTone) {
   };
 }
 
-function getRoleCapabilities(role: 'admin' | 'editor' | 'scanner', isFinishedEvent: boolean) {
-  if (role === 'admin') {
-    if (isFinishedEvent) {
-      return 'Ustawienia wydarzenia, godziny biura, eksport danych i przypisania skanerów.';
-    }
-
-    return 'Ustawienia wydarzenia, godziny biura, eksport danych i przypisywanie skanerów.';
-  }
-
-  if (role === 'editor') {
-    if (isFinishedEvent) {
-      return 'Obsługa uczestników, import CSV, wysyłka QR i praca operacyjna wykonana przy wydarzeniu.';
-    }
-
-    return 'Obsługa uczestników, import CSV, wysyłka QR i praca operacyjna na wydarzeniu.';
-  }
-
-  if (isFinishedEvent) {
-    return 'Skanowanie QR i odprawa uczestników podczas pracy biura zawodów.';
-  }
-
-  return 'Skanowanie QR i odprawa uczestników podczas pracy biura zawodów.';
-}
-
 function TeamMemberRow({ user }: { user: User }) {
   return (
     <div className="rounded-2xl border border-border/70 bg-background/80 px-4 py-3">
@@ -154,13 +130,11 @@ function TeamMemberRow({ user }: { user: User }) {
 
 function TeamRoleCard({
   title,
-  description,
   users,
   emptyText,
   action,
 }: {
   title: string;
-  description: string;
   users: User[];
   emptyText: string;
   action?: ReactNode;
@@ -171,7 +145,6 @@ function TeamRoleCard({
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="text-base">{title}</CardTitle>
-            <p className="mt-2 text-sm text-muted-foreground">{description}</p>
           </div>
           {action}
         </div>
@@ -186,35 +159,6 @@ function TeamRoleCard({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  iconClassName,
-}: {
-  icon: typeof Users;
-  label: string;
-  value: string;
-  hint: string;
-  iconClassName: string;
-}) {
-  return (
-    <div className="rounded-[1.35rem] border border-border/70 bg-background/80 p-4 shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconClassName}`}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-          <p className="mt-2 text-2xl font-bold tracking-tight">{value}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -240,7 +184,6 @@ export default function EventDetails() {
     exportEventLogsCsv,
   } = useData();
   const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
-  const [mappingsLoading, setMappingsLoading] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [scannerDialogOpen, setScannerDialogOpen] = useState(false);
@@ -274,7 +217,6 @@ export default function EventDetails() {
   const isArchivedEvent = Boolean(event?.archived_at);
   const eventParticipants = participants.filter(participant => participant.event_id === id);
   const checkedIn = eventParticipants.filter(participantCountsAsCheckedIn).length;
-  const checkInProgress = eventParticipants.length > 0 ? Math.round((checkedIn / eventParticipants.length) * 100) : 0;
   const activeMappings = useMemo(() => getActiveParticipantMappings(mappings), [mappings]);
   const organizationName = organizations.find(organization => organization.id === event?.organization_id)?.name ?? 'Nieznana organizacja';
   const organizationScanners = useMemo(
@@ -303,7 +245,6 @@ export default function EventDetails() {
   const canEditEvent = isArchivedEvent ? currentRole === 'superadmin' : canManageScanners;
   const canOperateOnEvent = !isArchivedEvent || currentRole === 'superadmin';
   const canUseActiveEventTools = !isArchivedEvent && event !== undefined && isEventOfficeOpen(event, new Date(nowTimestamp));
-  const canViewParticipantMappings = currentRole === 'superadmin';
 
   useEffect(() => {
     if (id && events.some(entry => entry.id === id)) {
@@ -319,7 +260,6 @@ export default function EventDetails() {
   useEffect(() => {
     if (!id) return;
 
-    setMappingsLoading(true);
     getParticipantFieldMappings(id)
       .then(data => {
         setMappings(data);
@@ -328,8 +268,7 @@ export default function EventDetails() {
       .catch(() => {
         setMappings([]);
         setManualFields({});
-      })
-      .finally(() => setMappingsLoading(false));
+      });
   }, [getParticipantFieldMappings, id]);
 
   useEffect(() => {
@@ -612,57 +551,22 @@ export default function EventDetails() {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="max-w-2xl">
                   <p className="text-lg font-semibold tracking-tight">{officeStatus.headline}</p>
-                  <p className="mt-2 text-sm text-muted-foreground">{officeStatus.detail}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{officeStatus.timingLabel}: {officeStatus.timingValue}</p>
                 </div>
-                <div className="rounded-2xl border border-border/70 bg-background px-4 py-3 text-left lg:min-w-[220px]">
-                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">{officeStatus.timingLabel}</p>
-                  <p className="mt-2 text-sm font-semibold">{officeStatus.timingValue}</p>
+                <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[420px]">
+                  <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <p className="mt-1 font-semibold">{officeStatus.badgeLabel}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
+                    <p className="text-xs text-muted-foreground">Odprawieni</p>
+                    <p className="mt-1 font-semibold">{checkedIn}/{eventParticipants.length}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
+                    <p className="text-xs text-muted-foreground">Skanerzy</p>
+                    <p className="mt-1 font-semibold">{assignedScanners.length}</p>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="grid gap-3 lg:grid-cols-3">
-              <StatTile
-                icon={Clock3}
-                label="Status biura"
-                value={officeStatus.badgeLabel}
-                hint={officeStatus.timingValue}
-                iconClassName={officeToneClasses.iconWrap}
-              />
-              <StatTile
-                icon={CheckCircle}
-                label="Odprawieni"
-                value={`${checkedIn}/${eventParticipants.length}`}
-                hint={eventParticipants.length > 0 ? `${checkInProgress}% całej listy` : 'Brak uczestników na liście'}
-                iconClassName="bg-primary/12 text-primary"
-              />
-              <StatTile
-                icon={ScanLine}
-                label="Skanerzy"
-                value={String(assignedScanners.length)}
-                hint={organizationScanners.length > 0 ? `${organizationScanners.length} dostępnych w organizacji` : 'Brak skanerów w organizacji'}
-                iconClassName="bg-sky-500/12 text-sky-700"
-              />
-            </div>
-
-            <div className="rounded-[1.6rem] border border-border/70 bg-background/85 p-4 sm:p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold">Postęp odprawy</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {eventParticipants.length > 0 && isFinishedEvent
-                      ? `Odprawiono ${checkedIn} z ${eventParticipants.length} osób.`
-                      : eventParticipants.length > 0
-                        ? `${checkedIn} z ${eventParticipants.length} osób jest już odprawionych.`
-                        : isFinishedEvent
-                          ? 'Nie dodano uczestników do tego wydarzenia.'
-                          : 'Po dodaniu uczestników tutaj od razu zobaczysz postęp odprawy.'}
-                  </p>
-                </div>
-                <div className="text-3xl font-black tracking-tight">{checkInProgress}%</div>
-              </div>
-              <div className="mt-4 h-3 rounded-full bg-muted">
-                <div className={`h-full rounded-full transition-all ${officeToneClasses.meter}`} style={{ width: `${checkInProgress}%` }} />
               </div>
             </div>
 
@@ -674,14 +578,6 @@ export default function EventDetails() {
               <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate('/participants'); }} className="h-11 md:w-auto">
                 <Users className="mr-1 h-4 w-4" /> Uczestnicy
               </Button>
-              <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate(`/events/${event.id}/import`); }} className="h-11 md:w-auto">
-                <FileUp className="mr-1 h-4 w-4" /> Import CSV
-              </Button>
-              {hasSavedMapping && (
-                <Button variant="outline" onClick={() => setManualOpen(true)} className="h-11 md:w-auto">
-                  <UserPlus className="mr-1 h-4 w-4" /> Dodaj ręcznie
-                </Button>
-              )}
             </div>
             )}
           </div>
@@ -691,13 +587,8 @@ export default function EventDetails() {
       <section className="space-y-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight">
-            {isFinishedEvent ? 'Kto pracował przy tym wydarzeniu' : 'Kto pracuje przy wydarzeniu'}
+            Zespół
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {isFinishedEvent
-              ? 'Podgląd zespołu i zakresu odpowiedzialności podczas tego wydarzenia.'
-              : 'Prosty podgląd zespołu i zakresu odpowiedzialności dla tego wydarzenia.'}
-          </p>
         </div>
 
         {!hasAnyTeamMembers && (
@@ -718,21 +609,18 @@ export default function EventDetails() {
         <div className="grid gap-4 xl:grid-cols-3">
           <TeamRoleCard
             title="Administracja"
-            description={getRoleCapabilities('admin', isFinishedEvent)}
             users={organizationAdmins}
-            emptyText="Brak administratorów przypisanych do tej organizacji."
+            emptyText="Brak administratorów."
           />
           <TeamRoleCard
             title="Organizatorzy"
-            description={getRoleCapabilities('editor', isFinishedEvent)}
             users={organizationEditors}
-            emptyText="Brak organizatorów przypisanych do tej organizacji."
+            emptyText="Brak organizatorów."
           />
           <TeamRoleCard
             title={isFinishedEvent ? 'Skanerzy pracujący przy wydarzeniu' : 'Skanerzy wydarzenia'}
-            description={getRoleCapabilities('scanner', isFinishedEvent)}
             users={assignedScanners}
-            emptyText={isFinishedEvent ? 'Do tego wydarzenia nie przypisano żadnego skanera.' : 'Do tego wydarzenia nie przypisano jeszcze żadnego skanera.'}
+            emptyText="Brak skanerów."
             action={canManageScanners && canUseActiveEventTools ? (
               <Button variant="outline" size="sm" onClick={openScannerDialog}>
                 Zarządzaj
@@ -742,89 +630,53 @@ export default function EventDetails() {
         </div>
       </section>
 
-      {(canOperateOnEvent || canViewParticipantMappings) && (
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      {canOperateOnEvent && (
         <Card className="border-border/70 shadow-sm">
           <CardHeader className="border-b border-border/60 bg-muted/20">
-            <CardTitle className="text-base">Dane i eksporty</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {isFinishedEvent
-                ? 'Dane administracyjne i eksporty po zakończeniu wydarzenia.'
-                : 'Miejsce na operacje administracyjne i szybkie pobranie danych wydarzenia.'}
-            </p>
-          </CardHeader>
-          <CardContent className="grid gap-3 p-5 sm:grid-cols-2">
-            {canOperateOnEvent && (
-            <Button variant="outline" onClick={() => void handleExportCsv()} className="h-11 justify-start" disabled={exportingCsv}>
-              {exportingCsv ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
-              Eksport uczestników CSV
-            </Button>
-            )}
-            {canOperateOnEvent && (
-            <Button variant="outline" onClick={() => void handleExportLogsCsv()} className="h-11 justify-start" disabled={exportingLogsCsv}>
-              {exportingLogsCsv ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
-              Eksport logów CSV
-            </Button>
-            )}
-            {canEditEvent && (
-              <Button variant="outline" onClick={() => setEditOpen(true)} className="h-11 justify-start">
-                <Pencil className="mr-1 h-4 w-4" /> Edytuj dane wydarzenia
-              </Button>
-            )}
-            {canManageScanners && canUseActiveEventTools && (
-              <Button variant="outline" onClick={openScannerDialog} className="h-11 justify-start">
-                <ScanLine className="mr-1 h-4 w-4" /> Zarządzaj skanerami
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70 shadow-sm">
-          <CardHeader className="border-b border-border/60 bg-muted/20">
-            <CardTitle className="text-base">{isFinishedEvent ? 'Uczestnicy i mapowanie' : 'Konfiguracja uczestników'}</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {isFinishedEvent
-                ? 'Zapisane mapowanie CSV i dane używane przy obsłudze uczestników.'
-                : 'Stan mapowania CSV i możliwość ręcznego dodania uczestnika.'}
-            </p>
+            <CardTitle className="text-base">Operacje</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 p-5">
-            {mappingsLoading ? (
-              <p className="text-sm text-muted-foreground">Ładowanie mapowania...</p>
-            ) : hasSavedMapping ? (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  {mappings.map(mapping => (
-                    <Badge key={`${mapping.source_column_name}-${mapping.alias}`} variant="outline">
-                      {mapping.alias} ({mapping.field_role})
-                    </Badge>
-                  ))}
-                </div>
-                {canOperateOnEvent && (
-                <Button variant="outline" onClick={() => setManualOpen(true)} className="h-11 w-full justify-start">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {canOperateOnEvent && (
+                <Button variant="outline" onClick={() => void handleExportCsv()} className="h-11 justify-start" disabled={exportingCsv}>
+                  {exportingCsv ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
+                  Eksport uczestników CSV
+                </Button>
+              )}
+              {canOperateOnEvent && (
+                <Button variant="outline" onClick={() => void handleExportLogsCsv()} className="h-11 justify-start" disabled={exportingLogsCsv}>
+                  {exportingLogsCsv ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
+                  Eksport logów CSV
+                </Button>
+              )}
+              {canEditEvent && (
+                <Button variant="outline" onClick={() => setEditOpen(true)} className="h-11 justify-start">
+                  <Pencil className="mr-1 h-4 w-4" /> Edytuj wydarzenie
+                </Button>
+              )}
+              {canManageScanners && canUseActiveEventTools && (
+                <Button variant="outline" onClick={openScannerDialog} className="h-11 justify-start">
+                  <ScanLine className="mr-1 h-4 w-4" /> Zarządzaj skanerami
+                </Button>
+              )}
+              {!isArchivedEvent && canOperateOnEvent && (
+                <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate(`/events/${event.id}/import`); }} className="h-11 justify-start">
+                  <FileUp className="mr-1 h-4 w-4" /> Import CSV
+                </Button>
+              )}
+              {!isArchivedEvent && canOperateOnEvent && (
+                <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate('/emails'); }} className="h-11 justify-start">
+                  <Mail className="mr-1 h-4 w-4" /> Wysyłka QR
+                </Button>
+              )}
+              {!isArchivedEvent && canOperateOnEvent && hasSavedMapping && (
+                <Button variant="outline" onClick={() => setManualOpen(true)} className="h-11 justify-start">
                   <Plus className="mr-1 h-4 w-4" /> Dodaj uczestnika ręcznie
                 </Button>
-                )}
-              </>
-            ) : (
-              <div className="rounded-2xl border border-dashed px-4 py-6 text-sm text-muted-foreground">
-                To wydarzenie nie ma jeszcze zapisanego mapowania CSV. Po pierwszym imporcie pojawi się też ręczne dodawanie uczestników.
-              </div>
-            )}
-
-            {canViewParticipantMappings && (
-              <div className="rounded-2xl border border-border/70 bg-muted/25 px-4 py-4">
-                <div className="flex items-start gap-3">
-                  <Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <p className="text-sm text-muted-foreground">
-                    Widok mapowania pól jest dostępny tutaj, ponieważ pracujesz jako superadmin.
-                  </p>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         </Card>
-      </div>
       )}
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>

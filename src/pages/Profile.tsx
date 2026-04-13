@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { Eye, EyeOff, Info, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -104,31 +104,25 @@ export default function Profile() {
       <Card>
         <CardHeader>
           <CardTitle>Mój profil</CardTitle>
-          <CardDescription>Podstawowe informacje o koncie i dostępach.</CardDescription>
+          <CardDescription>Podstawowe informacje o koncie.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-foreground/90 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)]">
-            <div className="flex items-start gap-2">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <p>Dane profilu poniżej nie są edytowalne ręcznie. Jeśli chcesz zmienić nazwę, email, rolę lub organizację, skontaktuj się z administratorem.</p>
-            </div>
-          </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Imię i nazwisko</Label>
-              <Input value={user.name} readOnly disabled className="cursor-not-allowed border-dashed bg-muted text-muted-foreground opacity-100" />
+            <div className="space-y-1 rounded-xl border px-4 py-3">
+              <p className="text-sm text-muted-foreground">Imię i nazwisko</p>
+              <p className="text-sm font-medium">{user.name}</p>
             </div>
-            <div className="space-y-1.5">
-              <Label>Email</Label>
-              <Input value={user.email} readOnly disabled className="cursor-not-allowed border-dashed bg-muted text-muted-foreground opacity-100" />
+            <div className="space-y-1 rounded-xl border px-4 py-3">
+              <p className="text-sm text-muted-foreground">Email</p>
+              <p className="text-sm font-medium break-all">{user.email}</p>
             </div>
-            <div className="space-y-1.5">
-              <Label>Rola</Label>
-              <Input value={roleLabels[user.role] ?? user.role} readOnly disabled className="cursor-not-allowed border-dashed bg-muted text-muted-foreground opacity-100" />
+            <div className="space-y-1 rounded-xl border px-4 py-3">
+              <p className="text-sm text-muted-foreground">Rola</p>
+              <p className="text-sm font-medium">{roleLabels[user.role] ?? user.role}</p>
             </div>
-            <div className="space-y-1.5">
-              <Label>Organizacja</Label>
-              <Input value={organizationLabel} readOnly disabled className="cursor-not-allowed border-dashed bg-muted text-muted-foreground opacity-100" />
+            <div className="space-y-1 rounded-xl border px-4 py-3">
+              <p className="text-sm text-muted-foreground">Organizacja</p>
+              <p className="text-sm font-medium">{organizationLabel}</p>
             </div>
           </div>
         </CardContent>

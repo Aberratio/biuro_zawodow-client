@@ -174,9 +174,6 @@ export default function Participants() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Uczestnicy</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Lista uczestników wybranego wydarzenia. Kliknij wiersz, aby zobaczyć szczegóły.
-          </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           {canImportParticipants && (
@@ -267,7 +264,6 @@ export default function Participants() {
           </Table>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">{sortedParticipants.length} uczestników</p>
 
       <Dialog
         open={manualOpen}

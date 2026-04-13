@@ -14,6 +14,7 @@ import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { formatEventOfficeWindow } from '@/lib/events';
 import { validateRequired } from '@/lib/form-validation';
+import { ParticipantFieldMapping } from '@/types';
 
 type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom';
 
@@ -65,6 +66,7 @@ export default function CsvImport() {
     analyzeParticipantImport,
     confirmParticipantImportMapping,
     runParticipantImport,
+    getParticipantFieldMappings,
     isLoading,
   } = useData();
   const eventId = routeEventId ?? selectedEventId;
@@ -79,12 +81,27 @@ export default function CsvImport() {
   const [runningAction, setRunningAction] = useState<'analyze' | 'confirm' | 'run' | ''>('');
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof runParticipantImport>> | null>(null);
   const [mappingErrors, setMappingErrors] = useState<{ emailColumn?: string; aliases: Record<string, string>; form?: string }>({ aliases: {} });
+  const [savedMappings, setSavedMappings] = useState<ParticipantFieldMapping[]>([]);
+  const [savedMappingsLoading, setSavedMappingsLoading] = useState(false);
 
   useEffect(() => {
     if (routeEventId) {
       setSelectedEventId(routeEventId);
     }
   }, [routeEventId, setSelectedEventId]);
+
+  useEffect(() => {
+    if (!eventId) {
+      setSavedMappings([]);
+      return;
+    }
+
+    setSavedMappingsLoading(true);
+    getParticipantFieldMappings(eventId)
+      .then(data => setSavedMappings(data.filter(mapping => mapping.is_active)))
+      .catch(() => setSavedMappings([]))
+      .finally(() => setSavedMappingsLoading(false));
+  }, [eventId, getParticipantFieldMappings]);
 
   useEffect(() => {
     if (!analysis || analysis.has_mapping) {
@@ -108,6 +125,7 @@ export default function CsvImport() {
   const multipleEmailCandidates = (analysis?.email_candidates.length ?? 0) > 1;
   const canRunWithSavedMapping = !!analysis?.has_mapping && (analysis.missing_required_columns?.length ?? 0) === 0;
   const displayNamePartsCount = mappingDrafts.filter(field => field.field_role === 'display_name_part').length;
+  const hasSavedMapping = savedMappings.length > 0;
 
   const activeDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role !== 'ignore'), [mappingDrafts]);
   const previewHeaders = useMemo(() => {
@@ -269,6 +287,34 @@ export default function CsvImport() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Mapowanie wydarzenia</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm">
+            <span className="text-muted-foreground">Status: </span>
+            <span className="font-medium">
+              {savedMappingsLoading ? 'Ładowanie…' : hasSavedMapping ? 'Gotowe' : 'Brak zapisanego mapowania'}
+            </span>
+          </p>
+          {hasSavedMapping && (
+            <div className="flex flex-wrap gap-2">
+              {savedMappings.map(mapping => (
+                <Badge key={`${mapping.source_column_name}-${mapping.alias}`} variant="outline">
+                  {mapping.source_column_name} → {mapping.alias} ({mapping.field_role})
+                </Badge>
+              ))}
+            </div>
+          )}
+          {!savedMappingsLoading && !hasSavedMapping && (
+            <p className="text-sm text-muted-foreground">
+              Pierwszy import dla tego wydarzenia pozwoli zapisać mapowanie kolumn.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {analysis && (
         <>
           <div className="grid gap-4 md:grid-cols-3">
@@ -396,19 +442,16 @@ export default function CsvImport() {
           {analysis.has_mapping && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Zapisane mapowanie wydarzenia</CardTitle>
+                <CardTitle className="text-base">Dopasowanie mapowania do pliku</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {analysis.mappings.map(mapping => (
-                    <Badge key={`${mapping.source_column_name}-${mapping.alias}`} variant="outline">
-                      {mapping.source_column_name} → {mapping.alias} ({mapping.field_role})
-                    </Badge>
-                  ))}
-                </div>
-                {analysis.missing_required_columns.length > 0 && (
+                {analysis.missing_required_columns.length > 0 ? (
                   <p className="text-sm text-destructive">
                     Plik nie zawiera wymaganych kolumn z zapisanego mapowania: {analysis.missing_required_columns.join(', ')}.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Ten plik pasuje do zapisanego mapowania i może zostać zaimportowany bez ponownej konfiguracji.
                   </p>
                 )}
               </CardContent>

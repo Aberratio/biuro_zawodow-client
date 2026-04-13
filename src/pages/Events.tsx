@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpDown, ListFilter, Pencil, Plus, Search } from 'lucide-react';
+import { ListFilter, Plus, Search } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
@@ -16,15 +15,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import EventsSkeleton from '@/components/skeletons/EventsSkeleton';
 import { toast } from '@/hooks/use-toast';
 import { formatEventOfficeWindow, getEventOfficeOpenAt, isEventOfficeOpen, isValidEventOfficeRange } from '@/lib/events';
-import { validateNonNegativeInteger, validateRequired } from '@/lib/form-validation';
-import { participantCountsAsCheckedIn } from '@/lib/participant-status';
+import { validateRequired } from '@/lib/form-validation';
 import { isScannerRole } from '@/lib/roles';
 
 const EVENTS_PAGE_SIZE = 20;
 
 type EventStatusFilter = 'all' | 'active' | 'upcoming' | 'finished';
-type EventSortOption = 'office_open_asc' | 'office_open_desc' | 'name_asc' | 'name_desc' | 'attendance_desc';
-
 type EventTimingStatus = Exclude<EventStatusFilter, 'all'>;
 
 function getEventTimingStatus(event: { office_open_at: string; office_close_at: string }, now: Date): EventTimingStatus {
@@ -69,10 +65,8 @@ function scrollAppContentToTop() {
 export default function Events() {
   const {
     visibleEvents,
-    participants,
     organizations,
     createEvent,
-    updateOrganizationEventLimit,
     currentUser,
     currentRole,
     selectedOrganizationId,
@@ -84,12 +78,7 @@ export default function Events() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<EventStatusFilter>('all');
-  const [sortBy, setSortBy] = useState<EventSortOption>('office_open_asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
-  const [limitDraft, setLimitDraft] = useState('');
-  const [isSavingLimit, setIsSavingLimit] = useState(false);
-  const [limitErrors, setLimitErrors] = useState<{ event_limit?: string; form?: string }>({});
   const adminOrganizationIds = useMemo(() => currentUser.organization_ids ?? [], [currentUser.organization_ids]);
   const adminOrganizations = useMemo(
     () => organizations.filter(org => adminOrganizationIds.includes(org.id)),
@@ -133,48 +122,26 @@ export default function Events() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedOrganizationId, sortBy, statusFilter]);
-
-  const pageOrganizationId = currentRole === 'admin'
-    ? selectedOrganizationId
-    : currentUser.organization_id || '';
-  const pageOrganization = useMemo(
-    () => organizations.find(org => org.id === pageOrganizationId),
-    [organizations, pageOrganizationId],
-  );
+  }, [searchQuery, selectedOrganizationId, statusFilter]);
   const scopedEvents = useMemo(
     () => currentRole === 'admin'
       ? visibleEvents.filter(event => event.organization_id === selectedOrganizationId)
       : visibleEvents,
     [currentRole, selectedOrganizationId, visibleEvents],
   );
-  const participantStatsByEventId = useMemo(() => {
-    return participants.reduce<Record<string, { participantCount: number; checkedInCount: number }>>((accumulator, participant) => {
-      const current = accumulator[participant.event_id] ?? { participantCount: 0, checkedInCount: 0 };
-      current.participantCount += 1;
-      if (participantCountsAsCheckedIn(participant)) {
-        current.checkedInCount += 1;
-      }
-      accumulator[participant.event_id] = current;
-      return accumulator;
-    }, {});
-  }, [participants]);
   const eventRows = useMemo(() => {
     const now = new Date();
 
     return scopedEvents.map(event => {
-      const participantStats = participantStatsByEventId[event.id] ?? { participantCount: 0, checkedInCount: 0 };
       const officeOpenAt = getEventOfficeOpenAt(event);
       return {
         ...event,
-        checkedInCount: participantStats.checkedInCount,
-        participantCount: participantStats.participantCount,
         organizationName: organizationNames[event.organization_id] ?? 'Nieznana organizacja',
         timingStatus: getEventTimingStatus(event, now),
         officeOpenAtTimestamp: officeOpenAt?.getTime() ?? Number.MAX_SAFE_INTEGER,
       };
     });
-  }, [organizationNames, participantStatsByEventId, scopedEvents]);
+  }, [organizationNames, scopedEvents]);
   const shouldShowFiltersAndPagination = eventRows.length > EVENTS_PAGE_SIZE;
   const processedRows = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -189,22 +156,10 @@ export default function Events() {
       return matchesQuery && matchesStatus;
     });
 
-    return [...filtered].sort((left, right) => {
-      switch (sortBy) {
-        case 'name_asc':
-          return left.name.localeCompare(right.name, 'pl');
-        case 'name_desc':
-          return right.name.localeCompare(left.name, 'pl');
-        case 'office_open_desc':
-          return right.officeOpenAtTimestamp - left.officeOpenAtTimestamp;
-        case 'attendance_desc':
-          return right.checkedInCount - left.checkedInCount || right.participantCount - left.participantCount || left.name.localeCompare(right.name, 'pl');
-        case 'office_open_asc':
-        default:
-          return left.officeOpenAtTimestamp - right.officeOpenAtTimestamp;
-      }
-    });
-  }, [eventRows, searchQuery, sortBy, statusFilter]);
+    return [...filtered].sort((left, right) =>
+      left.officeOpenAtTimestamp - right.officeOpenAtTimestamp || left.name.localeCompare(right.name, 'pl')
+    );
+  }, [eventRows, searchQuery, statusFilter]);
   const totalPages = Math.max(1, Math.ceil(processedRows.length / EVENTS_PAGE_SIZE));
 
   useEffect(() => {
@@ -229,8 +184,6 @@ export default function Events() {
     const startIndex = (currentPage - 1) * EVENTS_PAGE_SIZE;
     return processedRows.slice(startIndex, startIndex + EVENTS_PAGE_SIZE);
   }, [currentPage, processedRows, shouldShowFiltersAndPagination]);
-  const usedSlots = scopedEvents.length;
-  const remainingSlots = pageOrganization ? Math.max(pageOrganization.event_limit - usedSlots, 0) : 0;
   const formOrganization = useMemo(
     () => organizations.find(org => org.id === form.organization_id),
     [form.organization_id, organizations],
@@ -243,13 +196,6 @@ export default function Events() {
   const paginationModel = useMemo(() => buildPaginationModel(currentPage, totalPages), [currentPage, totalPages]);
 
   if (isLoading) return <EventsSkeleton />;
-
-  const openLimitDialog = () => {
-    if (!pageOrganization) return;
-    setLimitDraft(String(pageOrganization.event_limit + 1));
-    setLimitErrors({});
-    setLimitDialogOpen(true);
-  };
 
   const handleCreate = async () => {
     const nextErrors = {
@@ -310,52 +256,11 @@ export default function Events() {
     toast({ title: 'Wydarzenie utworzone' });
   };
 
-  const handleIncreaseLimit = async () => {
-    if (!pageOrganization) return;
-
-    const limitValue = limitDraft || String(pageOrganization.event_limit + 1);
-    const parsed = Number(limitValue);
-    const limitError = validateNonNegativeInteger(limitValue, 'Podaj liczbę całkowitą większą od obecnego limitu.');
-
-    if (limitError || !Number.isInteger(parsed) || parsed <= pageOrganization.event_limit) {
-      setLimitErrors({ event_limit: limitError || `Nowy limit musi być większy niż ${pageOrganization.event_limit}.` });
-      toast({
-        title: 'Nieprawidłowy limit',
-        description: `Nowy limit musi być większy niż ${pageOrganization.event_limit}.`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setLimitErrors({});
-    setIsSavingLimit(true);
-    const result = await updateOrganizationEventLimit(pageOrganization.id, parsed);
-    setIsSavingLimit(false);
-
-    if (!result.ok) {
-      setLimitErrors({ form: result.error ?? 'Nie udało się zwiększyć limitu wydarzeń.' });
-      toast({
-        title: 'Nie udało się zwiększyć limitu',
-        description: result.error ?? 'Spróbuj ponownie.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setLimitDialogOpen(false);
-    setLimitDraft('');
-    setLimitErrors({});
-    toast({ title: 'Zwiększono limit wydarzeń' });
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Wydarzenia</h1>
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            Lista wydarzeń, kontrola limitu organizacji oraz szybki dostęp do szczegółów biura zawodów.
-          </p>
         </div>
         {canCreateEvent && (
           <Button onClick={() => setOpen(true)} size="sm" className="w-full sm:w-auto sm:self-auto">
@@ -363,43 +268,6 @@ export default function Events() {
           </Button>
         )}
       </div>
-
-      <Card className="border-border/70 bg-muted/25 shadow-sm">
-        <CardContent className="px-4 py-3 text-sm text-muted-foreground">
-          Wydarzenia są automatycznie przenoszone do archiwum miesiąc po zamknięciu biura zawodów.
-        </CardContent>
-      </Card>
-
-      {pageOrganization && (
-        <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.025] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span className="font-medium text-foreground">Limit wydarzeń</span>
-            <span className="truncate text-muted-foreground">{pageOrganization.name}</span>
-            <Badge variant="outline" className="border-white/10 bg-white/[0.03] text-[11px] text-foreground/75">
-              {usedSlots}/{pageOrganization.event_limit}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2 sm:justify-end">
-            <p className="text-xs text-muted-foreground sm:text-right">
-              {remainingSlots > 0
-                ? `${remainingSlots} ${remainingSlots === 1 ? 'wolne miejsce' : 'wolnych miejsc'} na wydarzenia.`
-                : 'Limit wykorzystany. Zwiększ limit w organizacji, aby dodać kolejne wydarzenie.'}
-            </p>
-            {currentRole === 'admin' && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
-                onClick={openLimitDialog}
-                aria-label="Zwiększ limit wydarzeń"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
 
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
@@ -419,63 +287,38 @@ export default function Events() {
             </div>
           )}
 
-          {shouldShowFiltersAndPagination && (
-            <>
-              <div className="min-w-[16rem] flex-1 space-y-2">
-                <Label htmlFor="events-search">Szukaj</Label>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="events-search"
-                    value={searchQuery}
-                    onChange={event => setSearchQuery(event.target.value)}
-                    placeholder="Nazwa, lokalizacja lub organizacja"
-                    className="pl-9"
-                  />
-                </div>
-              </div>
+          <div className="min-w-[16rem] flex-1 space-y-2">
+            <Label htmlFor="events-search">Szukaj</Label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="events-search"
+                value={searchQuery}
+                onChange={event => setSearchQuery(event.target.value)}
+                placeholder="Nazwa, lokalizacja lub organizacja"
+                className="pl-9"
+              />
+            </div>
+          </div>
 
-              <div className="min-w-[13rem] space-y-2">
-                <Label htmlFor="events-status-filter" className="inline-flex items-center gap-2">
-                  <ListFilter className="h-3.5 w-3.5" />
-                  Filtr
-                </Label>
-                <Select value={statusFilter} onValueChange={value => setStatusFilter(value as EventStatusFilter)}>
-                  <SelectTrigger id="events-status-filter">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Wszystkie wydarzenia</SelectItem>
-                    <SelectItem value="active">Biuro otwarte teraz</SelectItem>
-                    <SelectItem value="upcoming">Nadchodzące</SelectItem>
-                    <SelectItem value="finished">Zakończone</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
-          )}
-        </div>
-
-        {eventRows.length > 0 && (
-          <div className="min-w-[14rem] space-y-2">
-            <Label htmlFor="events-sort" className="inline-flex items-center gap-2">
-              <ArrowUpDown className="h-3.5 w-3.5" />
-              Sortowanie
+          <div className="min-w-[13rem] space-y-2">
+            <Label htmlFor="events-status-filter" className="inline-flex items-center gap-2">
+              <ListFilter className="h-3.5 w-3.5" />
+              Filtr
             </Label>
-            <Select value={sortBy} onValueChange={value => setSortBy(value as EventSortOption)}>
-              <SelectTrigger id="events-sort">
+            <Select value={statusFilter} onValueChange={value => setStatusFilter(value as EventStatusFilter)}>
+              <SelectTrigger id="events-status-filter">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="office_open_asc">Biuro: najbliższy termin</SelectItem>
-                <SelectItem value="office_open_desc">Biuro: najdalszy termin</SelectItem>
-                <SelectItem value="name_asc">Nazwa: A-Z</SelectItem>
-                <SelectItem value="name_desc">Nazwa: Z-A</SelectItem>
-                <SelectItem value="attendance_desc">Odprawieni: malejąco</SelectItem>
+                <SelectItem value="all">Wszystkie wydarzenia</SelectItem>
+                <SelectItem value="active">Biuro otwarte teraz</SelectItem>
+                <SelectItem value="upcoming">Nadchodzące</SelectItem>
+                <SelectItem value="finished">Zakończone</SelectItem>
               </SelectContent>
             </Select>
           </div>
-        )}
+        </div>
       </div>
 
       {processedRows.length === 0 ? (
@@ -499,7 +342,6 @@ export default function Events() {
                   {showOrganizationColumn && <TableHead className="hidden lg:table-cell">Organizacja</TableHead>}
                   <TableHead className="hidden md:table-cell">Lokalizacja</TableHead>
                   <TableHead>Biuro</TableHead>
-                  <TableHead className="hidden sm:table-cell">Odprawieni</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -541,22 +383,13 @@ export default function Events() {
                     <TableCell className="text-sm text-muted-foreground">
                       {formatEventOfficeWindow(event)}
                     </TableCell>
-                    <TableCell className="hidden text-sm tabular-nums sm:table-cell">
-                      {event.checkedInCount}/{event.participantCount}
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-muted-foreground">
-              {shouldShowFiltersAndPagination
-                ? `Pokazano ${processedRows.length} z ${eventRows.length} wydarzeń`
-                : `${processedRows.length} wydarzeń`}
-            </p>
-
+          <div className="flex justify-end">
             {shouldShowFiltersAndPagination && totalPages > 1 && (
               <Pagination className="justify-end">
                 <PaginationContent>
@@ -720,54 +553,6 @@ export default function Events() {
             >
               <Plus className="mr-1 h-4 w-4" />
               Utwórz
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={limitDialogOpen}
-        onOpenChange={nextOpen => {
-          setLimitDialogOpen(nextOpen);
-          if (!nextOpen) {
-            setLimitDraft('');
-            setLimitErrors({});
-          }
-        }}
-      >
-        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Zwiększ limit wydarzeń</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="events-organization-event-limit">Nowy limit wydarzeń</Label>
-              <Input
-                id="events-organization-event-limit"
-                type="number"
-                min={pageOrganization ? String(pageOrganization.event_limit + 1) : '1'}
-                value={limitDraft}
-                onChange={event => {
-                  setLimitDraft(event.target.value);
-                  setLimitErrors(current => ({ ...current, event_limit: undefined, form: undefined }));
-                }}
-                className="mt-2"
-                required
-                aria-invalid={Boolean(limitErrors.event_limit)}
-                aria-describedby={limitErrors.event_limit ? 'events-organization-event-limit-error' : undefined}
-              />
-              <FieldError id="events-organization-event-limit-error" className="mt-2">{limitErrors.event_limit}</FieldError>
-            </div>
-            {pageOrganization && (
-              <p className="text-xs text-muted-foreground">
-                Obecny limit organizacji {pageOrganization.name}: {pageOrganization.event_limit}. Z tego miejsca możesz tylko zwiększyć limit.
-              </p>
-            )}
-            <FieldError id="events-organization-limit-form-error">{limitErrors.form}</FieldError>
-          </div>
-          <DialogFooter>
-            <Button className="w-full sm:w-auto" onClick={handleIncreaseLimit} disabled={isSavingLimit}>
-              Zapisz limit
             </Button>
           </DialogFooter>
         </DialogContent>
