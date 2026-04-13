@@ -18,6 +18,7 @@ import EmailSending from "./pages/EmailSending";
 import Organizations from "./pages/Organizations";
 import OrganizationDetails from "./pages/OrganizationDetails";
 import ArchivedEvents from "./pages/ArchivedEvents";
+import ForgotPassword from "./pages/ForgotPassword";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
@@ -188,6 +189,10 @@ function AppRoutes() {
       <Route path="/401" element={<Unauthorized />} />
       <Route path="/403" element={<Forbidden />} />
       <Route path="/404" element={<NotFound />} />
+      <Route
+        path="/forgot-password"
+        element={isAuthenticated ? <Navigate to="/" replace /> : <ForgotPassword />}
+      />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
       {isAuthenticated ? (

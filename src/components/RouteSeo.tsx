@@ -38,6 +38,13 @@ function getSeoConfig(pathname: string): SeoConfig {
     };
   }
 
+  if (pathname === "/forgot-password") {
+    return {
+      title: `Przypomnienie hasła | ${APP_NAME}`,
+      description: "Wyślij link do resetu hasła i odzyskaj dostęp do panelu Biuro Zawodów.",
+    };
+  }
+
   if (pathname === "/401") {
     return {
       title: `401 | ${APP_NAME}`,

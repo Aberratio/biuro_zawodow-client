@@ -1,10 +1,18 @@
 import * as React from "react";
-import { CalendarIcon, Clock3 } from "lucide-react";
 import { pl } from "date-fns/locale";
+import { CalendarIcon, Clock3 } from "lucide-react";
 
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -66,14 +74,91 @@ function formatDisplayValue(value: string): string {
   }).format(displayDate);
 }
 
+interface PickerPanelProps {
+  canSave: boolean;
+  draftDate?: Date;
+  draftTime: string;
+  isMobile: boolean;
+  onCancel: () => void;
+  onClear: () => void;
+  onSave: () => void;
+  onSelectDate: (date: Date | undefined) => void;
+  onSelectTime: (value: string) => void;
+  onToday: () => void;
+  timeInputId: string;
+}
+
+function PickerPanel({
+  canSave,
+  draftDate,
+  draftTime,
+  isMobile,
+  onCancel,
+  onClear,
+  onSave,
+  onSelectDate,
+  onSelectTime,
+  onToday,
+  timeInputId,
+}: PickerPanelProps) {
+  return (
+    <>
+      <Calendar
+        mode="single"
+        selected={draftDate}
+        onSelect={onSelectDate}
+        locale={pl}
+        initialFocus={!isMobile}
+        className="mx-auto"
+      />
+      <div className="space-y-3 border-t border-border p-3">
+        <div className="space-y-2">
+          <label htmlFor={timeInputId} className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Godzina
+          </label>
+          <div className="flex items-center gap-2">
+            <Clock3 className="h-4 w-4 text-muted-foreground" />
+            <Input
+              id={timeInputId}
+              type="time"
+              value={draftTime}
+              onChange={(event) => onSelectTime(event.target.value)}
+              className="h-9"
+            />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={onClear}>
+              Wyczysc
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={onToday}>
+              Dzisiaj
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+              Anuluj
+            </Button>
+            <Button type="button" size="sm" onClick={onSave} disabled={!canSave}>
+              Zapisz
+            </Button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function DateTimePicker({
   value,
   onChange,
-  placeholder = "Wybierz datę i godzinę",
+  placeholder = "Wybierz date i godzine",
   className,
   disabled,
   ...triggerProps
 }: DateTimePickerProps) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = React.useState(false);
   const [draftDate, setDraftDate] = React.useState<Date | undefined>(() => parseDateTimeValue(value).date);
   const [draftTime, setDraftTime] = React.useState(() => parseDateTimeValue(value).time);
@@ -109,67 +194,66 @@ export function DateTimePicker({
     setOpen(false);
   };
 
+  const trigger = (
+    <Button
+      type="button"
+      variant="outline"
+      disabled={disabled}
+      className={cn(
+        "h-10 w-full justify-start rounded-xl px-3 text-left font-normal aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-destructive/30",
+        !displayValue && "text-muted-foreground",
+        className,
+      )}
+      {...triggerProps}
+    >
+      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+      <span className="truncate">{displayValue || placeholder}</span>
+    </Button>
+  );
+
+  const panel = (
+    <PickerPanel
+      canSave={canSave}
+      draftDate={draftDate}
+      draftTime={draftTime}
+      isMobile={isMobile}
+      onCancel={() => setOpen(false)}
+      onClear={handleClear}
+      onSave={handleSave}
+      onSelectDate={setDraftDate}
+      onSelectTime={setDraftTime}
+      onToday={handleToday}
+      timeInputId={timeInputId}
+    />
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={handleOpenChange}>
+        <DrawerTrigger asChild>{trigger}</DrawerTrigger>
+        <DrawerContent className="max-h-[90dvh]">
+          <DrawerHeader className="pb-2 text-left">
+            <DrawerTitle>Wybierz date i godzine</DrawerTitle>
+          </DrawerHeader>
+          <div className="overflow-y-auto px-4 pb-4">
+            <div className="overflow-hidden rounded-lg border border-border bg-background">
+              {panel}
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={disabled}
-          className={cn(
-            "h-10 w-full justify-start rounded-xl px-3 text-left font-normal aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-destructive/30",
-            !displayValue && "text-muted-foreground",
-            className,
-          )}
-          {...triggerProps}
-        >
-          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-          <span className="truncate">{displayValue || placeholder}</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[min(calc(100vw-2rem),22rem)] p-0">
-        <Calendar
-          mode="single"
-          selected={draftDate}
-          onSelect={setDraftDate}
-          locale={pl}
-          initialFocus
-        />
-        <div className="space-y-3 border-t border-border p-3">
-          <div className="space-y-2">
-            <label htmlFor={timeInputId} className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Godzina
-            </label>
-            <div className="flex items-center gap-2">
-              <Clock3 className="h-4 w-4 text-muted-foreground" />
-              <Input
-                id={timeInputId}
-                type="time"
-                value={draftTime}
-                onChange={(event) => setDraftTime(event.target.value)}
-                className="h-9"
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={handleClear}>
-                Wyczyść
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={handleToday}>
-                Dzisiaj
-              </Button>
-            </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
-                Anuluj
-              </Button>
-              <Button type="button" size="sm" onClick={handleSave} disabled={!canSave}>
-                Zapisz
-              </Button>
-            </div>
-          </div>
-        </div>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent
+        align="start"
+        collisionPadding={16}
+        className="w-[min(calc(100vw-2rem),22rem)] max-h-[min(36rem,var(--radix-popover-content-available-height))] overflow-y-auto p-0"
+      >
+        {panel}
       </PopoverContent>
     </Popover>
   );

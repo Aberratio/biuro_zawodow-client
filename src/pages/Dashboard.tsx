@@ -57,14 +57,11 @@ export default function Dashboard() {
         </div>
 
         <section className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
+          <div>
             <div>
               <h2 className="text-lg font-semibold tracking-tight">Biuro zawodów otwarte teraz</h2>
               <p className="text-sm text-muted-foreground">Wydarzenia, które są aktualnie w trakcie odprawy.</p>
             </div>
-            <Badge className="shrink-0" variant={activeEvents.length > 0 ? 'default' : 'secondary'}>
-              {activeEvents.length} aktywne
-            </Badge>
           </div>
 
           {activeEvents.length === 0 ? (
@@ -91,14 +88,13 @@ export default function Dashboard() {
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <Card className="border-border/70 shadow-sm">
             <CardHeader className="border-b bg-muted/20">
-              <div className="flex items-center justify-between gap-3">
+              <div>
                 <div>
                   <CardTitle className="text-base">Nadchodzące wydarzenia</CardTitle>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Najbliższe otwarcia biura zawodów z informacją o organizacji.
                   </p>
                 </div>
-                <Badge variant="secondary">{upcomingEvents.length}</Badge>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -124,14 +120,13 @@ export default function Dashboard() {
 
           <Card className="border-border/70 shadow-sm">
             <CardHeader className="border-b bg-muted/20">
-              <div className="flex items-center justify-between gap-3">
+              <div>
                 <div>
                   <CardTitle className="text-base">Ostatnio zakończone</CardTitle>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Pięć ostatnich wydarzeń zamkniętych po pracy biura zawodów.
                   </p>
                 </div>
-                <Badge variant="outline">{finishedEvents.length}</Badge>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -188,14 +183,11 @@ export default function Dashboard() {
         </div>
 
         <section className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
+          <div>
             <div>
               <h2 className="text-lg font-semibold tracking-tight">Biuro zawodów otwarte teraz</h2>
               <p className="text-sm text-muted-foreground">Wydarzenia Twojej organizacji, które są aktualnie w trakcie odprawy.</p>
             </div>
-            <Badge className="shrink-0" variant={activeEvents.length > 0 ? 'default' : 'secondary'}>
-              {activeEvents.length} aktywne
-            </Badge>
           </div>
 
           {activeEvents.length === 0 ? (
@@ -222,14 +214,13 @@ export default function Dashboard() {
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <Card className="border-border/70 shadow-sm">
             <CardHeader className="border-b bg-muted/20">
-              <div className="flex items-center justify-between gap-3">
+              <div>
                 <div>
                   <CardTitle className="text-base">Nadchodzące wydarzenia</CardTitle>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Najbliższe wydarzenia Twojej organizacji z szybkim wejściem do szczegółów.
                   </p>
                 </div>
-                <Badge variant="secondary">{upcomingEvents.length}</Badge>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -255,14 +246,13 @@ export default function Dashboard() {
 
           <Card className="border-border/70 shadow-sm">
             <CardHeader className="border-b bg-muted/20">
-              <div className="flex items-center justify-between gap-3">
+              <div>
                 <div>
                   <CardTitle className="text-base">Ostatnio zakończone</CardTitle>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Pięć ostatnich zakończonych wydarzeń z Twojej organizacji.
                   </p>
                 </div>
-                <Badge variant="outline">{finishedEvents.length}</Badge>
               </div>
             </CardHeader>
             <CardContent className="p-0">

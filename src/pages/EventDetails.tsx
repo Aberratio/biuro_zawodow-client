@@ -30,7 +30,7 @@ import { formatEventOfficeEnd, formatEventOfficeStart, formatEventOfficeWindow, 
 import { buildEmptyParticipantFieldValues, getActiveParticipantMappings } from '@/lib/participant-fields';
 import { participantCountsAsCheckedIn } from '@/lib/participant-status';
 import { validateEmail, validateRequired } from '@/lib/form-validation';
-import { getScannerPermissionLabel, isScannerRole } from '@/lib/roles';
+import { isScannerRole } from '@/lib/roles';
 
 type OfficeStatusTone = 'open' | 'upcoming' | 'closed';
 
@@ -141,17 +141,12 @@ function getRoleCapabilities(role: 'admin' | 'editor' | 'scanner', isFinishedEve
   return 'Skanowanie QR i odprawa uczestników podczas pracy biura zawodów.';
 }
 
-function TeamMemberRow({ user, badgeLabel }: { user: User; badgeLabel: string | ((user: User) => string) }) {
-  const resolvedBadgeLabel = typeof badgeLabel === 'function' ? badgeLabel(user) : badgeLabel;
-
+function TeamMemberRow({ user }: { user: User }) {
   return (
     <div className="rounded-2xl border border-border/70 bg-background/80 px-4 py-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{user.name}</p>
-          <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-        </div>
-        <Badge variant={user.role === 'scanner_plus' ? 'default' : 'secondary'} className="shrink-0">{resolvedBadgeLabel}</Badge>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold">{user.name}</p>
+        <p className="truncate text-xs text-muted-foreground">{user.email}</p>
       </div>
     </div>
   );
@@ -162,14 +157,12 @@ function TeamRoleCard({
   description,
   users,
   emptyText,
-  badgeLabel,
   action,
 }: {
   title: string;
   description: string;
   users: User[];
   emptyText: string;
-  badgeLabel: string | ((user: User) => string);
   action?: ReactNode;
 }) {
   return (
@@ -189,7 +182,7 @@ function TeamRoleCard({
             {emptyText}
           </div>
         ) : (
-          users.map(user => <TeamMemberRow key={user.id} user={user} badgeLabel={badgeLabel} />)
+          users.map(user => <TeamMemberRow key={user.id} user={user} />)
         )}
       </CardContent>
     </Card>
@@ -728,21 +721,18 @@ export default function EventDetails() {
             description={getRoleCapabilities('admin', isFinishedEvent)}
             users={organizationAdmins}
             emptyText="Brak administratorów przypisanych do tej organizacji."
-            badgeLabel="Admin"
           />
           <TeamRoleCard
             title="Organizatorzy"
             description={getRoleCapabilities('editor', isFinishedEvent)}
             users={organizationEditors}
             emptyText="Brak organizatorów przypisanych do tej organizacji."
-            badgeLabel="Organizator"
           />
           <TeamRoleCard
             title={isFinishedEvent ? 'Skanerzy pracujący przy wydarzeniu' : 'Skanerzy wydarzenia'}
             description={getRoleCapabilities('scanner', isFinishedEvent)}
             users={assignedScanners}
             emptyText={isFinishedEvent ? 'Do tego wydarzenia nie przypisano żadnego skanera.' : 'Do tego wydarzenia nie przypisano jeszcze żadnego skanera.'}
-            badgeLabel={(user) => getScannerPermissionLabel(user.role)}
             action={canManageScanners && canUseActiveEventTools ? (
               <Button variant="outline" size="sm" onClick={openScannerDialog}>
                 Zarządzaj
@@ -1016,10 +1006,7 @@ export default function EventDetails() {
                 {organizationScanners.map(scanner => (
                   <label key={scanner.id} className="flex items-center gap-3 text-sm">
                     <Checkbox checked={scannerSelection.includes(scanner.id)} onCheckedChange={checked => toggleScannerSelection(scanner.id, checked === true)} />
-                    <span className="min-w-0">
-                      <span className="block truncate">{scanner.name}</span>
-                      <span className="block text-xs text-muted-foreground">{getScannerPermissionLabel(scanner.role)}</span>
-                    </span>
+                    <span className="min-w-0 truncate">{scanner.name}</span>
                   </label>
                 ))}
               </div>
