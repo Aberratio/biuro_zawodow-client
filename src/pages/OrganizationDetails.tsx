@@ -35,7 +35,11 @@ import {
 } from "@/components/ui/table";
 import TableSkeleton from "@/components/skeletons/TableSkeleton";
 import { toast } from "@/hooks/use-toast";
-import { formatEventOfficeWindow, isValidEventOfficeRange } from "@/lib/events";
+import {
+  formatEventOfficeWindow,
+  isEventCurrentOrUpcoming,
+  isValidEventOfficeRange,
+} from "@/lib/events";
 import {
   validateEmail,
   validateNonNegativeInteger,
@@ -207,6 +211,12 @@ export default function OrganizationDetails() {
     organization.event_limit - orgEvents.length,
     0,
   );
+  const assignableScannerEvents = orgEvents.filter((event) =>
+    isEventCurrentOrUpcoming(event),
+  );
+  const assignableScannerEventIds = new Set(
+    assignableScannerEvents.map((event) => event.id),
+  );
   const canCreateEvent = !isScannerRole(currentRole);
   const canEditOrganization =
     currentRole === "superadmin" || currentRole === "admin";
@@ -242,7 +252,11 @@ export default function OrganizationDetails() {
   const openScannerAssignmentsDialog = (scannerId: string) => {
     const scanner = scanners.find((user) => user.id === scannerId);
     setSelectedScannerId(scannerId);
-    setScannerAssignmentDraft(scanner?.assigned_events ?? []);
+    setScannerAssignmentDraft(
+      (scanner?.assigned_events ?? []).filter((eventId) =>
+        assignableScannerEventIds.has(eventId),
+      ),
+    );
     setScannerAssignmentsDialogOpen(true);
   };
 
@@ -299,7 +313,11 @@ export default function OrganizationDetails() {
       role: memberForm.role,
       organization_id: organization.id,
       assigned_events:
-        isScannerRole(memberForm.role) ? memberForm.assigned_events : [],
+        isScannerRole(memberForm.role)
+          ? memberForm.assigned_events.filter((eventId) =>
+              assignableScannerEventIds.has(eventId),
+            )
+          : [],
     });
     setIsSubmittingMember(false);
 
@@ -470,26 +488,28 @@ export default function OrganizationDetails() {
     setIsSavingScannerAssignments(true);
     const result = await assignScannerEvents(
       selectedScannerId,
-      scannerAssignmentDraft,
+      scannerAssignmentDraft.filter((eventId) =>
+        assignableScannerEventIds.has(eventId),
+      ),
     );
     setIsSavingScannerAssignments(false);
     if (!result.ok) {
       toast({
-        title: "Nie udało się zapisać przypisań skanera",
+        title: "Nie udało się zapisać przypisań operatora",
         description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
     }
     setScannerAssignmentsDialogOpen(false);
-    toast({ title: "Zapisano przypisania skanera" });
+    toast({ title: "Zapisano przypisania operatora" });
   };
 
   const handleChangeScannerRole = async (scanner: User, role: "scanner" | "scanner_plus") => {
     const result = await changeRole(scanner.id, role);
     if (!result.ok) {
       toast({
-        title: "Nie udało się zmienić uprawnień skanera",
+        title: "Nie udało się zmienić uprawnień operatora",
         description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
@@ -497,7 +517,7 @@ export default function OrganizationDetails() {
     }
 
     toast({
-      title: role === "scanner" ? "Skaner ma ograniczone uprawnienia" : "Skaner ma rozszerzone uprawnienia",
+      title: role === "scanner" ? "Zmieniono rolę na Operator" : "Zmieniono rolę na Operator Plus",
       description: scanner.name,
     });
   };
@@ -544,7 +564,7 @@ export default function OrganizationDetails() {
       title:
         archivedUser.role === "editor"
           ? "Usunięto organizatora"
-          : "Usunięto skanera",
+          : "Usunięto operatora",
       description:
         "Konto zostało zarchiwizowane. Ta osoba nie zaloguje się już na stare konto, a ten email można wykorzystać ponownie.",
     });
@@ -649,7 +669,7 @@ export default function OrganizationDetails() {
             <span className="ml-2 font-medium">{organizers.length}</span>
           </div>
           <div>
-            <span className="text-muted-foreground">Skanerzy</span>
+            <span className="text-muted-foreground">Operatorzy</span>
             <span className="ml-2 font-medium">{scanners.length}</span>
           </div>
           <div className="min-w-0">
@@ -828,7 +848,7 @@ export default function OrganizationDetails() {
       <section className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Skanerzy</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Operatorzy</h2>
           </div>
           {canManageScanners && (
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -837,7 +857,7 @@ export default function OrganizationDetails() {
                 className="h-11 w-full sm:h-10 sm:w-auto"
               >
                 <Plus className="mr-1 h-4 w-4" />
-                Dodaj skanera
+                Dodaj operatora
               </Button>
               <Button
                 variant="outline"
@@ -845,15 +865,15 @@ export default function OrganizationDetails() {
                 className="h-11 w-full sm:h-10 sm:w-auto"
               >
                 <Plus className="mr-1 h-4 w-4" />
-                Dodaj skanera plus
+                Dodaj Operator Plus
               </Button>
             </div>
           )}
         </div>
         {scanners.length === 0 ? (
           <EmptyTableState
-            title="Brak skanerów"
-            description="Po dodaniu skanerów pojawi się tutaj ich lista."
+            title="Brak operatorów"
+            description="Po dodaniu operatorów pojawi się tutaj ich lista."
           />
         ) : (
           <>
@@ -867,7 +887,7 @@ export default function OrganizationDetails() {
                     </TableHead>
                     <TableHead>Przypisane wydarzenia</TableHead>
                     {canManageScanners && (
-                      <TableHead className="w-[300px]">Akcje</TableHead>
+                      <TableHead className="w-[340px]">Akcje</TableHead>
                     )}
                   </TableRow>
                 </TableHeader>
@@ -891,12 +911,12 @@ export default function OrganizationDetails() {
                         {getEventNames(scanner.assigned_events)}
                       </TableCell>
                       {canManageScanners && (
-                        <TableCell>
-                          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                        <TableCell className="align-top">
+                          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-8 w-full rounded-lg px-2.5 text-xs sm:w-auto"
+                              className="h-9 w-full justify-center rounded-lg px-3 text-xs"
                               onClick={() =>
                                 openScannerAssignmentsDialog(scanner.id)
                               }
@@ -907,10 +927,10 @@ export default function OrganizationDetails() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-8 w-full rounded-lg px-2.5 text-xs sm:w-auto"
+                                className="h-9 w-full justify-center rounded-lg px-3 text-xs"
                                 onClick={() => void handleChangeScannerRole(scanner, "scanner")}
                               >
-                                Zmień na zwykły skaner
+                                Zmień na Operator
                               </Button>
                             )}
                             {canManageMemberAccounts && (
@@ -918,7 +938,7 @@ export default function OrganizationDetails() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-8 w-full rounded-lg px-2.5 text-xs sm:w-auto"
+                                  className="h-9 w-full justify-center rounded-lg px-3 text-xs"
                                   onClick={() =>
                                     openPasswordResetDialog(scanner)
                                   }
@@ -929,7 +949,7 @@ export default function OrganizationDetails() {
                                 <Button
                                   size="sm"
                                   variant="destructive"
-                                  className="h-8 w-full rounded-lg px-2.5 text-xs sm:w-auto"
+                                  className="h-9 w-full justify-center rounded-lg px-3 text-xs"
                                   onClick={() => openArchiveUserDialog(scanner)}
                                 >
                                   <Trash2 className="mr-1 h-3.5 w-3.5" />
@@ -1261,11 +1281,11 @@ export default function OrganizationDetails() {
               Po zapisaniu konto zostanie utworzone, a użytkownik dostanie mail
               z linkiem do ustawienia hasła.
             </p>
-            {isScannerRole(memberForm.role) && orgEvents.length > 0 && (
+            {isScannerRole(memberForm.role) && assignableScannerEvents.length > 0 && (
               <div className="space-y-2">
                 <Label>Przypisane wydarzenia</Label>
                 <div className="space-y-2 rounded-xl border p-3">
-                  {orgEvents.map((event) => (
+                  {assignableScannerEvents.map((event) => (
                     <label
                       key={event.id}
                       className="flex items-center gap-3 text-sm"
@@ -1281,6 +1301,11 @@ export default function OrganizationDetails() {
                   ))}
                 </div>
               </div>
+            )}
+            {isScannerRole(memberForm.role) && assignableScannerEvents.length === 0 && (
+              <p className="rounded-xl border border-dashed px-3 py-3 text-xs text-muted-foreground">
+                Operatora można przypisać tylko do aktualnie otwartych lub przyszłych wydarzeń.
+              </p>
             )}
             <FieldError id="organization-member-form-error">
               {memberErrors.form}
@@ -1305,12 +1330,12 @@ export default function OrganizationDetails() {
       >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Przypisz wydarzenia skanerowi</DialogTitle>
+            <DialogTitle>Przypisz wydarzenia operatorowi</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            {orgEvents.length > 0 ? (
+            {assignableScannerEvents.length > 0 ? (
               <div className="space-y-2 rounded-xl border p-3">
-                {orgEvents.map((event) => (
+                {assignableScannerEvents.map((event) => (
                   <label
                     key={event.id}
                     className="flex items-center gap-3 text-sm"
@@ -1327,7 +1352,7 @@ export default function OrganizationDetails() {
               </div>
             ) : (
               <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                Najpierw dodaj wydarzenia do tej organizacji.
+                Brak aktualnie otwartych lub przyszłych wydarzeń do przypisania.
               </div>
             )}
           </div>

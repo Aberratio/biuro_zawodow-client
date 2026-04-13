@@ -74,7 +74,7 @@ function getOfficeStatusSummary(eventOffice: { office_open_at: string; office_cl
       tone: 'upcoming',
       badgeLabel: 'Biuro przed otwarciem',
       headline: `Biuro otworzy się za ${formatDistanceToNowStrict(openAt, { addSuffix: false, locale: pl })}.`,
-      detail: `Zespół zacznie pracę ${formatEventOfficeStart(eventOffice)}. Do tego czasu skanerzy nie zobaczą aktywnego wydarzenia.`,
+      detail: `Zespół zacznie pracę ${formatEventOfficeStart(eventOffice)}. Do tego czasu operatorzy nie zobaczą aktywnego wydarzenia.`,
       timingLabel: 'Otwarcie',
       timingValue: formatEventOfficeStart(eventOffice),
     };
@@ -293,6 +293,7 @@ export default function EventDetails() {
   const officeCloseAt = getEventOfficeCloseAt(event);
   const isFinishedEvent = officeCloseAt !== null && now > officeCloseAt;
   const canArchiveEvent = canEditEvent && !isArchivedEvent && officeCloseAt !== null && now > officeCloseAt;
+  const canAssignScannersToEvent = !isArchivedEvent && officeCloseAt !== null && now <= officeCloseAt;
 
   const handleManualFieldChange = (alias: string, value: string) => {
     setManualFields(previous => ({ ...previous, [alias]: value }));
@@ -334,8 +335,8 @@ export default function EventDetails() {
         const result = await assignScannerEvents(scanner.id, nextAssignedEvents);
         if (!result.ok) {
           toast({
-            title: 'Nie udało się zapisać przypisań skanerów',
-            description: result.error ?? `Nie udało się zaktualizować skanera ${scanner.name}.`,
+            title: 'Nie udało się zapisać przypisań operatorów',
+            description: result.error ?? `Nie udało się zaktualizować operatora ${scanner.name}.`,
             variant: 'destructive',
           });
           return;
@@ -343,7 +344,7 @@ export default function EventDetails() {
       }
 
       setScannerDialogOpen(false);
-      toast({ title: 'Zapisano przypisania skanerów' });
+      toast({ title: 'Zapisano przypisania operatorów' });
     } finally {
       setScannerSaving(false);
     }
@@ -498,12 +499,14 @@ export default function EventDetails() {
       </Button>
 
       {isArchivedEvent && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900">
+        <div className="archive-notice rounded-xl border px-4 py-3 text-sm">
           <div className="flex items-start gap-3">
-            <Archive className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="archive-notice-icon mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border">
+              <Archive className="h-4 w-4" />
+            </div>
             <div>
-              <p className="font-semibold">To wydarzenie jest zarchiwizowane.</p>
-              <p className="mt-1 text-amber-900/80">
+              <p className="archive-notice-title font-semibold">To wydarzenie jest zarchiwizowane.</p>
+              <p className="archive-notice-copy mt-1">
                 Jest ukryte z aktywnych list i przypisań. Dane są dostępne do podglądu, a zmiany w archiwum może wykonywać tylko superadmin.
               </p>
             </div>
@@ -563,7 +566,7 @@ export default function EventDetails() {
                     <p className="mt-1 font-semibold">{checkedIn}/{eventParticipants.length}</p>
                   </div>
                   <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
-                    <p className="text-xs text-muted-foreground">Skanerzy</p>
+                    <p className="text-xs text-muted-foreground">Operatorzy</p>
                     <p className="mt-1 font-semibold">{assignedScanners.length}</p>
                   </div>
                 </div>
@@ -599,8 +602,8 @@ export default function EventDetails() {
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
                 {isFinishedEvent
-                  ? 'Sprawdź, czy organizacja miała przypisanych organizatorów, administratorów lub skanerów.'
-                  : 'Dodaj skanerów lub sprawdź, czy organizacja ma przypisanych organizatorów i administratorów.'}
+                  ? 'Sprawdź, czy organizacja miała przypisanych organizatorów, administratorów lub operatorów.'
+                  : 'Dodaj operatorów lub sprawdź, czy organizacja ma przypisanych organizatorów i administratorów.'}
               </p>
             </CardContent>
           </Card>
@@ -618,10 +621,10 @@ export default function EventDetails() {
             emptyText="Brak organizatorów."
           />
           <TeamRoleCard
-            title={isFinishedEvent ? 'Skanerzy pracujący przy wydarzeniu' : 'Skanerzy wydarzenia'}
+            title={isFinishedEvent ? 'Operatorzy pracujący przy wydarzeniu' : 'Operatorzy wydarzenia'}
             users={assignedScanners}
-            emptyText="Brak skanerów."
-            action={canManageScanners && canUseActiveEventTools ? (
+            emptyText="Brak operatorów."
+            action={canManageScanners && canAssignScannersToEvent ? (
               <Button variant="outline" size="sm" onClick={openScannerDialog}>
                 Zarządzaj
               </Button>
@@ -654,9 +657,9 @@ export default function EventDetails() {
                   <Pencil className="mr-1 h-4 w-4" /> Edytuj wydarzenie
                 </Button>
               )}
-              {canManageScanners && canUseActiveEventTools && (
+              {canManageScanners && canAssignScannersToEvent && (
                 <Button variant="outline" onClick={openScannerDialog} className="h-11 justify-start">
-                  <ScanLine className="mr-1 h-4 w-4" /> Zarządzaj skanerami
+                  <ScanLine className="mr-1 h-4 w-4" /> Zarządzaj operatorami
                 </Button>
               )}
               {!isArchivedEvent && canOperateOnEvent && (
@@ -850,7 +853,7 @@ export default function EventDetails() {
       <Dialog open={scannerDialogOpen} onOpenChange={setScannerDialogOpen}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Przypisz skanerów do wydarzenia</DialogTitle>
+            <DialogTitle>Przypisz operatorów do wydarzenia</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {organizationScanners.length > 0 ? (
@@ -864,7 +867,7 @@ export default function EventDetails() {
               </div>
             ) : (
               <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                Brak skanerów w organizacji tego wydarzenia.
+                Brak operatorów w organizacji tego wydarzenia.
               </div>
             )}
           </div>

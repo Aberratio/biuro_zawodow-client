@@ -35,6 +35,11 @@ export function getEventOfficeCloseAt(event: Pick<Event, 'office_close_at'>): Da
   return parseEventDateTime(event.office_close_at);
 }
 
+export function isEventCurrentOrUpcoming(event: Pick<Event, 'office_close_at'>, now = new Date()): boolean {
+  const closeAt = getEventOfficeCloseAt(event);
+  return closeAt !== null && closeAt > now;
+}
+
 export function formatEventOfficeStart(event: Pick<Event, 'office_open_at'>): string {
   const openAt = getEventOfficeOpenAt(event);
   if (!openAt) {

@@ -254,18 +254,20 @@ function ActiveEventCard({
   const progress = participantsCount ? Math.round((checkedInCount / participantsCount) * 100) : 0;
 
   return (
-    <Card className="overflow-hidden border-primary/30 shadow-sm">
-      <CardHeader className="border-b bg-primary/5">
+    <Card className="overflow-hidden border-emerald-400/30 shadow-sm">
+      <CardHeader className="border-b bg-emerald-500/5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="text-lg">{event.name}</CardTitle>
-              <Badge>Biuro otwarte</Badge>
+              <Badge className="border-emerald-400/25 bg-emerald-500/15 text-emerald-100 shadow-[0_8px_18px_rgba(16,185,129,0.18)] hover:bg-emerald-500/20">
+                Biuro otwarte
+              </Badge>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">{organizationName}</p>
           </div>
-          <div className="rounded-2xl bg-primary/10 px-3 py-2 text-right">
-            <p className="text-xs font-medium uppercase tracking-[0.14em] text-primary">Odprawa</p>
+          <div className="rounded-2xl bg-emerald-500/10 px-3 py-2 text-right ring-1 ring-inset ring-emerald-400/20">
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-emerald-300">Odprawa</p>
             <p className="text-lg font-semibold tabular-nums">{checkedInCount}/{participantsCount}</p>
           </div>
         </div>
@@ -281,11 +283,14 @@ function ActiveEventCard({
             <span className="font-medium">{progress}%</span>
           </div>
           <div className="h-2 rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+            <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${progress}%` }} />
           </div>
         </div>
         <div className="flex justify-end">
-          <Button className="h-11 w-full gap-2 sm:h-10 sm:w-auto" onClick={onOpen}>
+          <Button
+            className="h-11 w-full gap-2 border-emerald-400/35 bg-emerald-600 text-white shadow-[0_14px_30px_rgba(5,150,105,0.28)] hover:bg-emerald-500 sm:h-10 sm:w-auto"
+            onClick={onOpen}
+          >
             Otwórz wydarzenie
             <ArrowRight className="h-4 w-4" />
           </Button>

@@ -323,7 +323,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try { const updatedOrganization = await updateOrganizationInApi(organizationId, data); setOrganizations(previous => previous.map(organization => organization.id === organizationId ? updatedOrganization : organization)); if (data.name) addLog(`Zaktualizowano organizację: ${updatedOrganization.name}`); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zaktualizować organizacji' }; }
   }, [addLog, updateOrganizationInApi]);
   const assignScannerEvents = useCallback(async (userId: string, eventIds: string[]): Promise<MutationResult> => {
-    try { const updatedUser = await assignScannerEventsInApi(userId, eventIds); setUsers(previous => previous.map(user => user.id === userId ? updatedUser : user)); syncStoredAuthUser(user => user.id === userId ? updatedUser : user); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zapisać przypisań skanera' }; }
+    try { const updatedUser = await assignScannerEventsInApi(userId, eventIds); setUsers(previous => previous.map(user => user.id === userId ? updatedUser : user)); syncStoredAuthUser(user => user.id === userId ? updatedUser : user); return { ok: true }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zapisać przypisań operatora' }; }
   }, [assignScannerEventsInApi, syncStoredAuthUser]);
   const updateOrganizationEventLimit = useCallback(async (organizationId: string, eventLimit: number): Promise<MutationResult> => {
     const assignedEventsCount = events.filter(event => event.organization_id === organizationId).length;

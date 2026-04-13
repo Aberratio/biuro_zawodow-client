@@ -103,18 +103,18 @@ export default function ArchivedEvents() {
         </div>
       </div>
 
-      <Card className="border-amber-500/20 bg-amber-500/10 shadow-sm">
+      <Card className="archive-notice shadow-sm">
         <CardContent className="p-5">
-          <p className="text-sm font-semibold text-foreground">
+          <p className="archive-notice-title text-sm font-semibold">
             Archiwum wydarzeń przechowuje wydarzenia, które już się odbyły i
             zostały zamknięte w systemie.
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="archive-notice-copy mt-2 text-sm">
             Wydarzenia są automatycznie przenoszone do archiwum miesiąc po zamknięciu biura zawodów.
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="archive-notice-copy mt-2 text-sm">
             Takie wydarzenia nie pojawiają się na aktywnych listach, nie są
-            dostępne w filtrach ani przypisaniach skanerów. Dane pozostają do
+            dostępne w filtrach ani przypisaniach operatorów. Dane pozostają do
             podglądu, a zmiany w archiwum może wykonywać tylko superadmin.
           </p>
         </CardContent>
