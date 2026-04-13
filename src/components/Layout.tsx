@@ -1,8 +1,16 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 
 export function Layout({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  const mainRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [pathname]);
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -16,7 +24,11 @@ export function Layout({ children }: { children: ReactNode }) {
               <SidebarTrigger className="rounded-xl border border-border/60 bg-background/35 backdrop-blur-sm hover:bg-accent/70" />
             </div>
           </header>
-          <main className="relative flex-1 overflow-auto p-4 sm:p-5 lg:p-6">
+          <main
+            ref={mainRef}
+            data-app-scroll-root="true"
+            className="relative flex-1 overflow-auto p-4 sm:p-5 lg:p-6"
+          >
             <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-primary/25 to-transparent" />
             <div className="relative z-10 mx-auto w-full max-w-[1600px]">
               {children}

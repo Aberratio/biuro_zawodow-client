@@ -61,6 +61,11 @@ function buildPaginationModel(currentPage: number, totalPages: number): Array<nu
   return [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
 }
 
+function scrollAppContentToTop() {
+  const scrollRoot = document.querySelector<HTMLElement>('[data-app-scroll-root="true"]');
+  scrollRoot?.scrollTo({ top: 0 });
+}
+
 export default function Events() {
   const {
     visibleEvents,
@@ -207,6 +212,14 @@ export default function Events() {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    if (!shouldShowFiltersAndPagination || totalPages <= 1) {
+      return;
+    }
+
+    scrollAppContentToTop();
+  }, [currentPage, shouldShowFiltersAndPagination, totalPages]);
 
   const paginatedRows = useMemo(() => {
     if (!shouldShowFiltersAndPagination) {

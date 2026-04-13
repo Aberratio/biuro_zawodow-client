@@ -3,16 +3,12 @@ import { useNavigate } from "react-router-dom";
 import {
   Building2,
   CalendarDays,
-  Crown,
-  Eye,
   FileUp,
   Info,
   LayoutDashboard,
   LogOut,
   Mail,
-  Pencil,
   ScanLine,
-  Shield,
   UserRound,
   Users,
 } from "lucide-react";
@@ -48,7 +44,7 @@ import {
 } from "@/components/ui/select";
 import type { Role } from "@/types";
 import { isEventOfficeOpen } from "@/lib/events";
-import { getRoleLabel, isScannerRole } from "@/lib/roles";
+import { isScannerRole } from "@/lib/roles";
 
 const allItems = [
   {
@@ -101,13 +97,6 @@ const allItems = [
   },
 ];
 
-const roleIcons: Record<Role, typeof Shield> = {
-  superadmin: Crown,
-  admin: Shield,
-  editor: Pencil,
-  scanner: Eye,
-  scanner_plus: Eye,
-};
 const eventScopedUrls = new Set([
   "/participants",
   "/scanner",
@@ -156,7 +145,6 @@ export function AppSidebar() {
   });
 
   const generalItems = items.filter((item) => !eventScopedUrls.has(item.url));
-  const RoleIcon = roleIcons[currentRole];
   const adminOrganizations =
     currentRole === "admin"
       ? organizations.filter((organization) =>
@@ -378,13 +366,10 @@ export function AppSidebar() {
               onClick={() => navigate("/profile")}
             >
               <div className="flex min-w-0 items-center gap-2 text-left">
-                <RoleIcon className="h-3.5 w-3.5 shrink-0 text-sidebar-foreground/75" />
+                <UserRound className="h-3.5 w-3.5 shrink-0 text-sidebar-foreground/75" />
                 <div className="min-w-0">
                   <p className="truncate text-xs font-medium text-sidebar-foreground">
                     {currentUser.name}
-                  </p>
-                  <p className="text-[10px] text-sidebar-foreground/60">
-                    {getRoleLabel(currentRole)}
                   </p>
                 </div>
               </div>
@@ -407,7 +392,7 @@ export function AppSidebar() {
                 className="mx-auto h-8 w-8"
                 title={currentUser.name}
               >
-                <RoleIcon className="h-3.5 w-3.5" />
+                <UserRound className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="right" className="w-52">

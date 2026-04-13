@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
@@ -44,7 +43,6 @@ import {
 } from "@/lib/form-validation";
 import {
   getRoleLabel,
-  getScannerPermissionLabel,
   isScannerRole,
 } from "@/lib/roles";
 import type { User } from "@/types";
@@ -621,7 +619,7 @@ export default function OrganizationDetails() {
                   )}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Administrator: {adminLabel}
+                  Szczegóły organizacji i zespołu.
                 </p>
               </div>
             </div>
@@ -801,7 +799,6 @@ export default function OrganizationDetails() {
                   <TableRow>
                     <TableHead>Imię i nazwisko</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead className="w-[140px]">Rola</TableHead>
                     {canManageMemberAccounts && (
                       <TableHead className="w-[250px]">Akcje</TableHead>
                     )}
@@ -815,11 +812,6 @@ export default function OrganizationDetails() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {organizer.email}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-[10px]">
-                          Organizator
-                        </Badge>
                       </TableCell>
                       {canManageMemberAccounts && (
                         <TableCell>
@@ -900,7 +892,6 @@ export default function OrganizationDetails() {
                     <TableHead className="hidden md:table-cell">
                       Email
                     </TableHead>
-                    <TableHead>Uprawnienia</TableHead>
                     <TableHead>Przypisane wydarzenia</TableHead>
                     {canManageScanners && (
                       <TableHead className="w-[300px]">Akcje</TableHead>
@@ -922,11 +913,6 @@ export default function OrganizationDetails() {
                       </TableCell>
                       <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
                         {scanner.email}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={scanner.role === "scanner_plus" ? "default" : "secondary"}>
-                          {getScannerPermissionLabel(scanner.role)}
-                        </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {getEventNames(scanner.assigned_events)}
