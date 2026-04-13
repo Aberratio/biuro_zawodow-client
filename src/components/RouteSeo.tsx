@@ -27,7 +27,7 @@ function getSeoConfig(pathname: string): SeoConfig {
   if (pathname === "/login") {
     return {
       title: `Logowanie | ${APP_NAME}`,
-      description: "Logowanie do panelu Biuro Zawodów dla organizatorów, biura zawodów i obsługi skanerów QR.",
+      description: "Logowanie do panelu Biuro Zawodów dla organizatorów, biura zawodów i operatorów QR.",
     };
   }
 
@@ -117,8 +117,8 @@ function getSeoConfig(pathname: string): SeoConfig {
 
   if (pathname === "/scanner-info") {
     return {
-      title: `Informacje dla skanera | ${APP_NAME}`,
-      description: "Informacje o dostępności przypisanych wydarzeń i pracy skanera QR.",
+      title: `Informacje dla operatora | ${APP_NAME}`,
+      description: "Informacje o dostępności przypisanych wydarzeń i pracy operatora QR.",
     };
   }
 

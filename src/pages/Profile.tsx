@@ -15,8 +15,8 @@ const roleLabels: Record<string, string> = {
   superadmin: 'Superadmin',
   admin: 'Admin',
   editor: 'Organizator',
-  scanner: 'Skaner',
-  scanner_plus: 'Skaner plus',
+  scanner: 'Operator',
+  scanner_plus: 'Operator Plus',
 };
 
 export default function Profile() {
