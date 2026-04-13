@@ -167,6 +167,7 @@ export function AppSidebar() {
     selectedEvent !== null && isEventOfficeOpen(selectedEvent);
   const eventScopedItems = items
     .filter((item) => eventScopedUrls.has(item.url))
+    .filter((item) => item.url !== "/import" && item.url !== "/emails")
     .filter((item) => item.url !== "/scanner" || selectedEventOfficeOpen);
   const showOrganizationSelectControl = adminOrganizations.length > 1;
   const showEventSelectControl =

@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Info, ScanLine } from 'lucide-react';
+import { ArrowRight, ScanLine } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import DashboardSkeleton from '@/components/skeletons/DashboardSkeleton';
 import { participantCountsAsCheckedIn } from '@/lib/participant-status';
-import { formatEventOfficeEnd, formatEventOfficeStart, formatEventOfficeWindow, getEventOfficeCloseAt, getEventOfficeOpenAt, isEventOfficeOpen } from '@/lib/events';
+import { formatEventOfficeStart, formatEventOfficeWindow, getEventOfficeCloseAt, getEventOfficeOpenAt, isEventOfficeOpen } from '@/lib/events';
 import type { Event } from '@/types';
 
 export default function Dashboard() {
@@ -39,21 +39,10 @@ export default function Dashboard() {
         return openAt !== null && openAt > now;
       })
       .sort((left, right) => (getEventOfficeOpenAt(left)?.getTime() ?? Number.MAX_SAFE_INTEGER) - (getEventOfficeOpenAt(right)?.getTime() ?? Number.MAX_SAFE_INTEGER));
-    const finishedEvents = dashboardEvents
-      .filter(event => {
-        const closeAt = getEventOfficeCloseAt(event);
-        return closeAt !== null && closeAt < now;
-      })
-      .sort((left, right) => (getEventOfficeCloseAt(right)?.getTime() ?? 0) - (getEventOfficeCloseAt(left)?.getTime() ?? 0))
-      .slice(0, 5);
-
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Panel</h1>
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            Szybki podgląd aktualnie otwartych biur zawodów, nadchodzących startów i ostatnio zakończonych wydarzeń.
-          </p>
         </div>
 
         <section className="space-y-4">
@@ -85,15 +74,12 @@ export default function Dashboard() {
           )}
         </section>
 
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div>
           <Card className="border-border/70 shadow-sm">
             <CardHeader className="border-b bg-muted/20">
               <div>
                 <div>
                   <CardTitle className="text-base">Nadchodzące wydarzenia</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Najbliższe otwarcia biura zawodów z informacją o organizacji.
-                  </p>
                 </div>
               </div>
             </CardHeader>
@@ -117,38 +103,6 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
-
-          <Card className="border-border/70 shadow-sm">
-            <CardHeader className="border-b bg-muted/20">
-              <div>
-                <div>
-                  <CardTitle className="text-base">Ostatnio zakończone</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Pięć ostatnich wydarzeń zamkniętych po pracy biura zawodów.
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {finishedEvents.length === 0 ? (
-                <div className="p-5">
-                  <EmptyState
-                    title="Brak zakończonych wydarzeń"
-                    description="Zamknięte wydarzenia pojawią się tutaj automatycznie po upływie czasu pracy biura."
-                    compact
-                  />
-                </div>
-              ) : (
-                <EventOverviewTable
-                  events={finishedEvents}
-                  organizationNames={organizationNames}
-                  metaColumnLabel="Zamknięto"
-                  getMetaValue={event => formatEventOfficeEnd(event)}
-                  onOpen={eventId => navigate(`/events/${eventId}`)}
-                />
-              )}
-            </CardContent>
-          </Card>
         </div>
       </div>
     );
@@ -165,21 +119,10 @@ export default function Dashboard() {
         return openAt !== null && openAt > now;
       })
       .sort((left, right) => (getEventOfficeOpenAt(left)?.getTime() ?? Number.MAX_SAFE_INTEGER) - (getEventOfficeOpenAt(right)?.getTime() ?? Number.MAX_SAFE_INTEGER));
-    const finishedEvents = visibleEvents
-      .filter(event => {
-        const closeAt = getEventOfficeCloseAt(event);
-        return closeAt !== null && closeAt < now;
-      })
-      .sort((left, right) => (getEventOfficeCloseAt(right)?.getTime() ?? 0) - (getEventOfficeCloseAt(left)?.getTime() ?? 0))
-      .slice(0, 5);
-
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Panel</h1>
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            Podgląd wydarzeń Twojej organizacji: aktywnych, nadchodzących i ostatnio zakończonych.
-          </p>
         </div>
 
         <section className="space-y-4">
@@ -211,15 +154,12 @@ export default function Dashboard() {
           )}
         </section>
 
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div>
           <Card className="border-border/70 shadow-sm">
             <CardHeader className="border-b bg-muted/20">
               <div>
                 <div>
                   <CardTitle className="text-base">Nadchodzące wydarzenia</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Najbliższe wydarzenia Twojej organizacji z szybkim wejściem do szczegółów.
-                  </p>
                 </div>
               </div>
             </CardHeader>
@@ -243,38 +183,6 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
-
-          <Card className="border-border/70 shadow-sm">
-            <CardHeader className="border-b bg-muted/20">
-              <div>
-                <div>
-                  <CardTitle className="text-base">Ostatnio zakończone</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Pięć ostatnich zakończonych wydarzeń z Twojej organizacji.
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {finishedEvents.length === 0 ? (
-                <div className="p-5">
-                  <EmptyState
-                    title="Brak zakończonych wydarzeń"
-                    description="Po zakończeniu wydarzeń z Twojej organizacji pojawią się tutaj."
-                    compact
-                  />
-                </div>
-              ) : (
-                <EventOverviewTable
-                  events={finishedEvents}
-                  organizationNames={organizationNames}
-                  metaColumnLabel="Zamknięto"
-                  getMetaValue={event => formatEventOfficeEnd(event)}
-                  onOpen={eventId => navigate(`/events/${eventId}`)}
-                />
-              )}
-            </CardContent>
-          </Card>
         </div>
       </div>
     );
@@ -284,9 +192,6 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Panel</h1>
-        <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-          Panel skanera dla aktualnego wydarzenia.
-        </p>
       </div>
 
       {currentEvent && (
@@ -299,25 +204,10 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {currentEvent && (
-        <Card className={currentEventOfficeOpen ? 'border-primary/20 bg-primary/5' : 'border-dashed bg-muted/30'}>
-          <CardContent className="py-3">
-            <div className="flex items-start gap-2">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <div className="space-y-1 text-xs text-muted-foreground">
-                {currentEventOfficeOpen ? (
-                  <>
-                    <p>Witaj! Kliknij <strong>"Przejdź do skanera"</strong>, aby rozpocząć odprawę uczestników.</p>
-                    <p>Możesz skanować kody QR kamerą lub wyszukać zawodnika ręcznie po nazwisku albo numerze.</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-medium text-foreground">Skaner jest dostępny tylko w godzinach otwarcia biura zawodów.</p>
-                    <p>Dla wybranego wydarzenia biuro nie jest teraz otwarte, więc wejście do skanera jest ukryte.</p>
-                  </>
-                )}
-              </div>
-            </div>
+      {currentEvent && !currentEventOfficeOpen && (
+        <Card className="border-dashed bg-muted/30">
+          <CardContent className="py-3 text-sm text-muted-foreground">
+            Skaner jest dostępny tylko w godzinach otwarcia biura zawodów dla wybranego wydarzenia.
           </CardContent>
         </Card>
       )}
@@ -394,10 +284,7 @@ function ActiveEventCard({
             <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
           </div>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-muted-foreground">
-            Łatwy dostęp do uczestników, maili QR i szczegółów wydarzenia.
-          </div>
+        <div className="flex justify-end">
           <Button className="h-11 w-full gap-2 sm:h-10 sm:w-auto" onClick={onOpen}>
             Otwórz wydarzenie
             <ArrowRight className="h-4 w-4" />

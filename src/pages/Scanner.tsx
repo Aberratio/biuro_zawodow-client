@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Info, Loader2, Undo2, UserX2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Loader2, Undo2, UserX2 } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Participant } from '@/types';
 import QrScannerView from '@/components/QrScannerView';
 import ParticipantSearch from '@/components/ParticipantSearch';
 import ScannerSkeleton from '@/components/skeletons/ScannerSkeleton';
-import { getParticipantStatusDefinition, participantCountsAsCheckedIn } from '@/lib/participant-status';
+import { getParticipantStatusDefinition } from '@/lib/participant-status';
 import { Navigate } from 'react-router-dom';
 import { formatEventOfficeWindow, isEventOfficeOpen } from '@/lib/events';
 import { isScannerRole } from '@/lib/roles';
@@ -22,7 +22,6 @@ export default function Scanner() {
   const [scannedParticipant, setScannedParticipant] = useState<Participant | null>(null);
   const [recentScans, setRecentScans] = useState<Participant[]>([]);
   const [showRecent, setShowRecent] = useState(true);
-  const [showHelp, setShowHelp] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
   const [errorMessage, setErrorMessage] = useState('Nie znaleziono uczestnika dla tego kodu QR.');
   const successTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -34,7 +33,6 @@ export default function Scanner() {
     () => participants.filter(participant => participant.event_id === activeEventId),
     [activeEventId, participants]
   );
-  const checkedIn = eventParticipants.filter(participantCountsAsCheckedIn).length;
   const hasActiveEvents = visibleEvents.length > 0;
 
   useEffect(() => () => {
@@ -188,31 +186,9 @@ export default function Scanner() {
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 md:px-0">
-        <div className="flex items-center gap-2">
-          <h1 className="font-heading text-lg md:text-2xl font-bold tracking-tight">Skaner</h1>
-          <button className="text-muted-foreground hover:text-foreground transition-colors touch-manipulation" onClick={() => setShowHelp(previous => !previous)} aria-label="Pokaż instrukcję">
-            <Info className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 font-mono tabular-nums text-xs sm:text-sm font-bold">
-            {checkedIn}/{eventParticipants.length}
-          </div>
-        </div>
+      <div className="px-4 md:px-0">
+        <h1 className="font-heading text-lg font-bold tracking-tight md:text-2xl">Skaner</h1>
       </div>
-
-      {showHelp && (
-        <div className="px-4 md:px-0">
-          <Card className="border-primary/20 bg-primary/5">
-            <CardContent className="py-3 space-y-2 text-xs text-muted-foreground">
-              <p className="font-semibold text-foreground">Jak korzystać ze skanera</p>
-              <p>Skan QR zawsze weryfikuje kod po stronie API i pilnuje przypisań skanera do wydarzeń.</p>
-              <p>Po skanie zobaczysz kartę uczestnika i dopiero z niej wykonasz odpowiednią akcję.</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       <div className="px-4 md:px-0">
         <ParticipantSearch participants={eventParticipants} onSelect={handleSearchSelect} autoFocus={view === 'idle'} />

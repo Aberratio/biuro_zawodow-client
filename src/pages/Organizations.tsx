@@ -69,18 +69,14 @@ export default function Organizations() {
       .filter(org => !normalizedQuery || org.name.toLocaleLowerCase('pl-PL').includes(normalizedQuery))
       .map(org => {
         const organizationEvents = events.filter(event => event.organization_id === org.id);
-        const teamCount = users.filter(
-          user => user.organization_id === org.id && (user.role === 'editor' || user.role === 'scanner' || user.role === 'scanner_plus')
-        ).length;
 
         return {
           ...org,
           eventCount: organizationEvents.length,
           nextEventLabel: getClosestOrganizationEventLabel(organizationEvents, now),
-          teamCount,
         };
       });
-  }, [events, normalizedQuery, now, users, visibleOrganizations]);
+  }, [events, normalizedQuery, now, visibleOrganizations]);
 
   if (isLoading) return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
 
@@ -139,9 +135,6 @@ export default function Organizations() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Organizacje</h1>
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            Lista organizacji. Kliknij wiersz, aby otworzyć szczegóły.
-          </p>
         </div>
         {(currentRole === 'admin' || currentRole === 'superadmin') && (
           <Button onClick={() => setOpen(true)} size="sm" className="w-full sm:w-auto sm:self-auto">
@@ -187,7 +180,6 @@ export default function Organizations() {
                     <TableHead>Nazwa</TableHead>
                     <TableHead className="hidden md:table-cell">Najbliższe wydarzenie</TableHead>
                     <TableHead>Wydarzenia</TableHead>
-                    <TableHead className="hidden sm:table-cell">Zespół</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -219,16 +211,12 @@ export default function Organizations() {
                       <TableCell className="text-sm tabular-nums">
                         {org.eventCount}/{org.event_limit}
                       </TableCell>
-                      <TableCell className="hidden text-sm tabular-nums sm:table-cell">
-                        {org.teamCount}
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
           )}
-          <p className="text-xs text-muted-foreground">{filteredOrganizations.length} organizacji</p>
         </>
       )}
 
