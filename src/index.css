@@ -287,6 +287,21 @@ All colors MUST be HSL.
 }
 
 @layer utilities {
+  .min-h-app-viewport {
+    min-height: 100vh;
+    min-height: 100svh;
+  }
+
+  @supports (min-height: 100dvh) {
+    .min-h-app-viewport {
+      min-height: 100dvh;
+    }
+  }
+
+  .pb-safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  }
+
   .themed-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--primary) / 0.75) hsl(var(--muted));

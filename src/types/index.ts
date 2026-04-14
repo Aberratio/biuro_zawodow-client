@@ -1,4 +1,4 @@
-export type Role = 'superadmin' | 'admin' | 'editor' | 'scanner' | 'scanner_plus';
+﻿export type Role = 'superadmin' | 'admin' | 'editor' | 'scanner' | 'scanner_plus';
 
 export type ParticipantStatus = 'not_checked_in' | 'checked_in' | 'checked_in_not_starting';
 export type EmailStatus = 'not_sent' | 'sent';
@@ -75,6 +75,7 @@ export interface User {
 export interface ActivityLog {
   id: string;
   event_id?: string;
+  participant_id?: string;
   timestamp: string;
   action: string;
   participant_name?: string;

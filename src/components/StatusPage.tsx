@@ -26,7 +26,7 @@ export function StatusPage({
   primaryTo = "/",
 }: StatusPageProps) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10">
+    <div className="min-h-app-viewport relative flex items-center justify-center overflow-x-hidden bg-background px-4 py-10">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-[-8rem] top-[-6rem] h-56 w-56 rounded-full bg-primary/20 blur-3xl" />
         <div className="absolute bottom-[-7rem] right-[-5rem] h-64 w-64 rounded-full bg-sky-400/10 blur-3xl" />

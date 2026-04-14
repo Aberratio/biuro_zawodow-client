@@ -65,7 +65,7 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+    <div className="min-h-app-viewport relative flex items-center justify-center overflow-x-hidden px-4 py-10">
       <div className="pointer-events-none absolute inset-0 page-gradient" />
       <div className="pointer-events-none absolute right-[-8rem] top-[-6rem] h-[24rem] w-[24rem] rounded-full bg-primary/5 blur-3xl" />
       <Card className="relative z-10 w-full max-w-md overflow-hidden">
