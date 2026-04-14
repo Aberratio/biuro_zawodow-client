@@ -58,7 +58,7 @@ export default function Login() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden">
+    <div className="min-h-app-viewport relative flex flex-col overflow-x-hidden">
       <div className="pointer-events-none absolute inset-0 page-gradient" />
       <div className="pointer-events-none absolute left-[-8rem] top-[-10rem] h-[28rem] w-[28rem] rounded-full bg-primary/12 blur-3xl" />
       <div className="pointer-events-none absolute right-[-6rem] top-[14%] h-[24rem] w-[24rem] rounded-full bg-[hsl(var(--button-highlight)/0.08)] blur-3xl" />
@@ -153,7 +153,7 @@ export default function Login() {
                 <div className="flex justify-end">
                   <Link
                     to="/forgot-password"
-                    className="text-sm font-medium text-primary transition-colors hover:text-primary/80 hover:underline underline-offset-4"
+                    className="text-sm font-medium text-foreground/72 transition-colors hover:text-[hsl(var(--button-highlight))] hover:underline underline-offset-4"
                   >
                     Zapomniałeś hasła?
                   </Link>
@@ -164,7 +164,7 @@ export default function Login() {
         </div>
       </div>
 
-      <footer className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-4 pt-2 text-center text-xs leading-6 text-muted-foreground sm:px-6 lg:px-8">
+      <footer className="pb-safe-bottom relative z-10 mx-auto w-full max-w-7xl px-4 pt-2 text-center text-xs leading-6 text-muted-foreground sm:px-6 lg:px-8">
         <p>
           © {copyrightYears}{" "}
           <a

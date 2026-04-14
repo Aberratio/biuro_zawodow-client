@@ -64,7 +64,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden">
+    <div className="min-h-app-viewport relative flex flex-col overflow-x-hidden">
       <div className="pointer-events-none absolute inset-0 page-gradient" />
       <div className="pointer-events-none absolute left-[-8rem] top-[-10rem] h-[28rem] w-[28rem] rounded-full bg-primary/12 blur-3xl" />
       <div className="pointer-events-none absolute right-[-6rem] top-[14%] h-[24rem] w-[24rem] rounded-full bg-[hsl(var(--button-highlight)/0.08)] blur-3xl" />

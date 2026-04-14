@@ -73,6 +73,7 @@ export default function OrganizationDetails() {
     currentRole,
     currentUser,
     addUser,
+    updateUser,
     createEvent,
     updateOrganization,
     updateOrganizationEventLimit,
@@ -89,6 +90,7 @@ export default function OrganizationDetails() {
     useState(false);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [organizationEditOpen, setOrganizationEditOpen] = useState(false);
+  const [scannerEditDialogOpen, setScannerEditDialogOpen] = useState(false);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
   const [deleteOrganizationConfirmOpen, setDeleteOrganizationConfirmOpen] =
     useState(false);
@@ -99,6 +101,7 @@ export default function OrganizationDetails() {
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
   const [isSavingOrganization, setIsSavingOrganization] = useState(false);
   const [isDeletingOrganization, setIsDeletingOrganization] = useState(false);
+  const [isSavingScanner, setIsSavingScanner] = useState(false);
   const [isArchivingUser, setIsArchivingUser] = useState(false);
   const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
   const [isSavingScannerAssignments, setIsSavingScannerAssignments] =
@@ -109,6 +112,7 @@ export default function OrganizationDetails() {
   const [selectedScannerId, setSelectedScannerId] = useState<string | null>(
     null,
   );
+  const [selectedScanner, setSelectedScanner] = useState<User | null>(null);
   const [memberForm, setMemberForm] = useState({
     role: "editor" as MemberRole,
     name: "",
@@ -126,6 +130,10 @@ export default function OrganizationDetails() {
   >([]);
   const [limitDraft, setLimitDraft] = useState("");
   const [organizationNameDraft, setOrganizationNameDraft] = useState("");
+  const [scannerDraft, setScannerDraft] = useState({
+    name: "",
+    email: "",
+  });
   const [memberErrors, setMemberErrors] = useState<{
     name?: string;
     email?: string;
@@ -137,6 +145,11 @@ export default function OrganizationDetails() {
   }>({});
   const [organizationErrors, setOrganizationErrors] = useState<{
     name?: string;
+    form?: string;
+  }>({});
+  const [scannerErrors, setScannerErrors] = useState<{
+    name?: string;
+    email?: string;
     form?: string;
   }>({});
   const [eventErrors, setEventErrors] = useState<{
@@ -258,6 +271,16 @@ export default function OrganizationDetails() {
       ),
     );
     setScannerAssignmentsDialogOpen(true);
+  };
+
+  const openScannerEditDialog = (scanner: User) => {
+    setSelectedScanner(scanner);
+    setScannerDraft({
+      name: scanner.name,
+      email: scanner.email,
+    });
+    setScannerErrors({});
+    setScannerEditDialogOpen(true);
   };
 
   const openArchiveUserDialog = (user: User) => {
@@ -503,6 +526,45 @@ export default function OrganizationDetails() {
     }
     setScannerAssignmentsDialogOpen(false);
     toast({ title: "Zapisano przypisania operatora" });
+  };
+
+  const handleSaveScanner = async () => {
+    if (!selectedScanner) return;
+
+    const nextErrors = {
+      name: validateRequired(scannerDraft.name, "Podaj imię i nazwisko."),
+      email: validateEmail(scannerDraft.email),
+    };
+
+    if (nextErrors.name || nextErrors.email) {
+      setScannerErrors(nextErrors);
+      return;
+    }
+
+    setScannerErrors({});
+    setIsSavingScanner(true);
+    const result = await updateUser(selectedScanner.id, {
+      name: scannerDraft.name.trim(),
+      email: scannerDraft.email.trim(),
+    });
+    setIsSavingScanner(false);
+
+    if (!result.ok) {
+      setScannerErrors({
+        form: result.error ?? "Nie udało się zaktualizować operatora.",
+      });
+      toast({
+        title: "Nie udało się zapisać danych operatora",
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setScannerEditDialogOpen(false);
+    setSelectedScanner(null);
+    setScannerErrors({});
+    toast({ title: "Zaktualizowano dane operatora" });
   };
 
   const handleChangeScannerRole = async (scanner: User, role: "scanner" | "scanner_plus") => {
@@ -917,12 +979,36 @@ export default function OrganizationDetails() {
                               size="sm"
                               variant="outline"
                               className="h-9 w-full justify-center rounded-lg px-3 text-xs"
+                              onClick={() => openScannerEditDialog(scanner)}
+                            >
+                              <Pencil className="mr-1 h-3.5 w-3.5" />
+                              Edytuj dane
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-9 w-full justify-center rounded-lg px-3 text-xs"
                               onClick={() =>
                                 openScannerAssignmentsDialog(scanner.id)
                               }
                             >
                               Przypisz wydarzenia
                             </Button>
+                            {scanner.role === "scanner" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-9 w-full justify-center rounded-lg px-3 text-xs"
+                                onClick={() =>
+                                  void handleChangeScannerRole(
+                                    scanner,
+                                    "scanner_plus",
+                                  )
+                                }
+                              >
+                                Zmień na Operator Plus
+                              </Button>
+                            )}
                             {scanner.role === "scanner_plus" && (
                               <Button
                                 size="sm"
@@ -1201,6 +1287,92 @@ export default function OrganizationDetails() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={scannerEditDialogOpen}
+        onOpenChange={(open) => {
+          setScannerEditDialogOpen(open);
+          if (!open) {
+            setSelectedScanner(null);
+            setScannerErrors({});
+          }
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edytuj dane operatora</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="scanner-edit-name">Imię i nazwisko</Label>
+              <Input
+                id="scanner-edit-name"
+                value={scannerDraft.name}
+                onChange={(event) => {
+                  setScannerDraft((prev) => ({
+                    ...prev,
+                    name: event.target.value,
+                  }));
+                  setScannerErrors((prev) => ({
+                    ...prev,
+                    name: undefined,
+                    form: undefined,
+                  }));
+                }}
+                className="mt-2"
+                required
+                aria-invalid={Boolean(scannerErrors.name)}
+                aria-describedby={
+                  scannerErrors.name ? "scanner-edit-name-error" : undefined
+                }
+              />
+              <FieldError id="scanner-edit-name-error" className="mt-2">
+                {scannerErrors.name}
+              </FieldError>
+            </div>
+            <div>
+              <Label htmlFor="scanner-edit-email">Email</Label>
+              <Input
+                id="scanner-edit-email"
+                type="email"
+                value={scannerDraft.email}
+                onChange={(event) => {
+                  setScannerDraft((prev) => ({
+                    ...prev,
+                    email: event.target.value,
+                  }));
+                  setScannerErrors((prev) => ({
+                    ...prev,
+                    email: undefined,
+                    form: undefined,
+                  }));
+                }}
+                className="mt-2"
+                required
+                aria-invalid={Boolean(scannerErrors.email)}
+                aria-describedby={
+                  scannerErrors.email ? "scanner-edit-email-error" : undefined
+                }
+              />
+              <FieldError id="scanner-edit-email-error" className="mt-2">
+                {scannerErrors.email}
+              </FieldError>
+            </div>
+            <FieldError id="scanner-edit-form-error">
+              {scannerErrors.form}
+            </FieldError>
+          </div>
+          <DialogFooter>
+            <Button
+              className="w-full sm:w-auto"
+              onClick={handleSaveScanner}
+              disabled={isSavingScanner || !selectedScanner}
+            >
+              Zapisz zmiany
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={memberDialogOpen}
