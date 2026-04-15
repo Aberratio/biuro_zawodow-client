@@ -130,7 +130,7 @@ export default function ArchivedEvents() {
         </Card>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.02]">
+          <div className="w-full">
             <Table>
               <TableHeader>
                 <TableRow>

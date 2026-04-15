@@ -776,7 +776,7 @@ export default function OrganizationDetails() {
           />
         ) : (
           <>
-            <div className="rounded-lg border overflow-x-auto">
+            <div className="w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -854,7 +854,7 @@ export default function OrganizationDetails() {
           />
         ) : (
           <>
-            <div className="rounded-lg border overflow-x-auto">
+            <div className="w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -939,7 +939,7 @@ export default function OrganizationDetails() {
           />
         ) : (
           <>
-            <div className="rounded-lg border overflow-x-auto">
+            <div className="w-full">
               <Table>
                 <TableHeader>
                   <TableRow>

@@ -179,7 +179,7 @@ export default function Organizations() {
               </CardContent>
             </Card>
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="w-full">
               <Table>
                 <TableHeader>
                   <TableRow>

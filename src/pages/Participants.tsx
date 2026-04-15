@@ -232,7 +232,7 @@ export default function Participants() {
           </CardContent>
         </Card>
       ) : (
-        <div className="rounded-lg border overflow-x-auto">
+        <div className="w-full">
           <Table>
             <TableHeader>
               <TableRow>
