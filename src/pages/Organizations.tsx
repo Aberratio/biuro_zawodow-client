@@ -15,6 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import { formatEventOfficeEnd, formatEventOfficeStart, getEventOfficeCloseAt, getEventOfficeOpenAt, isEventOfficeOpen } from '@/lib/events';
 import { validateNonNegativeInteger, validateRequired } from '@/lib/form-validation';
 import type { Event } from '@/types';
+import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 
 function getClosestOrganizationEventLabel(organizationEvents: Event[], now: Date): string {
   const activeEvent = organizationEvents
@@ -40,7 +41,7 @@ function getClosestOrganizationEventLabel(organizationEvents: Event[], now: Date
 
 export default function Organizations() {
   const navigate = useNavigate();
-  const { organizations, events, users, currentRole, currentUser, createOrganization, isLoading } = useData();
+  const { organizations, events, users, currentRole, currentUser, createOrganization, isLoading, connectionState } = useData();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
@@ -63,6 +64,7 @@ export default function Organizations() {
   const shouldShowSearch = visibleOrganizations.length > 5;
   const normalizedQuery = shouldShowSearch ? searchQuery.trim().toLocaleLowerCase('pl-PL') : '';
   const now = useMemo(() => new Date(nowTimestamp), [nowTimestamp]);
+  const isOnline = connectionState === 'online';
 
   const filteredOrganizations = useMemo(() => {
     return visibleOrganizations
@@ -137,12 +139,16 @@ export default function Organizations() {
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Organizacje</h1>
         </div>
         {(currentRole === 'admin' || currentRole === 'superadmin') && (
-          <Button onClick={() => setOpen(true)} size="sm" className="w-full sm:w-auto sm:self-auto">
+          <Button onClick={() => setOpen(true)} size="sm" className="w-full sm:w-auto sm:self-auto" disabled={!isOnline}>
             <Plus className="mr-1 h-4 w-4" />
             Nowa organizacja
           </Button>
         )}
       </div>
+
+      {!isOnline && (currentRole === 'admin' || currentRole === 'superadmin') && (
+        <OnlineOnlyNotice description="Tworzenie i edycja organizacji wymagaja aktywnego polaczenia z serwerem. Lista pozostaje dostepna do odczytu z lokalnego snapshotu." />
+      )}
 
       {visibleOrganizations.length === 0 ? (
         <Card className="border-dashed">

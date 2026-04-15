@@ -18,6 +18,7 @@ import { buildEmptyParticipantFieldValues, getActiveParticipantMappings } from '
 import { getParticipantStatusDefinition, PARTICIPANT_STATUS_DEFINITIONS } from '@/lib/participant-status';
 import { validateEmail, validateRequired } from '@/lib/form-validation';
 import { isScannerRole } from '@/lib/roles';
+import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 
 type ParticipantSortKey = 'name' | 'email' | 'bib_number' | 'status';
 type SortDirection = 'asc' | 'desc';
@@ -30,6 +31,7 @@ export default function Participants() {
     isLoading,
     getParticipantFieldMappings,
     addParticipantManually,
+    connectionState,
   } = useData();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -42,6 +44,7 @@ export default function Participants() {
   const [manualFields, setManualFields] = useState<Record<string, string>>({});
   const [manualSaving, setManualSaving] = useState(false);
   const [manualErrors, setManualErrors] = useState<{ email?: string; fields: Record<string, string>; form?: string }>({ fields: {} });
+  const isOnline = connectionState === 'online';
 
   const eventParticipants = useMemo(
     () => participants.filter(participant => participant.event_id === selectedEventId),
@@ -74,7 +77,7 @@ export default function Participants() {
   }, [filtered, sortDirection, sortKey]);
 
   useEffect(() => {
-    if (!selectedEventId) {
+    if (!selectedEventId || !isOnline) {
       setMappings([]);
       setManualFields({});
       return;
@@ -89,7 +92,7 @@ export default function Participants() {
         setMappings([]);
         setManualFields({});
       });
-  }, [getParticipantFieldMappings, selectedEventId]);
+  }, [getParticipantFieldMappings, isOnline, selectedEventId]);
 
   const activeMappings = useMemo(() => getActiveParticipantMappings(mappings), [mappings]);
   const canImportParticipants = Boolean(selectedEventId) && !isScannerRole(currentRole);
@@ -180,18 +183,23 @@ export default function Participants() {
             <Button
               variant="outline"
               onClick={() => navigate(`/events/${selectedEventId}/import`)}
+              disabled={!isOnline}
               className="h-11 w-full sm:h-10 sm:w-auto"
             >
               <FileUp className="h-4 w-4 mr-1" /> Import z pliku
             </Button>
           )}
           {canAddManually && (
-            <Button onClick={() => setManualOpen(true)} className="h-11 w-full sm:h-10 sm:w-auto">
+            <Button onClick={() => setManualOpen(true)} className="h-11 w-full sm:h-10 sm:w-auto" disabled={!isOnline}>
               <UserPlus className="h-4 w-4 mr-1" /> Dodaj ręcznie
             </Button>
           )}
         </div>
       </div>
+
+      {!isOnline && !isScannerRole(currentRole) && (
+        <OnlineOnlyNotice description="Import CSV i reczne dodawanie uczestnikow sa dostepne tylko po polaczeniu z serwerem. Lista pozostaje dostepna do odczytu z lokalnego snapshotu." />
+      )}
 
       <div className="flex flex-col gap-3">
         <div className="relative">

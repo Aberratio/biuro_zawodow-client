@@ -1,7 +1,12 @@
-﻿export type Role = 'superadmin' | 'admin' | 'editor' | 'scanner' | 'scanner_plus';
+export type Role = 'superadmin' | 'admin' | 'editor' | 'scanner' | 'scanner_plus';
 
 export type ParticipantStatus = 'not_checked_in' | 'checked_in' | 'checked_in_not_starting';
 export type EmailStatus = 'not_sent' | 'sent';
+export type ParticipantSyncState = 'synced' | 'pending_sync' | 'requires_review';
+export type ConnectionState = 'online' | 'degraded' | 'offline';
+export type SnapshotSource = 'network' | 'cache' | 'none';
+export type ScannerMode = 'online' | 'offline_queue' | 'read_only';
+export type SessionState = 'online' | 'offline_cached' | 'expired';
 
 export interface Organization {
   id: string;
@@ -33,6 +38,8 @@ export interface Participant {
   email_status: EmailStatus;
   checked_in_at?: string;
   custom_fields?: Record<string, string>;
+  sync_state?: ParticipantSyncState;
+  sync_error?: string;
 }
 
 export interface ParticipantQrPreview {
