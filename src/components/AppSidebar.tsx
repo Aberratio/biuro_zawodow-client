@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { BrandWordmark } from "@/components/BrandWordmark";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -22,6 +23,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -90,7 +92,7 @@ const allItems = [
     roles: ["editor", "admin", "superadmin"] as Role[],
   },
   {
-    title: "Wysyłka QR",
+    title: "Wysylka QR",
     url: "/emails",
     icon: Mail,
     roles: ["editor", "admin", "superadmin"] as Role[],
@@ -124,10 +126,12 @@ export function AppSidebar() {
     logout();
     navigate("/login", { replace: true });
   };
+
   const handleOrganizationChange = (organizationId: string) => {
     setSelectedOrganizationId(organizationId);
     navigate(`/organizations/${organizationId}`);
   };
+
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);
     navigate(`/events/${eventId}`);
@@ -138,8 +142,9 @@ export function AppSidebar() {
   const items = allItems.filter((item) => {
     if (!item.roles.includes(currentRole)) return false;
     if (!isScannerRole(currentRole)) return true;
-    if (item.url === "/participants" || item.url === "/scanner")
+    if (item.url === "/participants" || item.url === "/scanner") {
       return scannerHasActiveEvents;
+    }
     if (item.url === "/scanner-info") return !scannerHasActiveEvents;
     return true;
   });
@@ -181,15 +186,27 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
+      <SidebarHeader className="border-b border-sidebar-border/70 px-3 pb-3 pt-4">
+        {collapsed ? (
+          <BrandWordmark compact className="mx-auto" />
+        ) : (
+          <BrandWordmark
+            className="max-w-full"
+            imageClassName="h-8 w-auto object-contain"
+          />
+        )}
+      </SidebarHeader>
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>
             {!collapsed && (
-              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
-                <ScanLine className="h-4 w-4" /> Biuro Zawodów
+              <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-sidebar-foreground/72">
+                <ScanLine className="h-4 w-4 text-sidebar-primary" />
+                Nawigacja
               </span>
             )}
-            {collapsed && <ScanLine className="h-4 w-4" />}
+            {collapsed && <ScanLine className="h-4 w-4 text-sidebar-primary" />}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -233,7 +250,7 @@ export function AppSidebar() {
                           onValueChange={handleOrganizationChange}
                         >
                           <SelectTrigger className="h-10 border-sidebar-border bg-sidebar text-xs text-sidebar-foreground">
-                            <SelectValue placeholder="Wybierz organizację" />
+                            <SelectValue placeholder="Wybierz organizacje" />
                           </SelectTrigger>
                           <SelectContent>
                             {adminOrganizations.map((organization) => (
@@ -256,7 +273,7 @@ export function AppSidebar() {
                       </div>
                     ) : (
                       <div className="mt-2 rounded-xl bg-sidebar px-3 py-3 text-xs text-sidebar-foreground/70">
-                        Brak przypisanych organizacji w tym kontekście.
+                        Brak przypisanych organizacji w tym kontekscie.
                       </div>
                     )}
                   </div>
@@ -275,8 +292,8 @@ export function AppSidebar() {
                     </p>
                     {scopedVisibleEvents.length === 0 ? (
                       <div className="mt-2 rounded-xl bg-sidebar px-3 py-3 text-xs text-sidebar-foreground/70">
-                        Do tej organizacji nie dodano jeszcze wydarzeń. Dodaj je
-                        w zakładce Wydarzenia.
+                        Do tej organizacji nie dodano jeszcze wydarzen. Dodaj je
+                        w zakladce Wydarzenia.
                       </div>
                     ) : showEventSelectControl ? (
                       <div className="mt-2">
@@ -308,7 +325,7 @@ export function AppSidebar() {
                       </div>
                     ) : (
                       <div className="mt-2 rounded-xl bg-sidebar px-3 py-3 text-xs text-sidebar-foreground/70">
-                        Brak dostępnych wydarzeń w tym kontekście.
+                        Brak dostepnych wydarzen w tym kontekscie.
                       </div>
                     )}
                   </div>
@@ -325,7 +342,7 @@ export function AppSidebar() {
                               activeClassName="rounded-xl bg-sidebar-accent/80 font-medium text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-primary)/0.14)]"
                             >
                               <CalendarDays className="mr-2 h-4 w-4 shrink-0" />
-                              <span>Szczegóły</span>
+                              <span>Szczegoly</span>
                             </NavLink>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -390,7 +407,7 @@ export function AppSidebar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="mx-auto h-8 w-8"
+                className="mx-auto h-9 w-9 rounded-xl border border-sidebar-border/70 bg-sidebar-accent/20"
                 title={currentUser.name}
               >
                 <UserRound className="h-3.5 w-3.5" />
@@ -399,7 +416,7 @@ export function AppSidebar() {
             <DropdownMenuContent align="end" side="right" className="w-52">
               <DropdownMenuItem onClick={() => navigate("/profile")}>
                 <UserRound className="mr-2 h-4 w-4" />
-                Mój profil
+                Moj profil
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
