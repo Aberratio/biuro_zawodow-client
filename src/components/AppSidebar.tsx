@@ -11,9 +11,10 @@ import {
   ScanLine,
   UserRound,
   Users,
+  X,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { BrandWordmark } from "@/components/BrandWordmark";
+import { BrandLogo } from "@/components/BrandLogo";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -106,8 +107,22 @@ const eventScopedUrls = new Set([
   "/emails",
 ]);
 
+const primaryNavItemClassName =
+  "h-13 rounded-[0.95rem] border border-transparent px-4.5 text-[0.94rem] font-medium text-sidebar-foreground/84 transition-all duration-200 hover:border-sidebar-border/70 hover:bg-[hsl(220_7%_14%/0.96)] hover:text-sidebar-foreground [&>svg]:text-sidebar-foreground/72 md:h-11 md:rounded-[0.9rem] md:px-4 md:text-[0.92rem]";
+
+const primaryNavItemActiveClassName =
+  "border-[hsl(var(--sidebar-primary)/0.22)] bg-[hsl(36_18%_19%/0.94)] text-sidebar-foreground shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04),0_0_0_1px_hsl(var(--sidebar-primary)/0.05)] [&>svg]:text-[hsl(var(--sidebar-primary))]";
+
+const workspaceNavItemClassName =
+  "rounded-[0.9rem] px-3 py-2.5 text-[0.92rem] font-medium text-sidebar-foreground/76 transition-all duration-200 hover:bg-[hsl(220_7%_15%/0.95)] hover:text-sidebar-foreground md:rounded-[0.8rem] md:px-3 md:py-2.5 md:text-[0.9rem]";
+
+const workspaceNavItemActiveClassName =
+  "bg-[hsl(220_7%_15%/0.98)] text-sidebar-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-primary)/0.12)]";
+
+const sidebarLogoClassName = "h-[2.85rem] w-auto object-contain md:h-[3rem]";
+
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
   const {
@@ -183,250 +198,268 @@ export function AppSidebar() {
     (currentRole === "admin"
       ? adminOrganizations.length > 0
       : visibleEvents.length > 0);
+  const organizationSelectContent = showOrganizationSelectControl ? (
+    <div className="mt-3">
+      <Select
+        value={selectedOrganizationId}
+        onValueChange={handleOrganizationChange}
+      >
+        <SelectTrigger className="h-11 rounded-[0.85rem] border-sidebar-border/80 bg-sidebar px-4 text-[0.92rem] font-semibold text-sidebar-foreground shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)]">
+          <SelectValue placeholder="Wybierz organizacje" />
+        </SelectTrigger>
+        <SelectContent>
+          {adminOrganizations.map((organization) => (
+            <SelectItem
+              key={organization.id}
+              value={organization.id}
+              className="text-sm"
+            >
+              {organization.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  ) : selectedOrganization ? (
+    <div className="mt-3 rounded-[0.85rem] bg-sidebar px-4 py-3.5 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)]">
+      <p className="text-[0.92rem] font-semibold leading-snug text-sidebar-foreground">
+        {selectedOrganization.name}
+      </p>
+    </div>
+  ) : (
+    <div className="mt-3 rounded-[0.85rem] bg-sidebar px-4 py-3.5 text-xs leading-5 text-sidebar-foreground/66">
+      Brak przypisanych organizacji w tym kontekscie.
+    </div>
+  );
+  const eventWorkspaceCard = (
+    <div className="rounded-[1rem] border border-sidebar-border/40 bg-[hsl(220_7%_13%/0.96)] p-3.5 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.02)]">
+      <p className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-sidebar-foreground/56">
+        Wybrane wydarzenie
+      </p>
+      {scopedVisibleEvents.length === 0 ? (
+        <div className="mt-2 rounded-[0.85rem] bg-sidebar px-4 py-3.5 text-xs leading-5 text-sidebar-foreground/66">
+          Do tej organizacji nie dodano jeszcze wydarzen. Dodaj je
+          w zakladce Wydarzenia.
+        </div>
+      ) : showEventSelectControl ? (
+        <div className="mt-2">
+          <Select value={selectedEventId} onValueChange={handleEventChange}>
+            <SelectTrigger className="h-11 rounded-[0.85rem] border-sidebar-border/80 bg-sidebar px-4 text-[0.92rem] font-semibold text-sidebar-foreground shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)]">
+              <SelectValue placeholder="Wybierz wydarzenie" />
+            </SelectTrigger>
+            <SelectContent>
+              {scopedVisibleEvents.map((event) => (
+                <SelectItem
+                  key={event.id}
+                  value={event.id}
+                  className="text-sm"
+                >
+                  {event.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : selectedEvent ? (
+        <div className="mt-2 rounded-[0.85rem] bg-sidebar px-4 py-3.5 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)]">
+          <p className="text-[0.92rem] font-semibold leading-snug text-sidebar-foreground">
+            {selectedEvent.name}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-2 rounded-[0.85rem] bg-sidebar px-4 py-3.5 text-xs leading-5 text-sidebar-foreground/66">
+          Brak dostepnych wydarzen w tym kontekscie.
+        </div>
+      )}
+
+      {selectedEvent && (
+        <div className="mt-4 border-l border-[hsl(var(--sidebar-primary)/0.16)] pl-4">
+          <SidebarMenu className="gap-1">
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <NavLink
+                  to={`/events/${selectedEvent.id}`}
+                  end
+                  className={workspaceNavItemClassName}
+                  activeClassName={workspaceNavItemActiveClassName}
+                >
+                  <CalendarDays className="mr-2 h-4 w-4 shrink-0" />
+                  <span>Szczegoly</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            {eventScopedItems.map((item) => (
+              <SidebarMenuItem key={item.url}>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to={
+                      item.url === "/import"
+                        ? `/events/${selectedEvent.id}/import`
+                        : item.url
+                    }
+                    end={item.url !== "/import"}
+                    className={workspaceNavItemClassName}
+                    activeClassName={workspaceNavItemActiveClassName}
+                  >
+                    <item.icon className="mr-2 h-4 w-4 shrink-0" />
+                    <span>{item.title}</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border/70 px-3 pb-3 pt-4">
-        {collapsed ? (
-          <BrandWordmark compact className="mx-auto" />
-        ) : (
-          <BrandWordmark
-            className="max-w-full"
-            imageClassName="h-8 w-auto object-contain"
-          />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {isMobile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute left-full top-5 z-30 ml-3 h-12 w-12 rounded-[0.95rem] border border-sidebar-border/80 bg-sidebar-accent/15 text-sidebar-foreground/90 shadow-[0_16px_34px_hsl(var(--surface-shadow)/0.35)] backdrop-blur-xl hover:bg-sidebar-accent/45 hover:text-sidebar-foreground"
+            onClick={() => setOpenMobile(false)}
+          >
+            <X className="h-5 w-5" />
+          </Button>
         )}
-      </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            {!collapsed && (
-              <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-sidebar-foreground/72">
-                <ScanLine className="h-4 w-4 text-sidebar-primary" />
-                Nawigacja
-              </span>
+        <div
+          data-sidebar-scroll-shell="true"
+          className="themed-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
+        >
+          <SidebarHeader className="border-b border-sidebar-border/70 px-4 pb-4 pt-5 md:px-4 md:pb-4 md:pt-5">
+            {collapsed ? (
+              <BrandLogo variant="short" className="mx-auto h-11 w-11 object-contain" />
+            ) : (
+              <img
+                src="/logo_long_mobile.png"
+                alt="Panel Zawodow Eventdesk"
+                className={sidebarLogoClassName}
+                draggable={false}
+              />
             )}
-            {collapsed && <ScanLine className="h-4 w-4 text-sidebar-primary" />}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {generalItems.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === "/"}
-                      className="hover:bg-accent/50"
-                      activeClassName="bg-accent font-medium text-accent-foreground"
-                    >
-                      <item.icon className="mr-2 h-4 w-4 shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+          </SidebarHeader>
 
-        {showEventWorkspace && (
-          <SidebarGroup>
-            <SidebarGroupLabel>
-              <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-sidebar-foreground/70">
-                Praca na wydarzeniu
-              </span>
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <div className="mx-2 rounded-2xl border border-sidebar-border/70 bg-sidebar-accent/35 p-2">
-                {currentRole === "admin" && (
-                  <div className="rounded-xl border border-sidebar-border/60 bg-sidebar-accent/50 p-3">
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-sidebar-foreground/60">
-                      Wybrana organizacja
-                    </p>
-                    {showOrganizationSelectControl ? (
-                      <div className="mt-2">
-                        <Select
-                          value={selectedOrganizationId}
-                          onValueChange={handleOrganizationChange}
-                        >
-                          <SelectTrigger className="h-10 border-sidebar-border bg-sidebar text-xs text-sidebar-foreground">
-                            <SelectValue placeholder="Wybierz organizacje" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {adminOrganizations.map((organization) => (
-                              <SelectItem
-                                key={organization.id}
-                                value={organization.id}
-                                className="text-xs"
-                              >
-                                {organization.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : selectedOrganization ? (
-                      <div className="mt-2 rounded-xl bg-sidebar px-3 py-3">
-                        <p className="text-sm font-medium leading-snug text-sidebar-foreground">
-                          {selectedOrganization.name}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="mt-2 rounded-xl bg-sidebar px-3 py-3 text-xs text-sidebar-foreground/70">
-                        Brak przypisanych organizacji w tym kontekscie.
-                      </div>
-                    )}
-                  </div>
+          <SidebarContent className="!flex-none !overflow-visible gap-5 px-3 py-5 md:gap-4 md:px-2 md:py-4.5">
+            <SidebarGroup className="px-1 py-0 md:px-2">
+              <SidebarGroupLabel>
+                {!collapsed && (
+                  <span className="flex items-center gap-2 text-[0.66rem] font-semibold uppercase tracking-[0.24em] text-sidebar-foreground/58">
+                    <ScanLine className="h-3.5 w-3.5 text-sidebar-primary/90" />
+                    Nawigacja
+                  </span>
                 )}
-
-                <div
-                  className={
-                    currentRole === "admin"
-                      ? "ml-3 mt-2 border-l border-sidebar-border/70 pl-3"
-                      : "mt-2"
-                  }
-                >
-                  <div className="rounded-xl border border-sidebar-border/60 bg-sidebar-accent/50 p-3">
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-sidebar-foreground/60">
-                      Wybrane wydarzenie
-                    </p>
-                    {scopedVisibleEvents.length === 0 ? (
-                      <div className="mt-2 rounded-xl bg-sidebar px-3 py-3 text-xs text-sidebar-foreground/70">
-                        Do tej organizacji nie dodano jeszcze wydarzen. Dodaj je
-                        w zakladce Wydarzenia.
-                      </div>
-                    ) : showEventSelectControl ? (
-                      <div className="mt-2">
-                        <Select
-                          value={selectedEventId}
-                          onValueChange={handleEventChange}
+                {collapsed && <ScanLine className="h-4 w-4 text-sidebar-primary/90" />}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1.5">
+                  {generalItems.map((item) => (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton asChild>
+                        <NavLink
+                          to={item.url}
+                          end={item.url === "/"}
+                          className={primaryNavItemClassName}
+                          activeClassName={primaryNavItemActiveClassName}
                         >
-                          <SelectTrigger className="h-10 border-sidebar-border bg-sidebar text-xs text-sidebar-foreground">
-                            <SelectValue placeholder="Wybierz wydarzenie" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {scopedVisibleEvents.map((event) => (
-                              <SelectItem
-                                key={event.id}
-                                value={event.id}
-                                className="text-xs"
-                              >
-                                {event.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : selectedEvent ? (
-                      <div className="mt-2 rounded-xl bg-sidebar px-3 py-3">
-                        <p className="text-sm font-medium leading-snug text-sidebar-foreground">
-                          {selectedEvent.name}
+                          <item.icon className="mr-3 h-[1rem] w-[1rem] shrink-0 md:h-[0.98rem] md:w-[0.98rem]" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {showEventWorkspace && (
+              <SidebarGroup className="px-1 py-0 md:px-2">
+                <SidebarGroupLabel>
+                  <span className="text-[0.66rem] font-semibold uppercase tracking-[0.24em] text-sidebar-foreground/58">
+                    Praca na wydarzeniu
+                  </span>
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <div className="mx-0.5 rounded-[1.15rem] border border-sidebar-border/65 bg-[hsl(220_9%_11%/0.98)] p-2.5 shadow-[0_16px_34px_hsl(var(--surface-shadow)/0.16),inset_0_1px_0_hsl(var(--foreground)/0.025)] md:mx-1">
+                    {currentRole === "admin" && (
+                      <div className="rounded-[1rem] border border-sidebar-border/38 bg-[hsl(220_7%_13%/0.96)] p-3.5 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.02)]">
+                        <p className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-sidebar-foreground/56">
+                          Wybrana organizacja
                         </p>
-                      </div>
-                    ) : (
-                      <div className="mt-2 rounded-xl bg-sidebar px-3 py-3 text-xs text-sidebar-foreground/70">
-                        Brak dostepnych wydarzen w tym kontekscie.
+                        {organizationSelectContent}
+                        <div className="mt-4 border-t border-sidebar-border/60 pt-4">
+                          {eventWorkspaceCard}
+                        </div>
                       </div>
                     )}
+
+                    {currentRole !== "admin" && eventWorkspaceCard}
                   </div>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
+          </SidebarContent>
 
-                  {selectedEvent && (
-                    <div className="mt-2 border-l border-sidebar-border/60 pl-3">
-                      <SidebarMenu>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild>
-                            <NavLink
-                              to={`/events/${selectedEvent.id}`}
-                              end
-                              className="rounded-xl hover:bg-accent/60"
-                              activeClassName="rounded-xl bg-sidebar-accent/80 font-medium text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-primary)/0.14)]"
-                            >
-                              <CalendarDays className="mr-2 h-4 w-4 shrink-0" />
-                              <span>Szczegoly</span>
-                            </NavLink>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        {eventScopedItems.map((item) => (
-                          <SidebarMenuItem key={item.url}>
-                            <SidebarMenuButton asChild>
-                              <NavLink
-                                to={
-                                  item.url === "/import"
-                                    ? `/events/${selectedEvent.id}/import`
-                                    : item.url
-                                }
-                                end={item.url !== "/import"}
-                                className="rounded-xl hover:bg-accent/60"
-                                activeClassName="rounded-xl bg-sidebar-accent/80 font-medium text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-primary)/0.14)]"
-                              >
-                                <item.icon className="mr-2 h-4 w-4 shrink-0" />
-                                <span>{item.title}</span>
-                              </NavLink>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        ))}
-                      </SidebarMenu>
+          <SidebarFooter className="mt-auto border-t border-sidebar-border/70 p-4 pt-4 md:border-t-0 md:p-4 md:pt-2">
+            {!collapsed ? (
+              <div className="space-y-2">
+                <Button
+                  variant="ghost"
+                  className="h-12 w-full justify-start rounded-[0.95rem] border border-sidebar-border/65 bg-[hsl(220_9%_9%/0.96)] px-4 shadow-[0_14px_30px_hsl(var(--surface-shadow)/0.22)] hover:bg-[hsl(220_8%_12%/0.98)]"
+                  onClick={() => navigate("/profile")}
+                >
+                  <div className="flex min-w-0 items-center gap-3 text-left">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sidebar-border/80 bg-black/20 text-sidebar-foreground/86">
+                      <UserRound className="h-3.5 w-3.5" />
                     </div>
-                  )}
-                </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-sidebar-foreground">
+                        {currentUser.name}
+                      </p>
+                    </div>
+                  </div>
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="h-12 w-full justify-start rounded-[0.95rem] border border-sidebar-border/65 bg-[hsl(220_9%_9%/0.96)] px-4 text-sm font-medium text-sidebar-foreground/82 hover:bg-[hsl(220_8%_12%/0.98)] hover:text-sidebar-foreground"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Wyloguj
+                </Button>
               </div>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-      </SidebarContent>
-
-      <SidebarFooter className="p-3">
-        {!collapsed ? (
-          <div className="space-y-2">
-            <Button
-              variant="ghost"
-              className="h-auto w-full justify-start rounded-[1.1rem] border border-sidebar-border/70 bg-sidebar-accent/25 px-3 py-2 shadow-[0_16px_34px_hsl(var(--surface-shadow)/0.3)] hover:bg-sidebar-accent/55"
-              onClick={() => navigate("/profile")}
-            >
-              <div className="flex min-w-0 items-center gap-2 text-left">
-                <UserRound className="h-3.5 w-3.5 shrink-0 text-sidebar-foreground/75" />
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-medium text-sidebar-foreground">
-                    {currentUser.name}
-                  </p>
-                </div>
-              </div>
-            </Button>
-            <Button
-              variant="ghost"
-              className="h-9 w-full justify-start rounded-[1.1rem] border border-sidebar-border/70 bg-sidebar-accent/15 px-3 text-xs hover:bg-sidebar-accent/45"
-              onClick={handleLogout}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Wyloguj
-            </Button>
-          </div>
-        ) : (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="mx-auto h-9 w-9 rounded-xl border border-sidebar-border/70 bg-sidebar-accent/20"
-                title={currentUser.name}
-              >
-                <UserRound className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="right" className="w-52">
-              <DropdownMenuItem onClick={() => navigate("/profile")}>
-                <UserRound className="mr-2 h-4 w-4" />
-                Moj profil
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Wyloguj
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </SidebarFooter>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="mx-auto h-10 w-10 rounded-2xl border border-sidebar-border/70 bg-sidebar-accent/20"
+                    title={currentUser.name}
+                  >
+                    <UserRound className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" side="right" className="w-52">
+                  <DropdownMenuItem onClick={() => navigate("/profile")}>
+                    <UserRound className="mr-2 h-4 w-4" />
+                    Moj profil
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Wyloguj
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </SidebarFooter>
+        </div>
+      </div>
     </Sidebar>
   );
 }

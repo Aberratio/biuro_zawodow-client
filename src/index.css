@@ -158,6 +158,15 @@ All colors MUST be HSL.
     backdrop-filter: blur(18px);
   }
 
+  .surface-table {
+    background-color: hsl(220 12% 8% / 0.42);
+    border-color: hsl(var(--border) / 0.74);
+    box-shadow:
+      inset 0 1px 0 hsl(var(--foreground) / 0.025),
+      0 10px 24px hsl(var(--surface-shadow) / 0.12);
+    backdrop-filter: blur(10px);
+  }
+
   .surface-panel {
     background-color: hsl(var(--background) / 0.78);
     background-image:
@@ -289,6 +298,169 @@ All colors MUST be HSL.
       radial-gradient(circle at 50% 18%, hsl(var(--foreground) / 0.018), transparent 38rem),
       linear-gradient(180deg, hsl(var(--foreground) / 0.015), transparent 42%);
   }
+
+  .app-shell {
+    --background: 220 18% 4%;
+    --foreground: 36 28% 96%;
+    --card: 220 10% 9%;
+    --card-foreground: 36 28% 96%;
+    --popover: 220 10% 9%;
+    --popover-foreground: 36 28% 96%;
+    --primary: 39 72% 64%;
+    --primary-foreground: 24 18% 10%;
+    --secondary: 35 18% 22%;
+    --secondary-foreground: 36 28% 96%;
+    --muted: 220 8% 12%;
+    --muted-foreground: 31 10% 68%;
+    --accent: 220 7% 13%;
+    --accent-foreground: 36 28% 96%;
+    --border: 35 12% 18%;
+    --input: 35 10% 16%;
+    --ring: 39 72% 64%;
+    --sidebar-background: 220 16% 7%;
+    --sidebar-foreground: 37 22% 92%;
+    --sidebar-primary: 39 72% 64%;
+    --sidebar-primary-foreground: 24 18% 10%;
+    --sidebar-accent: 220 7% 12%;
+    --sidebar-accent-foreground: 36 28% 96%;
+    --sidebar-border: 35 10% 17%;
+    --sidebar-ring: 39 72% 64%;
+    --surface-glow: 36 36% 24%;
+    --surface-warm: 39 48% 42%;
+    --surface-shadow: 220 30% 3%;
+    --button-highlight: 39 72% 64%;
+    background:
+      radial-gradient(circle at top left, hsl(var(--surface-glow) / 0.08), transparent 24rem),
+      radial-gradient(circle at top right, hsl(var(--surface-warm) / 0.06), transparent 26rem),
+      linear-gradient(180deg, hsl(220 16% 6%) 0%, hsl(var(--background)) 32%, hsl(220 18% 3%) 100%);
+    color: hsl(var(--foreground));
+    isolation: isolate;
+  }
+
+  .app-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, hsl(var(--foreground) / 0.012), transparent 10rem),
+      radial-gradient(circle at 50% 0%, hsl(var(--button-highlight) / 0.04), transparent 32%);
+    opacity: 0.78;
+  }
+
+  .app-shell .surface-card {
+    background-color: hsl(var(--card) / 0.94);
+    background-image:
+      linear-gradient(180deg, hsl(var(--foreground) / 0.03), transparent 20%),
+      radial-gradient(circle at top right, hsl(var(--button-highlight) / 0.08), transparent 34%),
+      linear-gradient(180deg, hsl(220 10% 12% / 0.98), hsl(220 14% 8% / 0.98));
+    border-color: hsl(var(--border) / 0.82);
+    box-shadow:
+      0 28px 70px hsl(var(--surface-shadow) / 0.48),
+      inset 0 1px 0 hsl(var(--foreground) / 0.04),
+      inset 0 0 0 1px hsl(var(--button-highlight) / 0.04);
+  }
+
+  .app-shell .surface-panel {
+    background-color: hsl(var(--background) / 0.88);
+    background-image:
+      linear-gradient(180deg, hsl(var(--foreground) / 0.015), transparent 70%),
+      radial-gradient(circle at top right, hsl(var(--button-highlight) / 0.04), transparent 28%);
+    border-color: hsl(var(--border) / 0.82);
+    box-shadow: inset 0 -1px 0 hsl(var(--foreground) / 0.03);
+  }
+
+  .app-shell .surface-sidebar {
+    background-color: hsl(220 15% 7% / 0.992);
+    background-image:
+      linear-gradient(180deg, hsl(var(--foreground) / 0.01), transparent 14%),
+      linear-gradient(180deg, hsl(220 13% 7%), hsl(220 16% 6%));
+    box-shadow:
+      18px 0 44px hsl(var(--surface-shadow) / 0.24),
+      inset -1px 0 0 hsl(var(--sidebar-border) / 0.86);
+    backdrop-filter: blur(28px);
+  }
+
+  .app-shell .surface-field {
+    background-color: hsl(220 15% 8% / 0.9);
+    border-color: hsl(var(--input) / 0.96);
+    box-shadow:
+      inset 0 1px 0 hsl(var(--foreground) / 0.03),
+      0 0 0 1px hsl(var(--background) / 0.18);
+  }
+
+  .app-shell .surface-button {
+    border-color: hsl(var(--button-highlight) / 0.52);
+    background-color: hsl(var(--secondary) / 0.96);
+    background-image:
+      radial-gradient(circle at top left, hsl(var(--button-highlight) / 0.18), transparent 56%),
+      linear-gradient(180deg, hsl(var(--foreground) / 0.07), transparent 18%),
+      linear-gradient(120deg, hsl(40 38% 44%) 0%, hsl(39 30% 33%) 38%, hsl(37 26% 25%) 100%);
+    box-shadow:
+      0 16px 34px hsl(var(--surface-shadow) / 0.38),
+      inset 0 1px 0 hsl(var(--foreground) / 0.12);
+  }
+
+  .app-shell .surface-button:hover {
+    box-shadow:
+      0 20px 42px hsl(var(--surface-shadow) / 0.46),
+      0 0 0 1px hsl(var(--button-highlight) / 0.16),
+      inset 0 1px 0 hsl(var(--foreground) / 0.13);
+  }
+
+  .app-shell .app-page-gradient {
+    background-image:
+      radial-gradient(circle at 10% 6%, hsl(var(--surface-glow) / 0.08), transparent 24rem),
+      radial-gradient(circle at 92% 2%, hsl(var(--surface-warm) / 0.05), transparent 22rem),
+      radial-gradient(circle at 50% 16%, hsl(var(--foreground) / 0.01), transparent 34rem),
+      linear-gradient(180deg, hsl(var(--foreground) / 0.008), transparent 40%);
+  }
+
+  .app-shell [data-sidebar="menu-button"] {
+    min-height: 3rem;
+    border-radius: 1rem;
+  }
+
+  .app-shell [data-sidebar="group-label"] {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+
+  .app-shell [data-sidebar="content"],
+  .app-shell [data-sidebar-scroll-shell="true"],
+  .app-shell [data-app-scroll-root="true"] {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--button-highlight) / 0.68) transparent;
+  }
+
+  @media (max-width: 767px) {
+    .app-shell [data-sidebar="sidebar"][data-mobile="true"] {
+      width: min(18.75rem, calc(100vw - 3rem));
+      border-right: 1px solid hsl(var(--sidebar-border) / 0.86);
+      border-top-right-radius: 1.9rem;
+      border-bottom-right-radius: 1.9rem;
+      box-shadow:
+        22px 0 48px hsl(var(--surface-shadow) / 0.42),
+        inset -1px 0 0 hsl(var(--sidebar-border) / 0.84);
+      overflow: visible;
+    }
+
+    .app-shell [data-sidebar="sidebar"][data-mobile="true"]::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, hsl(var(--foreground) / 0.018), transparent 7rem),
+        radial-gradient(circle at top left, hsl(var(--button-highlight) / 0.08), transparent 34%);
+    }
+
+    .app-shell [data-sidebar="sidebar"][data-mobile="true"] > div {
+      position: relative;
+      z-index: 1;
+      min-height: 100%;
+    }
+  }
 }
 
 @layer utilities {
@@ -309,33 +481,24 @@ All colors MUST be HSL.
 
   .themed-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--primary) / 0.75) hsl(var(--muted));
+    scrollbar-color: hsl(var(--primary) / 0.34) transparent;
   }
 
   .themed-scrollbar::-webkit-scrollbar {
-    width: 10px;
+    width: 6px;
   }
 
   .themed-scrollbar::-webkit-scrollbar-track {
-    background: hsl(var(--muted));
+    background: transparent;
     border-radius: 9999px;
   }
 
   .themed-scrollbar::-webkit-scrollbar-thumb {
-    background: linear-gradient(
-      180deg,
-      hsl(var(--primary) / 0.95),
-      hsl(var(--primary) / 0.7)
-    );
-    border: 2px solid hsl(var(--muted));
+    background: hsl(var(--primary) / 0.3);
     border-radius: 9999px;
   }
 
   .themed-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(
-      180deg,
-      hsl(var(--primary)),
-      hsl(var(--primary) / 0.82)
-    );
+    background: hsl(var(--primary) / 0.46);
   }
 }

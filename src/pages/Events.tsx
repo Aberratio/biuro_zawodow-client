@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ListFilter, Plus, Search } from 'lucide-react';
+import { ListFilter, Plus } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -296,16 +296,13 @@ export default function Events() {
 
           <div className="min-w-[16rem] flex-1 space-y-2">
             <Label htmlFor="events-search">Szukaj</Label>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="events-search"
-                value={searchQuery}
-                onChange={event => setSearchQuery(event.target.value)}
-                placeholder="Nazwa, lokalizacja lub organizacja"
-                className="pl-9"
-              />
-            </div>
+            <Input
+              id="events-search"
+              value={searchQuery}
+              onChange={event => setSearchQuery(event.target.value)}
+              placeholder="Nazwa, lokalizacja lub organizacja"
+              className="text-sm"
+            />
           </div>
 
           <div className="min-w-[13rem] space-y-2">
@@ -341,7 +338,7 @@ export default function Events() {
         </Card>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.02]">
+          <div className="w-full">
             <Table>
               <TableHeader>
                 <TableRow>

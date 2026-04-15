@@ -24,16 +24,16 @@ export default function TableSkeleton({ rows = 6, cols = 4, title, subtitle, sho
           </div>
         </div>
       )}
-      <div className="rounded-lg border overflow-hidden">
-        <div className="border-b px-4 py-3 flex gap-4">
+      <div className="surface-table overflow-hidden rounded-[1.35rem] border">
+        <div className="flex gap-4 border-b border-white/[0.07] px-5 py-4 sm:px-6">
           {Array.from({ length: cols }).map((_, i) => (
-            <Skeleton key={i} className="h-4 flex-1" />
+            <Skeleton key={i} className="h-3 flex-1 rounded-full bg-white/10" />
           ))}
         </div>
         {Array.from({ length: rows }).map((_, i) => (
-          <div key={i} className="px-4 py-3 flex gap-4 border-b last:border-0">
+          <div key={i} className="flex gap-4 border-b border-white/[0.06] px-5 py-4 last:border-0 sm:px-6 sm:py-5">
             {Array.from({ length: cols }).map((_, j) => (
-              <Skeleton key={j} className="h-4 flex-1" />
+              <Skeleton key={j} className="h-4 flex-1 rounded-full bg-white/10" />
             ))}
           </div>
         ))}
