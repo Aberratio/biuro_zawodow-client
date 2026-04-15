@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -11,6 +11,7 @@ import { ConnectionBanner } from "@/components/ConnectionBanner";
 
 function LayoutContent({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { isMobile, setOpenMobile } = useSidebar();
   const mainRef = useRef<HTMLElement | null>(null);
 
@@ -31,13 +32,22 @@ function LayoutContent({ children }: { children: ReactNode }) {
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="app-page-gradient absolute inset-0" />
         </div>
-        <header className="surface-panel sticky top-0 z-20 flex min-h-[4.9rem] shrink-0 items-center justify-between gap-3 border-b px-4 py-3.5 md:min-h-[5.1rem] md:flex-wrap md:px-5 lg:px-7">
+        <header className="surface-panel sticky top-0 z-20 flex min-h-[4.9rem] shrink-0 items-center gap-3 border-b px-4 py-3.5 md:min-h-[5.1rem] md:flex-wrap md:px-5 lg:px-7">
           <div className="flex min-w-0 items-center gap-3.5">
             <SidebarTrigger className="h-12 w-12 rounded-[1.15rem] border border-border/80 bg-background/45 text-primary backdrop-blur-xl hover:bg-accent/80 hover:text-foreground md:h-11 md:w-11 md:rounded-full" />
-            <BrandWordmark
-              className="md:hidden"
-              imageClassName="h-8 w-auto object-contain"
-            />
+          </div>
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center md:hidden">
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="pointer-events-auto shrink-0 rounded-[0.95rem] border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              aria-label="Przejdz do strony glownej"
+            >
+              <BrandWordmark
+                className="shrink-0"
+                imageClassName="h-12 w-auto object-contain"
+              />
+            </button>
           </div>
         </header>
         <ConnectionBanner />
