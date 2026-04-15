@@ -1,5 +1,15 @@
-const CACHE_NAME = 'biuro-zawodow-app-shell-v1';
-const APP_SHELL = ['/', '/favicon.ico', '/placeholder.svg'];
+const CACHE_NAME = 'biuro-zawodow-app-shell-v2';
+const APP_SHELL = [
+  '/',
+  '/favicon.ico',
+  '/favicon-16x16.png',
+  '/favicon-32x32.png',
+  '/apple-touch-icon.png',
+  '/android-chrome-192x192.png',
+  '/android-chrome-512x512.png',
+  '/site.webmanifest',
+  '/placeholder.svg',
+];
 
 self.addEventListener('install', event => {
   event.waitUntil(

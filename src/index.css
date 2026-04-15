@@ -4,7 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
 All colors MUST be HSL.
 */
 
@@ -14,49 +14,49 @@ All colors MUST be HSL.
     --font-heading: "Sora", ui-sans-serif, system-ui, sans-serif;
     --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
 
-    --background: 0 0% 6%;
-    --foreground: 40 10% 96%;
+    --background: 220 14% 5%;
+    --foreground: 40 33% 96%;
 
-    --card: 0 0% 11%;
-    --card-foreground: 40 10% 96%;
+    --card: 220 10% 12%;
+    --card-foreground: 40 33% 96%;
 
-    --popover: 0 0% 10%;
-    --popover-foreground: 40 10% 96%;
+    --popover: 220 10% 11%;
+    --popover-foreground: 40 33% 96%;
 
-    --primary: 2 76% 52%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 41 58% 64%;
+    --primary-foreground: 222 18% 10%;
 
-    --secondary: 0 0% 16%;
-    --secondary-foreground: 40 8% 92%;
+    --secondary: 36 19% 24%;
+    --secondary-foreground: 41 30% 92%;
 
-    --muted: 0 0% 14%;
-    --muted-foreground: 32 7% 66%;
+    --muted: 220 9% 14%;
+    --muted-foreground: 34 13% 69%;
 
-    --accent: 0 0% 17%;
-    --accent-foreground: 40 10% 96%;
+    --accent: 220 9% 16%;
+    --accent-foreground: 40 33% 96%;
 
     --destructive: 0 72% 46%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 43 74% 63%;
+    --border: 34 14% 22%;
+    --input: 36 14% 18%;
+    --ring: 41 58% 64%;
 
     --radius: 1rem;
 
-    --sidebar-background: 0 0% 8%;
-    --sidebar-foreground: 40 8% 92%;
-    --sidebar-primary: 2 76% 52%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 15%;
-    --sidebar-accent-foreground: 40 10% 96%;
-    --sidebar-border: 0 0% 15%;
-    --sidebar-ring: 2 76% 52%;
+    --sidebar-background: 220 12% 7%;
+    --sidebar-foreground: 39 25% 92%;
+    --sidebar-primary: 41 58% 64%;
+    --sidebar-primary-foreground: 222 18% 10%;
+    --sidebar-accent: 220 9% 15%;
+    --sidebar-accent-foreground: 40 33% 96%;
+    --sidebar-border: 36 12% 18%;
+    --sidebar-ring: 41 58% 64%;
 
-    --surface-glow: 2 76% 52%;
-    --surface-warm: 12 74% 44%;
-    --surface-shadow: 0 0% 3%;
-    --button-highlight: 43 74% 63%;
+    --surface-glow: 38 40% 42%;
+    --surface-warm: 42 54% 58%;
+    --surface-shadow: 220 20% 2%;
+    --button-highlight: 41 58% 64%;
   }
 }
 
@@ -69,10 +69,10 @@ All colors MUST be HSL.
     @apply min-h-screen bg-background text-foreground antialiased;
     font-family: var(--font-sans);
     background-image:
-      radial-gradient(circle at top left, hsl(var(--surface-glow) / 0.08), transparent 30rem),
-      radial-gradient(circle at top right, hsl(var(--surface-warm) / 0.05), transparent 28rem),
-      radial-gradient(circle at 50% 0%, hsl(var(--foreground) / 0.03), transparent 36rem),
-      linear-gradient(180deg, hsl(0 0% 9%) 0%, hsl(var(--background)) 34%, hsl(0 0% 5%) 100%);
+      radial-gradient(circle at top left, hsl(var(--surface-glow) / 0.22), transparent 24rem),
+      radial-gradient(circle at top right, hsl(var(--surface-warm) / 0.12), transparent 22rem),
+      radial-gradient(circle at 50% -10%, hsl(var(--foreground) / 0.04), transparent 34rem),
+      linear-gradient(180deg, hsl(220 13% 9%) 0%, hsl(var(--background)) 34%, hsl(220 15% 4%) 100%);
     background-attachment: fixed;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
@@ -123,9 +123,9 @@ All colors MUST be HSL.
     inset: 0;
     pointer-events: none;
     background:
-      linear-gradient(180deg, hsl(var(--foreground) / 0.02), transparent 12rem),
-      radial-gradient(circle at top, hsl(var(--foreground) / 0.03), transparent 42%);
-    opacity: 0.55;
+      linear-gradient(180deg, hsl(var(--foreground) / 0.018), transparent 12rem),
+      radial-gradient(circle at top, hsl(var(--surface-warm) / 0.07), transparent 42%);
+    opacity: 0.72;
   }
 
   #root {
@@ -147,24 +147,28 @@ All colors MUST be HSL.
   .surface-card {
     background-color: hsl(var(--card) / 0.92);
     background-image:
-      linear-gradient(180deg, hsl(var(--foreground) / 0.02), transparent 38%),
-      radial-gradient(circle at top left, hsl(var(--primary) / 0.04), transparent 60%);
+      linear-gradient(180deg, hsl(var(--foreground) / 0.03), transparent 32%),
+      radial-gradient(circle at top left, hsl(var(--surface-warm) / 0.08), transparent 58%),
+      linear-gradient(180deg, hsl(220 9% 14% / 0.98), hsl(220 14% 7% / 0.98));
     border-color: hsl(var(--border) / 0.82);
     box-shadow:
-      0 20px 55px hsl(var(--surface-shadow) / 0.45),
-      inset 0 1px 0 hsl(var(--foreground) / 0.04);
+      0 24px 70px hsl(var(--surface-shadow) / 0.56),
+      inset 0 1px 0 hsl(var(--foreground) / 0.04),
+      inset 0 0 0 1px hsl(var(--button-highlight) / 0.04);
     backdrop-filter: blur(18px);
   }
 
   .surface-panel {
-    background-color: hsl(var(--background) / 0.82);
-    background-image: linear-gradient(180deg, hsl(var(--foreground) / 0.02), transparent 60%);
+    background-color: hsl(var(--background) / 0.78);
+    background-image:
+      linear-gradient(180deg, hsl(var(--foreground) / 0.025), transparent 60%),
+      radial-gradient(circle at top left, hsl(var(--surface-warm) / 0.07), transparent 55%);
     border-color: hsl(var(--border) / 0.72);
     backdrop-filter: blur(24px);
   }
 
   .surface-field {
-    background-color: hsl(var(--background) / 0.72);
+    background-color: hsl(220 13% 8% / 0.84);
     border-color: hsl(var(--input) / 0.95);
     box-shadow:
       inset 0 1px 0 hsl(var(--foreground) / 0.03),
@@ -178,7 +182,7 @@ All colors MUST be HSL.
 
   .surface-field:not([aria-invalid="true"]):hover {
     border-color: hsl(var(--button-highlight) / 0.52);
-    background-color: hsl(var(--background) / 0.8);
+    background-color: hsl(220 13% 9% / 0.94);
   }
 
   .surface-field:not([aria-invalid="true"]):focus,
@@ -196,7 +200,7 @@ All colors MUST be HSL.
     background-color: hsl(var(--popover) / 0.95);
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.025), transparent 62%),
-      radial-gradient(circle at top left, hsl(var(--primary) / 0.05), transparent 58%);
+      radial-gradient(circle at top left, hsl(var(--surface-warm) / 0.1), transparent 58%);
     border-color: hsl(var(--border) / 0.82);
     box-shadow: 0 22px 60px hsl(var(--surface-shadow) / 0.5);
     backdrop-filter: blur(22px);
@@ -206,7 +210,8 @@ All colors MUST be HSL.
     background-color: hsl(var(--sidebar-background) / 0.96);
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.02), transparent 36%),
-      radial-gradient(circle at top left, hsl(var(--sidebar-primary) / 0.08), transparent 60%);
+      radial-gradient(circle at top left, hsl(var(--sidebar-primary) / 0.08), transparent 44%),
+      linear-gradient(180deg, hsl(220 10% 9%), hsl(220 15% 6%));
     box-shadow:
       18px 0 40px hsl(var(--surface-shadow) / 0.28),
       inset -1px 0 0 hsl(var(--sidebar-border) / 0.85);
@@ -214,32 +219,32 @@ All colors MUST be HSL.
   }
 
   .surface-button {
-    border-color: hsl(var(--button-highlight) / 0.34);
+    border-color: hsl(var(--button-highlight) / 0.56);
     background-color: hsl(var(--secondary) / 0.96);
     background-image:
-      radial-gradient(circle at top left, hsl(var(--button-highlight) / 0.12), transparent 58%),
-      linear-gradient(180deg, hsl(var(--foreground) / 0.07), transparent 16%),
+      radial-gradient(circle at top left, hsl(var(--button-highlight) / 0.18), transparent 58%),
+      linear-gradient(180deg, hsl(var(--foreground) / 0.06), transparent 16%),
       linear-gradient(
         120deg,
-        hsl(0 0% 18%) 0%,
-        hsl(0 0% 16%) 28%,
-        hsl(38 18% 20%) 48%,
-        hsl(0 0% 15%) 62%,
-        hsl(0 0% 13%) 100%
+        hsl(41 28% 34%) 0%,
+        hsl(39 26% 31%) 24%,
+        hsl(40 34% 43%) 52%,
+        hsl(39 22% 29%) 76%,
+        hsl(37 24% 25%) 100%
       );
     background-size: 140% 140%, 100% 100%, 220% 100%;
     background-position: 0% 0%, 0% 0%, 0% 50%;
     box-shadow:
-      0 14px 30px hsl(var(--surface-shadow) / 0.38),
-      inset 0 1px 0 hsl(var(--foreground) / 0.05);
+      0 14px 30px hsl(var(--surface-shadow) / 0.4),
+      inset 0 1px 0 hsl(var(--foreground) / 0.1);
   }
 
   .surface-button:hover {
     background-position: 8% 10%, 0% 0%, 100% 50%;
     box-shadow:
-      0 16px 34px hsl(var(--surface-shadow) / 0.42),
-      0 0 0 1px hsl(var(--button-highlight) / 0.12),
-      inset 0 1px 0 hsl(var(--foreground) / 0.06);
+      0 18px 40px hsl(var(--surface-shadow) / 0.48),
+      0 0 0 1px hsl(var(--button-highlight) / 0.18),
+      inset 0 1px 0 hsl(var(--foreground) / 0.12);
   }
 
   .archive-notice {
@@ -272,15 +277,15 @@ All colors MUST be HSL.
 
   .page-gradient {
     background-image:
-      radial-gradient(circle at top left, hsl(var(--primary) / 0.08), transparent 30%),
-      radial-gradient(circle at top right, hsl(var(--surface-warm) / 0.05), transparent 28%),
+      radial-gradient(circle at top left, hsl(var(--surface-glow) / 0.22), transparent 28%),
+      radial-gradient(circle at top right, hsl(var(--surface-warm) / 0.14), transparent 26%),
       linear-gradient(180deg, hsl(var(--foreground) / 0.02), transparent 75%);
   }
 
   .app-page-gradient {
     background-image:
-      radial-gradient(circle at 10% 6%, hsl(var(--surface-glow) / 0.05), transparent 26rem),
-      radial-gradient(circle at 88% 4%, hsl(var(--surface-warm) / 0.035), transparent 24rem),
+      radial-gradient(circle at 10% 6%, hsl(var(--surface-glow) / 0.14), transparent 24rem),
+      radial-gradient(circle at 88% 4%, hsl(var(--surface-warm) / 0.09), transparent 22rem),
       radial-gradient(circle at 50% 18%, hsl(var(--foreground) / 0.018), transparent 38rem),
       linear-gradient(180deg, hsl(var(--foreground) / 0.015), transparent 42%);
   }
