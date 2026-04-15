@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { AlertTriangle, CheckCircle, Info, Loader2, Mail, RefreshCcw, Send } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
+import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 
 type PendingEmailAction =
   | { kind: 'send-missing'; count: number }
@@ -24,7 +25,15 @@ type PendingEmailAction =
   | { kind: 'send-one'; participantId: string; participantName: string; participantEmail: string };
 
 export default function EmailSending() {
-  const { participants, events, selectedEventId, sendEventQrEmails, sendParticipantQrEmail, isLoading } = useData();
+  const {
+    participants,
+    events,
+    selectedEventId,
+    sendEventQrEmails,
+    sendParticipantQrEmail,
+    isLoading,
+    connectionState,
+  } = useData();
   const [sendingAll, setSendingAll] = useState(false);
   const [resendingAll, setResendingAll] = useState(false);
   const [sendingParticipantId, setSendingParticipantId] = useState<string | null>(null);
@@ -33,14 +42,17 @@ export default function EmailSending() {
 
   const eventParticipants = useMemo(
     () => participants.filter(participant => participant.event_id === selectedEventId),
-    [participants, selectedEventId]
+    [participants, selectedEventId],
   );
   const selectedEvent = events.find(event => event.id === selectedEventId);
   const sent = eventParticipants.filter(participant => participant.email_status === 'sent').length;
   const pending = eventParticipants.length - sent;
   const isConfirmingAction = sendingAll || resendingAll || sendingParticipantId !== null;
+  const isOnline = connectionState === 'online';
 
-  if (isLoading) return <TableSkeleton rows={5} cols={4} subtitle="" />;
+  if (isLoading) {
+    return <TableSkeleton rows={5} cols={4} subtitle="" />;
+  }
 
   const handleSendAll = async (resendAll: boolean) => {
     setPendingAction(null);
@@ -53,23 +65,23 @@ export default function EmailSending() {
     try {
       const result = await sendEventQrEmails(selectedEventId, resendAll);
       if (!result.ok) {
-        toast({ title: 'Nie udało się wysłać kodów QR', description: result.error, variant: 'destructive' });
+        toast({ title: 'Nie udalo sie wyslac kodow QR', description: result.error, variant: 'destructive' });
         return;
       }
 
       setLastErrors(result.errors.map(error => ({ participant_name: error.participant_name, error: error.error })));
       if (result.error_count > 0) {
         toast({
-          title: 'Wysyłka zakończona częściowo',
-          description: `Wysłano ${result.sent_count}, błędów: ${result.error_count}.`,
+          title: 'Wysylka zakonczona czesciowo',
+          description: `Wyslano ${result.sent_count}, bledow: ${result.error_count}.`,
           variant: 'destructive',
         });
         return;
       }
 
       toast({
-        title: resendAll ? 'Ponownie wysłano kody QR' : 'Wysłano kody QR',
-        description: `Łącznie wysłano ${result.sent_count} wiadomości.`,
+        title: resendAll ? 'Ponownie wyslano kody QR' : 'Wyslano kody QR',
+        description: `Lacznie wyslano ${result.sent_count} wiadomosci.`,
       });
     } finally {
       setSendingAll(false);
@@ -83,11 +95,11 @@ export default function EmailSending() {
     try {
       const result = await sendParticipantQrEmail(participantId);
       if (!result.ok) {
-        toast({ title: 'Nie udało się wysłać maila', description: result.error, variant: 'destructive' });
+        toast({ title: 'Nie udalo sie wyslac maila', description: result.error, variant: 'destructive' });
         return;
       }
 
-      toast({ title: 'Mail wysłany', description: participantName });
+      toast({ title: 'Mail wyslany', description: participantName });
     } finally {
       setSendingParticipantId(null);
     }
@@ -96,19 +108,23 @@ export default function EmailSending() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Wysyłka kodów QR</h1>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-          {selectedEvent ? `Wydarzenie: ${selectedEvent.name}` : 'Wyślij kody QR dla wybranego wydarzenia.'}
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Wysylka kodow QR</h1>
+        <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+          {selectedEvent ? `Wydarzenie: ${selectedEvent.name}` : 'Wyslij kody QR dla wybranego wydarzenia.'}
         </p>
       </div>
+
+      {!isOnline && (
+        <OnlineOnlyNotice description="Wysylka i ponowne wysylanie kodow QR wymagaja aktywnego polaczenia z serwerem. W trybie offline widoczny jest tylko stan z ostatniej synchronizacji." />
+      )}
 
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="py-3">
           <div className="flex items-start gap-2">
-            <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-            <div className="text-xs text-muted-foreground space-y-1">
-              <p>„Wyślij brakujące” wyśle wiadomości tylko do uczestników bez statusu wysyłki.</p>
-              <p>„Wyślij ponownie wszystkim” wymusi resend dla całego wydarzenia.</p>
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <div className="space-y-1 text-xs text-muted-foreground">
+              <p>"Wyslij brakujace" wysle wiadomosci tylko do uczestnikow bez statusu wysylki.</p>
+              <p>"Wyslij ponownie wszystkim" wymusi resend dla calego wydarzenia.</p>
             </div>
           </div>
         </CardContent>
@@ -116,41 +132,41 @@ export default function EmailSending() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base">Status wysyłki</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Status wysylki</CardTitle></CardHeader>
           <CardContent>
             <div className="text-3xl font-bold tabular-nums">{sent}/{eventParticipants.length}</div>
-            <p className="text-sm text-muted-foreground mt-1">uczestników ma już mail z QR</p>
-            <div className="h-2 bg-muted rounded-full mt-3">
-              <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${eventParticipants.length ? (sent / eventParticipants.length) * 100 : 0}%` }} />
+            <p className="mt-1 text-sm text-muted-foreground">uczestnikow ma juz mail z QR</p>
+            <div className="mt-3 h-2 rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${eventParticipants.length ? (sent / eventParticipants.length) * 100 : 0}%` }} />
             </div>
-            <div className="grid gap-2 mt-4">
-              <Button className="w-full h-11 sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || pending === 0}>
-                {sendingAll ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
-                {pending === 0 ? 'Brak zaległych wiadomości' : `Wyślij brakujące (${pending})`}
+            <div className="mt-4 grid gap-2">
+              <Button className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || pending === 0 || !isOnline}>
+                {sendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />}
+                {pending === 0 ? 'Brak zaleglych wiadomosci' : `Wyslij brakujace (${pending})`}
               </Button>
-              <Button variant="outline" className="w-full h-11 sm:h-10" onClick={() => setPendingAction({ kind: 'resend-all', count: eventParticipants.length })} disabled={resendingAll || eventParticipants.length === 0}>
-                {resendingAll ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-1" />}
-                Wyślij ponownie wszystkim
+              <Button variant="outline" className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'resend-all', count: eventParticipants.length })} disabled={resendingAll || eventParticipants.length === 0 || !isOnline}>
+                {resendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
+                Wyslij ponownie wszystkim
               </Button>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base">Ostatnie błędy</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Ostatnie bledy</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {lastErrors.length === 0 ? (
               <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                Brak błędów z ostatniej operacji.
+                Brak bledow z ostatniej operacji.
               </div>
             ) : (
               lastErrors.slice(0, 4).map(error => (
                 <div key={`${error.participant_name}-${error.error}`} className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                     <div>
                       <p className="text-sm font-medium">{error.participant_name}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{error.error}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{error.error}</p>
                     </div>
                   </div>
                 </div>
@@ -161,12 +177,12 @@ export default function EmailSending() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Lista uczestników</CardTitle></CardHeader>
-        <CardContent className="overflow-x-auto -mx-6 px-6">
+        <CardHeader><CardTitle className="text-base">Lista uczestnikow</CardTitle></CardHeader>
+        <CardContent className="-mx-6 overflow-x-auto px-6">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Imię</TableHead>
+                <TableHead>Imie</TableHead>
                 <TableHead className="hidden md:table-cell">Email</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Akcja</TableHead>
@@ -175,17 +191,17 @@ export default function EmailSending() {
             <TableBody>
               {eventParticipants.map(participant => (
                 <TableRow key={participant.id}>
-                  <TableCell className="font-medium text-sm">
+                  <TableCell className="text-sm font-medium">
                     <div className="min-w-0">
                       <p className="truncate">{participant.name}</p>
                       <p className="truncate text-xs text-muted-foreground md:hidden">{participant.email}</p>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground text-sm">{participant.email}</TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{participant.email}</TableCell>
                   <TableCell>
                     <Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'} className="gap-1 text-[10px]">
                       {participant.email_status === 'sent'
-                        ? <><CheckCircle className="h-3 w-3" /> Wysłany</>
+                        ? <><CheckCircle className="h-3 w-3" /> Wyslany</>
                         : <><Mail className="h-3 w-3" /> Oczekuje</>}
                     </Badge>
                   </TableCell>
@@ -194,7 +210,7 @@ export default function EmailSending() {
                       variant="outline"
                       size="sm"
                       className="h-9 w-full sm:w-auto"
-                      disabled={sendingParticipantId === participant.id}
+                      disabled={sendingParticipantId === participant.id || !isOnline}
                       onClick={() => setPendingAction({
                         kind: 'send-one',
                         participantId: participant.id,
@@ -202,7 +218,7 @@ export default function EmailSending() {
                         participantEmail: participant.email,
                       })}
                     >
-                      {sendingParticipantId === participant.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Wyślij ponownie'}
+                      {sendingParticipantId === participant.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Wyslij ponownie'}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -215,20 +231,23 @@ export default function EmailSending() {
       <AlertDialog open={pendingAction !== null} onOpenChange={open => !open && setPendingAction(null)}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Potwierdź wysyłkę maili z kodem QR</AlertDialogTitle>
+            <AlertDialogTitle>Potwierdz wysylke maili z kodem QR</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingAction?.kind === 'send-one'
-                ? <>Do uczestnika <span className="font-medium text-foreground">{pendingAction.participantName}</span> zostanie wysłany mail na adres <span className="font-medium text-foreground">{pendingAction.participantEmail}</span>.</>
+                ? <>Do uczestnika <span className="font-medium text-foreground">{pendingAction.participantName}</span> zostanie wyslany mail na adres <span className="font-medium text-foreground">{pendingAction.participantEmail}</span>.</>
                 : pendingAction?.kind === 'resend-all'
-                  ? <>Ta operacja ponownie wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestników wydarzenia.</>
-                  : <>Ta operacja wyśle brakujące maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia.</>}
+                  ? <>Ta operacja ponownie wysle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestnikow wydarzenia.</>
+                  : <>Ta operacja wysle brakujace maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestnikow wydarzenia.</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Anuluj</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (!pendingAction) return;
+                if (!pendingAction) {
+                  return;
+                }
+
                 if (pendingAction.kind === 'send-one') {
                   void handleSendOne(pendingAction.participantId, pendingAction.participantName);
                   return;
@@ -236,10 +255,10 @@ export default function EmailSending() {
 
                 void handleSendAll(pendingAction.kind === 'resend-all');
               }}
-              disabled={isConfirmingAction}
+              disabled={isConfirmingAction || !isOnline}
             >
-              {isConfirmingAction && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              Wyślij mail
+              {isConfirmingAction && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              Wyslij mail
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

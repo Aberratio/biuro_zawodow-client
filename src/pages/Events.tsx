@@ -17,6 +17,7 @@ import { toast } from '@/hooks/use-toast';
 import { formatEventOfficeWindow, getEventOfficeOpenAt, isEventOfficeOpen, isValidEventOfficeRange } from '@/lib/events';
 import { validateRequired } from '@/lib/form-validation';
 import { isScannerRole } from '@/lib/roles';
+import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 
 const EVENTS_PAGE_SIZE = 20;
 
@@ -72,6 +73,7 @@ export default function Events() {
     selectedOrganizationId,
     setSelectedOrganizationId,
     isLoading,
+    connectionState,
   } = useData();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -89,6 +91,7 @@ export default function Events() {
     [organizations],
   );
   const canCreateEvent = !isScannerRole(currentRole);
+  const isOnline = connectionState === 'online';
   const showOrganizationColumn = currentRole === 'superadmin';
   const [form, setForm] = useState({
     name: '',
@@ -263,11 +266,15 @@ export default function Events() {
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Wydarzenia</h1>
         </div>
         {canCreateEvent && (
-          <Button onClick={() => setOpen(true)} size="sm" className="w-full sm:w-auto sm:self-auto">
+          <Button onClick={() => setOpen(true)} size="sm" className="w-full sm:w-auto sm:self-auto" disabled={!isOnline}>
             <Plus className="mr-1 h-4 w-4" /> Nowe wydarzenie
           </Button>
         )}
       </div>
+
+      {!isOnline && canCreateEvent && (
+        <OnlineOnlyNotice description="Tworzenie i edycja wydarzen wymagaja aktywnego polaczenia z serwerem. Lista wydarzen pozostaje dostepna do odczytu z lokalnego snapshotu." />
+      )}
 
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">

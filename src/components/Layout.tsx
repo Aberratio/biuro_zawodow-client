@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
+import { ConnectionBanner } from '@/components/ConnectionBanner';
 
 function LayoutContent({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
@@ -30,6 +31,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
             <SidebarTrigger className="rounded-xl border border-border/60 bg-background/35 backdrop-blur-sm hover:bg-accent/70" />
           </div>
         </header>
+        <ConnectionBanner />
         <main
           ref={mainRef}
           data-app-scroll-root="true"

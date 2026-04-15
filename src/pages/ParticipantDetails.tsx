@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { buildParticipantFieldValues, getActiveParticipantMappings } from '@/lib/participant-fields';
 import { getParticipantStatusDefinition, PARTICIPANT_STATUS_DEFINITIONS } from '@/lib/participant-status';
 import { validateEmail, validateRequired } from '@/lib/form-validation';
+import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 
 function formatParticipantDateTime(value: string): string {
   const normalizedValue = value.includes(' ') ? value.replace(' ', 'T') : value;
@@ -69,6 +70,7 @@ export default function ParticipantDetails() {
     deleteParticipant,
     getParticipantQrPreview,
     isLoading,
+    connectionState,
   } = useData();
   const participant = participants.find(entry => entry.id === id);
   const event = events.find(entry => entry.id === participant?.event_id);
@@ -88,6 +90,7 @@ export default function ParticipantDetails() {
   const [isDeletingParticipant, setIsDeletingParticipant] = useState(false);
   const canManageParticipantData = currentRole === 'editor' || currentRole === 'admin' || currentRole === 'superadmin' || currentRole === 'scanner_plus';
   const canUseAdminActions = currentRole === 'editor' || currentRole === 'admin' || currentRole === 'superadmin';
+  const isOnline = connectionState === 'online';
 
   useEffect(() => {
     if (!participant) return;
@@ -96,7 +99,7 @@ export default function ParticipantDetails() {
   }, [participant]);
 
   useEffect(() => {
-    if (!participant?.event_id || !canManageParticipantData) return;
+    if (!participant?.event_id || !canManageParticipantData || !isOnline) return;
 
     void getParticipantFieldMappings(participant.event_id)
       .then(data => {
@@ -107,10 +110,10 @@ export default function ParticipantDetails() {
         setMappings([]);
         setTransferFields({});
       });
-  }, [canManageParticipantData, getParticipantFieldMappings, participant]);
+  }, [canManageParticipantData, getParticipantFieldMappings, isOnline, participant]);
 
   useEffect(() => {
-    if (!participant?.id || !canUseAdminActions) return;
+    if (!participant?.id || !canUseAdminActions || !isOnline) return;
 
     setIsQrLoading(true);
     void getParticipantQrPreview(participant.id)
@@ -119,7 +122,7 @@ export default function ParticipantDetails() {
         toast({ title: 'Nie udaĹ‚o siÄ™ pobraÄ‡ podglÄ…du QR', description: error instanceof Error ? error.message : 'BĹ‚Ä…d API', variant: 'destructive' });
       })
       .finally(() => setIsQrLoading(false));
-  }, [canUseAdminActions, getParticipantQrPreview, participant?.id]);
+  }, [canUseAdminActions, getParticipantQrPreview, isOnline, participant?.id]);
 
   const activeMappings = useMemo(() => getActiveParticipantMappings(mappings), [mappings]);
   const timeline = useMemo(() => {
@@ -254,12 +257,12 @@ export default function ParticipantDetails() {
         </div>
         {canManageParticipantData && (
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setTransferOpen(true)}>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setTransferOpen(true)} disabled={!isOnline}>
               <UserRoundCog className="h-4 w-4 mr-1" />
               Przepisz pakiet na innÄ… osobÄ™
             </Button>
             {canUseAdminActions && (
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setSendQrConfirmOpen(true)} disabled={isSendingQr}>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setSendQrConfirmOpen(true)} disabled={isSendingQr || !isOnline}>
               {isSendingQr ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Repeat className="h-4 w-4 mr-1" />}
               WyĹ›lij ponownie QR
             </Button>
@@ -270,11 +273,15 @@ export default function ParticipantDetails() {
 
       {canUseAdminActions && (
         <div className="flex justify-end">
-          <Button variant="destructive" size="sm" className="w-full sm:w-auto" onClick={() => setDeleteConfirmOpen(true)}>
+          <Button variant="destructive" size="sm" className="w-full sm:w-auto" onClick={() => setDeleteConfirmOpen(true)} disabled={!isOnline}>
             <Trash2 className="h-4 w-4 mr-1" />
             UsuĹ„ uczestnika
           </Button>
         </div>
+      )}
+
+      {!isOnline && (
+        <OnlineOnlyNotice description="Podglad QR, zmiana statusu poza skanerem, przepisanie pakietu, wysylka maila i usuwanie uczestnika wymagaja aktywnego polaczenia z serwerem." />
       )}
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
@@ -282,7 +289,15 @@ export default function ParticipantDetails() {
           <CardHeader><CardTitle className="text-base">SzczegĂłĹ‚y uczestnika</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Numer startowy</span><span className="font-semibold tabular-nums">#{participant.bib_number}</span></div>
-            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Status</span><Badge variant={statusDefinition.badgeVariant}>{statusDefinition.label}</Badge></div>
+                <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Status</span><Badge variant={statusDefinition.badgeVariant}>{statusDefinition.label}</Badge></div>
+            {(participant.sync_state === 'pending_sync' || participant.sync_state === 'requires_review') && (
+              <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-muted-foreground">Synchronizacja</span>
+                <Badge variant={participant.sync_state === 'pending_sync' ? 'secondary' : 'destructive'}>
+                  {participant.sync_state === 'pending_sync' ? 'Oczekuje na synchronizacje' : 'Wymaga weryfikacji'}
+                </Badge>
+              </div>
+            )}
             <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Mail z QR</span><Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'}>{participant.email_status === 'sent' ? 'WysĹ‚any' : 'Oczekuje'}</Badge></div>
             <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-start sm:justify-between"><span className="text-muted-foreground">Token QR</span><span className="font-mono text-xs break-all sm:max-w-[18rem] sm:text-right">{participant.qr_code}</span></div>
             {canManageParticipantData && (
@@ -299,7 +314,7 @@ export default function ParticipantDetails() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button className="w-full sm:w-auto" onClick={() => void handleSaveStatus()} disabled={isSavingStatus || statusValue === participant.status}>
+                  <Button className="w-full sm:w-auto" onClick={() => void handleSaveStatus()} disabled={isSavingStatus || statusValue === participant.status || !isOnline}>
                     {isSavingStatus && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                     Zapisz status
                   </Button>

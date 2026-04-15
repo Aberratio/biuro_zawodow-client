@@ -15,6 +15,7 @@ import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { formatEventOfficeWindow } from '@/lib/events';
 import { validateRequired } from '@/lib/form-validation';
 import { ParticipantFieldMapping } from '@/types';
+import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 
 type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom';
 
@@ -68,6 +69,7 @@ export default function CsvImport() {
     runParticipantImport,
     getParticipantFieldMappings,
     isLoading,
+    connectionState,
   } = useData();
   const eventId = routeEventId ?? selectedEventId;
   const event = events.find(item => item.id === eventId);
@@ -83,6 +85,7 @@ export default function CsvImport() {
   const [mappingErrors, setMappingErrors] = useState<{ emailColumn?: string; aliases: Record<string, string>; form?: string }>({ aliases: {} });
   const [savedMappings, setSavedMappings] = useState<ParticipantFieldMapping[]>([]);
   const [savedMappingsLoading, setSavedMappingsLoading] = useState(false);
+  const isOnline = connectionState === 'online';
 
   useEffect(() => {
     if (routeEventId) {
@@ -91,7 +94,7 @@ export default function CsvImport() {
   }, [routeEventId, setSelectedEventId]);
 
   useEffect(() => {
-    if (!eventId) {
+    if (!eventId || !isOnline) {
       setSavedMappings([]);
       return;
     }
@@ -101,7 +104,7 @@ export default function CsvImport() {
       .then(data => setSavedMappings(data.filter(mapping => mapping.is_active)))
       .catch(() => setSavedMappings([]))
       .finally(() => setSavedMappingsLoading(false));
-  }, [eventId, getParticipantFieldMappings]);
+  }, [eventId, getParticipantFieldMappings, isOnline]);
 
   useEffect(() => {
     if (!analysis || analysis.has_mapping) {
@@ -268,6 +271,10 @@ export default function CsvImport() {
         </div>
       </div>
 
+      {!isOnline && (
+        <OnlineOnlyNotice description="Analiza CSV, zapis mapowania i sam import wymagaja aktywnego polaczenia z serwerem. W trybie offline pozostaje tylko podglad ostatnich danych." />
+      )}
+
       <Card className="border-dashed">
         <CardContent className="py-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -278,7 +285,7 @@ export default function CsvImport() {
           </div>
           <div className="flex items-center gap-3">
             <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFilePicked} />
-            <Button onClick={() => fileInputRef.current?.click()} disabled={runningAction === 'analyze'}>
+            <Button onClick={() => fileInputRef.current?.click()} disabled={runningAction === 'analyze' || !isOnline}>
               {runningAction === 'analyze' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileUp className="h-4 w-4 mr-1" />}
               Wybierz plik
             </Button>
@@ -486,13 +493,13 @@ export default function CsvImport() {
 
           <div className="flex flex-wrap gap-3">
             {!analysis.has_mapping && (
-              <Button onClick={handleSaveMappingAndImport} disabled={runningAction === 'confirm' || runningAction === 'run'}>
+              <Button onClick={handleSaveMappingAndImport} disabled={runningAction === 'confirm' || runningAction === 'run' || !isOnline}>
                 {(runningAction === 'confirm' || runningAction === 'run') ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
                 Zapisz mapowanie i importuj
               </Button>
             )}
             {analysis.has_mapping && (
-              <Button onClick={handleRunExistingImport} disabled={!canRunWithSavedMapping || runningAction === 'run'}>
+              <Button onClick={handleRunExistingImport} disabled={!canRunWithSavedMapping || runningAction === 'run' || !isOnline}>
                 {runningAction === 'run' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-1" />}
                 Importuj z zapisanym mapowaniem
               </Button>

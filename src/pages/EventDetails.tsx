@@ -31,6 +31,7 @@ import { buildEmptyParticipantFieldValues, getActiveParticipantMappings } from '
 import { participantCountsAsCheckedIn } from '@/lib/participant-status';
 import { validateEmail, validateRequired } from '@/lib/form-validation';
 import { isScannerRole } from '@/lib/roles';
+import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 
 type OfficeStatusTone = 'open' | 'upcoming' | 'closed';
 
@@ -182,6 +183,7 @@ export default function EventDetails() {
     deleteEvent,
     exportEventCsv,
     exportEventLogsCsv,
+    connectionState,
   } = useData();
   const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
   const [manualOpen, setManualOpen] = useState(false);
@@ -245,6 +247,7 @@ export default function EventDetails() {
   const canEditEvent = isArchivedEvent ? currentRole === 'superadmin' : canManageScanners;
   const canOperateOnEvent = !isArchivedEvent || currentRole === 'superadmin';
   const canUseActiveEventTools = !isArchivedEvent && event !== undefined && isEventOfficeOpen(event, new Date(nowTimestamp));
+  const isOnline = connectionState === 'online';
 
   useEffect(() => {
     if (id && events.some(entry => entry.id === id)) {
@@ -258,7 +261,7 @@ export default function EventDetails() {
   }, []);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !isOnline) return;
 
     getParticipantFieldMappings(id)
       .then(data => {
@@ -269,7 +272,7 @@ export default function EventDetails() {
         setMappings([]);
         setManualFields({});
       });
-  }, [getParticipantFieldMappings, id]);
+  }, [getParticipantFieldMappings, id, isOnline]);
 
   useEffect(() => {
     if (!event) return;
@@ -514,6 +517,10 @@ export default function EventDetails() {
         </div>
       )}
 
+      {!isOnline && canOperateOnEvent && (
+        <OnlineOnlyNotice description="Import CSV, edycja wydarzenia, eksporty, wysylka QR, reczne dodawanie uczestnikow i zarzadzanie operatorami wymagaja aktywnego polaczenia z serwerem." />
+      )}
+
       <Card className={`overflow-hidden shadow-sm ${officeToneClasses.hero}`}>
         <CardContent className="p-5 sm:p-6">
           <div className="flex flex-col gap-5">
@@ -538,11 +545,11 @@ export default function EventDetails() {
 
               {canEditEvent && (
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                  <Button variant="outline" onClick={() => setEditOpen(true)} className="w-full sm:w-auto">
+                  <Button variant="outline" onClick={() => setEditOpen(true)} className="w-full sm:w-auto" disabled={!isOnline}>
                     <Pencil className="mr-1 h-4 w-4" /> Edytuj
                   </Button>
                   {canArchiveEvent && (
-                    <Button variant="destructive" onClick={() => setDeleteConfirmOpen(true)} className="w-full sm:w-auto">
+                    <Button variant="destructive" onClick={() => setDeleteConfirmOpen(true)} className="w-full sm:w-auto" disabled={!isOnline}>
                       <Archive className="mr-1 h-4 w-4" /> Archiwizuj
                     </Button>
                   )}
@@ -625,7 +632,7 @@ export default function EventDetails() {
             users={assignedScanners}
             emptyText="Brak operatorów."
             action={canManageScanners && canAssignScannersToEvent ? (
-              <Button variant="outline" size="sm" onClick={openScannerDialog}>
+              <Button variant="outline" size="sm" onClick={openScannerDialog} disabled={!isOnline}>
                 Zarządzaj
               </Button>
             ) : undefined}
@@ -641,39 +648,39 @@ export default function EventDetails() {
           <CardContent className="space-y-4 p-5">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {canOperateOnEvent && (
-                <Button variant="outline" onClick={() => void handleExportCsv()} className="h-11 justify-start" disabled={exportingCsv}>
+                <Button variant="outline" onClick={() => void handleExportCsv()} className="h-11 justify-start" disabled={exportingCsv || !isOnline}>
                   {exportingCsv ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
                   Eksport uczestników CSV
                 </Button>
               )}
               {canOperateOnEvent && (
-                <Button variant="outline" onClick={() => void handleExportLogsCsv()} className="h-11 justify-start" disabled={exportingLogsCsv}>
+                <Button variant="outline" onClick={() => void handleExportLogsCsv()} className="h-11 justify-start" disabled={exportingLogsCsv || !isOnline}>
                   {exportingLogsCsv ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
                   Eksport logów CSV
                 </Button>
               )}
               {canEditEvent && (
-                <Button variant="outline" onClick={() => setEditOpen(true)} className="h-11 justify-start">
+                <Button variant="outline" onClick={() => setEditOpen(true)} className="h-11 justify-start" disabled={!isOnline}>
                   <Pencil className="mr-1 h-4 w-4" /> Edytuj wydarzenie
                 </Button>
               )}
               {canManageScanners && canAssignScannersToEvent && (
-                <Button variant="outline" onClick={openScannerDialog} className="h-11 justify-start">
+                <Button variant="outline" onClick={openScannerDialog} className="h-11 justify-start" disabled={!isOnline}>
                   <ScanLine className="mr-1 h-4 w-4" /> Zarządzaj operatorami
                 </Button>
               )}
               {!isArchivedEvent && canOperateOnEvent && (
-                <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate(`/events/${event.id}/import`); }} className="h-11 justify-start">
+                <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate(`/events/${event.id}/import`); }} className="h-11 justify-start" disabled={!isOnline}>
                   <FileUp className="mr-1 h-4 w-4" /> Import CSV
                 </Button>
               )}
               {!isArchivedEvent && canOperateOnEvent && (
-                <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate('/emails'); }} className="h-11 justify-start">
+                <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate('/emails'); }} className="h-11 justify-start" disabled={!isOnline}>
                   <Mail className="mr-1 h-4 w-4" /> Wysyłka QR
                 </Button>
               )}
               {!isArchivedEvent && canOperateOnEvent && hasSavedMapping && (
-                <Button variant="outline" onClick={() => setManualOpen(true)} className="h-11 justify-start">
+                <Button variant="outline" onClick={() => setManualOpen(true)} className="h-11 justify-start" disabled={!isOnline}>
                   <Plus className="mr-1 h-4 w-4" /> Dodaj uczestnika ręcznie
                 </Button>
               )}
@@ -692,7 +699,7 @@ export default function EventDetails() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Anuluj</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void handleDeleteEvent()} disabled={isDeletingEvent} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={() => void handleDeleteEvent()} disabled={isDeletingEvent || !isOnline} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {isDeletingEvent && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               Archiwizuj wydarzenie
             </AlertDialogAction>

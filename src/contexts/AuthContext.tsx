@@ -1,11 +1,15 @@
-import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { User } from '@/types';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import type { SessionState, User } from '@/types';
+import { isJwtExpired } from '@/lib/auth-token';
+import { API_BASE_URL, fetchJson, isApiResponseError, isNetworkRequestError } from '@/lib/api';
+import { clearOfflineData } from '@/lib/offline-store';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isAuthLoading: boolean;
+  sessionState: SessionState;
   login: (email: string, password: string) => Promise<boolean>;
   forgotPassword: (email: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
   resetPassword: (token: string, password: string, passwordConfirmation: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
@@ -20,7 +24,6 @@ interface AuthMeResponse {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080').replace(/\/+$/, '');
 const AUTH_USER_KEY = 'auth_user';
 const AUTH_TOKEN_KEY = 'auth_token';
 
@@ -63,17 +66,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(loadUser);
   const [token, setToken] = useState<string | null>(loadToken);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [sessionState, setSessionState] = useState<SessionState>(() => {
+    const initialToken = loadToken();
+    if (!initialToken || isJwtExpired(initialToken)) {
+      return 'expired';
+    }
+
+    return 'online';
+  });
 
   const clearSession = useCallback(() => {
+    const currentUserId = user?.id ?? loadUser()?.id ?? null;
+
     setUser(null);
     setToken(null);
-    sessionStorage.removeItem(AUTH_USER_KEY);
-    sessionStorage.removeItem(AUTH_TOKEN_KEY);
-  }, []);
+    setSessionState('expired');
 
-  const persistSession = useCallback((nextUser: User, nextToken: string) => {
+    try {
+      sessionStorage.removeItem(AUTH_USER_KEY);
+      sessionStorage.removeItem(AUTH_TOKEN_KEY);
+    } catch {
+      // Ignore unavailable sessionStorage.
+    }
+
+    if (currentUserId) {
+      void clearOfflineData(API_BASE_URL, currentUserId);
+    }
+  }, [user?.id]);
+
+  const persistSession = useCallback((nextUser: User, nextToken: string, nextSessionState: SessionState = 'online') => {
     setUser(nextUser);
     setToken(nextToken);
+    setSessionState(nextSessionState);
     sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
     sessionStorage.setItem(AUTH_TOKEN_KEY, nextToken);
   }, []);
@@ -93,36 +117,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const validateStoredSession = async () => {
       const storedToken = loadToken();
-      if (!storedToken) {
+      const storedUser = loadUser();
+
+      if (!storedToken || !storedUser) {
+        clearSession();
+        setIsAuthLoading(false);
+        return;
+      }
+
+      if (isJwtExpired(storedToken)) {
         clearSession();
         setIsAuthLoading(false);
         return;
       }
 
       try {
-        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        const { payload } = await fetchJson(`${API_BASE_URL}/auth/me`, {
           headers: {
             Authorization: `Bearer ${storedToken}`,
           },
         });
 
-        if (!response.ok) {
-          clearSession();
-          setIsAuthLoading(false);
-          return;
-        }
-
-        const payload = await response.json() as AuthMeResponse;
-        const nextUser = normalizeUser(payload.data);
+        const nextUser = normalizeUser((payload as AuthMeResponse).data);
         if (!nextUser) {
           clearSession();
           setIsAuthLoading(false);
           return;
         }
 
-        persistSession(nextUser, storedToken);
-      } catch {
-        clearSession();
+        persistSession(nextUser, storedToken, 'online');
+      } catch (error) {
+        if (isApiResponseError(error) && (error.status === 401 || error.status === 403)) {
+          clearSession();
+        } else if (isNetworkRequestError(error)) {
+          setUser(storedUser);
+          setToken(storedToken);
+          setSessionState('offline_cached');
+        } else {
+          clearSession();
+        }
       } finally {
         setIsAuthLoading(false);
       }
@@ -133,29 +166,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const { payload } = await fetchJson(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password }),
       });
 
-      if (!response.ok) {
-        clearSession();
-        return false;
-      }
-
-      const payload = await response.json() as {
+      const responsePayload = payload as {
         access_token?: string;
         user?: Omit<User, 'password'> & { password?: string };
       };
-      const nextUser = normalizeUser(payload.user);
+      const nextUser = normalizeUser(responsePayload.user);
 
-      if (!payload.access_token || !nextUser) {
+      if (!responsePayload.access_token || !nextUser) {
         clearSession();
         return false;
       }
 
-      persistSession(nextUser, payload.access_token);
+      persistSession(nextUser, responsePayload.access_token, 'online');
       return true;
     } catch {
       clearSession();
@@ -165,29 +193,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const forgotPassword = useCallback(async (email: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+      const { payload } = await fetchJson(`${API_BASE_URL}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() }),
       });
-      const payload = await response.json().catch(() => ({})) as { error?: string; message?: string };
 
-      if (!response.ok) {
+      return { ok: true, message: (payload as { message?: string }).message };
+    } catch (error) {
+      if (isApiResponseError(error)) {
         return {
           ok: false,
-          error: payload.error ?? 'Nie udało się wysłać linku resetującego.',
+          error: error.message || 'Nie udało się wysłać linku resetującego.',
         };
       }
 
-      return { ok: true, message: payload.message };
-    } catch {
       return { ok: false, error: 'Nie udało się połączyć z serwerem.' };
     }
   }, []);
 
   const resetPassword = useCallback(async (tokenValue: string, password: string, passwordConfirmation: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+      const { payload } = await fetchJson(`${API_BASE_URL}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -196,24 +223,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password_confirmation: passwordConfirmation,
         }),
       });
-      const payload = await response.json().catch(() => ({})) as { error?: string; message?: string };
 
-      if (!response.ok) {
+      return { ok: true, message: (payload as { message?: string }).message };
+    } catch (error) {
+      if (isApiResponseError(error)) {
         return {
           ok: false,
-          error: payload.error ?? 'Nie udało się zresetować hasła.',
+          error: error.message || 'Nie udało się zresetować hasła.',
         };
       }
 
-      return { ok: true, message: payload.message };
-    } catch {
       return { ok: false, error: 'Nie udało się połączyć z serwerem.' };
     }
   }, []);
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string, newPasswordConfirmation: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+      const { payload } = await fetchJson(`${API_BASE_URL}/auth/change-password`, {
         method: 'POST',
         headers: getAuthHeaders(true),
         body: JSON.stringify({
@@ -222,21 +248,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           new_password_confirmation: newPasswordConfirmation,
         }),
       });
-      const payload = await response.json().catch(() => ({})) as { error?: string; message?: string };
 
-      if (response.status === 401) {
+      return { ok: true, message: (payload as { message?: string }).message };
+    } catch (error) {
+      if (isApiResponseError(error) && error.status === 401) {
         clearSession();
       }
 
-      if (!response.ok) {
+      if (isApiResponseError(error)) {
         return {
           ok: false,
-          error: payload.error ?? 'Nie udało się zmienić hasła.',
+          error: error.message || 'Nie udało się zmienić hasła.',
         };
       }
 
-      return { ok: true, message: payload.message };
-    } catch {
       return { ok: false, error: 'Nie udało się połączyć z serwerem.' };
     }
   }, [clearSession, getAuthHeaders]);
@@ -249,8 +274,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       user,
       token,
-      isAuthenticated: !!token && !!user,
+      isAuthenticated: !!token && !!user && sessionState !== 'expired',
       isAuthLoading,
+      sessionState,
       login,
       forgotPassword,
       resetPassword,

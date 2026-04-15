@@ -63,7 +63,12 @@ function createBootstrapResponse(user: User, events: Event[], organizations: Org
   return {
     ok: true,
     status: 200,
+    headers: {
+      get: (name: string) => name.toLowerCase() === 'content-type' ? 'application/json' : null,
+    },
     json: async () => ({
+      generated_at: '2099-04-12T07:00:00.000Z',
+      snapshot_version: 'snapshot-test',
       data: {
         organizations,
         events,
