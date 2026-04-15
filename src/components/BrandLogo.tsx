@@ -21,8 +21,7 @@ export function BrandLogo({
   if (variant === "long") {
     return (
       <picture className="contents">
-        <source media="(max-width: 767px)" srcSet="/logo_long_mobile.png" />
-        <source media="(min-width: 768px)" srcSet="/logo_long_desktop.png" />
+        <source srcSet="/logo_long_desktop.png" />
         <img
           src={logoSources.long}
           alt={alt}

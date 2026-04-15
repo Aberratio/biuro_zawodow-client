@@ -102,6 +102,7 @@ export default function OrganizationDetails() {
   const [isSavingOrganization, setIsSavingOrganization] = useState(false);
   const [isDeletingOrganization, setIsDeletingOrganization] = useState(false);
   const [isSavingScanner, setIsSavingScanner] = useState(false);
+  const [isChangingScannerRole, setIsChangingScannerRole] = useState(false);
   const [isArchivingUser, setIsArchivingUser] = useState(false);
   const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
   const [isSavingScannerAssignments, setIsSavingScannerAssignments] =
@@ -567,8 +568,13 @@ export default function OrganizationDetails() {
     toast({ title: "Zaktualizowano dane operatora" });
   };
 
-  const handleChangeScannerRole = async (scanner: User, role: "scanner" | "scanner_plus") => {
+  const handleChangeScannerRole = async (
+    scanner: User,
+    role: "scanner" | "scanner_plus",
+  ) => {
+    setIsChangingScannerRole(true);
     const result = await changeRole(scanner.id, role);
+    setIsChangingScannerRole(false);
     if (!result.ok) {
       toast({
         title: "Nie udało się zmienić uprawnień operatora",
@@ -578,6 +584,9 @@ export default function OrganizationDetails() {
       return;
     }
 
+    setSelectedScanner((prev) =>
+      prev && prev.id === scanner.id ? { ...prev, role } : prev,
+    );
     toast({
       title: role === "scanner" ? "Zmieniono rolę na Operator" : "Zmieniono rolę na Operator Plus",
       description: scanner.name,
@@ -622,6 +631,11 @@ export default function OrganizationDetails() {
     const archivedUser = selectedActionUser;
     setArchiveUserConfirmOpen(false);
     setSelectedActionUser(null);
+    if (selectedScanner?.id === archivedUser.id) {
+      setScannerEditDialogOpen(false);
+      setSelectedScanner(null);
+      setScannerErrors({});
+    }
     toast({
       title:
         archivedUser.role === "editor"
@@ -949,7 +963,7 @@ export default function OrganizationDetails() {
                     </TableHead>
                     <TableHead>Przypisane wydarzenia</TableHead>
                     {canManageScanners && (
-                      <TableHead className="w-[340px]">Akcje</TableHead>
+                      <TableHead className="w-[11.5rem] sm:w-[13.5rem] lg:w-[240px]">Akcje</TableHead>
                     )}
                   </TableRow>
                 </TableHeader>
@@ -973,12 +987,12 @@ export default function OrganizationDetails() {
                         {getEventNames(scanner.assigned_events)}
                       </TableCell>
                       {canManageScanners && (
-                        <TableCell className="align-top">
+                        <TableCell className="min-w-[11.5rem] align-top sm:min-w-[13.5rem] lg:min-w-[240px]">
                           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-9 w-full justify-center rounded-lg px-3 text-xs"
+                              className="min-h-9 h-auto w-full whitespace-normal rounded-lg px-2.5 py-2 text-center text-[11px] leading-[1.15rem] sm:px-3 sm:text-xs"
                               onClick={() => openScannerEditDialog(scanner)}
                             >
                               <Pencil className="mr-1 h-3.5 w-3.5" />
@@ -987,18 +1001,18 @@ export default function OrganizationDetails() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-9 w-full justify-center rounded-lg px-3 text-xs"
+                              className="min-h-9 h-auto w-full whitespace-normal rounded-lg px-2.5 py-2 text-center text-[11px] leading-[1.15rem] sm:px-3 sm:text-xs"
                               onClick={() =>
                                 openScannerAssignmentsDialog(scanner.id)
                               }
                             >
                               Przypisz wydarzenia
                             </Button>
-                            {scanner.role === "scanner" && (
+                            {false && scanner.role === "scanner" && (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-9 w-full justify-center rounded-lg px-3 text-xs"
+                                className="min-h-9 h-auto w-full whitespace-normal rounded-lg px-2.5 py-2 text-center text-[11px] leading-[1.15rem] sm:px-3 sm:text-xs"
                                 onClick={() =>
                                   void handleChangeScannerRole(
                                     scanner,
@@ -1009,22 +1023,22 @@ export default function OrganizationDetails() {
                                 Zmień na Operator Plus
                               </Button>
                             )}
-                            {scanner.role === "scanner_plus" && (
+                            {false && scanner.role === "scanner_plus" && (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-9 w-full justify-center rounded-lg px-3 text-xs"
+                                className="min-h-9 h-auto w-full whitespace-normal rounded-lg px-2.5 py-2 text-center text-[11px] leading-[1.15rem] sm:px-3 sm:text-xs"
                                 onClick={() => void handleChangeScannerRole(scanner, "scanner")}
                               >
                                 Zmień na Operator
                               </Button>
                             )}
-                            {canManageMemberAccounts && (
+                            {false && canManageMemberAccounts && (
                               <>
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-9 w-full justify-center rounded-lg px-3 text-xs"
+                                  className="min-h-9 h-auto w-full whitespace-normal rounded-lg px-2.5 py-2 text-center text-[11px] leading-[1.15rem] sm:px-3 sm:text-xs"
                                   onClick={() =>
                                     openPasswordResetDialog(scanner)
                                   }
@@ -1035,7 +1049,7 @@ export default function OrganizationDetails() {
                                 <Button
                                   size="sm"
                                   variant="destructive"
-                                  className="h-9 w-full justify-center rounded-lg px-3 text-xs"
+                                  className="min-h-9 h-auto w-full whitespace-normal rounded-lg px-2.5 py-2 text-center text-[11px] leading-[1.15rem] sm:px-3 sm:text-xs"
                                   onClick={() => openArchiveUserDialog(scanner)}
                                 >
                                   <Trash2 className="mr-1 h-3.5 w-3.5" />
@@ -1361,12 +1375,69 @@ export default function OrganizationDetails() {
             <FieldError id="scanner-edit-form-error">
               {scannerErrors.form}
             </FieldError>
+            {selectedScanner && canManageScanners && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Rola operatora</p>
+                  <p className="text-xs text-muted-foreground">
+                    Aktualna rola: {getRoleLabel(selectedScanner.role)}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="mt-3 w-full sm:w-auto"
+                  onClick={() =>
+                    void handleChangeScannerRole(
+                      selectedScanner,
+                      selectedScanner.role === "scanner"
+                        ? "scanner_plus"
+                        : "scanner",
+                    )
+                  }
+                  disabled={isChangingScannerRole || isSavingScanner}
+                >
+                  {selectedScanner.role === "scanner"
+                    ? "Zmien na Operator Plus"
+                    : "Zmien na Operator"}
+                </Button>
+              </div>
+            )}
+            {selectedScanner && canManageMemberAccounts && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Konto operatora</p>
+                  <p className="text-xs text-muted-foreground">
+                    Reset hasla i usuniecie konta sa dostepne w tym oknie.
+                  </p>
+                </div>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    onClick={() => openPasswordResetDialog(selectedScanner)}
+                    disabled={isSavingScanner || isChangingScannerRole}
+                  >
+                    <KeyRound className="mr-1 h-4 w-4" />
+                    Reset hasla
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="w-full sm:w-auto"
+                    onClick={() => openArchiveUserDialog(selectedScanner)}
+                    disabled={isSavingScanner || isChangingScannerRole}
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" />
+                    Usun konto
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
               className="w-full sm:w-auto"
               onClick={handleSaveScanner}
-              disabled={isSavingScanner || !selectedScanner}
+              disabled={isSavingScanner || isChangingScannerRole || !selectedScanner}
             >
               Zapisz zmiany
             </Button>

@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useParams,
+} from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -34,7 +40,12 @@ function HomeRoute() {
   const { currentRole, visibleEvents } = useData();
 
   if (isScannerRole(currentRole)) {
-    return <Navigate to={visibleEvents.length > 0 ? "/scanner" : "/scanner-info"} replace />;
+    return (
+      <Navigate
+        to={visibleEvents.length > 0 ? "/scanner" : "/scanner-info"}
+        replace
+      />
+    );
   }
 
   return <Dashboard />;
@@ -84,15 +95,30 @@ function ImportRedirect() {
   return <Navigate to={`/events/${selectedEventId}/import`} replace />;
 }
 
-function EventAccessRoute({ children, allowArchivedView = false }: { children: JSX.Element; allowArchivedView?: boolean }) {
+function EventAccessRoute({
+  children,
+  allowArchivedView = false,
+}: {
+  children: JSX.Element;
+  allowArchivedView?: boolean;
+}) {
   const { id } = useParams<{ id: string }>();
-  const { events, archivedEvents, canAccessEvent, canViewEvent, isLoading } = useData();
+  const { events, archivedEvents, canAccessEvent, canViewEvent, isLoading } =
+    useData();
 
   if (isLoading) {
-    return <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">Sprawdzamy trasę do wydarzenia...</div>;
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">
+        Sprawdzamy trasę do wydarzenia...
+      </div>
+    );
   }
 
-  if (!id || (!events.some(event => event.id === id) && !archivedEvents.some(event => event.id === id))) {
+  if (
+    !id ||
+    (!events.some((event) => event.id === id) &&
+      !archivedEvents.some((event) => event.id === id))
+  ) {
     return <NotFound />;
   }
 
@@ -108,10 +134,14 @@ function ParticipantAccessRoute({ children }: { children: JSX.Element }) {
   const { participants, canAccessEvent, isLoading } = useData();
 
   if (isLoading) {
-    return <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">Szukamy zawodnika na liście...</div>;
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">
+        Szukamy zawodnika na liście...
+      </div>
+    );
   }
 
-  const participant = participants.find(entry => entry.id === id);
+  const participant = participants.find((entry) => entry.id === id);
   if (!participant) {
     return <NotFound />;
   }
@@ -128,17 +158,22 @@ function OrganizationAccessRoute({ children }: { children: JSX.Element }) {
   const { organizations, currentRole, currentUser, isLoading } = useData();
 
   if (isLoading) {
-    return <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">Sprawdzamy organizację...</div>;
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">
+        Sprawdzamy organizację...
+      </div>
+    );
   }
 
-  const organization = organizations.find(entry => entry.id === id);
+  const organization = organizations.find((entry) => entry.id === id);
   if (!organization) {
     return <NotFound />;
   }
 
   const allowed =
     currentRole === "superadmin" ||
-    (currentRole === "admin" && (currentUser.organization_ids ?? []).includes(organization.id)) ||
+    (currentRole === "admin" &&
+      (currentUser.organization_ids ?? []).includes(organization.id)) ||
     currentUser.organization_id === organization.id;
 
   if (!allowed) {
@@ -155,17 +190,52 @@ function ProtectedAppRoutes() {
         <Routes>
           <Route path="/" element={<HomeRoute />} />
           <Route path="/events" element={<Events />} />
-          <Route path="/events/:id" element={<EventAccessRoute allowArchivedView><EventDetails /></EventAccessRoute>} />
-          <Route path="/events/:id/import" element={<EventAccessRoute><CsvImport /></EventAccessRoute>} />
+          <Route
+            path="/events/:id"
+            element={
+              <EventAccessRoute allowArchivedView>
+                <EventDetails />
+              </EventAccessRoute>
+            }
+          />
+          <Route
+            path="/events/:id/import"
+            element={
+              <EventAccessRoute>
+                <CsvImport />
+              </EventAccessRoute>
+            }
+          />
           <Route path="/participants" element={<ScannerParticipantsRoute />} />
-          <Route path="/participants/:id" element={<ParticipantAccessRoute><ParticipantDetails /></ParticipantAccessRoute>} />
+          <Route
+            path="/participants/:id"
+            element={
+              <ParticipantAccessRoute>
+                <ParticipantDetails />
+              </ParticipantAccessRoute>
+            }
+          />
           <Route path="/scanner" element={<ScannerRoute />} />
           <Route path="/scanner-info" element={<ScannerInfoRoute />} />
           <Route path="/import" element={<ImportRedirect />} />
           <Route path="/emails" element={<EmailSending />} />
           <Route path="/organizations" element={<Organizations />} />
-          <Route path="/organizations/:id" element={<OrganizationAccessRoute><OrganizationDetails /></OrganizationAccessRoute>} />
-          <Route path="/organizations/:id/archived-events" element={<OrganizationAccessRoute><ArchivedEvents /></OrganizationAccessRoute>} />
+          <Route
+            path="/organizations/:id"
+            element={
+              <OrganizationAccessRoute>
+                <OrganizationDetails />
+              </OrganizationAccessRoute>
+            }
+          />
+          <Route
+            path="/organizations/:id/archived-events"
+            element={
+              <OrganizationAccessRoute>
+                <ArchivedEvents />
+              </OrganizationAccessRoute>
+            }
+          />
           <Route path="/users" element={<Organizations />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/403" element={<Forbidden />} />
@@ -181,7 +251,11 @@ function AppRoutes() {
   const { isAuthenticated, isAuthLoading } = useAuth();
 
   if (isAuthLoading) {
-    return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Trwa weryfikacja sesji...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
+        Trwa weryfikacja sesji...
+      </div>
+    );
   }
 
   return (
@@ -191,10 +265,15 @@ function AppRoutes() {
       <Route path="/404" element={<NotFound />} />
       <Route
         path="/forgot-password"
-        element={isAuthenticated ? <Navigate to="/" replace /> : <ForgotPassword />}
+        element={
+          isAuthenticated ? <Navigate to="/" replace /> : <ForgotPassword />
+        }
       />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
+      <Route
+        path="/login"
+        element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+      />
       {isAuthenticated ? (
         <Route path="/*" element={<ProtectedAppRoutes />} />
       ) : (

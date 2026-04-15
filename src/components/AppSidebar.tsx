@@ -72,13 +72,25 @@ const allItems = [
     title: "Uczestnicy",
     url: "/participants",
     icon: Users,
-    roles: ["scanner", "scanner_plus", "editor", "admin", "superadmin"] as Role[],
+    roles: [
+      "scanner",
+      "scanner_plus",
+      "editor",
+      "admin",
+      "superadmin",
+    ] as Role[],
   },
   {
     title: "Skaner QR",
     url: "/scanner",
     icon: ScanLine,
-    roles: ["scanner", "scanner_plus", "editor", "admin", "superadmin"] as Role[],
+    roles: [
+      "scanner",
+      "scanner_plus",
+      "editor",
+      "admin",
+      "superadmin",
+    ] as Role[],
   },
   {
     title: "Informacje",
@@ -119,10 +131,19 @@ const workspaceNavItemClassName =
 const workspaceNavItemActiveClassName =
   "bg-[hsl(220_7%_15%/0.98)] text-sidebar-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-primary)/0.12)]";
 
-const sidebarLogoClassName = "h-[2.85rem] w-auto object-contain md:h-[3rem]";
+const workspaceSelectTriggerClassName =
+  "min-h-11 h-auto items-start gap-3 rounded-[0.85rem] border-sidebar-border/45 bg-[hsl(220_7%_11%/0.94)] px-4 py-3 text-left text-[0.92rem] font-semibold leading-snug text-sidebar-foreground shadow-none [&>span]:pr-2 [&>span]:whitespace-normal [&>span]:break-words [&>span]:line-clamp-3";
+
+const workspaceValueCardClassName =
+  "mt-3 rounded-[0.85rem] bg-[hsl(220_7%_11%/0.8)] px-4 py-3.5";
+
+const workspaceInfoCardClassName =
+  "mt-3 rounded-[0.85rem] bg-[hsl(220_7%_11%/0.72)] px-4 py-3.5 text-xs leading-5 text-sidebar-foreground/66";
+
+const sidebarLogoClassName = "h-[3.5rem] w-auto object-contain";
 
 export function AppSidebar() {
-  const { state, isMobile, setOpenMobile } = useSidebar();
+  const { state, isMobile, openMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
   const {
@@ -150,6 +171,13 @@ export function AppSidebar() {
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);
     navigate(`/events/${eventId}`);
+  };
+
+  const handleLogoClick = () => {
+    navigate("/");
+    if (isMobile) {
+      setOpenMobile(false);
+    }
   };
 
   const scannerHasActiveEvents =
@@ -204,7 +232,7 @@ export function AppSidebar() {
         value={selectedOrganizationId}
         onValueChange={handleOrganizationChange}
       >
-        <SelectTrigger className="h-11 rounded-[0.85rem] border-sidebar-border/80 bg-sidebar px-4 text-[0.92rem] font-semibold text-sidebar-foreground shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)]">
+        <SelectTrigger className={workspaceSelectTriggerClassName}>
           <SelectValue placeholder="Wybierz organizacje" />
         </SelectTrigger>
         <SelectContent>
@@ -221,39 +249,35 @@ export function AppSidebar() {
       </Select>
     </div>
   ) : selectedOrganization ? (
-    <div className="mt-3 rounded-[0.85rem] bg-sidebar px-4 py-3.5 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)]">
+    <div className={workspaceValueCardClassName}>
       <p className="text-[0.92rem] font-semibold leading-snug text-sidebar-foreground">
         {selectedOrganization.name}
       </p>
     </div>
   ) : (
-    <div className="mt-3 rounded-[0.85rem] bg-sidebar px-4 py-3.5 text-xs leading-5 text-sidebar-foreground/66">
+    <div className={workspaceInfoCardClassName}>
       Brak przypisanych organizacji w tym kontekscie.
     </div>
   );
   const eventWorkspaceCard = (
-    <div className="rounded-[1rem] border border-sidebar-border/40 bg-[hsl(220_7%_13%/0.96)] p-3.5 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.02)]">
+    <div className="rounded-[0.95rem] bg-[hsl(220_7%_13%/0.72)] p-3.5">
       <p className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-sidebar-foreground/56">
         Wybrane wydarzenie
       </p>
       {scopedVisibleEvents.length === 0 ? (
-        <div className="mt-2 rounded-[0.85rem] bg-sidebar px-4 py-3.5 text-xs leading-5 text-sidebar-foreground/66">
-          Do tej organizacji nie dodano jeszcze wydarzen. Dodaj je
-          w zakladce Wydarzenia.
+        <div className={workspaceInfoCardClassName}>
+          Do tej organizacji nie dodano jeszcze wydarzen. Dodaj je w zakladce
+          Wydarzenia.
         </div>
       ) : showEventSelectControl ? (
         <div className="mt-2">
           <Select value={selectedEventId} onValueChange={handleEventChange}>
-            <SelectTrigger className="h-11 rounded-[0.85rem] border-sidebar-border/80 bg-sidebar px-4 text-[0.92rem] font-semibold text-sidebar-foreground shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)]">
+            <SelectTrigger className={workspaceSelectTriggerClassName}>
               <SelectValue placeholder="Wybierz wydarzenie" />
             </SelectTrigger>
             <SelectContent>
               {scopedVisibleEvents.map((event) => (
-                <SelectItem
-                  key={event.id}
-                  value={event.id}
-                  className="text-sm"
-                >
+                <SelectItem key={event.id} value={event.id} className="text-sm">
                   {event.name}
                 </SelectItem>
               ))}
@@ -261,19 +285,19 @@ export function AppSidebar() {
           </Select>
         </div>
       ) : selectedEvent ? (
-        <div className="mt-2 rounded-[0.85rem] bg-sidebar px-4 py-3.5 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)]">
+        <div className="mt-2 rounded-[0.85rem] bg-[hsl(220_7%_11%/0.8)] px-4 py-3.5">
           <p className="text-[0.92rem] font-semibold leading-snug text-sidebar-foreground">
             {selectedEvent.name}
           </p>
         </div>
       ) : (
-        <div className="mt-2 rounded-[0.85rem] bg-sidebar px-4 py-3.5 text-xs leading-5 text-sidebar-foreground/66">
+        <div className="mt-2 rounded-[0.85rem] bg-[hsl(220_7%_11%/0.72)] px-4 py-3.5 text-xs leading-5 text-sidebar-foreground/66">
           Brak dostepnych wydarzen w tym kontekscie.
         </div>
       )}
 
       {selectedEvent && (
-        <div className="mt-4 border-l border-[hsl(var(--sidebar-primary)/0.16)] pl-4">
+        <div className="mt-4 border-t border-sidebar-border/35 pt-3">
           <SidebarMenu className="gap-1">
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
@@ -320,7 +344,11 @@ export function AppSidebar() {
           <Button
             variant="ghost"
             size="icon"
-            className="absolute left-full top-5 z-30 ml-3 h-12 w-12 rounded-[0.95rem] border border-sidebar-border/80 bg-sidebar-accent/15 text-sidebar-foreground/90 shadow-[0_16px_34px_hsl(var(--surface-shadow)/0.35)] backdrop-blur-xl hover:bg-sidebar-accent/45 hover:text-sidebar-foreground"
+            className={`absolute left-full top-5 z-30 ml-3 h-12 w-12 rounded-[0.95rem] border border-sidebar-border/80 bg-sidebar-accent/15 text-sidebar-foreground/90 shadow-[0_16px_34px_hsl(var(--surface-shadow)/0.35)] backdrop-blur-xl transition-all duration-100 ease-out hover:bg-sidebar-accent/45 hover:text-sidebar-foreground ${
+              openMobile
+                ? "translate-x-0 opacity-100"
+                : "-translate-x-2 opacity-0 pointer-events-none"
+            }`}
             onClick={() => setOpenMobile(false)}
           >
             <X className="h-5 w-5" />
@@ -332,16 +360,24 @@ export function AppSidebar() {
           className="themed-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
         >
           <SidebarHeader className="border-b border-sidebar-border/70 px-4 pb-4 pt-5 md:px-4 md:pb-4 md:pt-5">
-            {collapsed ? (
-              <BrandLogo variant="short" className="mx-auto h-11 w-11 object-contain" />
-            ) : (
-              <img
-                src="/logo_long_mobile.png"
-                alt="Panel Zawodow Eventdesk"
-                className={sidebarLogoClassName}
-                draggable={false}
-              />
-            )}
+            <button
+              type="button"
+              onClick={handleLogoClick}
+              className="block w-full cursor-pointer rounded-[0.95rem] border-0 bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+              aria-label="Przejdz do strony glownej"
+            >
+              {collapsed ? (
+                <BrandLogo
+                  variant="short"
+                  className="mx-auto h-11 w-11 object-contain"
+                />
+              ) : (
+                <BrandLogo
+                  variant="long"
+                  className={sidebarLogoClassName}
+                />
+              )}
+            </button>
           </SidebarHeader>
 
           <SidebarContent className="!flex-none !overflow-visible gap-5 px-3 py-5 md:gap-4 md:px-2 md:py-4.5">
@@ -353,7 +389,9 @@ export function AppSidebar() {
                     Nawigacja
                   </span>
                 )}
-                {collapsed && <ScanLine className="h-4 w-4 text-sidebar-primary/90" />}
+                {collapsed && (
+                  <ScanLine className="h-4 w-4 text-sidebar-primary/90" />
+                )}
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1.5">
@@ -384,16 +422,14 @@ export function AppSidebar() {
                   </span>
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
-                  <div className="mx-0.5 rounded-[1.15rem] border border-sidebar-border/65 bg-[hsl(220_9%_11%/0.98)] p-2.5 shadow-[0_16px_34px_hsl(var(--surface-shadow)/0.16),inset_0_1px_0_hsl(var(--foreground)/0.025)] md:mx-1">
+                  <div className="mx-0.5 rounded-[1.15rem] bg-[hsl(220_9%_11%/0.88)] p-3 md:mx-1">
                     {currentRole === "admin" && (
-                      <div className="rounded-[1rem] border border-sidebar-border/38 bg-[hsl(220_7%_13%/0.96)] p-3.5 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.02)]">
+                      <div className="space-y-4 rounded-[0.95rem] bg-[hsl(220_7%_13%/0.68)] p-3.5">
                         <p className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-sidebar-foreground/56">
                           Wybrana organizacja
                         </p>
                         {organizationSelectContent}
-                        <div className="mt-4 border-t border-sidebar-border/60 pt-4">
-                          {eventWorkspaceCard}
-                        </div>
+                        {eventWorkspaceCard}
                       </div>
                     )}
 
