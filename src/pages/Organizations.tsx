@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldError } from '@/components/ui/field-error';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
 import { formatEventOfficeEnd, formatEventOfficeStart, getEventOfficeCloseAt, getEventOfficeOpenAt, isEventOfficeOpen } from '@/lib/events';
@@ -41,14 +40,13 @@ function getClosestOrganizationEventLabel(organizationEvents: Event[], now: Date
 
 export default function Organizations() {
   const navigate = useNavigate();
-  const { organizations, events, users, currentRole, currentUser, createOrganization, isLoading, connectionState } = useData();
+  const { organizations, events, currentRole, currentUser, createOrganization, isLoading, connectionState } = useData();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState('');
-  const [form, setForm] = useState({ name: '', event_limit: '1', admin_user_id: '' });
-  const [errors, setErrors] = useState<{ name?: string; event_limit?: string; admin_user_id?: string; form?: string }>({});
-  const admins = users.filter(user => user.role === 'admin');
+  const [form, setForm] = useState({ name: '', event_limit: '1' });
+  const [errors, setErrors] = useState<{ name?: string; event_limit?: string; form?: string }>({});
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNowTimestamp(Date.now()), 30_000);
@@ -86,10 +84,9 @@ export default function Organizations() {
     const nextErrors = {
       name: validateRequired(form.name, 'Podaj nazwę organizacji.'),
       event_limit: validateNonNegativeInteger(form.event_limit, 'Podaj poprawny limit wydarzeń.'),
-      admin_user_id: currentRole === 'superadmin' ? validateRequired(form.admin_user_id, 'Wybierz admina organizacji.') : '',
     };
 
-    if (nextErrors.name || nextErrors.event_limit || nextErrors.admin_user_id) {
+    if (nextErrors.name || nextErrors.event_limit) {
       setErrors(nextErrors);
       return;
     }
@@ -103,17 +100,9 @@ export default function Organizations() {
 
     setErrors({});
     setIsSubmitting(true);
-    if (currentRole === 'superadmin' && !form.admin_user_id) {
-      setErrors({ admin_user_id: 'Wybierz admina organizacji.' });
-      toast({ title: 'Brak administratora', description: 'Wybierz admina dla nowej organizacji.', variant: 'destructive' });
-      setIsSubmitting(false);
-      return;
-    }
-
     const result = await createOrganization({
       name: form.name,
       event_limit: parsedLimit,
-      admin_user_id: currentRole === 'superadmin' ? form.admin_user_id : undefined,
     });
     setIsSubmitting(false);
 
@@ -123,7 +112,7 @@ export default function Organizations() {
       return;
     }
 
-    setForm({ name: '', event_limit: '1', admin_user_id: '' });
+    setForm({ name: '', event_limit: '1' });
     setErrors({});
     setOpen(false);
     toast({ title: 'Organizacja utworzona' });
@@ -270,34 +259,6 @@ export default function Organizations() {
               />
               <FieldError id="organization-event-limit-error" className="mt-2">{errors.event_limit}</FieldError>
             </div>
-            {currentRole === 'superadmin' && (
-              <div>
-                <Label htmlFor="organization-admin">Administrator organizacji</Label>
-                <Select
-                  value={form.admin_user_id}
-                  onValueChange={value => {
-                    setForm(prev => ({ ...prev, admin_user_id: value }));
-                    setErrors(prev => ({ ...prev, admin_user_id: undefined, form: undefined }));
-                  }}
-                >
-                  <SelectTrigger
-                    id="organization-admin"
-                    aria-invalid={Boolean(errors.admin_user_id)}
-                    aria-describedby={errors.admin_user_id ? 'organization-admin-error' : undefined}
-                  >
-                    <SelectValue placeholder="Wybierz admina" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {admins.map(admin => (
-                      <SelectItem key={admin.id} value={admin.id}>
-                        {admin.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldError id="organization-admin-error" className="mt-2">{errors.admin_user_id}</FieldError>
-              </div>
-            )}
             <FieldError id="organization-form-error">{errors.form}</FieldError>
           </div>
           <DialogFooter>

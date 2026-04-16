@@ -96,7 +96,7 @@ describe('DataProvider offline cache and queue', () => {
       selectedOrganizationId: 'org-1',
       selectedEventId: 'event-1',
       data: {
-        organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5 }],
+        organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5, admin_users: [] }],
         events: [{
           id: 'event-1',
           name: 'Event 1',
@@ -149,7 +149,7 @@ describe('DataProvider offline cache and queue', () => {
       selectedOrganizationId: 'org-1',
       selectedEventId: 'event-1',
       data: {
-        organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5 }],
+        organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5, admin_users: [] }],
         events: [{
           id: 'event-1',
           name: 'Event 1',

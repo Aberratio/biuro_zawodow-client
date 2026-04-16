@@ -31,7 +31,7 @@ function createOrganization(id: string, name: string): Organization {
     id,
     name,
     event_limit: 4,
-    admin_user_name: 'Admin organizacji',
+    admin_users: [{ id: 'admin-1', name: 'Admin organizacji', email: 'admin@example.com' }],
   };
 }
 
@@ -119,5 +119,13 @@ describe('Organizations page', () => {
     );
 
     expect(screen.getByText('W trakcie do 12.04.2099, 15:00')).toBeInTheDocument();
+  });
+
+  it('does not require selecting a single admin when creating organization as superadmin', () => {
+    renderPage([createOrganization('org-1', 'Alpha')]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nowa organizacja' }));
+
+    expect(screen.queryByLabelText('Administrator organizacji')).not.toBeInTheDocument();
   });
 });

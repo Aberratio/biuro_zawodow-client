@@ -56,6 +56,7 @@ function createOrganization(id: string): Organization {
     id,
     name: `Organization ${id}`,
     event_limit: 5,
+    admin_users: [],
   };
 }
 

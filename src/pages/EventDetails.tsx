@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+﻿import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { useData } from '@/contexts/DataContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -22,7 +20,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldError } from '@/components/ui/field-error';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Archive, ArrowLeft, Calendar, Download, FileUp, Loader2, Mail, MapPin, Pencil, Plus, ScanLine, Users } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Archive, ArrowLeft, Calendar, ChevronDown, Download, FileUp, Loader2, Mail, MapPin, Pencil, Plus, ScanLine, Users } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
 import { ParticipantFieldMapping, User } from '@/types';
@@ -31,6 +30,7 @@ import { buildEmptyParticipantFieldValues, getActiveParticipantMappings } from '
 import { participantCountsAsCheckedIn } from '@/lib/participant-status';
 import { validateEmail, validateRequired } from '@/lib/form-validation';
 import { isScannerRole } from '@/lib/roles';
+import { cn } from '@/lib/utils';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 
 type OfficeStatusTone = 'open' | 'upcoming' | 'closed';
@@ -52,8 +52,8 @@ function getOfficeStatusSummary(eventOffice: { office_open_at: string; office_cl
     return {
       tone: 'closed',
       badgeLabel: 'Brak godzin',
-      headline: 'Godziny pracy biura nie są ustawione poprawnie.',
-      detail: 'Uzupełnij datę i godzinę otwarcia oraz zamknięcia, aby zespół wiedział, kiedy obsługiwać uczestników.',
+      headline: 'Godziny pracy biura nie sÄ… ustawione poprawnie.',
+      detail: 'UzupeĹ‚nij datÄ™ i godzinÄ™ otwarcia oraz zamkniÄ™cia, aby zespĂłĹ‚ wiedziaĹ‚, kiedy obsĹ‚ugiwaÄ‡ uczestnikĂłw.',
       timingLabel: 'Zakres',
       timingValue: 'Brak danych',
     };
@@ -64,8 +64,8 @@ function getOfficeStatusSummary(eventOffice: { office_open_at: string; office_cl
       tone: 'open',
       badgeLabel: 'Biuro otwarte',
       headline: `Biuro pracuje jeszcze przez ${formatDistanceToNowStrict(closeAt, { addSuffix: false, locale: pl })}.`,
-      detail: `Uczestnicy mogą być teraz odprawiani. Biuro zamyka się ${formatEventOfficeEnd(eventOffice)}.`,
-      timingLabel: 'Zamknięcie',
+      detail: `Uczestnicy mogÄ… byÄ‡ teraz odprawiani. Biuro zamyka siÄ™ ${formatEventOfficeEnd(eventOffice)}.`,
+      timingLabel: 'ZamkniÄ™cie',
       timingValue: formatEventOfficeEnd(eventOffice),
     };
   }
@@ -74,8 +74,8 @@ function getOfficeStatusSummary(eventOffice: { office_open_at: string; office_cl
     return {
       tone: 'upcoming',
       badgeLabel: 'Biuro przed otwarciem',
-      headline: `Biuro otworzy się za ${formatDistanceToNowStrict(openAt, { addSuffix: false, locale: pl })}.`,
-      detail: `Zespół zacznie pracę ${formatEventOfficeStart(eventOffice)}. Do tego czasu operatorzy nie zobaczą aktywnego wydarzenia.`,
+      headline: `Biuro otworzy siÄ™ za ${formatDistanceToNowStrict(openAt, { addSuffix: false, locale: pl })}.`,
+      detail: `ZespĂłĹ‚ zacznie pracÄ™ ${formatEventOfficeStart(eventOffice)}. Do tego czasu operatorzy nie zobaczÄ… aktywnego wydarzenia.`,
       timingLabel: 'Otwarcie',
       timingValue: formatEventOfficeStart(eventOffice),
     };
@@ -83,10 +83,10 @@ function getOfficeStatusSummary(eventOffice: { office_open_at: string; office_cl
 
   return {
     tone: 'closed',
-    badgeLabel: 'Biuro zamknięte',
-    headline: `Biuro zakończyło pracę ${formatDistanceToNowStrict(closeAt, { addSuffix: true, locale: pl })}.`,
-    detail: 'Odprawa dla tego wydarzenia została już zamknięta. Nadal możesz sprawdzić dane, eksporty i skład zespołu.',
-    timingLabel: 'Zamknięcie',
+    badgeLabel: 'Biuro zamkniÄ™te',
+    headline: `Biuro zakoĹ„czyĹ‚o pracÄ™ ${formatDistanceToNowStrict(closeAt, { addSuffix: true, locale: pl })}.`,
+    detail: 'Odprawa dla tego wydarzenia zostaĹ‚a juĹĽ zamkniÄ™ta. Nadal moĹĽesz sprawdziÄ‡ dane, eksporty i skĹ‚ad zespoĹ‚u.',
+    timingLabel: 'ZamkniÄ™cie',
     timingValue: formatEventOfficeEnd(eventOffice),
   };
 }
@@ -94,33 +94,24 @@ function getOfficeStatusSummary(eventOffice: { office_open_at: string; office_cl
 function getOfficeToneClasses(tone: OfficeStatusTone) {
   if (tone === 'open') {
     return {
-      badge: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700',
-      hero: 'border-emerald-500/20 bg-[linear-gradient(135deg,hsl(142_76%_36%/0.08),transparent_55%)]',
-      iconWrap: 'bg-emerald-500/12 text-emerald-700',
-      meter: 'bg-emerald-500',
+      status: 'event-detail-status-open',
     };
   }
 
   if (tone === 'upcoming') {
     return {
-      badge: 'border-amber-500/30 bg-amber-500/10 text-amber-700',
-      hero: 'border-amber-500/20 bg-[linear-gradient(135deg,hsl(38_92%_50%/0.10),transparent_55%)]',
-      iconWrap: 'bg-amber-500/12 text-amber-700',
-      meter: 'bg-amber-500',
+      status: 'event-detail-status-upcoming',
     };
   }
 
   return {
-    badge: 'border-border bg-muted text-foreground',
-    hero: 'border-border bg-[linear-gradient(135deg,hsl(var(--muted)/0.65),transparent_55%)]',
-    iconWrap: 'bg-muted text-foreground',
-    meter: 'bg-foreground/70',
+    status: 'event-detail-status-closed',
   };
 }
 
 function TeamMemberRow({ user }: { user: User }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-background/80 px-4 py-3">
+    <div className="event-detail-member-row">
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold">{user.name}</p>
         <p className="truncate text-xs text-muted-foreground">{user.email}</p>
@@ -129,37 +120,60 @@ function TeamMemberRow({ user }: { user: User }) {
   );
 }
 
+function CollapsibleSection({
+  title,
+  defaultOpen = false,
+  children,
+  className,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <Collapsible defaultOpen={defaultOpen}>
+      <div className={cn('event-detail-list-section', className)}>
+        <CollapsibleTrigger className="event-detail-collapsible-trigger w-full">
+          <div>
+            <h3 className="text-base font-semibold text-foreground">{title}</h3>
+          </div>
+          <ChevronDown className="event-detail-collapsible-chevron h-4 w-4 shrink-0" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="event-detail-collapsible-content">
+          <div className="event-detail-list-content space-y-3">
+            {children}
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
+
 function TeamRoleCard({
   title,
   users,
   emptyText,
   action,
+  defaultOpen = false,
 }: {
   title: string;
   users: User[];
   emptyText: string;
   action?: ReactNode;
+  defaultOpen?: boolean;
 }) {
   return (
-    <Card className="h-full border-border/70 shadow-sm">
-      <CardHeader className="border-b border-border/60 bg-muted/20">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-base">{title}</CardTitle>
-          </div>
-          {action}
+    <CollapsibleSection title={title} defaultOpen={defaultOpen}>
+      {action ? <div className="flex justify-end">{action}</div> : null}
+      {users.length === 0 ? (
+        <div className="event-detail-empty-state px-4 py-5 text-sm text-muted-foreground">
+          {emptyText}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3 p-5">
-        {users.length === 0 ? (
-          <div className="rounded-2xl border border-dashed px-4 py-6 text-sm text-muted-foreground">
-            {emptyText}
-          </div>
-        ) : (
-          users.map(user => <TeamMemberRow key={user.id} user={user} />)
-        )}
-      </CardContent>
-    </Card>
+      ) : (
+        users.map(user => <TeamMemberRow key={user.id} user={user} />)
+      )}
+    </CollapsibleSection>
   );
 }
 
@@ -171,7 +185,6 @@ export default function EventDetails() {
     archivedEvents,
     participants,
     users,
-    organizations,
     currentRole,
     currentUser,
     setSelectedEventId,
@@ -220,7 +233,6 @@ export default function EventDetails() {
   const eventParticipants = participants.filter(participant => participant.event_id === id);
   const checkedIn = eventParticipants.filter(participantCountsAsCheckedIn).length;
   const activeMappings = useMemo(() => getActiveParticipantMappings(mappings), [mappings]);
-  const organizationName = organizations.find(organization => organization.id === event?.organization_id)?.name ?? 'Nieznana organizacja';
   const organizationScanners = useMemo(
     () => users.filter(user => isScannerRole(user.role) && user.organization_id === event?.organization_id),
     [event?.organization_id, users],
@@ -338,8 +350,8 @@ export default function EventDetails() {
         const result = await assignScannerEvents(scanner.id, nextAssignedEvents);
         if (!result.ok) {
           toast({
-            title: 'Nie udało się zapisać przypisań operatorów',
-            description: result.error ?? `Nie udało się zaktualizować operatora ${scanner.name}.`,
+            title: 'Nie udaĹ‚o siÄ™ zapisaÄ‡ przypisaĹ„ operatorĂłw',
+            description: result.error ?? `Nie udaĹ‚o siÄ™ zaktualizowaÄ‡ operatora ${scanner.name}.`,
             variant: 'destructive',
           });
           return;
@@ -347,7 +359,7 @@ export default function EventDetails() {
       }
 
       setScannerDialogOpen(false);
-      toast({ title: 'Zapisano przypisania operatorów' });
+      toast({ title: 'Zapisano przypisania operatorĂłw' });
     } finally {
       setScannerSaving(false);
     }
@@ -355,7 +367,7 @@ export default function EventDetails() {
 
   const handleManualSubmit = async () => {
     const fieldErrors = activeMappings.reduce<Record<string, string>>((accumulator, mapping) => {
-      const error = validateRequired(manualFields[mapping.alias] ?? '', `Uzupełnij pole: ${mapping.alias}.`);
+      const error = validateRequired(manualFields[mapping.alias] ?? '', `UzupeĹ‚nij pole: ${mapping.alias}.`);
       if (error) accumulator[mapping.alias] = error;
       return accumulator;
     }, {});
@@ -375,9 +387,9 @@ export default function EventDetails() {
     setManualSaving(false);
 
     if (!result.ok) {
-      setManualErrors({ fields: {}, form: result.error ?? 'Nie udało się dodać uczestnika.' });
+      setManualErrors({ fields: {}, form: result.error ?? 'Nie udaĹ‚o siÄ™ dodaÄ‡ uczestnika.' });
       toast({
-        title: 'Nie udało się dodać uczestnika',
+        title: 'Nie udaĹ‚o siÄ™ dodaÄ‡ uczestnika',
         description: result.error,
         variant: 'destructive',
       });
@@ -388,17 +400,17 @@ export default function EventDetails() {
     setManualEmail('');
     setManualFields(buildEmptyParticipantFieldValues(mappings));
     setManualErrors({ fields: {} });
-    toast({ title: 'Dodano uczestnika ręcznie' });
+    toast({ title: 'Dodano uczestnika rÄ™cznie' });
   };
 
   const handleEditSubmit = async () => {
     const submittedOfficeOpenAt = isFinishedEvent ? event.office_open_at : editForm.office_open_at;
     const submittedOfficeCloseAt = isFinishedEvent ? event.office_close_at : editForm.office_close_at;
     const nextErrors = {
-      name: validateRequired(editForm.name, 'Podaj nazwę wydarzenia.'),
-      location: validateRequired(editForm.location, 'Podaj lokalizację wydarzenia.'),
-      office_open_at: validateRequired(submittedOfficeOpenAt, 'Podaj datę i godzinę otwarcia biura.'),
-      office_close_at: validateRequired(submittedOfficeCloseAt, 'Podaj datę i godzinę zamknięcia biura.'),
+      name: validateRequired(editForm.name, 'Podaj nazwÄ™ wydarzenia.'),
+      location: validateRequired(editForm.location, 'Podaj lokalizacjÄ™ wydarzenia.'),
+      office_open_at: validateRequired(submittedOfficeOpenAt, 'Podaj datÄ™ i godzinÄ™ otwarcia biura.'),
+      office_close_at: validateRequired(submittedOfficeCloseAt, 'Podaj datÄ™ i godzinÄ™ zamkniÄ™cia biura.'),
     };
 
     if (nextErrors.name || nextErrors.location || nextErrors.office_open_at || nextErrors.office_close_at) {
@@ -407,10 +419,10 @@ export default function EventDetails() {
     }
 
     if (!submittedOfficeOpenAt || !submittedOfficeCloseAt || !isValidEventOfficeRange(submittedOfficeOpenAt, submittedOfficeCloseAt)) {
-      setEditErrors({ office_close_at: 'Zamknięcie biura musi być później niż otwarcie.' });
+      setEditErrors({ office_close_at: 'ZamkniÄ™cie biura musi byÄ‡ pĂłĹşniej niĹĽ otwarcie.' });
       toast({
-        title: 'Nieprawidłowe godziny biura',
-        description: 'Podaj poprawną datę i godzinę otwarcia oraz zamknięcia biura zawodów.',
+        title: 'NieprawidĹ‚owe godziny biura',
+        description: 'Podaj poprawnÄ… datÄ™ i godzinÄ™ otwarcia oraz zamkniÄ™cia biura zawodĂłw.',
         variant: 'destructive',
       });
       return;
@@ -428,10 +440,10 @@ export default function EventDetails() {
     setEditSaving(false);
 
     if (!result.ok) {
-      setEditErrors({ form: result.error ?? 'Nie udało się zaktualizować wydarzenia.' });
+      setEditErrors({ form: result.error ?? 'Nie udaĹ‚o siÄ™ zaktualizowaÄ‡ wydarzenia.' });
       toast({
-        title: 'Nie udało się zaktualizować wydarzenia',
-        description: result.error ?? 'Spróbuj ponownie.',
+        title: 'Nie udaĹ‚o siÄ™ zaktualizowaÄ‡ wydarzenia',
+        description: result.error ?? 'SprĂłbuj ponownie.',
         variant: 'destructive',
       });
       return;
@@ -449,14 +461,14 @@ export default function EventDetails() {
 
     if (!result.ok) {
       toast({
-        title: 'Nie udało się wyeksportować CSV',
-        description: result.error ?? 'Spróbuj ponownie.',
+        title: 'Nie udaĹ‚o siÄ™ wyeksportowaÄ‡ CSV',
+        description: result.error ?? 'SprĂłbuj ponownie.',
         variant: 'destructive',
       });
       return;
     }
 
-    toast({ title: 'Eksport CSV rozpoczęty' });
+    toast({ title: 'Eksport CSV rozpoczÄ™ty' });
   };
 
   const handleExportLogsCsv = async () => {
@@ -466,14 +478,14 @@ export default function EventDetails() {
 
     if (!result.ok) {
       toast({
-        title: 'Nie udało się wyeksportować logów CSV',
-        description: result.error ?? 'Spróbuj ponownie.',
+        title: 'Nie udaĹ‚o siÄ™ wyeksportowaÄ‡ logĂłw CSV',
+        description: result.error ?? 'SprĂłbuj ponownie.',
         variant: 'destructive',
       });
       return;
     }
 
-    toast({ title: 'Eksport logów CSV rozpoczęty' });
+    toast({ title: 'Eksport logĂłw CSV rozpoczÄ™ty' });
   };
 
   const handleDeleteEvent = async () => {
@@ -483,8 +495,8 @@ export default function EventDetails() {
 
     if (!result.ok) {
       toast({
-        title: 'Nie udało się zarchiwizować wydarzenia',
-        description: result.error ?? 'Spróbuj ponownie.',
+        title: 'Nie udaĹ‚o siÄ™ zarchiwizowaÄ‡ wydarzenia',
+        description: result.error ?? 'SprĂłbuj ponownie.',
         variant: 'destructive',
       });
       return;
@@ -496,9 +508,14 @@ export default function EventDetails() {
   };
 
   return (
-    <div className="space-y-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate(isArchivedEvent ? `/organizations/${event.organization_id}/archived-events` : '/events')} className="touch-manipulation">
-        <ArrowLeft className="mr-1 h-4 w-4" /> {isArchivedEvent ? 'Wróć do archiwum' : 'Wróć do wydarzeń'}
+    <div className="event-detail-page space-y-8">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => navigate(isArchivedEvent ? `/organizations/${event.organization_id}/archived-events` : '/events')}
+        className="event-detail-back touch-manipulation"
+      >
+        <ArrowLeft className="mr-1 h-4 w-4" /> {isArchivedEvent ? 'WrĂłÄ‡ do archiwum' : 'WrĂłÄ‡ do wydarzeĹ„'}
       </Button>
 
       {isArchivedEvent && (
@@ -510,7 +527,7 @@ export default function EventDetails() {
             <div>
               <p className="archive-notice-title font-semibold">To wydarzenie jest zarchiwizowane.</p>
               <p className="archive-notice-copy mt-1">
-                Jest ukryte z aktywnych list i przypisań. Dane są dostępne do podglądu, a zmiany w archiwum może wykonywać tylko superadmin.
+                Jest ukryte z aktywnych list i przypisaĹ„. Dane sÄ… dostÄ™pne do podglÄ…du, a zmiany w archiwum moĹĽe wykonywaÄ‡ tylko superadmin.
               </p>
             </div>
           </div>
@@ -521,118 +538,116 @@ export default function EventDetails() {
         <OnlineOnlyNotice description="Import CSV, edycja wydarzenia, eksporty, wysylka QR, reczne dodawanie uczestnikow i zarzadzanie operatorami wymagaja aktywnego polaczenia z serwerem." />
       )}
 
-      <Card className={`overflow-hidden shadow-sm ${officeToneClasses.hero}`}>
-        <CardContent className="p-5 sm:p-6">
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className={officeToneClasses.badge}>{officeStatus.badgeLabel}</Badge>
-                  <Badge variant="outline">{organizationName}</Badge>
-                </div>
-                <h1 className="mt-4 text-2xl font-black tracking-tight sm:text-3xl">{event.name}</h1>
-                <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
-                  <span className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    {event.location}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    {formatEventOfficeWindow(event)}
-                  </span>
-                </div>
-              </div>
-
-              {canEditEvent && (
-                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                  <Button variant="outline" onClick={() => setEditOpen(true)} className="w-full sm:w-auto" disabled={!isOnline}>
-                    <Pencil className="mr-1 h-4 w-4" /> Edytuj
-                  </Button>
-                  {canArchiveEvent && (
-                    <Button variant="destructive" onClick={() => setDeleteConfirmOpen(true)} className="w-full sm:w-auto" disabled={!isOnline}>
-                      <Archive className="mr-1 h-4 w-4" /> Archiwizuj
-                    </Button>
-                  )}
-                </div>
-              )}
+      <section className="event-detail-header-grid">
+        <div className="event-detail-info-panel">
+          <div className={cn('event-detail-status-row', officeToneClasses.status)}>
+            <div className="event-detail-status-dot" />
+            <div className="min-w-0">
+              <p className="event-detail-status-kicker">Status wydarzenia</p>
+              <p className="event-detail-status-value">{officeStatus.badgeLabel}</p>
             </div>
+          </div>
 
-            <div className="rounded-[1.6rem] border border-border/70 bg-background/80 p-4 sm:p-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="max-w-2xl">
-                  <p className="text-lg font-semibold tracking-tight">{officeStatus.headline}</p>
-                  <p className="mt-2 text-sm text-muted-foreground">{officeStatus.timingLabel}: {officeStatus.timingValue}</p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[420px]">
-                  <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
-                    <p className="text-xs text-muted-foreground">Status</p>
-                    <p className="mt-1 font-semibold">{officeStatus.badgeLabel}</p>
-                  </div>
-                  <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
-                    <p className="text-xs text-muted-foreground">Odprawieni</p>
-                    <p className="mt-1 font-semibold">{checkedIn}/{eventParticipants.length}</p>
-                  </div>
-                  <div className="rounded-2xl border border-border/70 bg-background px-4 py-3">
-                    <p className="text-xs text-muted-foreground">Operatorzy</p>
-                    <p className="mt-1 font-semibold">{assignedScanners.length}</p>
-                  </div>
-                </div>
+          <div className="space-y-3">
+            <h1 className="event-detail-title">{event.name}</h1>
+            <div className="event-detail-meta flex flex-col gap-2.5 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+              <span className="flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                {event.location}
+              </span>
+              <span className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                {formatEventOfficeWindow(event)}
+              </span>
+            </div>
+            <p className="event-detail-headline">{officeStatus.headline}</p>
+            <p className="event-detail-supporting-copy">{officeStatus.detail}</p>
+          </div>
+
+          <div className="event-detail-summary-strip">
+            <div className="event-detail-stats-grid">
+              <div className="event-detail-stat-item">
+                <span className="event-detail-stat-label">Odprawieni</span>
+                <strong className="event-detail-stat-value">{checkedIn}/{eventParticipants.length}</strong>
+              </div>
+              <div className="event-detail-stat-item">
+                <span className="event-detail-stat-label">Uczestnicy</span>
+                <strong className="event-detail-stat-value">{eventParticipants.length}</strong>
+              </div>
+              <div className="event-detail-stat-item">
+                <span className="event-detail-stat-label">{officeStatus.timingLabel}</span>
+                <strong className="event-detail-stat-value">{officeStatus.timingValue}</strong>
               </div>
             </div>
+          </div>
+        </div>
 
+        {(canUseActiveEventTools || canEditEvent || canArchiveEvent) && (
+          <aside className="event-detail-actions-panel">
             {canUseActiveEventTools && (
-            <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
-              <Button onClick={() => { setSelectedEventId(event.id); navigate('/scanner'); }} className="h-11 md:w-auto">
+              <Button onClick={() => { setSelectedEventId(event.id); navigate('/scanner'); }} className="event-detail-primary-action h-12 w-full">
                 <ScanLine className="mr-1 h-4 w-4" /> Otwórz skaner
               </Button>
-              <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate('/participants'); }} className="h-11 md:w-auto">
+            )}
+            {canUseActiveEventTools && (
+              <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate('/participants'); }} className="event-detail-secondary-action h-12 w-full">
                 <Users className="mr-1 h-4 w-4" /> Uczestnicy
               </Button>
-            </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
+            {canEditEvent && (
+              <Button variant="link" onClick={() => setEditOpen(true)} className="event-detail-tertiary-action px-0" disabled={!isOnline}>
+                <Pencil className="h-4 w-4" /> Edytuj wydarzenie
+              </Button>
+            )}
+            {canArchiveEvent && (
+              <Button variant="outline" onClick={() => setDeleteConfirmOpen(true)} className="event-detail-archive-action w-full" disabled={!isOnline}>
+                <Archive className="mr-1 h-4 w-4" /> Archiwizuj wydarzenie
+              </Button>
+            )}
+          </aside>
+        )}
+      </section>
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight">
+          <h2 className="event-detail-section-title text-xl font-bold tracking-tight">
             Zespół
           </h2>
         </div>
 
         {!hasAnyTeamMembers && (
-          <Card className="border-dashed">
-            <CardContent className="py-10 text-center">
-              <p className="text-base font-semibold">
-                {isFinishedEvent ? 'Nie było przypisanego zespołu' : 'Nie ma jeszcze przypisanego zespołu'}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {isFinishedEvent
-                  ? 'Sprawdź, czy organizacja miała przypisanych organizatorów, administratorów lub operatorów.'
-                  : 'Dodaj operatorów lub sprawdź, czy organizacja ma przypisanych organizatorów i administratorów.'}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="event-detail-empty-panel py-10 text-center">
+            <p className="text-base font-semibold">
+              {isFinishedEvent ? 'Nie było przypisanego zespołu' : 'Nie ma jeszcze przypisanego zespołu'}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isFinishedEvent
+                ? 'Sprawdź, czy organizacja miała przypisanych organizatorów, administratorów lub operatorów.'
+                : 'Dodaj operatorów lub sprawdź, czy organizacja ma przypisanych organizatorów i administratorów.'}
+            </p>
+          </div>
         )}
 
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="event-detail-section-group">
           <TeamRoleCard
             title="Administracja"
             users={organizationAdmins}
             emptyText="Brak administratorów."
+            defaultOpen={false}
           />
           <TeamRoleCard
             title="Organizatorzy"
             users={organizationEditors}
             emptyText="Brak organizatorów."
+            defaultOpen={false}
           />
           <TeamRoleCard
             title={isFinishedEvent ? 'Operatorzy pracujący przy wydarzeniu' : 'Operatorzy wydarzenia'}
             users={assignedScanners}
             emptyText="Brak operatorów."
+            defaultOpen={false}
             action={canManageScanners && canAssignScannersToEvent ? (
-              <Button variant="outline" size="sm" onClick={openScannerDialog} disabled={!isOnline}>
+              <Button variant="outline" size="sm" onClick={openScannerDialog} className="event-detail-secondary-action" disabled={!isOnline}>
                 Zarządzaj
               </Button>
             ) : undefined}
@@ -641,60 +656,65 @@ export default function EventDetails() {
       </section>
 
       {canOperateOnEvent && (
-        <Card className="border-border/70 shadow-sm">
-          <CardHeader className="border-b border-border/60 bg-muted/20">
-            <CardTitle className="text-base">Operacje</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 p-5">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {canOperateOnEvent && (
-                <Button variant="outline" onClick={() => void handleExportCsv()} className="h-11 justify-start" disabled={exportingCsv || !isOnline}>
-                  {exportingCsv ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
-                  Eksport uczestników CSV
-                </Button>
-              )}
-              {canOperateOnEvent && (
-                <Button variant="outline" onClick={() => void handleExportLogsCsv()} className="h-11 justify-start" disabled={exportingLogsCsv || !isOnline}>
-                  {exportingLogsCsv ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
-                  Eksport logów CSV
-                </Button>
-              )}
-              {canEditEvent && (
-                <Button variant="outline" onClick={() => setEditOpen(true)} className="h-11 justify-start" disabled={!isOnline}>
-                  <Pencil className="mr-1 h-4 w-4" /> Edytuj wydarzenie
-                </Button>
-              )}
-              {canManageScanners && canAssignScannersToEvent && (
-                <Button variant="outline" onClick={openScannerDialog} className="h-11 justify-start" disabled={!isOnline}>
-                  <ScanLine className="mr-1 h-4 w-4" /> Zarządzaj operatorami
-                </Button>
-              )}
-              {!isArchivedEvent && canOperateOnEvent && (
-                <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate(`/events/${event.id}/import`); }} className="h-11 justify-start" disabled={!isOnline}>
-                  <FileUp className="mr-1 h-4 w-4" /> Import CSV
-                </Button>
-              )}
-              {!isArchivedEvent && canOperateOnEvent && (
-                <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate('/emails'); }} className="h-11 justify-start" disabled={!isOnline}>
-                  <Mail className="mr-1 h-4 w-4" /> Wysyłka QR
-                </Button>
-              )}
-              {!isArchivedEvent && canOperateOnEvent && hasSavedMapping && (
-                <Button variant="outline" onClick={() => setManualOpen(true)} className="h-11 justify-start" disabled={!isOnline}>
-                  <Plus className="mr-1 h-4 w-4" /> Dodaj uczestnika ręcznie
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <section className="space-y-4">
+          <div>
+            <h2 className="event-detail-section-title text-xl font-bold tracking-tight">
+              Operacje
+            </h2>
+          </div>
+
+          <div className="event-detail-section-group">
+            <CollapsibleSection title="Operacje" defaultOpen={false}>
+              <div className="flex flex-col gap-2">
+                {canOperateOnEvent && (
+                  <Button variant="outline" onClick={() => void handleExportCsv()} className="event-detail-operation-button h-11 justify-start" disabled={exportingCsv || !isOnline}>
+                    {exportingCsv ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
+                    Eksport uczestników CSV
+                  </Button>
+                )}
+                {canOperateOnEvent && (
+                  <Button variant="outline" onClick={() => void handleExportLogsCsv()} className="event-detail-operation-button h-11 justify-start" disabled={exportingLogsCsv || !isOnline}>
+                    {exportingLogsCsv ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
+                    Eksport logów CSV
+                  </Button>
+                )}
+                {canEditEvent && (
+                  <Button variant="outline" onClick={() => setEditOpen(true)} className="event-detail-operation-button h-11 justify-start" disabled={!isOnline}>
+                    <Pencil className="mr-1 h-4 w-4" /> Edytuj wydarzenie
+                  </Button>
+                )}
+                {canManageScanners && canAssignScannersToEvent && (
+                  <Button variant="outline" onClick={openScannerDialog} className="event-detail-operation-button h-11 justify-start" disabled={!isOnline}>
+                    <ScanLine className="mr-1 h-4 w-4" /> Zarządzaj operatorami
+                  </Button>
+                )}
+                {!isArchivedEvent && canOperateOnEvent && (
+                  <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate(`/events/${event.id}/import`); }} className="event-detail-operation-button h-11 justify-start" disabled={!isOnline}>
+                    <FileUp className="mr-1 h-4 w-4" /> Import CSV
+                  </Button>
+                )}
+                {!isArchivedEvent && canOperateOnEvent && (
+                  <Button variant="outline" onClick={() => { setSelectedEventId(event.id); navigate('/emails'); }} className="event-detail-operation-button h-11 justify-start" disabled={!isOnline}>
+                    <Mail className="mr-1 h-4 w-4" /> Wysyłka QR
+                  </Button>
+                )}
+                {!isArchivedEvent && canOperateOnEvent && hasSavedMapping && (
+                  <Button variant="outline" onClick={() => setManualOpen(true)} className="event-detail-operation-button h-11 justify-start" disabled={!isOnline}>
+                    <Plus className="mr-1 h-4 w-4" /> Dodaj uczestnika ręcznie
+                  </Button>
+                )}
+              </div>
+            </CollapsibleSection>
+          </div>
+        </section>
       )}
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Zarchiwizować wydarzenie?</AlertDialogTitle>
+            <AlertDialogTitle>ZarchiwizowaÄ‡ wydarzenie?</AlertDialogTitle>
             <AlertDialogDescription>
-              Wydarzenie <span className="font-medium text-foreground">{event.name}</span> zniknie z aktywnych list i przypisań. Dane zostaną zachowane w archiwum organizacji.
+              Wydarzenie <span className="font-medium text-foreground">{event.name}</span> zniknie z aktywnych list i przypisaĹ„. Dane zostanÄ… zachowane w archiwum organizacji.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -750,7 +770,7 @@ export default function EventDetails() {
               <FieldError id="event-edit-location-error" className="mt-2">{editErrors.location}</FieldError>
             </div>
             <div>
-              <Label htmlFor="event-edit-office-open">Data i godzina otwarcia biura zawodów</Label>
+              <Label htmlFor="event-edit-office-open">Data i godzina otwarcia biura zawodĂłw</Label>
               <DateTimePicker
                 id="event-edit-office-open"
                 value={editForm.office_open_at}
@@ -764,13 +784,13 @@ export default function EventDetails() {
               />
               {isFinishedEvent && (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Dat zakończonego wydarzenia nie można już edytować.
+                  Dat zakoĹ„czonego wydarzenia nie moĹĽna juĹĽ edytowaÄ‡.
                 </p>
               )}
               <FieldError id="event-edit-office-open-error" className="mt-2">{editErrors.office_open_at}</FieldError>
             </div>
             <div>
-              <Label htmlFor="event-edit-office-close">Data i godzina zamknięcia biura zawodów</Label>
+              <Label htmlFor="event-edit-office-close">Data i godzina zamkniÄ™cia biura zawodĂłw</Label>
               <DateTimePicker
                 id="event-edit-office-close"
                 value={editForm.office_close_at}
@@ -804,7 +824,7 @@ export default function EventDetails() {
       >
         <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl lg:max-w-3xl">
           <DialogHeader className="shrink-0 px-6 pb-2 pt-6">
-            <DialogTitle>Dodaj uczestnika ręcznie</DialogTitle>
+            <DialogTitle>Dodaj uczestnika rÄ™cznie</DialogTitle>
           </DialogHeader>
           <div className="themed-scrollbar grid flex-1 gap-4 overflow-y-auto px-6 py-4 lg:grid-cols-2">
             <div className="lg:col-span-2">
@@ -860,7 +880,7 @@ export default function EventDetails() {
       <Dialog open={scannerDialogOpen} onOpenChange={setScannerDialogOpen}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Przypisz operatorów do wydarzenia</DialogTitle>
+            <DialogTitle>Przypisz operatorĂłw do wydarzenia</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {organizationScanners.length > 0 ? (
@@ -874,7 +894,7 @@ export default function EventDetails() {
               </div>
             ) : (
               <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                Brak operatorów w organizacji tego wydarzenia.
+                Brak operatorĂłw w organizacji tego wydarzenia.
               </div>
             )}
           </div>
@@ -889,3 +909,4 @@ export default function EventDetails() {
     </div>
   );
 }
+

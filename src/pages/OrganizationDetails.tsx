@@ -76,6 +76,8 @@ export default function OrganizationDetails() {
     updateUser,
     createEvent,
     updateOrganization,
+    updateOrganizationAdmins,
+    createOrganizationAdmin,
     updateOrganizationEventLimit,
     deleteOrganization,
     removeUser,
@@ -91,6 +93,9 @@ export default function OrganizationDetails() {
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [organizationEditOpen, setOrganizationEditOpen] = useState(false);
   const [scannerEditDialogOpen, setScannerEditDialogOpen] = useState(false);
+  const [adminAssignmentsDialogOpen, setAdminAssignmentsDialogOpen] =
+    useState(false);
+  const [adminCreateDialogOpen, setAdminCreateDialogOpen] = useState(false);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
   const [deleteOrganizationConfirmOpen, setDeleteOrganizationConfirmOpen] =
     useState(false);
@@ -102,6 +107,9 @@ export default function OrganizationDetails() {
   const [isSavingOrganization, setIsSavingOrganization] = useState(false);
   const [isDeletingOrganization, setIsDeletingOrganization] = useState(false);
   const [isSavingScanner, setIsSavingScanner] = useState(false);
+  const [isSavingAdminAssignments, setIsSavingAdminAssignments] =
+    useState(false);
+  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
   const [isChangingScannerRole, setIsChangingScannerRole] = useState(false);
   const [isArchivingUser, setIsArchivingUser] = useState(false);
   const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
@@ -129,8 +137,15 @@ export default function OrganizationDetails() {
   const [scannerAssignmentDraft, setScannerAssignmentDraft] = useState<
     string[]
   >([]);
+  const [adminAssignmentDraft, setAdminAssignmentDraft] = useState<string[]>(
+    [],
+  );
   const [limitDraft, setLimitDraft] = useState("");
   const [organizationNameDraft, setOrganizationNameDraft] = useState("");
+  const [adminForm, setAdminForm] = useState({
+    name: "",
+    email: "",
+  });
   const [scannerDraft, setScannerDraft] = useState({
     name: "",
     email: "",
@@ -146,6 +161,11 @@ export default function OrganizationDetails() {
   }>({});
   const [organizationErrors, setOrganizationErrors] = useState<{
     name?: string;
+    form?: string;
+  }>({});
+  const [adminErrors, setAdminErrors] = useState<{
+    name?: string;
+    email?: string;
     form?: string;
   }>({});
   const [scannerErrors, setScannerErrors] = useState<{
@@ -212,6 +232,20 @@ export default function OrganizationDetails() {
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
     [users, organization?.id],
   );
+  const organizationAdmins = useMemo(
+    () =>
+      [...(organization?.admin_users ?? [])].sort((a, b) =>
+        a.name.localeCompare(b.name, "pl"),
+      ),
+    [organization?.admin_users],
+  );
+  const availableAdmins = useMemo(
+    () =>
+      users
+        .filter((user) => user.role === "admin")
+        .sort((a, b) => a.name.localeCompare(b.name, "pl")),
+    [users],
+  );
 
   if (isLoading) return <TableSkeleton rows={4} cols={4} subtitle="" />;
   if (!organization || !allowed)
@@ -238,6 +272,7 @@ export default function OrganizationDetails() {
     currentRole === "superadmin" || currentRole === "admin";
   const canManageMembers =
     currentRole === "superadmin" || currentRole === "admin";
+  const canManageAdmins = currentRole === "superadmin";
   const canManageScanners =
     currentRole === "superadmin" ||
     currentRole === "admin" ||
@@ -246,12 +281,25 @@ export default function OrganizationDetails() {
     canEditOrganization &&
     orgEvents.length === 0 &&
     orgArchivedEvents.length === 0 &&
+    organizationAdmins.length === 0 &&
     organizers.length === 0 &&
     scanners.length === 0;
   const adminLabel =
-    organization.admin_user_name ??
-    users.find((user) => user.id === organization.admin_user_id)?.name ??
-    "Brak administratora";
+    organizationAdmins.length > 0
+      ? organizationAdmins.map((adminUser) => adminUser.name).join(", ")
+      : "Brak administratorów";
+  const sectionClassName =
+    "rounded-[1.9rem] border border-[hsl(var(--button-highlight)/0.14)] bg-[linear-gradient(180deg,hsl(220_13%_8%/_0.95),hsl(220_14%_6%/_0.98))] p-5 shadow-[0_24px_60px_hsl(var(--surface-shadow)/0.34),inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:p-6";
+  const primaryWideButtonClassName =
+    "h-12 w-full rounded-[1rem] border-[hsl(var(--button-highlight)/0.58)] text-[0.98rem] font-semibold tracking-[-0.01em] shadow-[0_18px_36px_hsl(var(--surface-shadow)/0.22)]";
+  const secondaryWideButtonClassName =
+    "h-12 w-full rounded-[1rem] border-[hsl(var(--button-highlight)/0.4)] bg-transparent text-foreground shadow-none hover:border-[hsl(var(--button-highlight)/0.62)] hover:bg-[hsl(var(--button-highlight)/0.08)]";
+  const subtleIconButtonClassName =
+    "h-10 w-10 rounded-[0.95rem] border border-[hsl(var(--button-highlight)/0.22)] bg-[hsl(var(--background)/0.66)] text-[hsl(var(--button-highlight))] hover:bg-[hsl(var(--button-highlight)/0.12)] hover:text-[hsl(var(--button-highlight))]";
+  const tableContainerClassName =
+    "rounded-[1.55rem] border-[hsl(var(--button-highlight)/0.15)] bg-[linear-gradient(180deg,hsl(220_13%_8%/_0.98),hsl(220_14%_7%/_0.98))] shadow-[0_18px_45px_hsl(var(--surface-shadow)/0.24),inset_0_1px_0_hsl(var(--foreground)/0.03)]";
+  const actionButtonClassName =
+    "min-h-10 h-auto rounded-[0.95rem] px-3 py-2 text-xs font-medium";
 
   const openMemberDialog = (role: MemberRole) => {
     setMemberForm({ role, name: "", email: "", assigned_events: [] });
@@ -261,6 +309,17 @@ export default function OrganizationDetails() {
   const openLimitDialog = () => {
     setLimitDraft(String(organization.event_limit));
     setLimitDialogOpen(true);
+  };
+
+  const openAdminAssignmentsDialog = () => {
+    setAdminAssignmentDraft(organizationAdmins.map((adminUser) => adminUser.id));
+    setAdminAssignmentsDialogOpen(true);
+  };
+
+  const openAdminCreateDialog = () => {
+    setAdminForm({ name: "", email: "" });
+    setAdminErrors({});
+    setAdminCreateDialogOpen(true);
   };
 
   const openScannerAssignmentsDialog = (scannerId: string) => {
@@ -308,6 +367,14 @@ export default function OrganizationDetails() {
       checked
         ? [...prev, eventId]
         : prev.filter((idValue) => idValue !== eventId),
+    );
+  };
+
+  const toggleAdminAssignmentDraft = (userId: string, checked: boolean) => {
+    setAdminAssignmentDraft((prev) =>
+      checked
+        ? [...new Set([...prev, userId])]
+        : prev.filter((idValue) => idValue !== userId),
     );
   };
 
@@ -407,6 +474,87 @@ export default function OrganizationDetails() {
     setLimitDraft("");
     setLimitErrors({});
     toast({ title: "Zaktualizowano limit wydarzeń" });
+  };
+
+  const handleSaveAdminAssignments = async () => {
+    setIsSavingAdminAssignments(true);
+    const result = await updateOrganizationAdmins(
+      organization.id,
+      adminAssignmentDraft,
+    );
+    setIsSavingAdminAssignments(false);
+
+    if (!result.ok) {
+      toast({
+        title: "Nie udało się zapisać administratorów",
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAdminAssignmentsDialogOpen(false);
+    toast({ title: "Zapisano administratorów organizacji" });
+  };
+
+  const handleDetachAdmin = async (adminUserId: string) => {
+    const result = await updateOrganizationAdmins(
+      organization.id,
+      organizationAdmins
+        .filter((adminUser) => adminUser.id !== adminUserId)
+        .map((adminUser) => adminUser.id),
+    );
+
+    if (!result.ok) {
+      toast({
+        title: "Nie udało się odpiąć administratora",
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({ title: "Odpięto administratora od organizacji" });
+  };
+
+  const handleCreateAdmin = async () => {
+    const nextErrors = {
+      name: validateRequired(adminForm.name, "Podaj imię i nazwisko."),
+      email: validateEmail(adminForm.email),
+    };
+
+    if (nextErrors.name || nextErrors.email) {
+      setAdminErrors(nextErrors);
+      return;
+    }
+
+    setAdminErrors({});
+    setIsCreatingAdmin(true);
+    const result = await createOrganizationAdmin(organization.id, {
+      name: adminForm.name.trim(),
+      email: adminForm.email.trim(),
+    });
+    setIsCreatingAdmin(false);
+
+    if (!result.ok) {
+      setAdminErrors({
+        form: result.error ?? "Nie udało się utworzyć administratora.",
+      });
+      toast({
+        title: "Nie udało się utworzyć administratora",
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAdminCreateDialogOpen(false);
+    setAdminForm({ name: "", email: "" });
+    setAdminErrors({});
+    toast({
+      title: "Dodano administratora",
+      description: "Konto zostało przypisane do organizacji.",
+    });
   };
 
   const handleSaveOrganization = async () => {
@@ -672,140 +820,250 @@ export default function OrganizationDetails() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto flex max-w-[1080px] flex-col gap-7 pb-6">
       <Button
         variant="ghost"
         size="sm"
         onClick={() => navigate("/organizations")}
-        className="w-fit touch-manipulation"
+        className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
       >
         <ArrowLeft className="mr-1 h-4 w-4" />
         Wróć do organizacji
       </Button>
 
-      <div className="space-y-2">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-primary/10 p-3">
-                <Building2 className="h-5 w-5 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">
-                    {organization.name}
-                  </h1>
-                  {canEditOrganization && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
-                      onClick={() => {
-                        setOrganizationNameDraft(organization.name);
-                        setOrganizationEditOpen(true);
-                      }}
-                      aria-label="Edytuj organizację"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  )}
+      <section className="rounded-[2.25rem] border border-white/8 bg-[linear-gradient(180deg,hsl(220_11%_7%/_0.98),hsl(220_15%_5%/_0.99))] px-5 py-6 shadow-[0_32px_80px_hsl(var(--surface-shadow)/0.44),inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:px-7 sm:py-7">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.4rem] border border-[hsl(var(--button-highlight)/0.16)] bg-[linear-gradient(180deg,hsl(var(--button-highlight)/0.1),hsl(var(--background)/0.78))] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:h-20 sm:w-20">
+                  <Building2 className="h-8 w-8 text-[hsl(var(--button-highlight))]" />
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Szczegóły organizacji i zespołu.
-                </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h1 className="truncate text-[2rem] font-bold leading-none tracking-[-0.03em] text-foreground sm:text-[2.35rem]">
+                      {organization.name}
+                    </h1>
+                    {canEditOrganization && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className={subtleIconButtonClassName}
+                        onClick={() => {
+                          setOrganizationNameDraft(organization.name);
+                          setOrganizationEditOpen(true);
+                        }}
+                        aria-label="Edytuj organizację"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <p className="mt-2 text-base text-muted-foreground">
+                    Szczegóły organizacji i zespołu.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-          {canEditOrganization && (
-            <div className="flex flex-col gap-2 sm:flex-row">
-              {canDeleteOrganization && (
+            {canEditOrganization && canDeleteOrganization && (
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
                   variant="destructive"
-                  className="w-full sm:w-auto"
+                  className="w-full rounded-[1rem] px-5 sm:w-auto"
                   onClick={() => setDeleteOrganizationConfirmOpen(true)}
                 >
                   <Trash2 className="mr-1 h-4 w-4" />
                   Usuń organizację
                 </Button>
+              </div>
+            )}
+          </div>
+
+          <Card className="overflow-hidden border-[hsl(var(--button-highlight)/0.2)] bg-[linear-gradient(180deg,hsl(220_12%_10%/_0.98),hsl(220_13%_8%/_0.98))] shadow-[0_0_0_1px_hsl(var(--button-highlight)/0.05),0_0_30px_hsl(var(--button-highlight)/0.12),0_28px_60px_hsl(var(--surface-shadow)/0.3)]">
+            <CardContent
+              className={`grid gap-0 p-0 text-sm sm:grid-cols-2 ${
+                canEditOrganization
+                  ? "lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
+                  : "lg:grid-cols-4"
+              }`}
+            >
+              <div className="border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-5 sm:px-6 lg:border-b-0 lg:border-r">
+                <span className="text-sm text-muted-foreground">Wydarzenia</span>
+                <p className="mt-3 text-[2rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
+                  {orgEvents.length}/{organization.event_limit}
+                </p>
+              </div>
+              <div className="border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-5 sm:px-6 sm:border-l-0 lg:border-b-0 lg:border-r">
+                <span className="text-sm text-muted-foreground">Organizatorzy</span>
+                <p className="mt-3 text-[2rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
+                  {organizers.length}
+                </p>
+              </div>
+              <div className="border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-5 sm:px-6 lg:border-b-0 lg:border-r">
+                <span className="text-sm text-muted-foreground">Operatorzy</span>
+                <p className="mt-3 text-[2rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
+                  {scanners.length}
+                </p>
+              </div>
+              <div className="px-5 py-5 sm:px-6 lg:border-r lg:border-[hsl(var(--button-highlight)/0.12)]">
+                <span className="text-sm text-muted-foreground">Administratorzy</span>
+                <p className="mt-3 break-words text-lg font-semibold tracking-[-0.02em] text-foreground">
+                  {adminLabel}
+                </p>
+              </div>
+              {canEditOrganization && (
+                <div className="flex items-end justify-end px-5 py-5 sm:px-6">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={subtleIconButtonClassName}
+                    onClick={openLimitDialog}
+                    aria-label="Edytuj limit wydarzeń"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className={sectionClassName}>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
+            <div>
+              <h2 className="text-[1.9rem] font-semibold tracking-[-0.03em] text-foreground">
+                Administratorzy
+              </h2>
+            </div>
+            {canManageAdmins && (
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  onClick={openAdminAssignmentsDialog}
+                  className={primaryWideButtonClassName}
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Przypisz istniejącego admina
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={openAdminCreateDialog}
+                  className={secondaryWideButtonClassName}
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Utwórz admina i przypisz
+                </Button>
+              </div>
+            )}
+          </div>
+          {organizationAdmins.length === 0 ? (
+            <EmptyTableState
+              title="Brak administratorów"
+              description={
+                canManageAdmins
+                  ? "Przypisz istniejącego admina albo utwórz nowe konto administratora."
+                  : "Ta organizacja nie ma obecnie przypisanych administratorów."
+              }
+            />
+          ) : (
+            <div className="w-full">
+              <Table containerClassName={tableContainerClassName}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                      Imię i nazwisko
+                    </TableHead>
+                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                      Email
+                    </TableHead>
+                    {canManageAdmins && (
+                      <TableHead className="h-12 w-[180px] px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                        Akcje
+                      </TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {organizationAdmins.map((adminUser) => (
+                    <TableRow
+                      key={adminUser.id}
+                      className="border-0 hover:bg-[hsl(var(--button-highlight)/0.04)]"
+                    >
+                      <TableCell className="px-5 text-base font-medium sm:px-7">
+                        {adminUser.name}
+                      </TableCell>
+                      <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
+                        {adminUser.email}
+                      </TableCell>
+                      {canManageAdmins && (
+                        <TableCell className="px-5 sm:px-7">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={`${actionButtonClassName} w-full sm:w-auto`}
+                            onClick={() => void handleDetachAdmin(adminUser.id)}
+                          >
+                            Odepnij
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
         </div>
-      </div>
+      </section>
 
-      <Card>
-        <CardContent className="flex flex-col gap-3 p-4 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div>
-            <span className="text-muted-foreground">Wydarzenia</span>
-            <span className="ml-2 font-medium">{orgEvents.length}/{organization.event_limit}</span>
+      <section className={sectionClassName}>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
+            <div>
+              <h2 className="text-[1.9rem] font-semibold tracking-[-0.03em] text-foreground">
+                Wydarzenia
+              </h2>
+            </div>
+            {canCreateEvent && (
+              <Button
+                onClick={() => setEventDialogOpen(true)}
+                className={primaryWideButtonClassName}
+                disabled={remainingSlots <= 0}
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Dodaj wydarzenie
+              </Button>
+            )}
           </div>
-          <div>
-            <span className="text-muted-foreground">Organizatorzy</span>
-            <span className="ml-2 font-medium">{organizers.length}</span>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Operatorzy</span>
-            <span className="ml-2 font-medium">{scanners.length}</span>
-          </div>
-          <div className="min-w-0">
-            <span className="text-muted-foreground">Administrator</span>
-            <span className="ml-2 font-medium">{adminLabel}</span>
-          </div>
-          {canEditOrganization && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
-              onClick={openLimitDialog}
-              aria-label="Edytuj limit wydarzeń"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Wydarzenia</h2>
-          </div>
-          {canCreateEvent && (
-            <Button
-              onClick={() => setEventDialogOpen(true)}
-              className="h-11 w-full sm:h-10 sm:w-auto"
-              disabled={remainingSlots <= 0}
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              Dodaj wydarzenie
-            </Button>
-          )}
-        </div>
         {orgEvents.length === 0 ? (
           <EmptyTableState
             title="Brak wydarzeń"
             description="Po dodaniu wydarzeń pojawi się tutaj ich lista."
           />
         ) : (
-          <>
             <div className="w-full">
-              <Table>
+              <Table containerClassName={tableContainerClassName}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Wydarzenie</TableHead>
-                    <TableHead className="hidden md:table-cell">
+                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                      Wydarzenie
+                    </TableHead>
+                    <TableHead className="hidden h-12 px-5 text-[0.72rem] tracking-[0.2em] md:table-cell sm:px-7">
                       Lokalizacja
                     </TableHead>
-                    <TableHead>Biuro</TableHead>
+                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                      Biuro
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {orgEvents.map((event) => (
                     <TableRow
                       key={event.id}
-                      className="cursor-pointer active:bg-accent/50 [&>td]:py-3"
+                      className="cursor-pointer border-0 transition-colors hover:bg-[hsl(var(--button-highlight)/0.06)] active:bg-[hsl(var(--button-highlight)/0.1)] [&>td]:py-4"
                       onClick={() => navigate(`/events/${event.id}`)}
                       onKeyDown={(keyboardEvent) => {
                         if (
@@ -819,20 +1077,20 @@ export default function OrganizationDetails() {
                       tabIndex={0}
                       aria-label={`Otwórz wydarzenie ${event.name}`}
                     >
-                      <TableCell>
+                      <TableCell className="px-5 sm:px-7">
                         <div>
-                          <span className="font-medium text-sm">
+                          <span className="text-base font-medium text-foreground">
                             {event.name}
                           </span>
-                          <span className="block text-xs text-muted-foreground md:hidden">
+                          <span className="mt-1 block text-sm text-muted-foreground md:hidden">
                             {event.location}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                      <TableCell className="hidden px-5 text-sm text-muted-foreground md:table-cell sm:px-7">
                         {event.location}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
                         {formatEventOfficeWindow(event)}
                       </TableCell>
                     </TableRow>
@@ -840,61 +1098,70 @@ export default function OrganizationDetails() {
                 </TableBody>
               </Table>
             </div>
-          </>
         )}
+        </div>
       </section>
 
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">
-              Organizatorzy
-            </h2>
+      <section className={sectionClassName}>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
+            <div>
+              <h2 className="text-[1.9rem] font-semibold tracking-[-0.03em] text-foreground">
+                Organizatorzy
+              </h2>
+            </div>
+            {canManageMembers && (
+              <Button
+                onClick={() => openMemberDialog("editor")}
+                className={primaryWideButtonClassName}
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Dodaj organizatora
+              </Button>
+            )}
           </div>
-          {canManageMembers && (
-            <Button
-              onClick={() => openMemberDialog("editor")}
-              className="h-11 w-full sm:h-10 sm:w-auto"
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              Dodaj organizatora
-            </Button>
-          )}
-        </div>
         {organizers.length === 0 ? (
           <EmptyTableState
             title="Brak organizatorów"
             description="Po dodaniu organizatorów pojawi się tutaj ich lista."
           />
         ) : (
-          <>
             <div className="w-full">
-              <Table>
+              <Table containerClassName={tableContainerClassName}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Imię i nazwisko</TableHead>
-                    <TableHead>Email</TableHead>
+                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                      Imię i nazwisko
+                    </TableHead>
+                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                      Email
+                    </TableHead>
                     {canManageMemberAccounts && (
-                      <TableHead className="w-[250px]">Akcje</TableHead>
+                      <TableHead className="h-12 w-[250px] px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                        Akcje
+                      </TableHead>
                     )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {organizers.map((organizer) => (
-                    <TableRow key={organizer.id}>
-                      <TableCell className="font-medium text-sm">
+                    <TableRow
+                      key={organizer.id}
+                      className="border-0 hover:bg-[hsl(var(--button-highlight)/0.04)]"
+                    >
+                      <TableCell className="px-5 text-base font-medium sm:px-7">
                         {organizer.name}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
                         {organizer.email}
                       </TableCell>
                       {canManageMemberAccounts && (
-                        <TableCell>
+                        <TableCell className="px-5 sm:px-7">
                           <div className="flex flex-col gap-2 sm:flex-row">
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-8 w-full rounded-lg px-2.5 text-xs sm:w-auto"
+                              className={`${actionButtonClassName} w-full sm:w-auto`}
                               onClick={() => openPasswordResetDialog(organizer)}
                             >
                               <KeyRound className="mr-1 h-3.5 w-3.5" />
@@ -903,7 +1170,7 @@ export default function OrganizationDetails() {
                             <Button
                               size="sm"
                               variant="destructive"
-                              className="h-8 w-full rounded-lg px-2.5 text-xs sm:w-auto"
+                              className={`${actionButtonClassName} w-full sm:w-auto`}
                               onClick={() => openArchiveUserDialog(organizer)}
                             >
                               <Trash2 className="mr-1 h-3.5 w-3.5" />
@@ -917,82 +1184,93 @@ export default function OrganizationDetails() {
                 </TableBody>
               </Table>
             </div>
-          </>
         )}
+        </div>
       </section>
 
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Operatorzy</h2>
-          </div>
-          {canManageScanners && (
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                onClick={() => openMemberDialog("scanner")}
-                className="h-11 w-full sm:h-10 sm:w-auto"
-              >
-                <Plus className="mr-1 h-4 w-4" />
-                Dodaj operatora
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => openMemberDialog("scanner_plus")}
-                className="h-11 w-full sm:h-10 sm:w-auto"
-              >
-                <Plus className="mr-1 h-4 w-4" />
-                Dodaj Operator Plus
-              </Button>
+      <section className={sectionClassName}>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
+            <div>
+              <h2 className="text-[1.9rem] font-semibold tracking-[-0.03em] text-foreground">
+                Operatorzy
+              </h2>
             </div>
-          )}
-        </div>
+            {canManageScanners && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Button
+                  onClick={() => openMemberDialog("scanner")}
+                  className={primaryWideButtonClassName}
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Dodaj operatora
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => openMemberDialog("scanner_plus")}
+                  className={secondaryWideButtonClassName}
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Dodaj Operator Plus
+                </Button>
+              </div>
+            )}
+          </div>
         {scanners.length === 0 ? (
           <EmptyTableState
             title="Brak operatorów"
             description="Po dodaniu operatorów pojawi się tutaj ich lista."
           />
         ) : (
-          <>
             <div className="w-full">
-              <Table>
+              <Table containerClassName={tableContainerClassName}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Imię i nazwisko</TableHead>
-                    <TableHead className="hidden md:table-cell">
+                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                      Imię i nazwisko
+                    </TableHead>
+                    <TableHead className="hidden h-12 px-5 text-[0.72rem] tracking-[0.2em] md:table-cell sm:px-7">
                       Email
                     </TableHead>
-                    <TableHead>Przypisane wydarzenia</TableHead>
+                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                      Przypisane wydarzenia
+                    </TableHead>
                     {canManageScanners && (
-                      <TableHead className="w-[11.5rem] sm:w-[13.5rem] lg:w-[240px]">Akcje</TableHead>
+                      <TableHead className="h-12 w-[11.5rem] px-5 text-[0.72rem] tracking-[0.2em] sm:w-[13.5rem] sm:px-7 lg:w-[240px]">
+                        Akcje
+                      </TableHead>
                     )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {scanners.map((scanner) => (
-                    <TableRow key={scanner.id}>
-                      <TableCell>
+                    <TableRow
+                      key={scanner.id}
+                      className="border-0 hover:bg-[hsl(var(--button-highlight)/0.04)]"
+                    >
+                      <TableCell className="px-5 sm:px-7">
                         <div>
-                          <span className="font-medium text-sm">
+                          <span className="text-base font-medium text-foreground">
                             {scanner.name}
                           </span>
-                          <span className="block text-xs text-muted-foreground md:hidden">
+                          <span className="mt-1 block text-sm text-muted-foreground md:hidden">
                             {scanner.email}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                      <TableCell className="hidden px-5 text-sm text-muted-foreground md:table-cell sm:px-7">
                         {scanner.email}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
                         {getEventNames(scanner.assigned_events)}
                       </TableCell>
                       {canManageScanners && (
-                        <TableCell className="min-w-[11.5rem] align-top sm:min-w-[13.5rem] lg:min-w-[240px]">
+                        <TableCell className="min-w-[11.5rem] px-5 align-top sm:min-w-[13.5rem] sm:px-7 lg:min-w-[240px]">
                           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              className="min-h-9 h-auto w-full whitespace-normal rounded-lg px-2.5 py-2 text-center text-[11px] leading-[1.15rem] sm:px-3 sm:text-xs"
+                              className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
                               onClick={() => openScannerEditDialog(scanner)}
                             >
                               <Pencil className="mr-1 h-3.5 w-3.5" />
@@ -1001,7 +1279,7 @@ export default function OrganizationDetails() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="min-h-9 h-auto w-full whitespace-normal rounded-lg px-2.5 py-2 text-center text-[11px] leading-[1.15rem] sm:px-3 sm:text-xs"
+                              className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
                               onClick={() =>
                                 openScannerAssignmentsDialog(scanner.id)
                               }
@@ -1012,7 +1290,7 @@ export default function OrganizationDetails() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="min-h-9 h-auto w-full whitespace-normal rounded-lg px-2.5 py-2 text-center text-[11px] leading-[1.15rem] sm:px-3 sm:text-xs"
+                                className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
                                 onClick={() =>
                                   void handleChangeScannerRole(
                                     scanner,
@@ -1027,7 +1305,7 @@ export default function OrganizationDetails() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="min-h-9 h-auto w-full whitespace-normal rounded-lg px-2.5 py-2 text-center text-[11px] leading-[1.15rem] sm:px-3 sm:text-xs"
+                                className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
                                 onClick={() => void handleChangeScannerRole(scanner, "scanner")}
                               >
                                 Zmień na Operator
@@ -1038,7 +1316,7 @@ export default function OrganizationDetails() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="min-h-9 h-auto w-full whitespace-normal rounded-lg px-2.5 py-2 text-center text-[11px] leading-[1.15rem] sm:px-3 sm:text-xs"
+                                  className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
                                   onClick={() =>
                                     openPasswordResetDialog(scanner)
                                   }
@@ -1049,7 +1327,7 @@ export default function OrganizationDetails() {
                                 <Button
                                   size="sm"
                                   variant="destructive"
-                                  className="min-h-9 h-auto w-full whitespace-normal rounded-lg px-2.5 py-2 text-center text-[11px] leading-[1.15rem] sm:px-3 sm:text-xs"
+                                  className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
                                   onClick={() => openArchiveUserDialog(scanner)}
                                 >
                                   <Trash2 className="mr-1 h-3.5 w-3.5" />
@@ -1065,23 +1343,25 @@ export default function OrganizationDetails() {
                 </TableBody>
               </Table>
             </div>
-          </>
         )}
+        </div>
       </section>
 
-      <section className="rounded-xl border border-dashed px-4 py-5 sm:px-5">
+      <section className="rounded-[1.9rem] border border-[hsl(var(--button-highlight)/0.3)] bg-[linear-gradient(180deg,hsl(var(--button-highlight)/0.12),hsl(var(--background)/0.82))] px-5 py-5 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Archive className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-base font-semibold tracking-tight">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[hsl(var(--button-highlight)/0.22)] bg-[hsl(var(--background)/0.48)]">
+                <Archive className="h-4 w-4 text-[hsl(var(--button-highlight))]" />
+              </div>
+              <h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">
                 Archiwum wydarzeń
               </h2>
             </div>
           </div>
           <Button
             variant="outline"
-            className="h-11 w-full sm:h-10 sm:w-auto"
+            className="h-12 w-full rounded-[1rem] border-[hsl(var(--button-highlight)/0.38)] bg-transparent text-[hsl(var(--button-highlight))] hover:bg-[hsl(var(--button-highlight)/0.08)] hover:text-[hsl(var(--button-highlight))] sm:w-auto"
             onClick={() => navigate(`/organizations/${organization.id}/archived-events`)}
           >
             Otwórz archiwum
@@ -1301,6 +1581,148 @@ export default function OrganizationDetails() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={adminAssignmentsDialogOpen}
+        onOpenChange={(open) => {
+          setAdminAssignmentsDialogOpen(open);
+          if (!open) {
+            setAdminAssignmentDraft([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Przypisz administratorów</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {availableAdmins.length > 0 ? (
+              <div className="space-y-2 rounded-xl border p-3">
+                {availableAdmins.map((adminUser) => (
+                  <label
+                    key={adminUser.id}
+                    className="flex items-center gap-3 text-sm"
+                  >
+                    <Checkbox
+                      checked={adminAssignmentDraft.includes(adminUser.id)}
+                      onCheckedChange={(checked) =>
+                        toggleAdminAssignmentDraft(
+                          adminUser.id,
+                          checked === true,
+                        )
+                      }
+                    />
+                    <span className="flex-1">
+                      {adminUser.name}
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {adminUser.email}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed px-3 py-3 text-xs text-muted-foreground">
+                Brak istniejących kont admina. Utwórz nowe konto i przypisz je
+                do organizacji.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              className="w-full sm:w-auto"
+              onClick={() => void handleSaveAdminAssignments()}
+              disabled={isSavingAdminAssignments}
+            >
+              Zapisz administratorów
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={adminCreateDialogOpen}
+        onOpenChange={(open) => {
+          setAdminCreateDialogOpen(open);
+          if (!open) {
+            setAdminErrors({});
+            setAdminForm({ name: "", email: "" });
+          }
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Utwórz administratora</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="admin-name">Imię i nazwisko</Label>
+              <Input
+                id="admin-name"
+                value={adminForm.name}
+                onChange={(event) => {
+                  setAdminForm((prev) => ({
+                    ...prev,
+                    name: event.target.value,
+                  }));
+                  setAdminErrors((prev) => ({
+                    ...prev,
+                    name: undefined,
+                    form: undefined,
+                  }));
+                }}
+                className="mt-2"
+                required
+                aria-invalid={Boolean(adminErrors.name)}
+                aria-describedby={adminErrors.name ? "admin-name-error" : undefined}
+              />
+              <FieldError id="admin-name-error" className="mt-2">
+                {adminErrors.name}
+              </FieldError>
+            </div>
+            <div>
+              <Label htmlFor="admin-email">Email</Label>
+              <Input
+                id="admin-email"
+                type="email"
+                value={adminForm.email}
+                onChange={(event) => {
+                  setAdminForm((prev) => ({
+                    ...prev,
+                    email: event.target.value,
+                  }));
+                  setAdminErrors((prev) => ({
+                    ...prev,
+                    email: undefined,
+                    form: undefined,
+                  }));
+                }}
+                className="mt-2"
+                required
+                aria-invalid={Boolean(adminErrors.email)}
+                aria-describedby={adminErrors.email ? "admin-email-error" : undefined}
+              />
+              <FieldError id="admin-email-error" className="mt-2">
+                {adminErrors.email}
+              </FieldError>
+            </div>
+            <p className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              Konto zostanie utworzone i od razu przypisane do tej organizacji.
+            </p>
+            <FieldError id="admin-form-error">{adminErrors.form}</FieldError>
+          </div>
+          <DialogFooter>
+            <Button
+              className="w-full sm:w-auto"
+              onClick={() => void handleCreateAdmin()}
+              disabled={isCreatingAdmin}
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              Utwórz administratora
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={scannerEditDialogOpen}
@@ -1784,10 +2206,10 @@ function EmptyTableState({
   description: string;
 }) {
   return (
-    <Card className="border-dashed">
-      <CardContent className="py-8 text-center">
-        <p className="text-sm font-medium text-muted-foreground">{title}</p>
-        <p className="mt-1 text-xs text-muted-foreground/70">{description}</p>
+    <Card className="border-[hsl(var(--button-highlight)/0.16)] bg-[linear-gradient(180deg,hsl(220_13%_9%/_0.92),hsl(220_14%_7%/_0.96))]">
+      <CardContent className="py-10 text-center">
+        <p className="text-base font-medium text-foreground">{title}</p>
+        <p className="mt-2 text-sm text-muted-foreground">{description}</p>
       </CardContent>
     </Card>
   );
