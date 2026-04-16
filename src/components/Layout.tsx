@@ -34,7 +34,9 @@ function LayoutContent({ children }: { children: ReactNode }) {
         </div>
         <header className="surface-panel sticky top-0 z-20 flex min-h-[4.9rem] shrink-0 items-center gap-3 border-b px-4 py-3.5 md:min-h-[5.1rem] md:flex-wrap md:px-5 lg:px-7">
           <div className="flex min-w-0 items-center gap-3.5">
-            <SidebarTrigger className="h-12 w-12 rounded-[1.15rem] border border-border/80 bg-background/45 text-primary backdrop-blur-xl hover:bg-accent/80 hover:text-foreground md:h-11 md:w-11 md:rounded-full" />
+            {isMobile && (
+              <SidebarTrigger className="h-12 w-12 rounded-[1.15rem] border border-border/80 bg-background/45 text-primary backdrop-blur-xl hover:bg-accent/80 hover:text-foreground" />
+            )}
           </div>
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center md:hidden">
             <button
