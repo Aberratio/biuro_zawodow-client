@@ -36,17 +36,36 @@ export interface ApiUser {
 }
 
 export type ApiEvent = Event;
+export type ApiOrganization = Omit<Organization, 'admin_users'> & { admin_users?: Organization['admin_users'] | null };
 
 export interface BootstrapResponse {
   generated_at?: string;
   snapshot_version?: string;
   data: {
-    organizations: Organization[];
+    organizations: ApiOrganization[];
     events: ApiEvent[];
     archivedEvents?: ApiEvent[];
     users: ApiUser[];
     participants: ApiParticipant[];
     activityLog: ActivityLog[];
+  };
+}
+
+export function mapApiOrganizationToUi(organization: ApiOrganization): Organization {
+  return {
+    ...organization,
+    admin_users: Array.isArray(organization.admin_users)
+      ? organization.admin_users
+          .filter(
+            (adminUser): adminUser is Organization['admin_users'][number] =>
+              Boolean(adminUser?.id && adminUser.name && adminUser.email),
+          )
+          .map(adminUser => ({
+            id: adminUser.id,
+            name: adminUser.name,
+            email: adminUser.email,
+          }))
+      : [],
   };
 }
 
@@ -232,7 +251,7 @@ export function buildOfflineSnapshot(args: {
     selectedOrganizationId: args.selectedOrganizationId,
     selectedEventId: args.selectedEventId,
     data: {
-      organizations: args.organizations,
+      organizations: args.organizations.map(mapApiOrganizationToUi),
       events: args.events,
       archivedEvents: args.archivedEvents,
       users: args.users,
@@ -244,7 +263,7 @@ export function buildOfflineSnapshot(args: {
 
 export function createBootstrapSnapshotVersion(response: BootstrapResponse['data']): string {
   return createSnapshotVersion({
-    organizations: response.organizations ?? [],
+    organizations: (response.organizations ?? []).map(mapApiOrganizationToUi),
     events: response.events ?? [],
     archivedEvents: response.archivedEvents ?? [],
     users: (response.users ?? []).map(mapApiUserToUi),

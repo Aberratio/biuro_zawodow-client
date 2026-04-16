@@ -8,13 +8,18 @@ export type SnapshotSource = 'network' | 'cache' | 'none';
 export type ScannerMode = 'online' | 'offline_queue' | 'read_only';
 export type SessionState = 'online' | 'offline_cached' | 'expired';
 
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
 export interface Organization {
   id: string;
   name: string;
   logo?: string;
   event_limit: number;
-  admin_user_id?: string;
-  admin_user_name?: string;
+  admin_users: AdminUser[];
 }
 
 export interface Event {
