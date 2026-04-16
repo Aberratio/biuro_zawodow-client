@@ -359,7 +359,7 @@ export function AppSidebar() {
           data-sidebar-scroll-shell="true"
           className="themed-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
         >
-          <SidebarHeader className="border-b border-sidebar-border/70 px-4 pb-4 pt-5 md:px-4 md:pb-4 md:pt-5">
+          <SidebarHeader className="px-4 pb-4 pt-5 md:px-4 md:pb-4 md:pt-5">
             <button
               type="button"
               onClick={handleLogoClick}
@@ -378,6 +378,7 @@ export function AppSidebar() {
                 />
               )}
             </button>
+            <div className="mx-auto mt-4 h-px w-[70%] bg-sidebar-border/70" aria-hidden="true" />
           </SidebarHeader>
 
           <SidebarContent className="!flex-none !overflow-visible gap-5 px-3 py-5 md:gap-4 md:px-2 md:py-4.5">
