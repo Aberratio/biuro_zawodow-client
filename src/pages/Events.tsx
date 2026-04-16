@@ -273,7 +273,7 @@ export default function Events() {
       </div>
 
       {!isOnline && canCreateEvent && (
-        <OnlineOnlyNotice description="Tworzenie i edycja wydarzen wymagaja aktywnego polaczenia z serwerem. Lista wydarzen pozostaje dostepna do odczytu z lokalnego snapshotu." />
+        <OnlineOnlyNotice description="Tworzenie i edycja wydarzeń wymagają aktywnego połączenia z serwerem. Lista wydarzeń pozostaje dostępna do odczytu z lokalnego snapshotu." />
       )}
 
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">

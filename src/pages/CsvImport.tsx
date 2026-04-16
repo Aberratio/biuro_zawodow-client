@@ -272,7 +272,7 @@ export default function CsvImport() {
       </div>
 
       {!isOnline && (
-        <OnlineOnlyNotice description="Analiza CSV, zapis mapowania i sam import wymagaja aktywnego polaczenia z serwerem. W trybie offline pozostaje tylko podglad ostatnich danych." />
+        <OnlineOnlyNotice description="Analiza CSV, zapis mapowania i sam import wymagają aktywnego połączenia z serwerem. W trybie offline pozostaje tylko podgląd ostatnich danych." />
       )}
 
       <Card className="border-dashed">

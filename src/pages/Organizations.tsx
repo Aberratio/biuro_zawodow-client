@@ -136,7 +136,7 @@ export default function Organizations() {
       </div>
 
       {!isOnline && (currentRole === 'admin' || currentRole === 'superadmin') && (
-        <OnlineOnlyNotice description="Tworzenie i edycja organizacji wymagaja aktywnego polaczenia z serwerem. Lista pozostaje dostepna do odczytu z lokalnego snapshotu." />
+        <OnlineOnlyNotice description="Tworzenie i edycja organizacji wymagają aktywnego połączenia z serwerem. Lista pozostaje dostępna do odczytu z lokalnego snapshotu." />
       )}
 
       {visibleOrganizations.length === 0 ? (

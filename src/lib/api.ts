@@ -53,7 +53,7 @@ export async function fetchJson(input: RequestInfo | URL, options: FetchJsonOpti
 
     if (!response.ok) {
       throw new ApiResponseError(
-        getErrorMessage(payload, `Request failed with status ${response.status}`),
+        getErrorMessage(payload, `Żądanie zakończyło się błędem ${response.status}`),
         response.status,
         payload,
       );
