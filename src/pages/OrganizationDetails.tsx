@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/ui/field-error";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Table,
   TableBody,
@@ -54,13 +59,63 @@ import {
   ArrowLeft,
   Archive,
   Building2,
+  ChevronDown,
   KeyRound,
   Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type MemberRole = "editor" | "scanner" | "scanner_plus";
+
+function CollapsibleOrganizationSection({
+  title,
+  defaultOpen = false,
+  children,
+  className,
+  action,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+  className?: string;
+  action?: ReactNode;
+}) {
+  const displayTitle = title.startsWith("Archiwum") ? "Archiwum wydarzen" : title;
+  const isStaticSection = title.startsWith("Archiwum");
+
+  if (isStaticSection) {
+    return (
+      <div className={cn("event-detail-list-section", className)}>
+        <div className="event-detail-list-content space-y-4">
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Collapsible defaultOpen={defaultOpen}>
+      <div className={cn("event-detail-list-section", className)}>
+        <div className="flex items-center gap-3 pr-3">
+          <CollapsibleTrigger className="event-detail-collapsible-trigger w-full flex-1">
+            <h2 className="text-base font-semibold text-foreground">
+              {displayTitle}
+            </h2>
+            <ChevronDown className="event-detail-collapsible-chevron h-4 w-4 shrink-0" />
+          </CollapsibleTrigger>
+          {action ? <div className="shrink-0">{action}</div> : null}
+        </div>
+        <CollapsibleContent className="event-detail-collapsible-content">
+          <div className="event-detail-list-content space-y-4">
+            {children}
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
 
 export default function OrganizationDetails() {
   const { id } = useParams<{ id: string }>();
@@ -92,11 +147,11 @@ export default function OrganizationDetails() {
     useState(false);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [organizationEditOpen, setOrganizationEditOpen] = useState(false);
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
   const [scannerEditDialogOpen, setScannerEditDialogOpen] = useState(false);
   const [adminAssignmentsDialogOpen, setAdminAssignmentsDialogOpen] =
     useState(false);
   const [adminCreateDialogOpen, setAdminCreateDialogOpen] = useState(false);
-  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
   const [deleteOrganizationConfirmOpen, setDeleteOrganizationConfirmOpen] =
     useState(false);
   const [archiveUserConfirmOpen, setArchiveUserConfirmOpen] = useState(false);
@@ -289,26 +344,30 @@ export default function OrganizationDetails() {
       ? organizationAdmins.map((adminUser) => adminUser.name).join(", ")
       : "Brak administratorów";
   const sectionClassName =
-    "rounded-[1.9rem] border border-[hsl(var(--button-highlight)/0.14)] bg-[linear-gradient(180deg,hsl(220_13%_8%/_0.95),hsl(220_14%_6%/_0.98))] p-5 shadow-[0_24px_60px_hsl(var(--surface-shadow)/0.34),inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:p-6";
+    "overflow-hidden rounded-[1.35rem] border border-[hsl(var(--button-highlight)/0.14)] bg-[linear-gradient(180deg,hsl(220_13%_8%/_0.95),hsl(220_14%_6%/_0.98))] shadow-[0_18px_44px_hsl(var(--surface-shadow)/0.28),inset_0_1px_0_hsl(var(--foreground)/0.04)]";
   const primaryWideButtonClassName =
     "h-12 w-full rounded-[1rem] border-[hsl(var(--button-highlight)/0.58)] text-[0.98rem] font-semibold tracking-[-0.01em] shadow-[0_18px_36px_hsl(var(--surface-shadow)/0.22)]";
   const secondaryWideButtonClassName =
     "h-12 w-full rounded-[1rem] border-[hsl(var(--button-highlight)/0.4)] bg-transparent text-foreground shadow-none hover:border-[hsl(var(--button-highlight)/0.62)] hover:bg-[hsl(var(--button-highlight)/0.08)]";
+  const sectionPrimaryButtonClassName =
+    "h-12 w-full rounded-[1rem] border border-[hsl(42_62%_62%/0.78)] bg-[linear-gradient(180deg,hsl(42_46%_56%),hsl(38_34%_42%))] px-4 text-[0.98rem] font-semibold text-white shadow-[inset_0_1px_0_hsl(48_65%_78%/0.32)] hover:brightness-105";
+  const sectionSecondaryButtonClassName =
+    "h-12 w-full rounded-[1rem] border border-[hsl(var(--button-highlight)/0.32)] bg-[linear-gradient(180deg,hsl(220_10%_10%/_0.94),hsl(220_11%_8%/_0.96))] px-4 text-[0.98rem] font-semibold text-foreground shadow-[inset_0_1px_0_hsl(var(--foreground)/0.08)] hover:border-[hsl(var(--button-highlight)/0.52)] hover:bg-[linear-gradient(180deg,hsl(220_10%_11%/_0.98),hsl(220_11%_9%/_0.98))]";
   const subtleIconButtonClassName =
     "h-10 w-10 rounded-[0.95rem] border border-[hsl(var(--button-highlight)/0.22)] bg-[hsl(var(--background)/0.66)] text-[hsl(var(--button-highlight))] hover:bg-[hsl(var(--button-highlight)/0.12)] hover:text-[hsl(var(--button-highlight))]";
   const tableContainerClassName =
-    "rounded-[1.55rem] border-[hsl(var(--button-highlight)/0.15)] bg-[linear-gradient(180deg,hsl(220_13%_8%/_0.98),hsl(220_14%_7%/_0.98))] shadow-[0_18px_45px_hsl(var(--surface-shadow)/0.24),inset_0_1px_0_hsl(var(--foreground)/0.03)]";
+    "rounded-[1.2rem] border border-[hsl(var(--button-highlight)/0.12)] bg-[hsl(220_14%_7%/_0.72)] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)]";
   const actionButtonClassName =
     "min-h-10 h-auto rounded-[0.95rem] px-3 py-2 text-xs font-medium";
-
-  const openMemberDialog = (role: MemberRole) => {
-    setMemberForm({ role, name: "", email: "", assigned_events: [] });
-    setMemberDialogOpen(true);
-  };
 
   const openLimitDialog = () => {
     setLimitDraft(String(organization.event_limit));
     setLimitDialogOpen(true);
+  };
+
+  const openMemberDialog = (role: MemberRole) => {
+    setMemberForm({ role, name: "", email: "", assigned_events: [] });
+    setMemberDialogOpen(true);
   };
 
   const openAdminAssignmentsDialog = () => {
@@ -413,6 +472,12 @@ export default function OrganizationDetails() {
     setIsSubmittingMember(false);
 
     if (!result.ok) {
+      setIsSavingOrganization(false);
+      setIsSavingOrganization(false);
+      setIsSavingOrganization(false);
+      setIsSavingOrganization(false);
+      setIsSavingOrganization(false);
+      setIsSavingOrganization(false);
       setMemberErrors({ form: result.error ?? "Nie udało się dodać konta." });
       toast({
         title: "Nie udało się dodać konta",
@@ -471,7 +536,6 @@ export default function OrganizationDetails() {
       return;
     }
     setLimitDialogOpen(false);
-    setLimitDraft("");
     setLimitErrors({});
     toast({ title: "Zaktualizowano limit wydarzeń" });
   };
@@ -559,16 +623,44 @@ export default function OrganizationDetails() {
 
   const handleSaveOrganization = async () => {
     const name = organizationNameDraft.trim();
+    const parsedLimit = Number(limitDraft || organization.event_limit);
+    const limitError = validateNonNegativeInteger(
+      limitDraft || String(organization.event_limit),
+      "Podaj liczbÄ™ caĹ‚kowitÄ… wiÄ™kszÄ… lub rĂłwnÄ… 0.",
+    );
     const nameError = validateRequired(name, "Podaj nazwę organizacji.");
     if (nameError) {
       setOrganizationErrors({ name: nameError });
       toast({ title: "Nazwa jest wymagana", variant: "destructive" });
       return;
     }
+    if (limitError || !Number.isInteger(parsedLimit) || parsedLimit < 0) {
+      setLimitErrors({
+        event_limit:
+          limitError || "Podaj liczbe calkowita wieksza lub rowna 0.",
+      });
+      toast({
+        title: "Nieprawidlowy limit",
+        description: "Podaj liczbe calkowita wieksza lub rowna 0.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (parsedLimit < orgEvents.length) {
+      setLimitErrors({
+        event_limit: `Limit wydarzen nie moze byc mniejszy niz ${orgEvents.length}.`,
+      });
+      toast({
+        title: "Nieprawidlowy limit",
+        description: `Limit wydarzen nie moze byc mniejszy niz ${orgEvents.length}.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setOrganizationErrors({});
+    setLimitErrors({});
     setIsSavingOrganization(true);
     const result = await updateOrganization(organization.id, { name });
-    setIsSavingOrganization(false);
     if (!result.ok) {
       setOrganizationErrors({ form: result.error ?? "Nie udało się zaktualizować organizacji." });
       toast({
@@ -578,6 +670,23 @@ export default function OrganizationDetails() {
       });
       return;
     }
+    if (parsedLimit !== organization.event_limit) {
+      const limitResult = await updateOrganizationEventLimit(
+        organization.id,
+        parsedLimit,
+      );
+      if (!limitResult.ok) {
+        setIsSavingOrganization(false);
+        setLimitErrors({ form: limitResult.error ?? "Nie udalo sie zapisac limitu." });
+        toast({
+          title: "Nie udalo sie zapisac limitu",
+          description: limitResult.error ?? "Sprobuj ponownie.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    setIsSavingOrganization(false);
     setOrganizationEditOpen(false);
     setOrganizationErrors({});
     toast({ title: "Zaktualizowano organizację" });
@@ -831,12 +940,12 @@ export default function OrganizationDetails() {
         Wróć do organizacji
       </Button>
 
-      <section className="rounded-[2.25rem] border border-white/8 bg-[linear-gradient(180deg,hsl(220_11%_7%/_0.98),hsl(220_15%_5%/_0.99))] px-5 py-6 shadow-[0_32px_80px_hsl(var(--surface-shadow)/0.44),inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:px-7 sm:py-7">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <section className="rounded-[2.25rem] border border-white/8 bg-[linear-gradient(180deg,hsl(220_11%_7%/_0.98),hsl(220_15%_5%/_0.99))] px-5 py-5 shadow-[0_32px_80px_hsl(var(--surface-shadow)/0.44),inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:px-7 sm:py-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.4rem] border border-[hsl(var(--button-highlight)/0.16)] bg-[linear-gradient(180deg,hsl(var(--button-highlight)/0.1),hsl(var(--background)/0.78))] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:h-20 sm:w-20">
+                <div className="hidden h-16 w-16 shrink-0 items-center justify-center rounded-[1.4rem] border border-[hsl(var(--button-highlight)/0.16)] bg-[linear-gradient(180deg,hsl(var(--button-highlight)/0.1),hsl(var(--background)/0.78))] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:h-20 sm:w-20">
                   <Building2 className="h-8 w-8 text-[hsl(var(--button-highlight))]" />
                 </div>
                 <div className="min-w-0">
@@ -852,6 +961,7 @@ export default function OrganizationDetails() {
                         className={subtleIconButtonClassName}
                         onClick={() => {
                           setOrganizationNameDraft(organization.name);
+                          setLimitDraft(String(organization.event_limit));
                           setOrganizationEditOpen(true);
                         }}
                         aria-label="Edytuj organizację"
@@ -860,7 +970,7 @@ export default function OrganizationDetails() {
                       </Button>
                     )}
                   </div>
-                  <p className="mt-2 text-base text-muted-foreground">
+                  <p className="hidden mt-2 text-sm text-muted-foreground">
                     Szczegóły organizacji i zespołu.
                   </p>
                 </div>
@@ -880,40 +990,40 @@ export default function OrganizationDetails() {
             )}
           </div>
 
-          <Card className="overflow-hidden border-[hsl(var(--button-highlight)/0.2)] bg-[linear-gradient(180deg,hsl(220_12%_10%/_0.98),hsl(220_13%_8%/_0.98))] shadow-[0_0_0_1px_hsl(var(--button-highlight)/0.05),0_0_30px_hsl(var(--button-highlight)/0.12),0_28px_60px_hsl(var(--surface-shadow)/0.3)]">
+          <Card className="overflow-hidden border-[hsl(var(--button-highlight)/0.14)] bg-[hsl(220_13%_8%/_0.78)] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04)]">
             <CardContent
-              className={`grid gap-0 p-0 text-sm sm:grid-cols-2 ${
+              className={`grid grid-cols-1 gap-0 p-0 text-sm ${
                 canEditOrganization
                   ? "lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
                   : "lg:grid-cols-4"
               }`}
             >
-              <div className="border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-5 sm:px-6 lg:border-b-0 lg:border-r">
+              <div className="border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-4 sm:px-6 lg:border-b-0 lg:border-r">
                 <span className="text-sm text-muted-foreground">Wydarzenia</span>
-                <p className="mt-3 text-[2rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
+                <p className="mt-2 text-[1.85rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
                   {orgEvents.length}/{organization.event_limit}
                 </p>
               </div>
-              <div className="border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-5 sm:px-6 sm:border-l-0 lg:border-b-0 lg:border-r">
+              <div className="hidden border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-4 sm:px-6 sm:border-l-0 lg:border-b-0 lg:border-r">
                 <span className="text-sm text-muted-foreground">Organizatorzy</span>
-                <p className="mt-3 text-[2rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
+                <p className="mt-2 text-[1.85rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
                   {organizers.length}
                 </p>
               </div>
-              <div className="border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-5 sm:px-6 lg:border-b-0 lg:border-r">
+              <div className="hidden border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-4 sm:px-6 lg:border-b-0 lg:border-r">
                 <span className="text-sm text-muted-foreground">Operatorzy</span>
-                <p className="mt-3 text-[2rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
+                <p className="mt-2 text-[1.85rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
                   {scanners.length}
                 </p>
               </div>
-              <div className="px-5 py-5 sm:px-6 lg:border-r lg:border-[hsl(var(--button-highlight)/0.12)]">
+              <div className="hidden px-5 py-4 sm:px-6 lg:border-r lg:border-[hsl(var(--button-highlight)/0.12)]">
                 <span className="text-sm text-muted-foreground">Administratorzy</span>
-                <p className="mt-3 break-words text-lg font-semibold tracking-[-0.02em] text-foreground">
+                <p className="mt-2 break-words text-lg font-semibold tracking-[-0.02em] text-foreground">
                   {adminLabel}
                 </p>
               </div>
               {canEditOrganization && (
-                <div className="flex items-end justify-end px-5 py-5 sm:px-6">
+                <div className="hidden items-end justify-end px-5 py-4 sm:px-6">
                   <Button
                     type="button"
                     variant="ghost"
@@ -932,13 +1042,8 @@ export default function OrganizationDetails() {
       </section>
 
       <section className={sectionClassName}>
-        <div className="flex flex-col gap-4">
+        <CollapsibleOrganizationSection title="Administratorzy">
           <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-[1.9rem] font-semibold tracking-[-0.03em] text-foreground">
-                Administratorzy
-              </h2>
-            </div>
             {canManageAdmins && (
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
@@ -1016,29 +1121,30 @@ export default function OrganizationDetails() {
               </Table>
             </div>
           )}
-        </div>
+        </CollapsibleOrganizationSection>
       </section>
 
       <section className={sectionClassName}>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-[1.9rem] font-semibold tracking-[-0.03em] text-foreground">
-                Wydarzenia
-              </h2>
-            </div>
-            {canCreateEvent && (
+        <CollapsibleOrganizationSection
+          title="Wydarzenia"
+          defaultOpen
+          action={
+            canCreateEvent ? (
               <Button
+                size="sm"
+                variant="outline"
                 onClick={() => setEventDialogOpen(true)}
-                className={primaryWideButtonClassName}
+                className="h-9 rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)]"
                 disabled={remainingSlots <= 0}
               >
-                <Plus className="mr-1 h-4 w-4" />
+                <Plus className="mr-1 h-3.5 w-3.5" />
                 Dodaj wydarzenie
               </Button>
-            )}
-          </div>
-        {orgEvents.length === 0 ? (
+            ) : null
+          }
+        >
+          <div className="flex flex-col gap-4">
+            {orgEvents.length === 0 ? (
           <EmptyTableState
             title="Brak wydarzeń"
             description="Po dodaniu wydarzeń pojawi się tutaj ich lista."
@@ -1098,29 +1204,24 @@ export default function OrganizationDetails() {
                 </TableBody>
               </Table>
             </div>
-        )}
-        </div>
+            )}
+          </div>
+        </CollapsibleOrganizationSection>
       </section>
 
       <section className={sectionClassName}>
-        <div className="flex flex-col gap-4">
+        <CollapsibleOrganizationSection title="Organizatorzy">
           <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-[1.9rem] font-semibold tracking-[-0.03em] text-foreground">
-                Organizatorzy
-              </h2>
-            </div>
             {canManageMembers && (
               <Button
                 onClick={() => openMemberDialog("editor")}
-                className={primaryWideButtonClassName}
+                className={sectionPrimaryButtonClassName}
               >
                 <Plus className="mr-1 h-4 w-4" />
                 Dodaj organizatora
               </Button>
             )}
-          </div>
-        {organizers.length === 0 ? (
+            {organizers.length === 0 ? (
           <EmptyTableState
             title="Brak organizatorów"
             description="Po dodaniu organizatorów pojawi się tutaj ich lista."
@@ -1184,23 +1285,19 @@ export default function OrganizationDetails() {
                 </TableBody>
               </Table>
             </div>
-        )}
-        </div>
+            )}
+          </div>
+        </CollapsibleOrganizationSection>
       </section>
 
       <section className={sectionClassName}>
-        <div className="flex flex-col gap-4">
+        <CollapsibleOrganizationSection title="Operatorzy">
           <div className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-[1.9rem] font-semibold tracking-[-0.03em] text-foreground">
-                Operatorzy
-              </h2>
-            </div>
             {canManageScanners && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <Button
                   onClick={() => openMemberDialog("scanner")}
-                  className={primaryWideButtonClassName}
+                  className={sectionPrimaryButtonClassName}
                 >
                   <Plus className="mr-1 h-4 w-4" />
                   Dodaj operatora
@@ -1208,15 +1305,14 @@ export default function OrganizationDetails() {
                 <Button
                   variant="outline"
                   onClick={() => openMemberDialog("scanner_plus")}
-                  className={secondaryWideButtonClassName}
+                  className={sectionSecondaryButtonClassName}
                 >
                   <Plus className="mr-1 h-4 w-4" />
                   Dodaj Operator Plus
                 </Button>
               </div>
             )}
-          </div>
-        {scanners.length === 0 ? (
+            {scanners.length === 0 ? (
           <EmptyTableState
             title="Brak operatorów"
             description="Po dodaniu operatorów pojawi się tutaj ich lista."
@@ -1343,20 +1439,25 @@ export default function OrganizationDetails() {
                 </TableBody>
               </Table>
             </div>
-        )}
-        </div>
+            )}
+          </div>
+        </CollapsibleOrganizationSection>
       </section>
 
       <section className="rounded-[1.9rem] border border-[hsl(var(--button-highlight)/0.3)] bg-[linear-gradient(180deg,hsl(var(--button-highlight)/0.12),hsl(var(--background)/0.82))] px-5 py-5 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:px-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
+        <CollapsibleOrganizationSection title="Archiwum wydarzeĹ„">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[hsl(var(--button-highlight)/0.22)] bg-[hsl(var(--background)/0.48)]">
                 <Archive className="h-4 w-4 text-[hsl(var(--button-highlight))]" />
               </div>
-              <h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">
+              <p className="hidden text-sm text-muted-foreground">
                 Archiwum wydarzeń
-              </h2>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Przegladaj zakonczone wydarzenia tej organizacji w osobnym widoku.
+              </p>
             </div>
           </div>
           <Button
@@ -1366,14 +1467,19 @@ export default function OrganizationDetails() {
           >
             Otwórz archiwum
           </Button>
-        </div>
+          </div>
+        </CollapsibleOrganizationSection>
       </section>
 
       <Dialog
         open={organizationEditOpen}
         onOpenChange={(open) => {
           setOrganizationEditOpen(open);
-          if (!open) setOrganizationErrors({});
+          if (!open) {
+            setOrganizationErrors({});
+            setLimitErrors({});
+            setLimitDraft("");
+          }
         }}
       >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
@@ -1407,8 +1513,42 @@ export default function OrganizationDetails() {
                 {organizationErrors.name}
               </FieldError>
             </div>
+            <div>
+              <Label htmlFor="organization-edit-limit">Limit wydarzen</Label>
+              <Input
+                id="organization-edit-limit"
+                type="number"
+                min={String(orgEvents.length)}
+                value={limitDraft || String(organization.event_limit)}
+                onChange={(event) => {
+                  setLimitDraft(event.target.value);
+                  setLimitErrors((prev) => ({
+                    ...prev,
+                    event_limit: undefined,
+                    form: undefined,
+                  }));
+                }}
+                className="mt-2"
+                required
+                aria-invalid={Boolean(limitErrors.event_limit)}
+                aria-describedby={
+                  limitErrors.event_limit
+                    ? "organization-edit-limit-error"
+                    : undefined
+                }
+              />
+              <FieldError id="organization-edit-limit-error" className="mt-2">
+                {limitErrors.event_limit}
+              </FieldError>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Minimalny limit to {orgEvents.length}, bo tyle wydarzen jest juz przypisanych.
+              </p>
+            </div>
             <FieldError id="organization-edit-form-error">
               {organizationErrors.form}
+            </FieldError>
+            <FieldError id="organization-edit-limit-form-error">
+              {limitErrors.form}
             </FieldError>
           </div>
           <DialogFooter>
