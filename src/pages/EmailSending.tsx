@@ -65,23 +65,23 @@ export default function EmailSending() {
     try {
       const result = await sendEventQrEmails(selectedEventId, resendAll);
       if (!result.ok) {
-        toast({ title: 'Nie udalo sie wyslac kodow QR', description: result.error, variant: 'destructive' });
+        toast({ title: 'Nie udało się wysłać kodów QR', description: result.error, variant: 'destructive' });
         return;
       }
 
       setLastErrors(result.errors.map(error => ({ participant_name: error.participant_name, error: error.error })));
       if (result.error_count > 0) {
         toast({
-          title: 'Wysylka zakonczona czesciowo',
-          description: `Wyslano ${result.sent_count}, bledow: ${result.error_count}.`,
+          title: 'Wysyłka zakończona częściowo',
+          description: `Wysłano ${result.sent_count}, błędów: ${result.error_count}.`,
           variant: 'destructive',
         });
         return;
       }
 
       toast({
-        title: resendAll ? 'Ponownie wyslano kody QR' : 'Wyslano kody QR',
-        description: `Lacznie wyslano ${result.sent_count} wiadomosci.`,
+        title: resendAll ? 'Ponownie wysłano kody QR' : 'Wysłano kody QR',
+        description: `Łącznie wysłano ${result.sent_count} wiadomości.`,
       });
     } finally {
       setSendingAll(false);
@@ -95,11 +95,11 @@ export default function EmailSending() {
     try {
       const result = await sendParticipantQrEmail(participantId);
       if (!result.ok) {
-        toast({ title: 'Nie udalo sie wyslac maila', description: result.error, variant: 'destructive' });
+        toast({ title: 'Nie udało się wysłać maila', description: result.error, variant: 'destructive' });
         return;
       }
 
-      toast({ title: 'Mail wyslany', description: participantName });
+      toast({ title: 'Mail wysłany', description: participantName });
     } finally {
       setSendingParticipantId(null);
     }
@@ -108,14 +108,14 @@ export default function EmailSending() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Wysylka kodow QR</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Wysyłka kodów QR</h1>
         <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-          {selectedEvent ? `Wydarzenie: ${selectedEvent.name}` : 'Wyslij kody QR dla wybranego wydarzenia.'}
+          {selectedEvent ? `Wydarzenie: ${selectedEvent.name}` : 'Wyślij kody QR dla wybranego wydarzenia.'}
         </p>
       </div>
 
       {!isOnline && (
-        <OnlineOnlyNotice description="Wysylka i ponowne wysylanie kodow QR wymagaja aktywnego polaczenia z serwerem. W trybie offline widoczny jest tylko stan z ostatniej synchronizacji." />
+        <OnlineOnlyNotice description="Wysyłka i ponowne wysyłanie kodów QR wymagają aktywnego połączenia z serwerem. W trybie offline widoczny jest tylko stan z ostatniej synchronizacji." />
       )}
 
       <Card className="border-primary/20 bg-primary/5">
@@ -123,8 +123,8 @@ export default function EmailSending() {
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <div className="space-y-1 text-xs text-muted-foreground">
-              <p>"Wyslij brakujace" wysle wiadomosci tylko do uczestnikow bez statusu wysylki.</p>
-              <p>"Wyslij ponownie wszystkim" wymusi resend dla calego wydarzenia.</p>
+              <p>"Wyślij brakujące" wyśle wiadomości tylko do uczestników bez statusu wysyłki.</p>
+              <p>"Wyślij ponownie wszystkim" wymusi ponowną wysyłkę dla całego wydarzenia.</p>
             </div>
           </div>
         </CardContent>
@@ -132,32 +132,32 @@ export default function EmailSending() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base">Status wysylki</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Status wysyłki</CardTitle></CardHeader>
           <CardContent>
             <div className="text-3xl font-bold tabular-nums">{sent}/{eventParticipants.length}</div>
-            <p className="mt-1 text-sm text-muted-foreground">uczestnikow ma juz mail z QR</p>
+            <p className="mt-1 text-sm text-muted-foreground">uczestników ma już mail z QR</p>
             <div className="mt-3 h-2 rounded-full bg-muted">
               <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${eventParticipants.length ? (sent / eventParticipants.length) * 100 : 0}%` }} />
             </div>
             <div className="mt-4 grid gap-2">
               <Button className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || pending === 0 || !isOnline}>
                 {sendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />}
-                {pending === 0 ? 'Brak zaleglych wiadomosci' : `Wyslij brakujace (${pending})`}
+                {pending === 0 ? 'Brak zaległych wiadomości' : `Wyślij brakujące (${pending})`}
               </Button>
               <Button variant="outline" className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'resend-all', count: eventParticipants.length })} disabled={resendingAll || eventParticipants.length === 0 || !isOnline}>
                 {resendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
-                Wyslij ponownie wszystkim
+                Wyślij ponownie wszystkim
               </Button>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base">Ostatnie bledy</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Ostatnie błędy</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {lastErrors.length === 0 ? (
               <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                Brak bledow z ostatniej operacji.
+                Brak błędów z ostatniej operacji.
               </div>
             ) : (
               lastErrors.slice(0, 4).map(error => (
@@ -177,12 +177,12 @@ export default function EmailSending() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Lista uczestnikow</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Lista uczestników</CardTitle></CardHeader>
         <CardContent className="-mx-6 overflow-x-auto px-6">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Imie</TableHead>
+                <TableHead>Imię</TableHead>
                 <TableHead className="hidden md:table-cell">Email</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Akcja</TableHead>
@@ -201,7 +201,7 @@ export default function EmailSending() {
                   <TableCell>
                     <Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'} className="gap-1 text-[10px]">
                       {participant.email_status === 'sent'
-                        ? <><CheckCircle className="h-3 w-3" /> Wyslany</>
+                        ? <><CheckCircle className="h-3 w-3" /> Wysłany</>
                         : <><Mail className="h-3 w-3" /> Oczekuje</>}
                     </Badge>
                   </TableCell>
@@ -218,7 +218,7 @@ export default function EmailSending() {
                         participantEmail: participant.email,
                       })}
                     >
-                      {sendingParticipantId === participant.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Wyslij ponownie'}
+                      {sendingParticipantId === participant.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Wyślij ponownie'}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -231,13 +231,13 @@ export default function EmailSending() {
       <AlertDialog open={pendingAction !== null} onOpenChange={open => !open && setPendingAction(null)}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Potwierdz wysylke maili z kodem QR</AlertDialogTitle>
+            <AlertDialogTitle>Potwierdź wysyłkę maili z kodem QR</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingAction?.kind === 'send-one'
-                ? <>Do uczestnika <span className="font-medium text-foreground">{pendingAction.participantName}</span> zostanie wyslany mail na adres <span className="font-medium text-foreground">{pendingAction.participantEmail}</span>.</>
+                ? <>Do uczestnika <span className="font-medium text-foreground">{pendingAction.participantName}</span> zostanie wysłany mail na adres <span className="font-medium text-foreground">{pendingAction.participantEmail}</span>.</>
                 : pendingAction?.kind === 'resend-all'
-                  ? <>Ta operacja ponownie wysle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestnikow wydarzenia.</>
-                  : <>Ta operacja wysle brakujace maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestnikow wydarzenia.</>}
+                  ? <>Ta operacja ponownie wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestników wydarzenia.</>
+                  : <>Ta operacja wyśle brakujące maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia.</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -258,7 +258,7 @@ export default function EmailSending() {
               disabled={isConfirmingAction || !isOnline}
             >
               {isConfirmingAction && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-              Wyslij mail
+              Wyślij mail
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -5,7 +5,7 @@ interface OnlineOnlyNoticeProps {
 }
 
 export function OnlineOnlyNotice({
-  title = 'Operacje administracyjne sa tymczasowo niedostepne',
+  title = 'Operacje administracyjne są tymczasowo niedostępne',
   description,
   className = '',
 }: OnlineOnlyNoticeProps) {

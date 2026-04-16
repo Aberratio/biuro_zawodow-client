@@ -77,16 +77,16 @@ export default function Dashboard() {
 
     const activeDescription =
       currentRole === 'editor'
-        ? 'Wydarzenia Twojej organizacji, ktore sa aktualnie w trakcie odprawy.'
-        : 'Wydarzenia, ktore sa aktualnie w trakcie odprawy.';
+        ? 'Wydarzenia Twojej organizacji, które są aktualnie w trakcie odprawy.'
+        : 'Wydarzenia, które są aktualnie w trakcie odprawy.';
     const activeEmptyDescription =
       currentRole === 'editor'
-        ? 'Gdy biuro zawodow bedzie otwarte dla wydarzenia z Twojej organizacji, pojawi sie tutaj z szybkim wejsciem i statystyka odpraw.'
-        : 'Gdy biuro zawodow bedzie otwarte dla ktoregos wydarzenia, pojawi sie tutaj z szybkim wejsciem i statystyka odpraw.';
+        ? 'Gdy biuro zawodów będzie otwarte dla wydarzenia z Twojej organizacji, pojawi się tutaj z szybkim wejściem i statystyką odpraw.'
+        : 'Gdy biuro zawodów będzie otwarte dla któregoś wydarzenia, pojawi się tutaj z szybkim wejściem i statystyką odpraw.';
     const upcomingEmptyDescription =
       currentRole === 'editor'
-        ? 'Po dodaniu kolejnych wydarzen w Twojej organizacji zobaczysz je tutaj.'
-        : 'Po dodaniu kolejnych zawodow zobaczysz tutaj ich uporzadkowana liste.';
+        ? 'Po dodaniu kolejnych wydarzeń w Twojej organizacji zobaczysz je tutaj.'
+        : 'Po dodaniu kolejnych zawodów zobaczysz tutaj ich uporządkowaną listę.';
 
     return (
       <div className="space-y-6 lg:space-y-8">
@@ -99,7 +99,7 @@ export default function Dashboard() {
         <section className="space-y-4">
           <div className="space-y-1.5">
             <h2 className="text-[1.25rem] font-semibold tracking-[-0.03em] text-[hsl(var(--button-highlight))] sm:text-[1.55rem]">
-              Biuro zawodow otwarte teraz
+              Biuro zawodów otwarte teraz
             </h2>
             <p className="max-w-2xl text-[0.92rem] leading-6 text-muted-foreground sm:text-[0.98rem] sm:leading-7">
               {activeDescription}
@@ -108,7 +108,7 @@ export default function Dashboard() {
 
           {activeEvents.length === 0 ? (
             <EmptyState
-              title="Brak aktywnych wydarzen"
+              title="Brak aktywnych wydarzeń"
               description={activeEmptyDescription}
             />
           ) : (
@@ -138,7 +138,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between gap-4">
               <div className="space-y-1">
                 <CardTitle className="text-[1.18rem] font-semibold tracking-[-0.03em] text-foreground sm:text-[1.3rem]">
-                  Nadchodzace wydarzenia
+                  Nadchodzące wydarzenia
                 </CardTitle>
               </div>
             </div>
@@ -147,7 +147,7 @@ export default function Dashboard() {
             {upcomingEvents.length === 0 ? (
               <div className="p-5 sm:p-6">
                 <EmptyState
-                  title="Brak nadchodzacych wydarzen"
+                  title="Brak nadchodzących wydarzeń"
                   description={upcomingEmptyDescription}
                   compact
                 />
@@ -192,7 +192,7 @@ export default function Dashboard() {
       {currentEvent && !currentEventOfficeOpen && (
         <Card className="border-dashed border-[hsl(var(--primary)/0.22)] bg-[hsl(var(--accent)/0.35)]">
           <CardContent className="py-4 text-sm leading-7 text-muted-foreground">
-            Skaner jest dostepny tylko w godzinach otwarcia biura zawodow dla wybranego wydarzenia.
+            Skaner jest dostępny tylko w godzinach otwarcia biura zawodów dla wybranego wydarzenia.
           </CardContent>
         </Card>
       )}
@@ -204,7 +204,7 @@ export default function Dashboard() {
           onClick={() => navigate('/scanner')}
         >
           <ScanLine className="h-5 w-5 sm:h-6 sm:w-6" />
-          Przejdz do skanera
+          Przejdź do skanera
         </Button>
       )}
 
@@ -232,8 +232,8 @@ export default function Dashboard() {
           {activityLog.filter((log) => log.action === 'Check-in').length === 0 && (
             <p className="py-6 text-center text-sm leading-7 text-muted-foreground">
               {currentEventOfficeOpen
-                ? 'Brak skanow - przejdz do skanera, aby rozpoczac odprawe'
-                : 'Brak skanow dla aktualnego zakresu.'}
+                ? 'Brak skanów. Przejdź do skanera, aby rozpocząć odprawę.'
+                : 'Brak skanów dla aktualnego zakresu.'}
             </p>
           )}
         </CardContent>
@@ -309,7 +309,7 @@ function ActiveEventCard({
 
         <div className="flex justify-end">
           <Button className="h-10 rounded-[0.95rem] border-[hsl(var(--button-highlight)/0.3)] px-[1.125rem] text-[0.9rem] font-semibold text-[hsl(39_28%_96%)] shadow-[0_12px_28px_hsl(var(--surface-shadow)/0.34),inset_0_1px_0_hsl(var(--foreground)/0.08)]" onClick={onOpen}>
-            Otworz wydarzenie
+            Otwórz wydarzenie
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>

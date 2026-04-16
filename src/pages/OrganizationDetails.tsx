@@ -736,7 +736,7 @@ export default function OrganizationDetails() {
       prev && prev.id === scanner.id ? { ...prev, role } : prev,
     );
     toast({
-      title: role === "scanner" ? "Zmieniono rolę na Operator" : "Zmieniono rolę na Operator Plus",
+      title: role === "scanner" ? "Zmieniono rolę na operatora" : "Zmieniono rolę na operatora Plus",
       description: scanner.name,
     });
   };
@@ -1819,8 +1819,8 @@ export default function OrganizationDetails() {
                   disabled={isChangingScannerRole || isSavingScanner}
                 >
                   {selectedScanner.role === "scanner"
-                    ? "Zmien na Operator Plus"
-                    : "Zmien na Operator"}
+                    ? "Zmień na Operator Plus"
+                    : "Zmień na Operator"}
                 </Button>
               </div>
             )}
@@ -1829,7 +1829,7 @@ export default function OrganizationDetails() {
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Konto operatora</p>
                   <p className="text-xs text-muted-foreground">
-                    Reset hasla i usuniecie konta sa dostepne w tym oknie.
+                    Reset hasła i usunięcie konta są dostępne w tym oknie.
                   </p>
                 </div>
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -1840,7 +1840,7 @@ export default function OrganizationDetails() {
                     disabled={isSavingScanner || isChangingScannerRole}
                   >
                     <KeyRound className="mr-1 h-4 w-4" />
-                    Reset hasla
+                    Reset hasła
                   </Button>
                   <Button
                     variant="destructive"
@@ -1849,7 +1849,7 @@ export default function OrganizationDetails() {
                     disabled={isSavingScanner || isChangingScannerRole}
                   >
                     <Trash2 className="mr-1 h-4 w-4" />
-                    Usun konto
+                    Usuń konto
                   </Button>
                 </div>
               </div>

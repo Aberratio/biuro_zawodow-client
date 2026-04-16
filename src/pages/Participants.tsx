@@ -198,7 +198,7 @@ export default function Participants() {
       </div>
 
       {!isOnline && !isScannerRole(currentRole) && (
-        <OnlineOnlyNotice description="Import CSV i reczne dodawanie uczestnikow sa dostepne tylko po polaczeniu z serwerem. Lista pozostaje dostepna do odczytu z lokalnego snapshotu." />
+        <OnlineOnlyNotice description="Import CSV i ręczne dodawanie uczestników są dostępne tylko po połączeniu z serwerem. Lista pozostaje dostępna do odczytu z lokalnego snapshotu." />
       )}
 
       <div className="flex flex-col gap-3">

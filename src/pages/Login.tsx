@@ -39,7 +39,7 @@ function LoginFooter({
         >
           webcodesign.pl
         </a>
-        . Strona jest czescia aplikacji{" "}
+        . Strona jest częścią aplikacji{" "}
         <a
           href="https://zmierzymyczas.pl"
           target="_blank"
@@ -48,8 +48,8 @@ function LoginFooter({
         >
           zmierzymyczas.pl
         </a>
-        , gdzie znajduja sie wszystkie informacje oraz kontakt z
-        wlascicielami.
+        , gdzie znajdują się wszystkie informacje oraz kontakt z
+        właścicielami.
       </p>
     </footer>
   );
@@ -91,7 +91,7 @@ export default function Login() {
     event.preventDefault();
     const nextErrors = {
       email: validateEmail(email),
-      password: validateRequired(password, "Podaj haslo."),
+      password: validateRequired(password, "Podaj hasło."),
     };
 
     if (nextErrors.email || nextErrors.password) {
@@ -105,10 +105,10 @@ export default function Login() {
     try {
       const ok = await login(email, password);
       if (!ok) {
-        setErrors({ form: "Nieprawidlowy email lub haslo." });
+        setErrors({ form: "Nieprawidłowy e-mail lub hasło." });
         toast({
-          title: "Blad logowania",
-          description: "Nieprawidlowy email lub haslo.",
+          title: "Błąd logowania",
+          description: "Nieprawidłowy e-mail lub hasło.",
           variant: "destructive",
         });
       }
@@ -185,7 +185,7 @@ export default function Login() {
                   htmlFor="login-mobile-password"
                   className="text-[0.9rem] font-semibold uppercase tracking-[0.24em] text-foreground/65"
                 >
-                  Haslo
+                  Hasło
                 </Label>
                 <div
                   className={cn(
@@ -215,7 +215,7 @@ export default function Login() {
                     }
                     className="text-foreground/46 transition-colors hover:text-foreground/78"
                     aria-label={
-                      showMobilePassword ? "Ukryj haslo" : "Pokaz haslo"
+                      showMobilePassword ? "Ukryj hasło" : "Pokaż hasło"
                     }
                   >
                     {showMobilePassword ? (
@@ -238,7 +238,7 @@ export default function Login() {
                 className="mt-2 h-16 w-full rounded-[1.35rem] border-[hsl(var(--button-highlight)/0.86)] bg-[linear-gradient(180deg,hsl(40_40%_44%)_0%,hsl(39_29%_31%)_48%,hsl(38_24%_22%)_100%)] text-[1.12rem] font-semibold shadow-[inset_0_1px_0_hsl(var(--foreground)/0.14),0_0_0_1px_hsl(var(--button-highlight)/0.12),0_12px_24px_hsl(var(--surface-shadow)/0.28)] hover:bg-[linear-gradient(180deg,hsl(40_42%_47%)_0%,hsl(39_30%_33%)_48%,hsl(38_25%_24%)_100%)] hover:translate-y-0"
                 disabled={isSubmitting}
               >
-                Zaloguj
+                Zaloguj się
               </Button>
 
               <div className="flex justify-end pt-1">
@@ -246,7 +246,7 @@ export default function Login() {
                   to="/forgot-password"
                   className="text-[1rem] font-medium text-foreground/88 transition-colors underline-offset-4 hover:text-[hsl(var(--button-highlight))] hover:underline"
                 >
-                  Zapomniales hasla?
+                  Zapomniałeś hasła?
                 </Link>
               </div>
             </form>
@@ -316,7 +316,7 @@ export default function Login() {
                       htmlFor="login-desktop-password"
                       className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/65"
                     >
-                      Haslo
+                      Hasło
                     </Label>
                     <Input
                       id="login-desktop-password"
@@ -351,7 +351,7 @@ export default function Login() {
                     className="h-12 w-full rounded-2xl text-sm"
                     disabled={isSubmitting}
                   >
-                    Zaloguj
+                    Zaloguj się
                   </Button>
 
                   <div className="flex justify-end">
@@ -359,7 +359,7 @@ export default function Login() {
                       to="/forgot-password"
                       className="text-sm font-medium text-foreground/72 transition-colors underline-offset-4 hover:text-[hsl(var(--button-highlight))] hover:underline"
                     >
-                      Zapomniales hasla?
+                      Zapomniałeś hasła?
                     </Link>
                   </div>
                 </form>

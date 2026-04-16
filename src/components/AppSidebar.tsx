@@ -105,7 +105,7 @@ const allItems = [
     roles: ["editor", "admin", "superadmin"] as Role[],
   },
   {
-    title: "Wysylka QR",
+    title: "Wysyłka QR",
     url: "/emails",
     icon: Mail,
     roles: ["editor", "admin", "superadmin"] as Role[],
@@ -233,7 +233,7 @@ export function AppSidebar() {
         onValueChange={handleOrganizationChange}
       >
         <SelectTrigger className={workspaceSelectTriggerClassName}>
-          <SelectValue placeholder="Wybierz organizacje" />
+          <SelectValue placeholder="Wybierz organizację" />
         </SelectTrigger>
         <SelectContent>
           {adminOrganizations.map((organization) => (
@@ -256,7 +256,7 @@ export function AppSidebar() {
     </div>
   ) : (
     <div className={workspaceInfoCardClassName}>
-      Brak przypisanych organizacji w tym kontekscie.
+      Brak przypisanych organizacji w tym kontekście.
     </div>
   );
   const eventWorkspaceCard = (
@@ -266,7 +266,7 @@ export function AppSidebar() {
       </p>
       {scopedVisibleEvents.length === 0 ? (
         <div className={workspaceInfoCardClassName}>
-          Do tej organizacji nie dodano jeszcze wydarzen. Dodaj je w zakladce
+          Do tej organizacji nie dodano jeszcze wydarzeń. Dodaj je w zakładce
           Wydarzenia.
         </div>
       ) : showEventSelectControl ? (
@@ -292,7 +292,7 @@ export function AppSidebar() {
         </div>
       ) : (
         <div className="mt-2 rounded-[0.85rem] bg-[hsl(220_7%_11%/0.72)] px-4 py-3.5 text-xs leading-5 text-sidebar-foreground/66">
-          Brak dostepnych wydarzen w tym kontekscie.
+          Brak dostępnych wydarzeń w tym kontekście.
         </div>
       )}
 
@@ -308,7 +308,7 @@ export function AppSidebar() {
                   activeClassName={workspaceNavItemActiveClassName}
                 >
                   <CalendarDays className="mr-2 h-4 w-4 shrink-0" />
-                  <span>Szczegoly</span>
+                  <span>Szczegóły</span>
                 </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -364,7 +364,7 @@ export function AppSidebar() {
               type="button"
               onClick={handleLogoClick}
               className="block w-full cursor-pointer rounded-[0.95rem] border-0 bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-              aria-label="Przejdz do strony glownej"
+              aria-label="Przejdź do strony głównej"
             >
               {collapsed ? (
                 <BrandLogo

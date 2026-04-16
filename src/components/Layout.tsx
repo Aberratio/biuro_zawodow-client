@@ -41,7 +41,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
               type="button"
               onClick={() => navigate("/")}
               className="pointer-events-auto shrink-0 rounded-[0.95rem] border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              aria-label="Przejdz do strony glownej"
+              aria-label="Przejdź do strony głównej"
             >
               <BrandWordmark
                 className="shrink-0"

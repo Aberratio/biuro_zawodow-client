@@ -52,8 +52,8 @@ function getOfficeStatusSummary(eventOffice: { office_open_at: string; office_cl
     return {
       tone: 'closed',
       badgeLabel: 'Brak godzin',
-      headline: 'Godziny pracy biura nie sÄ… ustawione poprawnie.',
-      detail: 'UzupeĹ‚nij datÄ™ i godzinÄ™ otwarcia oraz zamkniÄ™cia, aby zespĂłĹ‚ wiedziaĹ‚, kiedy obsĹ‚ugiwaÄ‡ uczestnikĂłw.',
+      headline: 'Godziny pracy biura nie są ustawione poprawnie.',
+      detail: 'Uzupełnij datę i godzinę otwarcia oraz zamknięcia, aby zespół wiedział, kiedy obsługiwać uczestników.',
       timingLabel: 'Zakres',
       timingValue: 'Brak danych',
     };
@@ -64,8 +64,8 @@ function getOfficeStatusSummary(eventOffice: { office_open_at: string; office_cl
       tone: 'open',
       badgeLabel: 'Biuro otwarte',
       headline: `Biuro pracuje jeszcze przez ${formatDistanceToNowStrict(closeAt, { addSuffix: false, locale: pl })}.`,
-      detail: `Uczestnicy mogÄ… byÄ‡ teraz odprawiani. Biuro zamyka siÄ™ ${formatEventOfficeEnd(eventOffice)}.`,
-      timingLabel: 'ZamkniÄ™cie',
+      detail: `Uczestnicy mogą być teraz odprawiani. Biuro zamyka się ${formatEventOfficeEnd(eventOffice)}.`,
+      timingLabel: 'Zamknięcie',
       timingValue: formatEventOfficeEnd(eventOffice),
     };
   }
@@ -74,8 +74,8 @@ function getOfficeStatusSummary(eventOffice: { office_open_at: string; office_cl
     return {
       tone: 'upcoming',
       badgeLabel: 'Biuro przed otwarciem',
-      headline: `Biuro otworzy siÄ™ za ${formatDistanceToNowStrict(openAt, { addSuffix: false, locale: pl })}.`,
-      detail: `ZespĂłĹ‚ zacznie pracÄ™ ${formatEventOfficeStart(eventOffice)}. Do tego czasu operatorzy nie zobaczÄ… aktywnego wydarzenia.`,
+      headline: `Biuro otworzy się za ${formatDistanceToNowStrict(openAt, { addSuffix: false, locale: pl })}.`,
+      detail: `Zespół zacznie pracę ${formatEventOfficeStart(eventOffice)}. Do tego czasu operatorzy nie zobaczą aktywnego wydarzenia.`,
       timingLabel: 'Otwarcie',
       timingValue: formatEventOfficeStart(eventOffice),
     };
@@ -83,10 +83,10 @@ function getOfficeStatusSummary(eventOffice: { office_open_at: string; office_cl
 
   return {
     tone: 'closed',
-    badgeLabel: 'Biuro zamkniÄ™te',
-    headline: `Biuro zakoĹ„czyĹ‚o pracÄ™ ${formatDistanceToNowStrict(closeAt, { addSuffix: true, locale: pl })}.`,
-    detail: 'Odprawa dla tego wydarzenia zostaĹ‚a juĹĽ zamkniÄ™ta. Nadal moĹĽesz sprawdziÄ‡ dane, eksporty i skĹ‚ad zespoĹ‚u.',
-    timingLabel: 'ZamkniÄ™cie',
+    badgeLabel: 'Biuro zamknięte',
+    headline: `Biuro zakończyło pracę ${formatDistanceToNowStrict(closeAt, { addSuffix: true, locale: pl })}.`,
+    detail: 'Odprawa dla tego wydarzenia została już zamknięta. Nadal możesz sprawdzić dane, eksporty i skład zespołu.',
+    timingLabel: 'Zamknięcie',
     timingValue: formatEventOfficeEnd(eventOffice),
   };
 }
@@ -350,8 +350,8 @@ export default function EventDetails() {
         const result = await assignScannerEvents(scanner.id, nextAssignedEvents);
         if (!result.ok) {
           toast({
-            title: 'Nie udaĹ‚o siÄ™ zapisaÄ‡ przypisaĹ„ operatorĂłw',
-            description: result.error ?? `Nie udaĹ‚o siÄ™ zaktualizowaÄ‡ operatora ${scanner.name}.`,
+            title: 'Nie udało się zapisać przypisań operatorów',
+            description: result.error ?? `Nie udało się zaktualizować operatora ${scanner.name}.`,
             variant: 'destructive',
           });
           return;
@@ -359,7 +359,7 @@ export default function EventDetails() {
       }
 
       setScannerDialogOpen(false);
-      toast({ title: 'Zapisano przypisania operatorĂłw' });
+      toast({ title: 'Zapisano przypisania operatorów' });
     } finally {
       setScannerSaving(false);
     }
@@ -367,7 +367,7 @@ export default function EventDetails() {
 
   const handleManualSubmit = async () => {
     const fieldErrors = activeMappings.reduce<Record<string, string>>((accumulator, mapping) => {
-      const error = validateRequired(manualFields[mapping.alias] ?? '', `UzupeĹ‚nij pole: ${mapping.alias}.`);
+      const error = validateRequired(manualFields[mapping.alias] ?? '', `Uzupełnij pole: ${mapping.alias}.`);
       if (error) accumulator[mapping.alias] = error;
       return accumulator;
     }, {});
@@ -387,9 +387,9 @@ export default function EventDetails() {
     setManualSaving(false);
 
     if (!result.ok) {
-      setManualErrors({ fields: {}, form: result.error ?? 'Nie udaĹ‚o siÄ™ dodaÄ‡ uczestnika.' });
+      setManualErrors({ fields: {}, form: result.error ?? 'Nie udało się dodać uczestnika.' });
       toast({
-        title: 'Nie udaĹ‚o siÄ™ dodaÄ‡ uczestnika',
+        title: 'Nie udało się dodać uczestnika',
         description: result.error,
         variant: 'destructive',
       });
@@ -400,17 +400,17 @@ export default function EventDetails() {
     setManualEmail('');
     setManualFields(buildEmptyParticipantFieldValues(mappings));
     setManualErrors({ fields: {} });
-    toast({ title: 'Dodano uczestnika rÄ™cznie' });
+    toast({ title: 'Dodano uczestnika ręcznie' });
   };
 
   const handleEditSubmit = async () => {
     const submittedOfficeOpenAt = isFinishedEvent ? event.office_open_at : editForm.office_open_at;
     const submittedOfficeCloseAt = isFinishedEvent ? event.office_close_at : editForm.office_close_at;
     const nextErrors = {
-      name: validateRequired(editForm.name, 'Podaj nazwÄ™ wydarzenia.'),
-      location: validateRequired(editForm.location, 'Podaj lokalizacjÄ™ wydarzenia.'),
-      office_open_at: validateRequired(submittedOfficeOpenAt, 'Podaj datÄ™ i godzinÄ™ otwarcia biura.'),
-      office_close_at: validateRequired(submittedOfficeCloseAt, 'Podaj datÄ™ i godzinÄ™ zamkniÄ™cia biura.'),
+      name: validateRequired(editForm.name, 'Podaj nazwę wydarzenia.'),
+      location: validateRequired(editForm.location, 'Podaj lokalizację wydarzenia.'),
+      office_open_at: validateRequired(submittedOfficeOpenAt, 'Podaj datę i godzinę otwarcia biura.'),
+      office_close_at: validateRequired(submittedOfficeCloseAt, 'Podaj datę i godzinę zamknięcia biura.'),
     };
 
     if (nextErrors.name || nextErrors.location || nextErrors.office_open_at || nextErrors.office_close_at) {
@@ -419,10 +419,10 @@ export default function EventDetails() {
     }
 
     if (!submittedOfficeOpenAt || !submittedOfficeCloseAt || !isValidEventOfficeRange(submittedOfficeOpenAt, submittedOfficeCloseAt)) {
-      setEditErrors({ office_close_at: 'ZamkniÄ™cie biura musi byÄ‡ pĂłĹşniej niĹĽ otwarcie.' });
+      setEditErrors({ office_close_at: 'Zamknięcie biura musi być później niż otwarcie.' });
       toast({
-        title: 'NieprawidĹ‚owe godziny biura',
-        description: 'Podaj poprawnÄ… datÄ™ i godzinÄ™ otwarcia oraz zamkniÄ™cia biura zawodĂłw.',
+        title: 'Nieprawidłowe godziny biura',
+        description: 'Podaj poprawną datę i godzinę otwarcia oraz zamknięcia biura zawodów.',
         variant: 'destructive',
       });
       return;
@@ -440,10 +440,10 @@ export default function EventDetails() {
     setEditSaving(false);
 
     if (!result.ok) {
-      setEditErrors({ form: result.error ?? 'Nie udaĹ‚o siÄ™ zaktualizowaÄ‡ wydarzenia.' });
+      setEditErrors({ form: result.error ?? 'Nie udało się zaktualizować wydarzenia.' });
       toast({
-        title: 'Nie udaĹ‚o siÄ™ zaktualizowaÄ‡ wydarzenia',
-        description: result.error ?? 'SprĂłbuj ponownie.',
+        title: 'Nie udało się zaktualizować wydarzenia',
+        description: result.error ?? 'Spróbuj ponownie.',
         variant: 'destructive',
       });
       return;
@@ -461,14 +461,14 @@ export default function EventDetails() {
 
     if (!result.ok) {
       toast({
-        title: 'Nie udaĹ‚o siÄ™ wyeksportowaÄ‡ CSV',
-        description: result.error ?? 'SprĂłbuj ponownie.',
+        title: 'Nie udało się wyeksportować CSV',
+        description: result.error ?? 'Spróbuj ponownie.',
         variant: 'destructive',
       });
       return;
     }
 
-    toast({ title: 'Eksport CSV rozpoczÄ™ty' });
+    toast({ title: 'Eksport CSV rozpoczęty' });
   };
 
   const handleExportLogsCsv = async () => {
@@ -478,14 +478,14 @@ export default function EventDetails() {
 
     if (!result.ok) {
       toast({
-        title: 'Nie udaĹ‚o siÄ™ wyeksportowaÄ‡ logĂłw CSV',
-        description: result.error ?? 'SprĂłbuj ponownie.',
+        title: 'Nie udało się wyeksportować logów CSV',
+        description: result.error ?? 'Spróbuj ponownie.',
         variant: 'destructive',
       });
       return;
     }
 
-    toast({ title: 'Eksport logĂłw CSV rozpoczÄ™ty' });
+    toast({ title: 'Eksport logów CSV rozpoczęty' });
   };
 
   const handleDeleteEvent = async () => {
@@ -495,8 +495,8 @@ export default function EventDetails() {
 
     if (!result.ok) {
       toast({
-        title: 'Nie udaĹ‚o siÄ™ zarchiwizowaÄ‡ wydarzenia',
-        description: result.error ?? 'SprĂłbuj ponownie.',
+        title: 'Nie udało się zarchiwizować wydarzenia',
+        description: result.error ?? 'Spróbuj ponownie.',
         variant: 'destructive',
       });
       return;
@@ -515,7 +515,7 @@ export default function EventDetails() {
         onClick={() => navigate(isArchivedEvent ? `/organizations/${event.organization_id}/archived-events` : '/events')}
         className="event-detail-back touch-manipulation"
       >
-        <ArrowLeft className="mr-1 h-4 w-4" /> {isArchivedEvent ? 'WrĂłÄ‡ do archiwum' : 'WrĂłÄ‡ do wydarzeĹ„'}
+        <ArrowLeft className="mr-1 h-4 w-4" /> {isArchivedEvent ? 'Wróć do archiwum' : 'Wróć do wydarzeń'}
       </Button>
 
       {isArchivedEvent && (
@@ -527,7 +527,7 @@ export default function EventDetails() {
             <div>
               <p className="archive-notice-title font-semibold">To wydarzenie jest zarchiwizowane.</p>
               <p className="archive-notice-copy mt-1">
-                Jest ukryte z aktywnych list i przypisaĹ„. Dane sÄ… dostÄ™pne do podglÄ…du, a zmiany w archiwum moĹĽe wykonywaÄ‡ tylko superadmin.
+                Jest ukryte z aktywnych list i przypisań. Dane są dostępne do podglądu, a zmiany w archiwum może wykonywać tylko superadmin.
               </p>
             </div>
           </div>
@@ -535,7 +535,7 @@ export default function EventDetails() {
       )}
 
       {!isOnline && canOperateOnEvent && (
-        <OnlineOnlyNotice description="Import CSV, edycja wydarzenia, eksporty, wysylka QR, reczne dodawanie uczestnikow i zarzadzanie operatorami wymagaja aktywnego polaczenia z serwerem." />
+        <OnlineOnlyNotice description="Import CSV, edycja wydarzenia, eksporty, wysyłka QR, ręczne dodawanie uczestników i zarządzanie operatorami wymagają aktywnego połączenia z serwerem." />
       )}
 
       <section className="event-detail-header-grid">
@@ -712,9 +712,9 @@ export default function EventDetails() {
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>ZarchiwizowaÄ‡ wydarzenie?</AlertDialogTitle>
+            <AlertDialogTitle>Zarchiwizować wydarzenie?</AlertDialogTitle>
             <AlertDialogDescription>
-              Wydarzenie <span className="font-medium text-foreground">{event.name}</span> zniknie z aktywnych list i przypisaĹ„. Dane zostanÄ… zachowane w archiwum organizacji.
+              Wydarzenie <span className="font-medium text-foreground">{event.name}</span> zniknie z aktywnych list i przypisań. Dane zostaną zachowane w archiwum organizacji.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -770,7 +770,7 @@ export default function EventDetails() {
               <FieldError id="event-edit-location-error" className="mt-2">{editErrors.location}</FieldError>
             </div>
             <div>
-              <Label htmlFor="event-edit-office-open">Data i godzina otwarcia biura zawodĂłw</Label>
+              <Label htmlFor="event-edit-office-open">Data i godzina otwarcia biura zawodów</Label>
               <DateTimePicker
                 id="event-edit-office-open"
                 value={editForm.office_open_at}
@@ -784,13 +784,13 @@ export default function EventDetails() {
               />
               {isFinishedEvent && (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Dat zakoĹ„czonego wydarzenia nie moĹĽna juĹĽ edytowaÄ‡.
+                  Dat zakończonego wydarzenia nie można już edytować.
                 </p>
               )}
               <FieldError id="event-edit-office-open-error" className="mt-2">{editErrors.office_open_at}</FieldError>
             </div>
             <div>
-              <Label htmlFor="event-edit-office-close">Data i godzina zamkniÄ™cia biura zawodĂłw</Label>
+              <Label htmlFor="event-edit-office-close">Data i godzina zamknięcia biura zawodów</Label>
               <DateTimePicker
                 id="event-edit-office-close"
                 value={editForm.office_close_at}
@@ -824,7 +824,7 @@ export default function EventDetails() {
       >
         <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl lg:max-w-3xl">
           <DialogHeader className="shrink-0 px-6 pb-2 pt-6">
-            <DialogTitle>Dodaj uczestnika rÄ™cznie</DialogTitle>
+            <DialogTitle>Dodaj uczestnika ręcznie</DialogTitle>
           </DialogHeader>
           <div className="themed-scrollbar grid flex-1 gap-4 overflow-y-auto px-6 py-4 lg:grid-cols-2">
             <div className="lg:col-span-2">
@@ -880,7 +880,7 @@ export default function EventDetails() {
       <Dialog open={scannerDialogOpen} onOpenChange={setScannerDialogOpen}>
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Przypisz operatorĂłw do wydarzenia</DialogTitle>
+            <DialogTitle>Przypisz operatorów do wydarzenia</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {organizationScanners.length > 0 ? (
@@ -894,7 +894,7 @@ export default function EventDetails() {
               </div>
             ) : (
               <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                Brak operatorĂłw w organizacji tego wydarzenia.
+                Brak operatorów w organizacji tego wydarzenia.
               </div>
             )}
           </div>
