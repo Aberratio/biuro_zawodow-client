@@ -18,7 +18,6 @@ interface ParticipantImportRunResult { created_count: number; duplicate_count: n
 interface ParticipantUpdateOptions { allowOfflineQueue?: boolean; }
 interface OrganizationUpdateInput { name?: string; event_limit?: number; }
 interface UserUpdateInput { name: string; email: string; }
-interface AdminCreateInput { name: string; email: string; }
 
 interface DataContextType {
   organizations: Organization[];
@@ -47,8 +46,6 @@ interface DataContextType {
   updateUser: (userId: string, data: UserUpdateInput) => Promise<MutationResult>;
   createOrganization: (data: { name: string; event_limit: number }) => Promise<MutationResult>;
   updateOrganization: (organizationId: string, data: OrganizationUpdateInput) => Promise<MutationResult>;
-  updateOrganizationAdmins: (organizationId: string, adminUserIds: string[]) => Promise<MutationResult>;
-  createOrganizationAdmin: (organizationId: string, data: AdminCreateInput) => Promise<MutationResult>;
   updateOrganizationEventLimit: (organizationId: string, eventLimit: number) => Promise<MutationResult>;
   deleteOrganization: (organizationId: string) => Promise<MutationResult>;
   removeUser: (id: string) => Promise<MutationResult>;
@@ -288,8 +285,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const event = events.find(entry => entry.id === eventId) ?? archivedEvents.find(entry => entry.id === eventId);
     if (!event) return false;
     if (event.archived_at) return currentRole === 'superadmin';
-    if (currentRole === 'superadmin') return true;
-    if (currentRole === 'admin') return (currentUser.organization_ids ?? []).includes(event.organization_id);
+    if (currentRole === 'superadmin' || currentRole === 'admin') return true;
     if (currentRole === 'editor') return event.organization_id === currentUser.organization_id;
     return currentUser.assigned_events.includes(eventId) && isEventOfficeOpen(event, new Date(nowTimestamp));
   }, [archivedEvents, currentRole, currentUser, events, nowTimestamp]);
@@ -298,7 +294,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (canAccessEvent(eventId)) return true;
     const event = archivedEvents.find(entry => entry.id === eventId);
     if (!event) return false;
-    if (currentRole === 'admin') return (currentUser.organization_ids ?? []).includes(event.organization_id);
+    if (currentRole === 'admin') return true;
     if (currentRole === 'editor') return event.organization_id === currentUser.organization_id;
     return false;
   }, [archivedEvents, canAccessEvent, currentRole, currentUser]);
@@ -452,8 +448,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const payload = (await fetchJson(`${API_BASE_URL}/organizations`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(data) })).payload as { data?: ApiOrganization };
     if (!payload.data) return { ok: false, error: 'API organization create returned empty payload' };
     const createdOrganization = mapApiOrganizationToUi(payload.data);
-    setOrganizations(previous => [...previous, createdOrganization]); if (currentRole === 'admin') { setUsers(previous => previous.map(user => user.id === currentUser.id ? { ...user, organization_ids: [...new Set([...(user.organization_ids ?? []), createdOrganization.id])] } : user)); syncStoredAuthUser(user => ({ ...user, organization_ids: [...new Set([...(user.organization_ids ?? []), createdOrganization.id])] })); } return { ok: true, entityId: createdOrganization.id };
-  }), [currentRole, currentUser.id, ensureOnline, getAuthHeaders, runMutation, syncStoredAuthUser]);
+    setOrganizations(previous => [...previous, createdOrganization]); return { ok: true, entityId: createdOrganization.id };
+  }), [ensureOnline, getAuthHeaders, runMutation]);
 
   const updateOrganization = useCallback(async (organizationId: string, data: OrganizationUpdateInput) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
@@ -462,32 +458,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const updatedOrganization = mapApiOrganizationToUi(payload.data);
     setOrganizations(previous => previous.map(organization => organization.id === organizationId ? updatedOrganization : organization)); if (data.name) addLog(`Zaktualizowano organizację: ${updatedOrganization.name}`); return { ok: true };
   }), [addLog, ensureOnline, getAuthHeaders, runMutation]);
-
-  const updateOrganizationAdmins = useCallback(async (organizationId: string, adminUserIds: string[]) => runMutation(async () => {
-    const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
-    const payload = (await fetchJson(`${API_BASE_URL}/organizations/${organizationId}/admin-assignments`, { method: 'PATCH', headers: getAuthHeaders(true), body: JSON.stringify({ admin_user_ids: adminUserIds }) })).payload as { data?: ApiOrganization };
-    if (!payload.data) return { ok: false, error: 'API organization admin assignment returned empty payload' };
-    const updatedOrganization = mapApiOrganizationToUi(payload.data);
-    setOrganizations(previous => previous.map(organization => organization.id === organizationId ? updatedOrganization : organization));
-    await loadBootstrap(true);
-    return { ok: true };
-  }), [ensureOnline, getAuthHeaders, loadBootstrap, runMutation]);
-
-  const createOrganizationAdmin = useCallback(async (organizationId: string, data: AdminCreateInput) => runMutation(async () => {
-    const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
-    const createdUserPayload = (await fetchJson(`${API_BASE_URL}/users`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ name: data.name, email: data.email, role: 'admin', assigned_events: [] }) })).payload as { data?: ApiUser };
-    if (!createdUserPayload.data) return { ok: false, error: 'API user create returned empty payload' };
-    const createdAdmin = mapApiUserToUi(createdUserPayload.data);
-    const organization = organizations.find(entry => entry.id === organizationId);
-    const nextAdminUserIds = [...new Set([...(organization?.admin_users ?? []).map(adminUser => adminUser.id), createdAdmin.id])];
-    const organizationPayload = (await fetchJson(`${API_BASE_URL}/organizations/${organizationId}/admin-assignments`, { method: 'PATCH', headers: getAuthHeaders(true), body: JSON.stringify({ admin_user_ids: nextAdminUserIds }) })).payload as { data?: ApiOrganization };
-    if (!organizationPayload.data) return { ok: false, error: 'API organization admin assignment returned empty payload' };
-    setUsers(previous => [...previous, createdAdmin]);
-    const updatedOrganization = mapApiOrganizationToUi(organizationPayload.data);
-    setOrganizations(previous => previous.map(entry => entry.id === organizationId ? updatedOrganization : entry));
-    await loadBootstrap(true);
-    return { ok: true, entityId: createdAdmin.id };
-  }), [ensureOnline, getAuthHeaders, loadBootstrap, organizations, runMutation]);
 
   const updateOrganizationEventLimit = useCallback(async (organizationId: string, eventLimit: number) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
@@ -500,8 +470,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const deleteOrganization = useCallback(async (organizationId: string) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
-    const existingOrganization = organizations.find(organization => organization.id === organizationId); await fetchJson(`${API_BASE_URL}/organizations/${organizationId}`, { method: 'DELETE', headers: getAuthHeaders() }); setOrganizations(previous => previous.filter(organization => organization.id !== organizationId)); setUsers(previous => previous.map(user => user.id === currentUser.id ? { ...user, organization_ids: (user.organization_ids ?? []).filter(id => id !== organizationId) } : user)); if (currentUser.id) syncStoredAuthUser(user => user.id === currentUser.id ? { ...user, organization_ids: (user.organization_ids ?? []).filter(id => id !== organizationId) } : user); if (existingOrganization) addLog(`Usunięto organizację: ${existingOrganization.name}`); return { ok: true };
-  }), [addLog, currentUser.id, ensureOnline, getAuthHeaders, organizations, runMutation, syncStoredAuthUser]);
+    const existingOrganization = organizations.find(organization => organization.id === organizationId); await fetchJson(`${API_BASE_URL}/organizations/${organizationId}`, { method: 'DELETE', headers: getAuthHeaders() }); setOrganizations(previous => previous.filter(organization => organization.id !== organizationId)); if (existingOrganization) addLog(`Usunięto organizację: ${existingOrganization.name}`); return { ok: true };
+  }), [addLog, ensureOnline, getAuthHeaders, organizations, runMutation]);
 
   const assignScannerEvents = useCallback(async (userId: string, eventIds: string[]) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
@@ -600,7 +570,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [ensureOnline, getAuthHeaders, handleNetworkFailure]);
 
   return (
-    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, updateParticipantStatus, reassignParticipantPackage, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationAdmins, createOrganizationAdmin, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
+    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, updateParticipantStatus, reassignParticipantPackage, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
       {children}
     </DataContext.Provider>
   );

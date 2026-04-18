@@ -131,8 +131,6 @@ export default function OrganizationDetails() {
     updateUser,
     createEvent,
     updateOrganization,
-    updateOrganizationAdmins,
-    createOrganizationAdmin,
     updateOrganizationEventLimit,
     deleteOrganization,
     removeUser,
@@ -149,9 +147,6 @@ export default function OrganizationDetails() {
   const [organizationEditOpen, setOrganizationEditOpen] = useState(false);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
   const [scannerEditDialogOpen, setScannerEditDialogOpen] = useState(false);
-  const [adminAssignmentsDialogOpen, setAdminAssignmentsDialogOpen] =
-    useState(false);
-  const [adminCreateDialogOpen, setAdminCreateDialogOpen] = useState(false);
   const [deleteOrganizationConfirmOpen, setDeleteOrganizationConfirmOpen] =
     useState(false);
   const [archiveUserConfirmOpen, setArchiveUserConfirmOpen] = useState(false);
@@ -162,9 +157,6 @@ export default function OrganizationDetails() {
   const [isSavingOrganization, setIsSavingOrganization] = useState(false);
   const [isDeletingOrganization, setIsDeletingOrganization] = useState(false);
   const [isSavingScanner, setIsSavingScanner] = useState(false);
-  const [isSavingAdminAssignments, setIsSavingAdminAssignments] =
-    useState(false);
-  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
   const [isChangingScannerRole, setIsChangingScannerRole] = useState(false);
   const [isArchivingUser, setIsArchivingUser] = useState(false);
   const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
@@ -192,15 +184,8 @@ export default function OrganizationDetails() {
   const [scannerAssignmentDraft, setScannerAssignmentDraft] = useState<
     string[]
   >([]);
-  const [adminAssignmentDraft, setAdminAssignmentDraft] = useState<string[]>(
-    [],
-  );
   const [limitDraft, setLimitDraft] = useState("");
   const [organizationNameDraft, setOrganizationNameDraft] = useState("");
-  const [adminForm, setAdminForm] = useState({
-    name: "",
-    email: "",
-  });
   const [scannerDraft, setScannerDraft] = useState({
     name: "",
     email: "",
@@ -216,11 +201,6 @@ export default function OrganizationDetails() {
   }>({});
   const [organizationErrors, setOrganizationErrors] = useState<{
     name?: string;
-    form?: string;
-  }>({});
-  const [adminErrors, setAdminErrors] = useState<{
-    name?: string;
-    email?: string;
     form?: string;
   }>({});
   const [scannerErrors, setScannerErrors] = useState<{
@@ -244,8 +224,7 @@ export default function OrganizationDetails() {
   const allowed = useMemo(() => {
     if (!organization) return false;
     if (currentRole === "superadmin") return true;
-    if (currentRole === "admin")
-      return (currentUser.organization_ids ?? []).includes(organization.id);
+    if (currentRole === "admin") return true;
     return currentUser.organization_id === organization.id;
   }, [currentRole, currentUser, organization]);
 
@@ -287,21 +266,6 @@ export default function OrganizationDetails() {
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
     [users, organization?.id],
   );
-  const organizationAdmins = useMemo(
-    () =>
-      [...(organization?.admin_users ?? [])].sort((a, b) =>
-        a.name.localeCompare(b.name, "pl"),
-      ),
-    [organization?.admin_users],
-  );
-  const availableAdmins = useMemo(
-    () =>
-      users
-        .filter((user) => user.role === "admin")
-        .sort((a, b) => a.name.localeCompare(b.name, "pl")),
-    [users],
-  );
-
   if (isLoading) return <TableSkeleton rows={4} cols={4} subtitle="" />;
   if (!organization || !allowed)
     return (
@@ -327,7 +291,6 @@ export default function OrganizationDetails() {
     currentRole === "superadmin" || currentRole === "admin";
   const canManageMembers =
     currentRole === "superadmin" || currentRole === "admin";
-  const canManageAdmins = currentRole === "superadmin";
   const canManageScanners =
     currentRole === "superadmin" ||
     currentRole === "admin" ||
@@ -336,19 +299,11 @@ export default function OrganizationDetails() {
     canEditOrganization &&
     orgEvents.length === 0 &&
     orgArchivedEvents.length === 0 &&
-    organizationAdmins.length === 0 &&
     organizers.length === 0 &&
     scanners.length === 0;
-  const adminLabel =
-    organizationAdmins.length > 0
-      ? organizationAdmins.map((adminUser) => adminUser.name).join(", ")
-      : "Brak administratorów";
+  const adminLabel = "Wszystkie organizacje";
   const sectionClassName =
     "overflow-hidden rounded-[1.35rem] border border-[hsl(var(--button-highlight)/0.14)] bg-[linear-gradient(180deg,hsl(220_13%_8%/_0.95),hsl(220_14%_6%/_0.98))] shadow-[0_18px_44px_hsl(var(--surface-shadow)/0.28),inset_0_1px_0_hsl(var(--foreground)/0.04)]";
-  const primaryWideButtonClassName =
-    "h-12 w-full rounded-[1rem] border-[hsl(var(--button-highlight)/0.58)] text-[0.98rem] font-semibold tracking-[-0.01em] shadow-[0_18px_36px_hsl(var(--surface-shadow)/0.22)]";
-  const secondaryWideButtonClassName =
-    "h-12 w-full rounded-[1rem] border-[hsl(var(--button-highlight)/0.4)] bg-transparent text-foreground shadow-none hover:border-[hsl(var(--button-highlight)/0.62)] hover:bg-[hsl(var(--button-highlight)/0.08)]";
   const sectionPrimaryButtonClassName =
     "h-12 w-full rounded-[1rem] border border-[hsl(42_62%_62%/0.78)] bg-[linear-gradient(180deg,hsl(42_46%_56%),hsl(38_34%_42%))] px-4 text-[0.98rem] font-semibold text-white shadow-[inset_0_1px_0_hsl(48_65%_78%/0.32)] hover:brightness-105";
   const sectionSecondaryButtonClassName =
@@ -368,17 +323,6 @@ export default function OrganizationDetails() {
   const openMemberDialog = (role: MemberRole) => {
     setMemberForm({ role, name: "", email: "", assigned_events: [] });
     setMemberDialogOpen(true);
-  };
-
-  const openAdminAssignmentsDialog = () => {
-    setAdminAssignmentDraft(organizationAdmins.map((adminUser) => adminUser.id));
-    setAdminAssignmentsDialogOpen(true);
-  };
-
-  const openAdminCreateDialog = () => {
-    setAdminForm({ name: "", email: "" });
-    setAdminErrors({});
-    setAdminCreateDialogOpen(true);
   };
 
   const openScannerAssignmentsDialog = (scannerId: string) => {
@@ -426,14 +370,6 @@ export default function OrganizationDetails() {
       checked
         ? [...prev, eventId]
         : prev.filter((idValue) => idValue !== eventId),
-    );
-  };
-
-  const toggleAdminAssignmentDraft = (userId: string, checked: boolean) => {
-    setAdminAssignmentDraft((prev) =>
-      checked
-        ? [...new Set([...prev, userId])]
-        : prev.filter((idValue) => idValue !== userId),
     );
   };
 
@@ -538,87 +474,6 @@ export default function OrganizationDetails() {
     setLimitDialogOpen(false);
     setLimitErrors({});
     toast({ title: "Zaktualizowano limit wydarzeń" });
-  };
-
-  const handleSaveAdminAssignments = async () => {
-    setIsSavingAdminAssignments(true);
-    const result = await updateOrganizationAdmins(
-      organization.id,
-      adminAssignmentDraft,
-    );
-    setIsSavingAdminAssignments(false);
-
-    if (!result.ok) {
-      toast({
-        title: "Nie udało się zapisać administratorów",
-        description: result.error ?? "Spróbuj ponownie.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setAdminAssignmentsDialogOpen(false);
-    toast({ title: "Zapisano administratorów organizacji" });
-  };
-
-  const handleDetachAdmin = async (adminUserId: string) => {
-    const result = await updateOrganizationAdmins(
-      organization.id,
-      organizationAdmins
-        .filter((adminUser) => adminUser.id !== adminUserId)
-        .map((adminUser) => adminUser.id),
-    );
-
-    if (!result.ok) {
-      toast({
-        title: "Nie udało się odpiąć administratora",
-        description: result.error ?? "Spróbuj ponownie.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    toast({ title: "Odpięto administratora od organizacji" });
-  };
-
-  const handleCreateAdmin = async () => {
-    const nextErrors = {
-      name: validateRequired(adminForm.name, "Podaj imię i nazwisko."),
-      email: validateEmail(adminForm.email),
-    };
-
-    if (nextErrors.name || nextErrors.email) {
-      setAdminErrors(nextErrors);
-      return;
-    }
-
-    setAdminErrors({});
-    setIsCreatingAdmin(true);
-    const result = await createOrganizationAdmin(organization.id, {
-      name: adminForm.name.trim(),
-      email: adminForm.email.trim(),
-    });
-    setIsCreatingAdmin(false);
-
-    if (!result.ok) {
-      setAdminErrors({
-        form: result.error ?? "Nie udało się utworzyć administratora.",
-      });
-      toast({
-        title: "Nie udało się utworzyć administratora",
-        description: result.error ?? "Spróbuj ponownie.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setAdminCreateDialogOpen(false);
-    setAdminForm({ name: "", email: "" });
-    setAdminErrors({});
-    toast({
-      title: "Dodano administratora",
-      description: "Konto zostało przypisane do organizacji.",
-    });
   };
 
   const handleSaveOrganization = async () => {
@@ -1039,89 +894,6 @@ export default function OrganizationDetails() {
             </CardContent>
           </Card>
         </div>
-      </section>
-
-      <section className={sectionClassName}>
-        <CollapsibleOrganizationSection title="Administratorzy">
-          <div className="flex flex-col gap-4">
-            {canManageAdmins && (
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button
-                  onClick={openAdminAssignmentsDialog}
-                  className={primaryWideButtonClassName}
-                >
-                  <Plus className="mr-1 h-4 w-4" />
-                  Przypisz istniejącego admina
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={openAdminCreateDialog}
-                  className={secondaryWideButtonClassName}
-                >
-                  <Plus className="mr-1 h-4 w-4" />
-                  Utwórz admina i przypisz
-                </Button>
-              </div>
-            )}
-          </div>
-          {organizationAdmins.length === 0 ? (
-            <EmptyTableState
-              title="Brak administratorów"
-              description={
-                canManageAdmins
-                  ? "Przypisz istniejącego admina albo utwórz nowe konto administratora."
-                  : "Ta organizacja nie ma obecnie przypisanych administratorów."
-              }
-            />
-          ) : (
-            <div className="w-full">
-              <Table containerClassName={tableContainerClassName}>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                      Imię i nazwisko
-                    </TableHead>
-                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                      Email
-                    </TableHead>
-                    {canManageAdmins && (
-                      <TableHead className="h-12 w-[180px] px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                        Akcje
-                      </TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {organizationAdmins.map((adminUser) => (
-                    <TableRow
-                      key={adminUser.id}
-                      className="border-0 hover:bg-[hsl(var(--button-highlight)/0.04)]"
-                    >
-                      <TableCell className="px-5 text-base font-medium sm:px-7">
-                        {adminUser.name}
-                      </TableCell>
-                      <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
-                        {adminUser.email}
-                      </TableCell>
-                      {canManageAdmins && (
-                        <TableCell className="px-5 sm:px-7">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className={`${actionButtonClassName} w-full sm:w-auto`}
-                            onClick={() => void handleDetachAdmin(adminUser.id)}
-                          >
-                            Odepnij
-                          </Button>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CollapsibleOrganizationSection>
       </section>
 
       <section className={sectionClassName}>
@@ -1721,148 +1493,6 @@ export default function OrganizationDetails() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog
-        open={adminAssignmentsDialogOpen}
-        onOpenChange={(open) => {
-          setAdminAssignmentsDialogOpen(open);
-          if (!open) {
-            setAdminAssignmentDraft([]);
-          }
-        }}
-      >
-        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Przypisz administratorów</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {availableAdmins.length > 0 ? (
-              <div className="space-y-2 rounded-xl border p-3">
-                {availableAdmins.map((adminUser) => (
-                  <label
-                    key={adminUser.id}
-                    className="flex items-center gap-3 text-sm"
-                  >
-                    <Checkbox
-                      checked={adminAssignmentDraft.includes(adminUser.id)}
-                      onCheckedChange={(checked) =>
-                        toggleAdminAssignmentDraft(
-                          adminUser.id,
-                          checked === true,
-                        )
-                      }
-                    />
-                    <span className="flex-1">
-                      {adminUser.name}
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {adminUser.email}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <p className="rounded-xl border border-dashed px-3 py-3 text-xs text-muted-foreground">
-                Brak istniejących kont admina. Utwórz nowe konto i przypisz je
-                do organizacji.
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              className="w-full sm:w-auto"
-              onClick={() => void handleSaveAdminAssignments()}
-              disabled={isSavingAdminAssignments}
-            >
-              Zapisz administratorów
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={adminCreateDialogOpen}
-        onOpenChange={(open) => {
-          setAdminCreateDialogOpen(open);
-          if (!open) {
-            setAdminErrors({});
-            setAdminForm({ name: "", email: "" });
-          }
-        }}
-      >
-        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Utwórz administratora</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="admin-name">Imię i nazwisko</Label>
-              <Input
-                id="admin-name"
-                value={adminForm.name}
-                onChange={(event) => {
-                  setAdminForm((prev) => ({
-                    ...prev,
-                    name: event.target.value,
-                  }));
-                  setAdminErrors((prev) => ({
-                    ...prev,
-                    name: undefined,
-                    form: undefined,
-                  }));
-                }}
-                className="mt-2"
-                required
-                aria-invalid={Boolean(adminErrors.name)}
-                aria-describedby={adminErrors.name ? "admin-name-error" : undefined}
-              />
-              <FieldError id="admin-name-error" className="mt-2">
-                {adminErrors.name}
-              </FieldError>
-            </div>
-            <div>
-              <Label htmlFor="admin-email">Email</Label>
-              <Input
-                id="admin-email"
-                type="email"
-                value={adminForm.email}
-                onChange={(event) => {
-                  setAdminForm((prev) => ({
-                    ...prev,
-                    email: event.target.value,
-                  }));
-                  setAdminErrors((prev) => ({
-                    ...prev,
-                    email: undefined,
-                    form: undefined,
-                  }));
-                }}
-                className="mt-2"
-                required
-                aria-invalid={Boolean(adminErrors.email)}
-                aria-describedby={adminErrors.email ? "admin-email-error" : undefined}
-              />
-              <FieldError id="admin-email-error" className="mt-2">
-                {adminErrors.email}
-              </FieldError>
-            </div>
-            <p className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              Konto zostanie utworzone i od razu przypisane do tej organizacji.
-            </p>
-            <FieldError id="admin-form-error">{adminErrors.form}</FieldError>
-          </div>
-          <DialogFooter>
-            <Button
-              className="w-full sm:w-auto"
-              onClick={() => void handleCreateAdmin()}
-              disabled={isCreatingAdmin}
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              Utwórz administratora
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={scannerEditDialogOpen}

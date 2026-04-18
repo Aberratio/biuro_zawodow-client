@@ -22,7 +22,6 @@ function createUser(): User {
     password: '',
     role: 'superadmin',
     assigned_events: [],
-    organization_ids: [],
   };
 }
 
@@ -31,7 +30,6 @@ function createOrganization(id: string, name: string): Organization {
     id,
     name,
     event_limit: 4,
-    admin_users: [{ id: 'admin-1', name: 'Admin organizacji', email: 'admin@example.com' }],
   };
 }
 

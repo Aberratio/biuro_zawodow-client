@@ -172,8 +172,7 @@ function OrganizationAccessRoute({ children }: { children: JSX.Element }) {
 
   const allowed =
     currentRole === "superadmin" ||
-    (currentRole === "admin" &&
-      (currentUser.organization_ids ?? []).includes(organization.id)) ||
+    currentRole === "admin" ||
     currentUser.organization_id === organization.id;
 
   if (!allowed) {

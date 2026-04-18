@@ -56,7 +56,6 @@ describe('AuthProvider offline session handling', () => {
       email: 'offline@example.com',
       password: '',
       role: 'admin',
-      organization_ids: ['org-1'],
       assigned_events: [],
     }));
 
@@ -84,7 +83,6 @@ describe('AuthProvider offline session handling', () => {
       email: 'online@example.com',
       password: '',
       role: 'admin',
-      organization_ids: ['org-1'],
       assigned_events: [],
     }));
 

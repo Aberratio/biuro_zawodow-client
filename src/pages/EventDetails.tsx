@@ -246,13 +246,13 @@ export default function EventDetails() {
     [event?.organization_id, users],
   );
   const organizationAdmins = useMemo(
-    () => users.filter(user => user.role === 'admin' && (user.organization_ids ?? []).includes(event?.organization_id ?? '')),
-    [event?.organization_id, users],
+    () => users.filter(user => user.role === 'admin'),
+    [users],
   );
   const canManageScanners = useMemo(() => {
     if (!event) return false;
     if (currentRole === 'superadmin') return true;
-    if (currentRole === 'admin') return (currentUser.organization_ids ?? []).includes(event.organization_id);
+    if (currentRole === 'admin') return true;
     if (currentRole === 'editor') return currentUser.organization_id === event.organization_id;
     return false;
   }, [currentRole, currentUser, event]);

@@ -16,7 +16,6 @@ const authState: {
     email: 'admin@example.com',
     password: '',
     role: 'admin',
-    organization_ids: ['org-1'],
     assigned_events: [],
   },
   token: 'token',
@@ -75,7 +74,6 @@ describe('DataProvider offline cache and queue', () => {
       email: 'admin@example.com',
       password: '',
       role: 'admin',
-      organization_ids: ['org-1'],
       assigned_events: [],
     };
     authState.token = 'token';
@@ -96,7 +94,7 @@ describe('DataProvider offline cache and queue', () => {
       selectedOrganizationId: 'org-1',
       selectedEventId: 'event-1',
       data: {
-        organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5, admin_users: [] }],
+        organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5 }],
         events: [{
           id: 'event-1',
           name: 'Event 1',
@@ -149,7 +147,7 @@ describe('DataProvider offline cache and queue', () => {
       selectedOrganizationId: 'org-1',
       selectedEventId: 'event-1',
       data: {
-        organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5, admin_users: [] }],
+        organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5 }],
         events: [{
           id: 'event-1',
           name: 'Event 1',

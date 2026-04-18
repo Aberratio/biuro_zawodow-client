@@ -81,7 +81,10 @@ export default function Events() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<EventStatusFilter>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const adminOrganizationIds = useMemo(() => currentUser.organization_ids ?? [], [currentUser.organization_ids]);
+  const adminOrganizationIds = useMemo(
+    () => organizations.map(organization => organization.id),
+    [organizations],
+  );
   const adminOrganizations = useMemo(
     () => organizations.filter(org => adminOrganizationIds.includes(org.id)),
     [adminOrganizationIds, organizations],

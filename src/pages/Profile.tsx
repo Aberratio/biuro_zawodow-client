@@ -38,13 +38,7 @@ export default function Profile() {
 
   const organizationLabel = useMemo(() => {
     if (!user) return 'Brak';
-    if (user.role === 'admin') {
-      const names = (user.organization_ids ?? [])
-        .map(organizationId => organizations.find(organization => organization.id === organizationId)?.name ?? organizationId)
-        .filter(Boolean);
-
-      return names.length > 0 ? names.join(', ') : 'Brak przypisanych organizacji';
-    }
+    if (user.role === 'admin') return 'Wszystkie organizacje';
 
     if (!user.organization_id) return 'Brak';
     return organizations.find(organization => organization.id === user.organization_id)?.name ?? user.organization_id;

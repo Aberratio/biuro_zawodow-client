@@ -133,7 +133,7 @@ Scanner specific behavior:
 ## Role behavior
 
 - `superadmin` sees all organizations and all events
-- `admin` sees only assigned organizations and their events
+- `admin` sees all organizations and their events
 - `editor` sees only their own organization and its events
 - `scanner` sees only assigned events while the race office is open
 
