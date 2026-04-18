@@ -20,13 +20,24 @@ vi.mock('@/contexts/AuthContext', () => ({
 }));
 
 function TestConsumer() {
-  const { selectedOrganizationId, setSelectedOrganizationId, selectedEventId, visibleEvents, setSelectedEventId } = useData();
+  const {
+    selectedOrganizationId,
+    setSelectedOrganizationId,
+    selectedEventId,
+    visibleEvents,
+    setSelectedEventId,
+    canAccessEvent,
+    canViewEvent,
+  } = useData();
 
   return (
     <div>
       <div data-testid="selected-organization">{selectedOrganizationId}</div>
       <div data-testid="selected-event">{selectedEventId}</div>
       <div data-testid="visible-events-count">{visibleEvents.length}</div>
+      <div data-testid="can-access-event-1">{String(canAccessEvent('event-1'))}</div>
+      <div data-testid="can-access-event-2">{String(canAccessEvent('event-2'))}</div>
+      <div data-testid="can-view-archived-event">{String(canViewEvent('archived-event-1'))}</div>
       <button type="button" onClick={() => setSelectedOrganizationId('org-1')}>
         select-org-1
       </button>
@@ -51,6 +62,13 @@ function createEvent(id: string, organizationId = 'org-1'): Event {
   };
 }
 
+function createArchivedEvent(id: string, organizationId = 'org-1'): Event {
+  return {
+    ...createEvent(id, organizationId),
+    archived_at: '2099-04-13T12:00:00',
+  };
+}
+
 function createOrganization(id: string): Organization {
   return {
     id,
@@ -72,6 +90,34 @@ function createBootstrapResponse(user: User, events: Event[], organizations: Org
       data: {
         organizations,
         events,
+        archivedEvents: [],
+        users: [user],
+        participants: [],
+        activityLog: [],
+      },
+    }),
+  };
+}
+
+function createBootstrapResponseWithArchivedEvents(
+  user: User,
+  events: Event[],
+  archivedEvents: Event[],
+  organizations: Organization[] = [],
+) {
+  return {
+    ok: true,
+    status: 200,
+    headers: {
+      get: (name: string) => name.toLowerCase() === 'content-type' ? 'application/json' : null,
+    },
+    json: async () => ({
+      generated_at: '2099-04-12T07:00:00.000Z',
+      snapshot_version: 'snapshot-test',
+      data: {
+        organizations,
+        events,
+        archivedEvents,
         users: [user],
         participants: [],
         activityLog: [],
@@ -233,6 +279,41 @@ describe('DataProvider bootstrap loading', () => {
     expect(screen.getByTestId('selected-event')).toBeEmptyDOMElement();
     expect(window.localStorage.getItem('selected_organization_context:admin-1')).toBe('org-2');
     expect(window.localStorage.getItem('selected_event_context:admin-1')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows admin to access active and archived events across all organizations', async () => {
+    const adminUser: User = {
+      id: 'admin-1',
+      name: 'Admin',
+      email: 'admin@example.com',
+      password: '',
+      role: 'admin',
+      assigned_events: [],
+    };
+
+    authState.user = adminUser;
+
+    const organizations = [createOrganization('org-1'), createOrganization('org-2')];
+    const fetchMock = vi.fn(async () => createBootstrapResponseWithArchivedEvents(
+      adminUser,
+      [createEvent('event-1', 'org-1'), createEvent('event-2', 'org-2')],
+      [createArchivedEvent('archived-event-1', 'org-2')],
+      organizations,
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <TestConsumer />
+      </DataProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('visible-events-count').textContent).toBe('2'));
+
+    expect(screen.getByTestId('can-access-event-1').textContent).toBe('true');
+    expect(screen.getByTestId('can-access-event-2').textContent).toBe('true');
+    expect(screen.getByTestId('can-view-archived-event').textContent).toBe('true');
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -14,13 +14,13 @@ vi.mock('@/hooks/use-toast', () => ({
   toast: vi.fn(),
 }));
 
-function createUser(): User {
+function createUser(role: User['role'] = 'superadmin'): User {
   return {
-    id: 'superadmin-1',
-    name: 'Super Admin',
-    email: 'superadmin@example.com',
+    id: `${role}-1`,
+    name: role === 'admin' ? 'Admin' : 'Super Admin',
+    email: `${role}@example.com`,
     password: '',
-    role: 'superadmin',
+    role,
     assigned_events: [],
   };
 }
@@ -49,14 +49,14 @@ function createEvent(
   };
 }
 
-function renderPage(organizations: Organization[], events?: Event[]) {
-  const currentUser = createUser();
+function renderPage(organizations: Organization[], events?: Event[], role: User['role'] = 'superadmin') {
+  const currentUser = createUser(role);
 
   useDataMock.mockReturnValue({
     organizations,
     events: events ?? organizations.map((organization, index) => createEvent(`event-${index + 1}`, organization.id)),
     users: [currentUser],
-    currentRole: 'superadmin',
+    currentRole: role,
     currentUser,
     createOrganization: vi.fn(),
     isLoading: false,
@@ -125,5 +125,19 @@ describe('Organizations page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Nowa organizacja' }));
 
     expect(screen.queryByLabelText('Administrator organizacji')).not.toBeInTheDocument();
+  });
+
+  it('shows all organizations for admin', () => {
+    renderPage(
+      [
+        createOrganization('org-1', 'Alpha'),
+        createOrganization('org-2', 'Beta'),
+      ],
+      undefined,
+      'admin',
+    );
+
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Beta')).toBeInTheDocument();
   });
 });
