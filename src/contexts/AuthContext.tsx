@@ -39,7 +39,6 @@ function normalizeUser(user: (Omit<User, 'password'> & { password?: string }) | 
     password: '',
     role: user.role,
     organization_id: user.organization_id ?? undefined,
-    organization_ids: Array.isArray(user.organization_ids) ? user.organization_ids : [],
     assigned_events: Array.isArray(user.assigned_events) ? user.assigned_events : [],
   };
 }

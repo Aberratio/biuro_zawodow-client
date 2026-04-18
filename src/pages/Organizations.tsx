@@ -55,7 +55,7 @@ export default function Organizations() {
 
   const visibleOrganizations = useMemo(() => {
     if (currentRole === 'superadmin') return organizations;
-    if (currentRole === 'admin') return organizations.filter(org => (currentUser.organization_ids ?? []).includes(org.id));
+    if (currentRole === 'admin') return organizations;
     return organizations.filter(org => org.id === currentUser.organization_id);
   }, [currentRole, currentUser, organizations]);
 

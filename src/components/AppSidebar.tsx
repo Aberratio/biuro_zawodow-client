@@ -195,9 +195,7 @@ export function AppSidebar() {
   const generalItems = items.filter((item) => !eventScopedUrls.has(item.url));
   const adminOrganizations =
     currentRole === "admin"
-      ? organizations.filter((organization) =>
-          (currentUser.organization_ids ?? []).includes(organization.id),
-        )
+      ? organizations
       : [];
   const selectedOrganization =
     adminOrganizations.find(
@@ -256,7 +254,7 @@ export function AppSidebar() {
     </div>
   ) : (
     <div className={workspaceInfoCardClassName}>
-      Brak przypisanych organizacji w tym kontekście.
+      Brak dostępnych organizacji w tym kontekście.
     </div>
   );
   const eventWorkspaceCard = (

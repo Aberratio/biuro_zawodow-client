@@ -31,12 +31,11 @@ export interface ApiUser {
   password?: string;
   role: User['role'];
   organization_id?: string | null;
-  organization_ids?: string[];
   assigned_events: string[];
 }
 
 export type ApiEvent = Event;
-export type ApiOrganization = Omit<Organization, 'admin_users'> & { admin_users?: Organization['admin_users'] | null };
+export type ApiOrganization = Organization;
 
 export interface BootstrapResponse {
   generated_at?: string;
@@ -52,21 +51,7 @@ export interface BootstrapResponse {
 }
 
 export function mapApiOrganizationToUi(organization: ApiOrganization): Organization {
-  return {
-    ...organization,
-    admin_users: Array.isArray(organization.admin_users)
-      ? organization.admin_users
-          .filter(
-            (adminUser): adminUser is Organization['admin_users'][number] =>
-              Boolean(adminUser?.id && adminUser.name && adminUser.email),
-          )
-          .map(adminUser => ({
-            id: adminUser.id,
-            name: adminUser.name,
-            email: adminUser.email,
-          }))
-      : [],
-  };
+  return { ...organization };
 }
 
 export interface ParticipantQrPreviewResponse {
@@ -144,7 +129,6 @@ export function mapApiUserToUi(user: ApiUser): User {
     ...user,
     password: '',
     organization_id: user.organization_id ?? undefined,
-    organization_ids: Array.isArray(user.organization_ids) ? user.organization_ids : [],
     assigned_events: Array.isArray(user.assigned_events) ? user.assigned_events : [],
   };
 }
@@ -155,13 +139,13 @@ export function getDefaultCurrentUser(): User {
 
 export function getSelectableOrganizationsForUser(allOrganizations: Organization[], user: User): Organization[] {
   if (user.role !== 'admin') return [];
-  return allOrganizations.filter(organization => (user.organization_ids ?? []).includes(organization.id));
+  return allOrganizations;
 }
 
 export function getVisibleEventsForUser(allEvents: Event[], user: User, now = new Date()): Event[] {
   const activeEvents = allEvents.filter(event => !event.archived_at);
   if (user.role === 'superadmin') return activeEvents;
-  if (user.role === 'admin') return activeEvents.filter(event => (user.organization_ids ?? []).includes(event.organization_id));
+  if (user.role === 'admin') return activeEvents;
   if (user.role === 'editor') return activeEvents.filter(event => event.organization_id === user.organization_id);
   return activeEvents.filter(event => user.assigned_events.includes(event.id) && isEventOfficeOpen(event, now));
 }

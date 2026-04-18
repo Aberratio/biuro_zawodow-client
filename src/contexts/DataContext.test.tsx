@@ -56,7 +56,6 @@ function createOrganization(id: string): Organization {
     id,
     name: `Organization ${id}`,
     event_limit: 5,
-    admin_users: [],
   };
 }
 
@@ -140,7 +139,6 @@ describe('DataProvider bootstrap loading', () => {
       password: '',
       role: 'superadmin',
       assigned_events: [],
-      organization_ids: [],
     };
 
     authState.user = adminUser;
@@ -173,7 +171,6 @@ describe('DataProvider bootstrap loading', () => {
       password: '',
       role: 'admin',
       assigned_events: [],
-      organization_ids: ['org-1', 'org-2'],
     };
 
     authState.user = adminUser;
@@ -211,7 +208,6 @@ describe('DataProvider bootstrap loading', () => {
       password: '',
       role: 'admin',
       assigned_events: [],
-      organization_ids: ['org-1', 'org-2'],
     };
 
     authState.user = adminUser;
