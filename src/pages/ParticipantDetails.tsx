@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, CheckCircle, Clock, Loader2, Mail, QrCode, Repeat, Trash2, UserRoundCog } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
-import type { ParticipantFieldMapping, ParticipantQrPreview, ParticipantStatus } from '@/types';
+import type { Participant, ParticipantFieldMapping, ParticipantQrPreview, ParticipantStatus } from '@/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -82,6 +82,9 @@ export default function ParticipantDetails() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [sendQrConfirmOpen, setSendQrConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [bibNumberConflictOpen, setBibNumberConflictOpen] = useState(false);
+  const [bibNumberConflictParticipants, setBibNumberConflictParticipants] = useState<Participant[]>([]);
+  const [pendingBibNumberCandidate, setPendingBibNumberCandidate] = useState('');
   const [bibNumberValue, setBibNumberValue] = useState('');
   const [bibNumberError, setBibNumberError] = useState<string | undefined>();
   const [transferEmail, setTransferEmail] = useState('');
@@ -102,6 +105,9 @@ export default function ParticipantDetails() {
     setStatusValue(participant.status);
     setBibNumberValue(participant.bib_number);
     setBibNumberError(undefined);
+    setBibNumberConflictOpen(false);
+    setBibNumberConflictParticipants([]);
+    setPendingBibNumberCandidate('');
     setTransferEmail(participant.email);
   }, [participant]);
 
@@ -240,6 +246,12 @@ export default function ParticipantDetails() {
     setIsSavingBibNumber(true);
     try {
       const result = await updateParticipantBibNumber(participant.id, normalizedBibNumber);
+      if (result.conflict) {
+        setPendingBibNumberCandidate(result.conflict.bibNumber);
+        setBibNumberConflictParticipants(result.conflict.conflictingParticipants);
+        setBibNumberConflictOpen(true);
+        return;
+      }
       if (!result.ok) {
         setBibNumberError(result.error);
         toast({ title: 'Nie udało się zapisać numeru startowego', description: result.error, variant: 'destructive' });
@@ -247,6 +259,27 @@ export default function ParticipantDetails() {
       }
 
       toast({ title: normalizedBibNumber ? 'Numer startowy zapisany' : 'Numer startowy wyczyszczony' });
+    } finally {
+      setIsSavingBibNumber(false);
+    }
+  };
+
+  const handleResolveBibNumberConflict = async (resolution: 'keep_duplicates' | 'delete_conflicts') => {
+    setIsSavingBibNumber(true);
+    try {
+      const result = await updateParticipantBibNumber(participant.id, pendingBibNumberCandidate, { conflictResolution: resolution });
+      if (!result.ok) {
+        setBibNumberError(result.error);
+        toast({ title: 'Nie udało się zapisać numeru startowego', description: result.error, variant: 'destructive' });
+        return;
+      }
+
+      setBibNumberConflictOpen(false);
+      setBibNumberConflictParticipants([]);
+      setPendingBibNumberCandidate('');
+      toast({
+        title: resolution === 'delete_conflicts' ? 'Numer przeniesiony i konflikty usunięte' : 'Numer startowy zapisany dla wielu uczestników',
+      });
     } finally {
       setIsSavingBibNumber(false);
     }
@@ -540,6 +573,68 @@ export default function ParticipantDetails() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={bibNumberConflictOpen}
+        onOpenChange={nextOpen => {
+          setBibNumberConflictOpen(nextOpen);
+          if (!nextOpen) {
+            setPendingBibNumberCandidate('');
+            setBibNumberConflictParticipants([]);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ten numer jest już używany</AlertDialogTitle>
+            <AlertDialogDescription>
+              Numer startowy <span className="font-medium text-foreground">{formatBibNumber(pendingBibNumberCandidate, pendingBibNumberCandidate || 'bez numeru')}</span> jest już przypisany do {bibNumberConflictParticipants.length === 1 ? 'innego uczestnika' : `innych uczestników (${bibNumberConflictParticipants.length})`}. Wybierz, co zrobić dalej.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            {bibNumberConflictParticipants.map(conflictParticipant => (
+              <div key={conflictParticipant.id} className="rounded-xl border px-4 py-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="font-medium">{conflictParticipant.name}</p>
+                    <p className="text-sm text-muted-foreground">{conflictParticipant.email}</p>
+                  </div>
+                  <a
+                    href={`/participants/${conflictParticipant.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-9 items-center justify-center rounded-md border px-3 text-sm font-medium transition-colors hover:bg-accent"
+                  >
+                    Otwórz profil
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+          <AlertDialogFooter className="gap-2 sm:justify-between">
+            <AlertDialogCancel>Cofnij operację</AlertDialogCancel>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {canUseAdminActions && (
+                <Button
+                  variant="destructive"
+                  onClick={() => void handleResolveBibNumberConflict('delete_conflicts')}
+                  disabled={isSavingBibNumber}
+                >
+                  {isSavingBibNumber && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                  Przenieś numer i usuń pozostałych uczestników
+                </Button>
+              )}
+              <Button
+                onClick={() => void handleResolveBibNumberConflict('keep_duplicates')}
+                disabled={isSavingBibNumber}
+              >
+                {isSavingBibNumber && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                Zachowaj ten numer u wszystkich
+              </Button>
+            </div>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={sendQrConfirmOpen} onOpenChange={setSendQrConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">

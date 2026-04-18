@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { ActivityLog, ConnectionState, Event, Organization, Participant, ParticipantFieldMapping, ParticipantQrPreview, ParticipantScanResult, ParticipantStatus, Role, ScannerMode, SnapshotSource, User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { API_BASE_URL, fetchJson, isApiResponseError, isNetworkRequestError } from '@/lib/api';
+import { API_BASE_URL, fetchJson, getApiErrorCode, isApiResponseError, isNetworkRequestError } from '@/lib/api';
 import { type ApiEvent, type ApiOrganization, type ApiParticipant, type ApiUser, type BootstrapResponse, type ParticipantQrPreviewResponse, type ParticipantScanApiResponse, OFFLINE_ACTION_MESSAGE, applyPendingMutations, buildOfflineSnapshot, createBootstrapSnapshotVersion, createClientMutationId, extractConflictParticipant, getDefaultCurrentUser, getDeviceId, getInitialConnectionState, getSelectableOrganizationsForUser, getSelectedEventStorageKey, getSelectedOrganizationStorageKey, getVisibleEventsForUser, mapApiOrganizationToUi, mapApiParticipantToUi, mapApiUserToUi, participantUiIdToApiId, readStoredSelectedEventId, readStoredSelectedOrganizationId, resolveSelectedEventId, resolveSelectedOrganizationId } from '@/lib/data-context-helpers';
 import { deletePendingMutation, loadBootstrapSnapshot, loadPendingMutations, loadSyncMeta, saveBootstrapSnapshot, savePendingMutation, saveSyncMeta, updatePendingMutation, type PendingParticipantMutation } from '@/lib/offline-store';
 import { isEventOfficeOpen } from '@/lib/events';
@@ -10,12 +10,15 @@ type UserCreateInput = Omit<User, 'id' | 'password'>;
 type EventMutationInput = Omit<Event, 'id' | 'archived_at'>;
 
 interface MutationResult { ok: boolean; error?: string; entityId?: string; }
+interface ParticipantBibNumberConflict { bibNumber: string; conflictingParticipants: Participant[]; }
+interface ParticipantBibNumberUpdateResult extends MutationResult { conflict?: ParticipantBibNumberConflict; }
 interface EventQrEmailResult { ok: boolean; sent_count: number; error_count: number; errors: Array<{ participant_id: number; participant_name: string; error: string }>; error?: string; }
 interface ParticipantImportAnalysis { headers: string[]; sample_rows: Record<string, string>[]; email_candidates: { column: string; matched_count: number }[]; has_mapping: boolean; mappings: ParticipantFieldMapping[]; missing_required_columns: string[]; row_count: number; }
 interface ParticipantImportMappingFieldInput { source_column_name: string; alias: string; field_role: 'display_name_part' | 'bib_number' | 'custom'; is_active: boolean; }
 interface ParticipantImportMappingPayload { csv_columns: string[]; email_column: string; fields: ParticipantImportMappingFieldInput[]; }
 interface ParticipantImportRunResult { created_count: number; duplicate_count: number; invalid_count: number; invalid_rows: number[]; participants: Participant[]; }
 interface ParticipantUpdateOptions { allowOfflineQueue?: boolean; }
+interface ParticipantBibNumberUpdateOptions { conflictResolution?: 'keep_duplicates' | 'delete_conflicts'; }
 interface OrganizationUpdateInput { name?: string; event_limit?: number; }
 interface UserUpdateInput { name: string; email: string; }
 
@@ -33,7 +36,7 @@ interface DataContextType {
   selectedEventId: string;
   setSelectedEventId: (id: string) => void;
   updateParticipantStatus: (participantId: string, status: ParticipantStatus, options?: ParticipantUpdateOptions) => Promise<MutationResult>;
-  updateParticipantBibNumber: (participantId: string, bibNumber: string) => Promise<MutationResult>;
+  updateParticipantBibNumber: (participantId: string, bibNumber: string, options?: ParticipantBibNumberUpdateOptions) => Promise<ParticipantBibNumberUpdateResult>;
   updateParticipantDetails: (participantId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
   analyzeParticipantImport: (eventId: string, csvContent: string) => Promise<ParticipantImportAnalysis>;
   confirmParticipantImportMapping: (eventId: string, payload: ParticipantImportMappingPayload) => Promise<ParticipantFieldMapping[]>;
@@ -80,6 +83,7 @@ interface ParticipantUpdatePayload {
   status?: ParticipantStatus;
   email?: string;
   bib_number?: string | null;
+  bib_number_conflict_resolution?: 'keep_duplicates' | 'delete_conflicts';
   field_values?: Record<string, string>;
   client_mutation_id?: string;
   device_id?: string;
@@ -373,7 +377,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
   }, [ensureOnline, loadBootstrap, queueStatusUpdate, replaceParticipantRecord, runMutation, updateParticipantInApi]);
 
-  const updateParticipantBibNumber = useCallback(async (participantId: string, bibNumber: string) => runMutation(async () => {
+  const updateParticipantBibNumberLegacy = useCallback(async (participantId: string, bibNumber: string) => runMutation(async () => {
     const offlineError = ensureOnline('Zmiana numeru startowego jest dostępna tylko po połączeniu z serwerem.');
     if (offlineError) return { ok: false, error: offlineError };
     const participant = await updateParticipantInApi(participantId, { bib_number: bibNumber.trim() });
@@ -381,6 +385,48 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await loadBootstrap(true);
     return { ok: true };
   }), [ensureOnline, loadBootstrap, replaceParticipantRecord, runMutation, updateParticipantInApi]);
+
+  const updateParticipantBibNumber = useCallback(async (
+    participantId: string,
+    bibNumber: string,
+    options?: ParticipantBibNumberUpdateOptions
+  ): Promise<ParticipantBibNumberUpdateResult> => {
+    const offlineError = ensureOnline('Zmiana numeru startowego jest dostÄ™pna tylko po poĹ‚Ä…czeniu z serwerem.');
+    if (offlineError) return { ok: false, error: offlineError };
+
+    try {
+      const participant = await updateParticipantInApi(participantId, {
+        bib_number: bibNumber.trim(),
+        bib_number_conflict_resolution: options?.conflictResolution,
+      });
+      replaceParticipantRecord(participant);
+      await loadBootstrap(true);
+      return { ok: true };
+    } catch (error) {
+      handleNetworkFailure(error);
+      if (isApiResponseError(error) && error.status === 409 && getApiErrorCode(error) === 'bib_number_conflict') {
+        const payload = error.payload as {
+          data?: {
+            bib_number?: string;
+            conflicting_participants?: ApiParticipant[];
+          };
+        };
+
+        return {
+          ok: false,
+          error: error.message,
+          conflict: {
+            bibNumber: String(payload.data?.bib_number ?? bibNumber.trim()),
+            conflictingParticipants: Array.isArray(payload.data?.conflicting_participants)
+              ? payload.data.conflicting_participants.map(conflictParticipant => mapApiParticipantToUi(conflictParticipant, selectedEventId))
+              : [],
+          },
+        };
+      }
+
+      return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zapisać numeru startowego.' };
+    }
+  }, [ensureOnline, handleNetworkFailure, loadBootstrap, replaceParticipantRecord, selectedEventId, updateParticipantInApi]);
 
   const updateParticipantDetails = useCallback(async (participantId: string, email: string, fieldValues: Record<string, string>) => runMutation(async () => {
     const offlineError = ensureOnline();
