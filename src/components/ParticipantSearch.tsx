@@ -3,6 +3,7 @@ import { Search, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Participant } from '@/types';
 import { getParticipantStatusDefinition } from '@/lib/participant-status';
+import { formatBibNumber } from '@/lib/participants';
 
 interface ParticipantSearchProps {
   participants: Participant[];
@@ -120,7 +121,7 @@ export default function ParticipantSearch({
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-3">
                     <span className="text-sm font-bold tabular-nums text-primary">
-                      #{participant.bib_number}
+                      {formatBibNumber(participant.bib_number)}
                     </span>
                     <span
                       className={`rounded-full border px-2 py-0.5 text-xs font-bold ${

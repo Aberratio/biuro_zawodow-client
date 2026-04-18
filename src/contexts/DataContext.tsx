@@ -33,7 +33,8 @@ interface DataContextType {
   selectedEventId: string;
   setSelectedEventId: (id: string) => void;
   updateParticipantStatus: (participantId: string, status: ParticipantStatus, options?: ParticipantUpdateOptions) => Promise<MutationResult>;
-  reassignParticipantPackage: (participantId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
+  updateParticipantBibNumber: (participantId: string, bibNumber: string) => Promise<MutationResult>;
+  updateParticipantDetails: (participantId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
   analyzeParticipantImport: (eventId: string, csvContent: string) => Promise<ParticipantImportAnalysis>;
   confirmParticipantImportMapping: (eventId: string, payload: ParticipantImportMappingPayload) => Promise<ParticipantFieldMapping[]>;
   runParticipantImport: (eventId: string, csvContent: string) => Promise<ParticipantImportRunResult>;
@@ -78,6 +79,7 @@ const OFFLINE_MUTATION_WINDOW_MS = 60_000;
 interface ParticipantUpdatePayload {
   status?: ParticipantStatus;
   email?: string;
+  bib_number?: string | null;
   field_values?: Record<string, string>;
   client_mutation_id?: string;
   device_id?: string;
@@ -371,7 +373,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
   }, [ensureOnline, loadBootstrap, queueStatusUpdate, replaceParticipantRecord, runMutation, updateParticipantInApi]);
 
-  const reassignParticipantPackage = useCallback(async (participantId: string, email: string, fieldValues: Record<string, string>) => runMutation(async () => {
+  const updateParticipantBibNumber = useCallback(async (participantId: string, bibNumber: string) => runMutation(async () => {
+    const offlineError = ensureOnline('Zmiana numeru startowego jest dostępna tylko po połączeniu z serwerem.');
+    if (offlineError) return { ok: false, error: offlineError };
+    const participant = await updateParticipantInApi(participantId, { bib_number: bibNumber.trim() });
+    replaceParticipantRecord(participant);
+    await loadBootstrap(true);
+    return { ok: true };
+  }), [ensureOnline, loadBootstrap, replaceParticipantRecord, runMutation, updateParticipantInApi]);
+
+  const updateParticipantDetails = useCallback(async (participantId: string, email: string, fieldValues: Record<string, string>) => runMutation(async () => {
     const offlineError = ensureOnline();
     if (offlineError) return { ok: false, error: offlineError };
     const participant = await updateParticipantInApi(participantId, { email, field_values: fieldValues });
@@ -570,7 +581,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [ensureOnline, getAuthHeaders, handleNetworkFailure]);
 
   return (
-    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, updateParticipantStatus, reassignParticipantPackage, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
+    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
       {children}
     </DataContext.Provider>
   );

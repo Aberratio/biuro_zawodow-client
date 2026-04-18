@@ -11,6 +11,7 @@ import QrScannerView from '@/components/QrScannerView';
 import ParticipantSearch from '@/components/ParticipantSearch';
 import ScannerSkeleton from '@/components/skeletons/ScannerSkeleton';
 import { buildParticipantFieldValues } from '@/lib/participant-fields';
+import { formatBibNumber } from '@/lib/participants';
 import { getParticipantStatusDefinition } from '@/lib/participant-status';
 import { formatEventOfficeWindow, isEventOfficeOpen } from '@/lib/events';
 import { isScannerRole } from '@/lib/roles';
@@ -335,7 +336,7 @@ export default function Scanner() {
           <CheckCircle className="mx-auto h-16 w-16 sm:h-20 sm:w-20" strokeWidth={2.5} />
           <p className="font-heading text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">{status.shortLabel.toUpperCase()}</p>
           <p className="break-words text-xl font-bold sm:text-2xl md:text-3xl">{scannedParticipant.name}</p>
-          <p className="font-mono text-4xl font-black tabular-nums sm:text-5xl md:text-7xl">#{scannedParticipant.bib_number}</p>
+          <p className="font-mono text-4xl font-black tabular-nums sm:text-5xl md:text-7xl">{formatBibNumber(scannedParticipant.bib_number)}</p>
           {scannedParticipant.status === 'checked_in_not_starting' && (
             <p className="mt-4 text-base opacity-80">Pakiet odebrany, uczestnik nie wystartuje</p>
           )}
@@ -397,7 +398,7 @@ export default function Scanner() {
                   <CardTitle className="truncate text-lg sm:text-xl">{scannedParticipant.name}</CardTitle>
                   <p className="mt-1 break-all text-sm text-muted-foreground">{scannedParticipant.email}</p>
                 </div>
-                <span className="shrink-0 text-2xl font-black tabular-nums text-primary sm:text-3xl">#{scannedParticipant.bib_number}</span>
+                <span className="shrink-0 text-2xl font-black tabular-nums text-primary sm:text-3xl">{formatBibNumber(scannedParticipant.bib_number)}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge variant={getParticipantStatusDefinition(scannedParticipant.status).badgeVariant}>
@@ -418,7 +419,7 @@ export default function Scanner() {
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <div className="rounded-xl border bg-background/90 px-3 py-2 shadow-sm">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Numer startowy</p>
-                      <p className="mt-1 text-sm font-medium text-foreground">#{scannedParticipant.bib_number}</p>
+                      <p className="mt-1 text-sm font-medium text-foreground">{formatBibNumber(scannedParticipant.bib_number)}</p>
                     </div>
                     <div className="rounded-xl border bg-background/90 px-3 py-2 shadow-sm">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Status</p>
@@ -506,7 +507,7 @@ export default function Scanner() {
                   {recentScans.map(participant => (
                     <div key={participant.id} className="flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-2 hover:bg-accent/30" onClick={() => { setScannedParticipant(participant); setView('detail'); }}>
                       <span className="min-w-0 truncate font-medium">{participant.name}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">#{participant.bib_number}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{formatBibNumber(participant.bib_number)}</span>
                     </div>
                   ))}
                 </div>

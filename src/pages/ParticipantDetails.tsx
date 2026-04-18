@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input';
 import { FieldError } from '@/components/ui/field-error';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { buildParticipantFieldValues, getActiveParticipantMappings } from '@/lib/participant-fields';
+import { formatBibNumber } from '@/lib/participants';
 import { getParticipantStatusDefinition, PARTICIPANT_STATUS_DEFINITIONS } from '@/lib/participant-status';
 import { validateEmail, validateRequired } from '@/lib/form-validation';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
@@ -64,7 +65,8 @@ export default function ParticipantDetails() {
     activityLog,
     currentRole,
     updateParticipantStatus,
-    reassignParticipantPackage,
+    updateParticipantBibNumber,
+    updateParticipantDetails,
     getParticipantFieldMappings,
     sendParticipantQrEmail,
     deleteParticipant,
@@ -80,11 +82,14 @@ export default function ParticipantDetails() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [sendQrConfirmOpen, setSendQrConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [bibNumberValue, setBibNumberValue] = useState('');
+  const [bibNumberError, setBibNumberError] = useState<string | undefined>();
   const [transferEmail, setTransferEmail] = useState('');
   const [transferFields, setTransferFields] = useState<Record<string, string>>({});
   const [transferErrors, setTransferErrors] = useState<{ email?: string; fields: Record<string, string>; form?: string }>({ fields: {} });
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [isSendingQr, setIsSendingQr] = useState(false);
+  const [isSavingBibNumber, setIsSavingBibNumber] = useState(false);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSavingTransfer, setIsSavingTransfer] = useState(false);
   const [isDeletingParticipant, setIsDeletingParticipant] = useState(false);
@@ -95,6 +100,8 @@ export default function ParticipantDetails() {
   useEffect(() => {
     if (!participant) return;
     setStatusValue(participant.status);
+    setBibNumberValue(participant.bib_number);
+    setBibNumberError(undefined);
     setTransferEmail(participant.email);
   }, [participant]);
 
@@ -125,6 +132,38 @@ export default function ParticipantDetails() {
   }, [canUseAdminActions, getParticipantQrPreview, isOnline, participant?.id]);
 
   const activeMappings = useMemo(() => getActiveParticipantMappings(mappings), [mappings]);
+  const editableMappings = useMemo(
+    () => activeMappings.filter(mapping => mapping.field_role !== 'bib_number'),
+    [activeMappings]
+  );
+  const participantDataEntries = useMemo(() => {
+    if (!participant) return [];
+
+    const entries = [
+      { label: 'Imię i nazwisko', value: participant.name },
+      { label: 'Email', value: participant.email },
+    ];
+    const mappedValues = buildParticipantFieldValues(mappings, participant);
+    const seenLabels = new Set(['Imię i nazwisko', 'Email']);
+
+    for (const mapping of activeMappings) {
+      if (mapping.field_role === 'bib_number') continue;
+      const value = (mappedValues[mapping.alias] ?? '').trim();
+      if (!value) continue;
+      entries.push({ label: mapping.alias, value });
+      seenLabels.add(mapping.alias);
+    }
+
+    for (const [label, value] of Object.entries(participant.custom_fields ?? {})) {
+      const normalizedLabel = label.trim();
+      const normalizedValue = value.trim();
+      if (!normalizedLabel || !normalizedValue || seenLabels.has(normalizedLabel)) continue;
+      entries.push({ label: normalizedLabel, value: normalizedValue });
+    }
+
+    return entries;
+  }, [activeMappings, mappings, participant]);
+
   const timeline = useMemo(() => {
     if (!participant) return [];
 
@@ -154,6 +193,8 @@ export default function ParticipantDetails() {
   if (!participant) return <div className="text-center py-12 text-muted-foreground">Nie znaleziono uczestnika</div>;
 
   const statusDefinition = getParticipantStatusDefinition(participant.status);
+  const normalizedBibNumberValue = bibNumberValue.trim();
+  const normalizedCurrentBibNumber = participant.bib_number.trim();
 
   const handleSendQr = async () => {
     setSendQrConfirmOpen(false);
@@ -188,6 +229,29 @@ export default function ParticipantDetails() {
     }
   };
 
+  const handleSaveBibNumber = async () => {
+    const normalizedBibNumber = bibNumberValue.trim();
+    if (normalizedBibNumber.length > 32) {
+      setBibNumberError('Numer startowy może mieć maksymalnie 32 znaki.');
+      return;
+    }
+
+    setBibNumberError(undefined);
+    setIsSavingBibNumber(true);
+    try {
+      const result = await updateParticipantBibNumber(participant.id, normalizedBibNumber);
+      if (!result.ok) {
+        setBibNumberError(result.error);
+        toast({ title: 'Nie udało się zapisać numeru startowego', description: result.error, variant: 'destructive' });
+        return;
+      }
+
+      toast({ title: normalizedBibNumber ? 'Numer startowy zapisany' : 'Numer startowy wyczyszczony' });
+    } finally {
+      setIsSavingBibNumber(false);
+    }
+  };
+
   const handleTransferFieldChange = (alias: string, value: string) => {
     setTransferFields(previous => ({ ...previous, [alias]: value }));
     setTransferErrors(previous => ({ ...previous, fields: { ...previous.fields, [alias]: '' }, form: undefined }));
@@ -200,12 +264,13 @@ export default function ParticipantDetails() {
       if (error) accumulator[mapping.alias] = error;
       return accumulator;
     }, {});
+    void fieldErrors;
     const nextErrors = {
       email: validateEmail(transferEmail),
-      fields: fieldErrors,
+      fields: {},
     };
 
-    if (nextErrors.email || Object.values(fieldErrors).some(Boolean)) {
+    if (nextErrors.email) {
       setTransferErrors(nextErrors);
       return;
     }
@@ -213,16 +278,16 @@ export default function ParticipantDetails() {
     setTransferErrors({ fields: {} });
     setIsSavingTransfer(true);
     try {
-      const result = await reassignParticipantPackage(participant.id, transferEmail, transferFields);
+      const result = await updateParticipantDetails(participant.id, transferEmail, transferFields);
       if (!result.ok) {
-        setTransferErrors({ fields: {}, form: result.error ?? 'Nie udało się przepisać pakietu.' });
-        toast({ title: 'Nie udało się przepisać pakietu', description: result.error, variant: 'destructive' });
+        setTransferErrors({ fields: {}, form: result.error ?? 'Nie udało się zapisać danych uczestnika.' });
+        toast({ title: 'Nie udało się zapisać danych uczestnika', description: result.error, variant: 'destructive' });
         return;
       }
 
       setTransferOpen(false);
       setTransferErrors({ fields: {} });
-      toast({ title: 'Pakiet przepisany na nową osobę' });
+      toast({ title: 'Dane uczestnika zaktualizowane' });
     } finally {
       setIsSavingTransfer(false);
     }
@@ -259,7 +324,7 @@ export default function ParticipantDetails() {
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
             <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setTransferOpen(true)} disabled={!isOnline}>
               <UserRoundCog className="h-4 w-4 mr-1" />
-              Przepisz pakiet na inną osobę
+              Edytuj dane uczestnika
             </Button>
             {canUseAdminActions && (
             <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setSendQrConfirmOpen(true)} disabled={isSendingQr || !isOnline}>
@@ -281,15 +346,18 @@ export default function ParticipantDetails() {
       )}
 
       {!isOnline && (
-        <OnlineOnlyNotice description="Podgląd QR, zmiana statusu poza skanerem, przepisanie pakietu, wysyłka maila i usuwanie uczestnika wymagają aktywnego połączenia z serwerem." />
+        <OnlineOnlyNotice description="Podgląd QR, edycja danych i statusu, wysyłka maila oraz usuwanie uczestnika wymagają aktywnego połączenia z serwerem." />
       )}
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <Card>
           <CardHeader><CardTitle className="text-base">Szczegóły uczestnika</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Numer startowy</span><span className="font-semibold tabular-nums">#{participant.bib_number}</span></div>
-                <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Status</span><Badge variant={statusDefinition.badgeVariant}>{statusDefinition.label}</Badge></div>
+            <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-muted-foreground">Numer startowy</span>
+              <span className="font-semibold tabular-nums">{formatBibNumber(participant.bib_number)}</span>
+            </div>
+            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Status</span><Badge variant={statusDefinition.badgeVariant}>{statusDefinition.label}</Badge></div>
             {(participant.sync_state === 'pending_sync' || participant.sync_state === 'requires_review') && (
               <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-muted-foreground">Synchronizacja</span>
@@ -300,6 +368,35 @@ export default function ParticipantDetails() {
             )}
             <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Mail z QR</span><Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'}>{participant.email_status === 'sent' ? 'Wysłany' : 'Oczekuje'}</Badge></div>
             <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-start sm:justify-between"><span className="text-muted-foreground">Token QR</span><span className="font-mono text-xs break-all sm:max-w-[18rem] sm:text-right">{participant.qr_code}</span></div>
+            {canManageParticipantData && (
+              <div className="space-y-2 pt-2">
+                <Label htmlFor="participant-bib-number">Numer startowy</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="participant-bib-number"
+                    value={bibNumberValue}
+                    onChange={event => {
+                      setBibNumberValue(event.target.value);
+                      setBibNumberError(undefined);
+                    }}
+                    placeholder="Np. 101"
+                    className="sm:flex-1"
+                    aria-invalid={Boolean(bibNumberError)}
+                    aria-describedby={bibNumberError ? 'participant-bib-number-error' : undefined}
+                  />
+                  <Button
+                    className="w-full sm:w-auto"
+                    onClick={() => void handleSaveBibNumber()}
+                    disabled={isSavingBibNumber || normalizedBibNumberValue === normalizedCurrentBibNumber || !isOnline}
+                  >
+                    {isSavingBibNumber && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                    Zapisz numer
+                  </Button>
+                </div>
+                <FieldError id="participant-bib-number-error">{bibNumberError}</FieldError>
+                <p className="text-xs text-muted-foreground">Pole może pozostać puste. Numer musi być unikalny w ramach wydarzenia.</p>
+              </div>
+            )}
             {canManageParticipantData && (
               <div className="space-y-2 pt-2">
                 <Label>Zmień status</Label>
@@ -354,6 +451,18 @@ export default function ParticipantDetails() {
       </div>
 
       <Card>
+        <CardHeader><CardTitle className="text-base">Dane uczestnika</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {participantDataEntries.map(entry => (
+            <div key={entry.label} className="flex flex-col gap-1 text-sm sm:flex-row sm:items-start sm:justify-between">
+              <span className="text-muted-foreground">{entry.label}</span>
+              <span className="font-medium sm:max-w-[60%] sm:text-right break-words">{entry.value}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader><CardTitle className="text-base">Historia</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -379,12 +488,12 @@ export default function ParticipantDetails() {
           if (!nextOpen) setTransferErrors({ fields: {} });
         }}
       >
-        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[calc(100vh-2rem)] overflow-hidden p-0 flex flex-col">
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl lg:max-w-3xl">
           <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-            <DialogTitle>Przepisz pakiet na inną osobę</DialogTitle>
+            <DialogTitle>Edytuj dane uczestnika</DialogTitle>
           </DialogHeader>
-          <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4 space-y-4">
-            <div>
+          <div className="themed-scrollbar grid flex-1 gap-4 overflow-y-auto px-6 py-4 lg:grid-cols-2">
+            <div className="lg:col-span-2">
               <Label htmlFor="transfer-participant-email">Email</Label>
               <Input
                 id="transfer-participant-email"
@@ -401,7 +510,7 @@ export default function ParticipantDetails() {
               />
               <FieldError id="transfer-participant-email-error" className="mt-2">{transferErrors.email}</FieldError>
             </div>
-            {activeMappings.map((mapping, index) => {
+            {editableMappings.map((mapping, index) => {
               const fieldId = `transfer-participant-field-${index}`;
               const errorId = `${fieldId}-error`;
               const fieldError = transferErrors.fields[mapping.alias];
@@ -411,11 +520,9 @@ export default function ParticipantDetails() {
                   <Label htmlFor={fieldId}>{mapping.alias}</Label>
                   <Input
                     id={fieldId}
-                    value={mapping.field_role === 'bib_number' ? participant.bib_number : (transferFields[mapping.alias] ?? '')}
+                    value={transferFields[mapping.alias] ?? ''}
                     onChange={event => handleTransferFieldChange(mapping.alias, event.target.value)}
                     className="mt-2"
-                    readOnly={mapping.field_role === 'bib_number'}
-                    required={mapping.field_role !== 'bib_number'}
                     aria-invalid={Boolean(fieldError)}
                     aria-describedby={fieldError ? errorId : undefined}
                   />
@@ -423,7 +530,7 @@ export default function ParticipantDetails() {
                 </div>
               );
             })}
-            <FieldError id="transfer-participant-form-error">{transferErrors.form}</FieldError>
+            <FieldError id="transfer-participant-form-error" className="lg:col-span-2">{transferErrors.form}</FieldError>
           </div>
           <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button className="w-full sm:w-auto" onClick={() => void handleTransferSubmit()} disabled={isSavingTransfer}>

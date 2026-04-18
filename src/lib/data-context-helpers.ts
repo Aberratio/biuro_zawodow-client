@@ -109,7 +109,7 @@ export function mapApiParticipantToUi(participant: ApiParticipant, fallbackEvent
     event_id: eventId,
     name: (participant.display_name ?? `${participant.first_name} ${participant.last_name}`.trim()).trim(),
     email: participant.email,
-    bib_number: participant.bib_number ?? `BIB-${participant.id}`,
+    bib_number: participant.bib_number ?? '',
     qr_code: participant.qr_code ?? '',
     status: normalizeParticipantStatus(participant.status),
     email_status: participant.email_status ?? 'not_sent',

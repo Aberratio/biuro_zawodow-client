@@ -15,6 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { ParticipantFieldMapping } from '@/types';
 import { buildEmptyParticipantFieldValues, getActiveParticipantMappings } from '@/lib/participant-fields';
+import { formatBibNumber } from '@/lib/participants';
 import { getParticipantStatusDefinition, PARTICIPANT_STATUS_DEFINITIONS } from '@/lib/participant-status';
 import { validateEmail, validateRequired } from '@/lib/form-validation';
 import { isScannerRole } from '@/lib/roles';
@@ -138,12 +139,13 @@ export default function Participants() {
       if (error) accumulator[mapping.alias] = error;
       return accumulator;
     }, {});
+    void fieldErrors;
     const nextErrors = {
       email: validateEmail(manualEmail),
-      fields: fieldErrors,
+      fields: {},
     };
 
-    if (nextErrors.email || Object.values(fieldErrors).some(Boolean)) {
+    if (nextErrors.email) {
       setManualErrors(nextErrors);
       return;
     }
@@ -259,7 +261,7 @@ export default function Participants() {
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground text-sm">{participant.email}</TableCell>
-                    <TableCell className="tabular-nums text-sm">#{participant.bib_number}</TableCell>
+                    <TableCell className="tabular-nums text-sm">{formatBibNumber(participant.bib_number)}</TableCell>
                     <TableCell>
                       <Badge variant={status.badgeVariant} className="text-[10px]">
                         {status.label}
@@ -315,7 +317,6 @@ export default function Participants() {
                     value={manualFields[mapping.alias] ?? ''}
                     onChange={event => handleManualFieldChange(mapping.alias, event.target.value)}
                     className="mt-2"
-                    required
                     aria-invalid={Boolean(fieldError)}
                     aria-describedby={fieldError ? errorId : undefined}
                   />

@@ -371,12 +371,13 @@ export default function EventDetails() {
       if (error) accumulator[mapping.alias] = error;
       return accumulator;
     }, {});
+    void fieldErrors;
     const nextErrors = {
       email: validateEmail(manualEmail),
-      fields: fieldErrors,
+      fields: {},
     };
 
-    if (nextErrors.email || Object.values(fieldErrors).some(Boolean)) {
+    if (nextErrors.email) {
       setManualErrors(nextErrors);
       return;
     }
@@ -857,7 +858,6 @@ export default function EventDetails() {
                     value={manualFields[mapping.alias] ?? ''}
                     onChange={eventValue => handleManualFieldChange(mapping.alias, eventValue.target.value)}
                     className="mt-2"
-                    required
                     aria-invalid={Boolean(fieldError)}
                     aria-describedby={fieldError ? errorId : undefined}
                   />
