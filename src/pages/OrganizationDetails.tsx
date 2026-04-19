@@ -61,6 +61,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  Calculator,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -801,17 +802,13 @@ export default function OrganizationDetails() {
         className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
       >
         <ArrowLeft className="mr-1 h-4 w-4" />
-        Wróć do organizacji
+        Wróć do listy wszystkich organizacji
       </Button>
 
-      <section className="rounded-[2.25rem] border border-white/8 bg-[linear-gradient(180deg,hsl(220_11%_7%/_0.98),hsl(220_15%_5%/_0.99))] px-5 py-5 shadow-[0_32px_80px_hsl(var(--surface-shadow)/0.44),inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:px-7 sm:py-6">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
-              <div className="flex items-center gap-4">
-                <div className="hidden h-16 w-16 shrink-0 items-center justify-center rounded-[1.4rem] border border-[hsl(var(--button-highlight)/0.16)] bg-[linear-gradient(180deg,hsl(var(--button-highlight)/0.1),hsl(var(--background)/0.78))] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:h-20 sm:w-20">
-                  <Building2 className="h-8 w-8 text-[hsl(var(--button-highlight))]" />
-                </div>
+              <div className="flex items-center gap-4"> 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h1 className="truncate text-[2rem] font-bold leading-none tracking-[-0.03em] text-foreground sm:text-[2.35rem]">
@@ -833,20 +830,25 @@ export default function OrganizationDetails() {
                         <Pencil className="h-4 w-4" />
                       </Button>
                     )}
-                  </div>
-                  <p className="hidden mt-2 text-sm text-muted-foreground">
-                    Szczegóły organizacji i zespołu.
-                  </p>
+                  </div> 
                 </div>
               </div>
             </div>
-            {canEditOrganization && canDeleteOrganization && (
+            {canEditOrganization && (
               <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  variant="outline"
+                  className="w-full rounded-[1rem] px-5 sm:w-auto"
+                  onClick={openLimitDialog}
+                > 
+                  <Calculator className="mr-1 h-4 w-4" />
+                  Zmień limit wydarzeń
+                </Button>
                 <Button
                   variant="destructive"
                   className="w-full rounded-[1rem] px-5 sm:w-auto"
                   onClick={() => setDeleteOrganizationConfirmOpen(true)}
-                >
+                > 
                   <Trash2 className="mr-1 h-4 w-4" />
                   Usuń organizację
                 </Button>
@@ -854,68 +856,11 @@ export default function OrganizationDetails() {
             )}
           </div>
 
-          <Card className="overflow-hidden border-[hsl(var(--button-highlight)/0.14)] bg-[hsl(220_13%_8%/_0.78)] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04)]">
-            <CardContent
-              className={`grid grid-cols-1 gap-0 p-0 text-sm ${
-                canEditOrganization
-                  ? "lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
-                  : "lg:grid-cols-4"
-              }`}
-            >
-              <div className="border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-4 sm:px-6 lg:border-b-0 lg:border-r">
-                <span className="text-sm text-muted-foreground">
-                  Wydarzenia
-                </span>
-                <p className="mt-2 text-[1.85rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
-                  {orgEvents.length}/{organization.event_limit}
-                </p>
-              </div>
-              <div className="hidden border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-4 sm:px-6 sm:border-l-0 lg:border-b-0 lg:border-r">
-                <span className="text-sm text-muted-foreground">
-                  Organizatorzy
-                </span>
-                <p className="mt-2 text-[1.85rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
-                  {organizers.length}
-                </p>
-              </div>
-              <div className="hidden border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-4 sm:px-6 lg:border-b-0 lg:border-r">
-                <span className="text-sm text-muted-foreground">
-                  Operatorzy
-                </span>
-                <p className="mt-2 text-[1.85rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
-                  {scanners.length}
-                </p>
-              </div>
-              <div className="hidden px-5 py-4 sm:px-6 lg:border-r lg:border-[hsl(var(--button-highlight)/0.12)]">
-                <span className="text-sm text-muted-foreground">
-                  Administratorzy
-                </span>
-                <p className="mt-2 break-words text-lg font-semibold tracking-[-0.02em] text-foreground">
-                  {adminLabel}
-                </p>
-              </div>
-              {canEditOrganization && (
-                <div className="hidden items-end justify-end px-5 py-4 sm:px-6">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className={subtleIconButtonClassName}
-                    onClick={openLimitDialog}
-                    aria-label="Edytuj limit wydarzeń"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
-      </section>
 
       <section className={sectionClassName}>
         <CollapsibleOrganizationSection
-          title="Wydarzenia"
+          title={`Wydarzenia  (${orgEvents.length}/${organization.event_limit})`}
           defaultOpen
           action={
             canCreateEvent ? (
@@ -1189,7 +1134,7 @@ export default function OrganizationDetails() {
                               >
                                 Przypisz wydarzenia
                               </Button>
-                              {false && scanner.role === "scanner" && (
+                              {scanner.role === "scanner" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -1204,7 +1149,7 @@ export default function OrganizationDetails() {
                                   Zmień na Operator Plus
                                 </Button>
                               )}
-                              {false && scanner.role === "scanner_plus" && (
+                              {scanner.role === "scanner_plus" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -1219,7 +1164,7 @@ export default function OrganizationDetails() {
                                   Zmień na Operator
                                 </Button>
                               )}
-                              {false && canManageMemberAccounts && (
+                              {canManageMemberAccounts && (
                                 <>
                                   <Button
                                     size="sm"
