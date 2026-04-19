@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { formatDistanceToNowStrict } from "date-fns";
 import { pl } from "date-fns/locale";
 import { useData } from "@/contexts/DataContext";
@@ -224,6 +224,7 @@ function TeamRoleCard({
 export default function EventDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     events,
     archivedEvents,
@@ -330,7 +331,6 @@ export default function EventDetails() {
   const canEditEvent = isArchivedEvent
     ? currentRole === "superadmin"
     : canManageScanners;
-  const canOperateOnEvent = !isArchivedEvent || currentRole === "superadmin";
   const canUseActiveEventTools =
     !isArchivedEvent &&
     event !== undefined &&
@@ -653,24 +653,27 @@ export default function EventDetails() {
     navigate("/events");
   };
 
+  const backTo =
+    location.state?.backTo ??
+    (isArchivedEvent
+      ? `/organizations/${event.organization_id}/archived-events`
+      : "/events");
+
+  const backLabel =
+    location.state?.backLabel ??
+    (isArchivedEvent
+      ? "Wróć do archiwum"
+      : "Wróć do listy wszystkich wydarzeń");
+
   return (
     <div className="event-detail-page space-y-8">
       <Button
         variant="ghost"
         size="sm"
-        onClick={() =>
-          navigate(
-            isArchivedEvent
-              ? `/organizations/${event.organization_id}/archived-events`
-              : "/events",
-          )
-        }
+        onClick={() => navigate(backTo)}
         className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
       >
-        <ArrowLeft className="mr-1 h-4 w-4" />{" "}
-        {isArchivedEvent
-          ? "Wróć do archiwum"
-          : "Wróć do listy wszystkich wydarzeń"}
+        <ArrowLeft className="mr-1 h-4 w-4" /> {backLabel}
       </Button>
 
       {isArchivedEvent && (
@@ -692,7 +695,7 @@ export default function EventDetails() {
         </div>
       )}
 
-      {!isOnline && canOperateOnEvent && (
+      {!isOnline && (
         <OnlineOnlyNotice description="Import CSV, edycja wydarzenia, eksporty, wysyłka QR, ręczne dodawanie uczestników i zarządzanie operatorami wymagają aktywnego połączenia z serwerem." />
       )}
 
@@ -858,44 +861,40 @@ export default function EventDetails() {
         </div>
       </section>
 
-      {canOperateOnEvent && (
-        <section className="space-y-4">
-          <div>
-            <h2 className="event-detail-section-title text-xl font-bold tracking-tight">
-              Operacje
-            </h2>
-          </div>
+      <section className="space-y-4">
+        <div>
+          <h2 className="event-detail-section-title text-xl font-bold tracking-tight">
+            Operacje
+          </h2>
+        </div>
 
-          <div className="event-detail-section-group">
+        <div className="event-detail-section-group">
+          {(!isArchivedEvent || currentRole === "superadmin") && (
             <CollapsibleSection title="Uczestnicy" defaultOpen={false}>
               <div className="flex flex-col gap-2">
-                {!isArchivedEvent && canOperateOnEvent && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedEventId(event.id);
-                      navigate(`/events/${event.id}/import`);
-                    }}
-                    className="event-detail-operation-button h-11 justify-start"
-                    disabled={!isOnline}
-                  >
-                    <FileUp className="mr-1 h-4 w-4" /> Import uczestników CSV
-                  </Button>
-                )}
-                {!isArchivedEvent && canOperateOnEvent && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedEventId(event.id);
-                      navigate("/emails");
-                    }}
-                    className="event-detail-operation-button h-11 justify-start"
-                    disabled={!isOnline}
-                  >
-                    <Mail className="mr-1 h-4 w-4" /> Wyślij QR do uczestników
-                  </Button>
-                )}
-                {!isArchivedEvent && canOperateOnEvent && hasSavedMapping && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedEventId(event.id);
+                    navigate(`/events/${event.id}/import`);
+                  }}
+                  className="event-detail-operation-button h-11 justify-start"
+                  disabled={!isOnline}
+                >
+                  <FileUp className="mr-1 h-4 w-4" /> Import uczestników CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedEventId(event.id);
+                    navigate("/emails");
+                  }}
+                  className="event-detail-operation-button h-11 justify-start"
+                  disabled={!isOnline}
+                >
+                  <Mail className="mr-1 h-4 w-4" /> Wyślij QR do uczestników
+                </Button>
+                {hasSavedMapping && (
                   <Button
                     variant="outline"
                     onClick={() => setManualOpen(true)}
@@ -907,42 +906,40 @@ export default function EventDetails() {
                 )}
               </div>
             </CollapsibleSection>
+          )}
 
-            {canOperateOnEvent && (
-              <CollapsibleSection title="Eksport" defaultOpen={false}>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => void handleExportCsv()}
-                    className="event-detail-operation-button h-11 justify-start"
-                    disabled={exportingCsv || !isOnline}
-                  >
-                    {exportingCsv ? (
-                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="mr-1 h-4 w-4" />
-                    )}
-                    Eksport uczestników CSV
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => void handleExportLogsCsv()}
-                    className="event-detail-operation-button h-11 justify-start"
-                    disabled={exportingLogsCsv || !isOnline}
-                  >
-                    {exportingLogsCsv ? (
-                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="mr-1 h-4 w-4" />
-                    )}
-                    Eksport logów CSV
-                  </Button>
-                </div>
-              </CollapsibleSection>
-            )}
-          </div>
-        </section>
-      )}
+          <CollapsibleSection title="Eksport" defaultOpen={false}>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                onClick={() => void handleExportCsv()}
+                className="event-detail-operation-button h-11 justify-start"
+                disabled={exportingCsv || !isOnline}
+              >
+                {exportingCsv ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-1 h-4 w-4" />
+                )}
+                Eksport uczestników CSV
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void handleExportLogsCsv()}
+                className="event-detail-operation-button h-11 justify-start"
+                disabled={exportingLogsCsv || !isOnline}
+              >
+                {exportingLogsCsv ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-1 h-4 w-4" />
+                )}
+                Eksport logów CSV
+              </Button>
+            </div>
+          </CollapsibleSection>
+        </div>
+      </section>
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
