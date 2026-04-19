@@ -668,7 +668,9 @@ export default function EventDetails() {
         className="event-detail-back touch-manipulation"
       >
         <ArrowLeft className="mr-1 h-4 w-4" />{" "}
-        {isArchivedEvent ? "Wróć do archiwum" : "Wróć do wydarzeń"}
+        {isArchivedEvent
+          ? "Wróć do archiwum"
+          : "Wróć do listy wszystkich wydarzeń"}
       </Button>
 
       {isArchivedEvent && (
