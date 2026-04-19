@@ -665,7 +665,7 @@ export default function EventDetails() {
               : "/events",
           )
         }
-        className="event-detail-back touch-manipulation"
+        className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
       >
         <ArrowLeft className="mr-1 h-4 w-4" />{" "}
         {isArchivedEvent
@@ -781,7 +781,7 @@ export default function EventDetails() {
             )}
             {canEditEvent && (
               <Button
-                variant="link"
+                variant="outline"
                 onClick={() => setEditOpen(true)}
                 className="event-detail-secondary-action h-12 w-full"
                 disabled={!isOnline}
@@ -791,9 +791,9 @@ export default function EventDetails() {
             )}
             {canArchiveEvent && (
               <Button
-                variant="outline"
+                variant="destructive"
                 onClick={() => setDeleteConfirmOpen(true)}
-                className="event-detail-archive-action w-full"
+                className="event-detail-archive-action h-12 w-full"
                 disabled={!isOnline}
               >
                 <Archive className="mr-1 h-4 w-4" /> Archiwizuj wydarzenie
