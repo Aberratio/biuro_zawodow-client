@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertTriangle, CheckCircle, Info, Loader2, Mail, RefreshCcw, Send } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle, Info, Loader2, Mail, RefreshCcw, Send } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
@@ -25,6 +26,7 @@ type PendingEmailAction =
   | { kind: 'send-one'; participantId: string; participantName: string; participantEmail: string };
 
 export default function EmailSending() {
+  const navigate = useNavigate();
   const {
     participants,
     events,
@@ -108,7 +110,11 @@ export default function EmailSending() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Wysyłka kodów QR</h1>
+        <Button variant="ghost" size="sm" onClick={() => navigate(`/events/${selectedEventId}`)} className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
+          >
+        <ArrowLeft className="h-4 w-4 mr-1" /> Wróć do wydarzenia
+      </Button>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl mt-8">Wysyłka kodów QR</h1>
         <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
           {selectedEvent ? `Wydarzenie: ${selectedEvent.name}` : 'Wyślij kody QR dla wybranego wydarzenia.'}
         </p>
