@@ -805,58 +805,57 @@ export default function OrganizationDetails() {
         Wróć do listy wszystkich organizacji
       </Button>
 
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex items-center gap-4"> 
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h1 className="truncate text-[2rem] font-bold leading-none tracking-[-0.03em] text-foreground sm:text-[2.35rem]">
-                      {organization.name}
-                    </h1>
-                    {canEditOrganization && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className={subtleIconButtonClassName}
-                        onClick={() => {
-                          setOrganizationNameDraft(organization.name);
-                          setLimitDraft(String(organization.event_limit));
-                          setOrganizationEditOpen(true);
-                        }}
-                        aria-label="Edytuj organizację"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div> 
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="truncate text-[2rem] font-bold leading-none tracking-[-0.03em] text-foreground sm:text-[2.35rem]">
+                    {organization.name}
+                  </h1>
+                  {canEditOrganization && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={subtleIconButtonClassName}
+                      onClick={() => {
+                        setOrganizationNameDraft(organization.name);
+                        setLimitDraft(String(organization.event_limit));
+                        setOrganizationEditOpen(true);
+                      }}
+                      aria-label="Edytuj organizację"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
-            {canEditOrganization && (
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button
-                  variant="outline"
-                  className="w-full rounded-[1rem] px-5 sm:w-auto"
-                  onClick={openLimitDialog}
-                > 
-                  <Calculator className="mr-1 h-4 w-4" />
-                  Zmień limit wydarzeń
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="w-full rounded-[1rem] px-5 sm:w-auto"
-                  onClick={() => setDeleteOrganizationConfirmOpen(true)}
-                > 
-                  <Trash2 className="mr-1 h-4 w-4" />
-                  Usuń organizację
-                </Button>
-              </div>
-            )}
           </div>
-
+          {canEditOrganization && (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                variant="outline"
+                className="w-full rounded-[1rem] px-5 sm:w-auto"
+                onClick={openLimitDialog}
+              >
+                <Calculator className="mr-1 h-4 w-4" />
+                Zmień limit wydarzeń
+              </Button>
+              <Button
+                variant="destructive"
+                className="w-full rounded-[1rem] px-5 sm:w-auto"
+                onClick={() => setDeleteOrganizationConfirmOpen(true)}
+              >
+                <Trash2 className="mr-1 h-4 w-4" />
+                Usuń organizację
+              </Button>
+            </div>
+          )}
         </div>
+      </div>
 
       <section className={sectionClassName}>
         <CollapsibleOrganizationSection
@@ -904,14 +903,26 @@ export default function OrganizationDetails() {
                       <TableRow
                         key={event.id}
                         className="cursor-pointer border-0 transition-colors hover:bg-[hsl(var(--button-highlight)/0.06)] active:bg-[hsl(var(--button-highlight)/0.1)] [&>td]:py-4"
-                        onClick={() => navigate(`/events/${event.id}`)}
+                        onClick={() =>
+                          navigate(`/events/${event.id}`, {
+                            state: {
+                              backTo: `/organizations/${organization.id}`,
+                              backLabel: "Wróć do szczegółów organizacji",
+                            },
+                          })
+                        }
                         onKeyDown={(keyboardEvent) => {
                           if (
                             keyboardEvent.key === "Enter" ||
                             keyboardEvent.key === " "
                           ) {
                             keyboardEvent.preventDefault();
-                            navigate(`/events/${event.id}`);
+                            navigate(`/events/${event.id}`, {
+                              state: {
+                                backTo: `/organizations/${organization.id}`,
+                                backLabel: "Wróć do szczegółów organizacji",
+                              },
+                            });
                           }
                         }}
                         tabIndex={0}
