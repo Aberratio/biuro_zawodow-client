@@ -1,13 +1,28 @@
-﻿import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useData } from '@/contexts/DataContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle, Clock, Loader2, Mail, QrCode, Repeat, Trash2, UserRoundCog } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
-import DetailSkeleton from '@/components/skeletons/DetailSkeleton';
-import type { Participant, ParticipantFieldMapping, ParticipantQrPreview, ParticipantStatus } from '@/types';
+﻿import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useData } from "@/contexts/DataContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  ArrowLeft,
+  CheckCircle,
+  Clock,
+  Loader2,
+  Mail,
+  QrCode,
+  Repeat,
+  Trash2,
+  UserRoundCog,
+} from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import DetailSkeleton from "@/components/skeletons/DetailSkeleton";
+import type {
+  Participant,
+  ParticipantFieldMapping,
+  ParticipantQrPreview,
+  ParticipantStatus,
+} from "@/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,42 +32,66 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { FieldError } from '@/components/ui/field-error';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { buildParticipantFieldValues, getActiveParticipantMappings } from '@/lib/participant-fields';
-import { formatBibNumber } from '@/lib/participants';
-import { getParticipantStatusDefinition, PARTICIPANT_STATUS_DEFINITIONS } from '@/lib/participant-status';
-import { validateEmail, validateRequired } from '@/lib/form-validation';
-import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { FieldError } from "@/components/ui/field-error";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  buildParticipantFieldValues,
+  getActiveParticipantMappings,
+} from "@/lib/participant-fields";
+import { formatBibNumber } from "@/lib/participants";
+import {
+  getParticipantStatusDefinition,
+  PARTICIPANT_STATUS_DEFINITIONS,
+} from "@/lib/participant-status";
+import { validateEmail, validateRequired } from "@/lib/form-validation";
+import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 
 function formatParticipantDateTime(value: string): string {
-  const normalizedValue = value.includes(' ') ? value.replace(' ', 'T') : value;
+  const normalizedValue = value.includes(" ") ? value.replace(" ", "T") : value;
   const parsed = new Date(normalizedValue);
   if (Number.isNaN(parsed.getTime())) {
     return value;
   }
 
-  return new Intl.DateTimeFormat('pl-PL', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+  return new Intl.DateTimeFormat("pl-PL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
   }).format(parsed);
 }
 
 function getTimelineIcon(action: string) {
-  const normalizedAction = action.toLocaleLowerCase('pl-PL');
+  const normalizedAction = action.toLocaleLowerCase("pl-PL");
 
-  if (normalizedAction.includes('qr') || normalizedAction.includes('mail')) return Mail;
-  if (normalizedAction.includes('przepis')) return Repeat;
-  if (normalizedAction.includes('usun')) return Trash2;
-  if (normalizedAction.includes('status') || normalizedAction.includes('check-in') || normalizedAction.includes('skan')) return CheckCircle;
+  if (normalizedAction.includes("qr") || normalizedAction.includes("mail"))
+    return Mail;
+  if (normalizedAction.includes("przepis")) return Repeat;
+  if (normalizedAction.includes("usun")) return Trash2;
+  if (
+    normalizedAction.includes("status") ||
+    normalizedAction.includes("check-in") ||
+    normalizedAction.includes("skan")
+  )
+    return CheckCircle;
   return Clock;
 }
 
@@ -74,31 +113,47 @@ export default function ParticipantDetails() {
     isLoading,
     connectionState,
   } = useData();
-  const participant = participants.find(entry => entry.id === id);
-  const event = events.find(entry => entry.id === participant?.event_id);
+  const participant = participants.find((entry) => entry.id === id);
+  const event = events.find((entry) => entry.id === participant?.event_id);
   const [qrPreview, setQrPreview] = useState<ParticipantQrPreview | null>(null);
   const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
-  const [statusValue, setStatusValue] = useState<ParticipantStatus>('not_checked_in');
+  const [statusValue, setStatusValue] =
+    useState<ParticipantStatus>("not_checked_in");
   const [transferOpen, setTransferOpen] = useState(false);
   const [sendQrConfirmOpen, setSendQrConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [bibNumberConflictOpen, setBibNumberConflictOpen] = useState(false);
-  const [bibNumberConflictParticipants, setBibNumberConflictParticipants] = useState<Participant[]>([]);
-  const [pendingBibNumberCandidate, setPendingBibNumberCandidate] = useState('');
-  const [bibNumberValue, setBibNumberValue] = useState('');
+  const [bibNumberConflictParticipants, setBibNumberConflictParticipants] =
+    useState<Participant[]>([]);
+  const [pendingBibNumberCandidate, setPendingBibNumberCandidate] =
+    useState("");
+  const [bibNumberValue, setBibNumberValue] = useState("");
   const [bibNumberError, setBibNumberError] = useState<string | undefined>();
-  const [transferEmail, setTransferEmail] = useState('');
-  const [transferFields, setTransferFields] = useState<Record<string, string>>({});
-  const [transferErrors, setTransferErrors] = useState<{ email?: string; fields: Record<string, string>; form?: string }>({ fields: {} });
+  const [transferEmail, setTransferEmail] = useState("");
+  const [transferFields, setTransferFields] = useState<Record<string, string>>(
+    {},
+  );
+  const [transferErrors, setTransferErrors] = useState<{
+    email?: string;
+    fields: Record<string, string>;
+    form?: string;
+  }>({ fields: {} });
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [isSendingQr, setIsSendingQr] = useState(false);
   const [isSavingBibNumber, setIsSavingBibNumber] = useState(false);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSavingTransfer, setIsSavingTransfer] = useState(false);
   const [isDeletingParticipant, setIsDeletingParticipant] = useState(false);
-  const canManageParticipantData = currentRole === 'editor' || currentRole === 'admin' || currentRole === 'superadmin' || currentRole === 'scanner_plus';
-  const canUseAdminActions = currentRole === 'editor' || currentRole === 'admin' || currentRole === 'superadmin';
-  const isOnline = connectionState === 'online';
+  const canManageParticipantData =
+    currentRole === "editor" ||
+    currentRole === "admin" ||
+    currentRole === "superadmin" ||
+    currentRole === "scanner_plus";
+  const canUseAdminActions =
+    currentRole === "editor" ||
+    currentRole === "admin" ||
+    currentRole === "superadmin";
+  const isOnline = connectionState === "online";
 
   useEffect(() => {
     if (!participant) return;
@@ -107,15 +162,16 @@ export default function ParticipantDetails() {
     setBibNumberError(undefined);
     setBibNumberConflictOpen(false);
     setBibNumberConflictParticipants([]);
-    setPendingBibNumberCandidate('');
+    setPendingBibNumberCandidate("");
     setTransferEmail(participant.email);
   }, [participant]);
 
   useEffect(() => {
-    if (!participant?.event_id || !canManageParticipantData || !isOnline) return;
+    if (!participant?.event_id || !canManageParticipantData || !isOnline)
+      return;
 
     void getParticipantFieldMappings(participant.event_id)
-      .then(data => {
+      .then((data) => {
         setMappings(data);
         setTransferFields(buildParticipantFieldValues(data, participant));
       })
@@ -123,7 +179,12 @@ export default function ParticipantDetails() {
         setMappings([]);
         setTransferFields({});
       });
-  }, [canManageParticipantData, getParticipantFieldMappings, isOnline, participant]);
+  }, [
+    canManageParticipantData,
+    getParticipantFieldMappings,
+    isOnline,
+    participant,
+  ]);
 
   useEffect(() => {
     if (!participant?.id || !canUseAdminActions || !isOnline) return;
@@ -131,39 +192,54 @@ export default function ParticipantDetails() {
     setIsQrLoading(true);
     void getParticipantQrPreview(participant.id)
       .then(setQrPreview)
-      .catch(error => {
-        toast({ title: 'Nie udało się pobrać podglądu QR', description: error instanceof Error ? error.message : 'Błąd API', variant: 'destructive' });
+      .catch((error) => {
+        toast({
+          title: "Nie udało się pobrać podglądu QR",
+          description: error instanceof Error ? error.message : "Błąd API",
+          variant: "destructive",
+        });
       })
       .finally(() => setIsQrLoading(false));
   }, [canUseAdminActions, getParticipantQrPreview, isOnline, participant?.id]);
 
-  const activeMappings = useMemo(() => getActiveParticipantMappings(mappings), [mappings]);
+  const activeMappings = useMemo(
+    () => getActiveParticipantMappings(mappings),
+    [mappings],
+  );
   const editableMappings = useMemo(
-    () => activeMappings.filter(mapping => mapping.field_role !== 'bib_number'),
-    [activeMappings]
+    () =>
+      activeMappings.filter((mapping) => mapping.field_role !== "bib_number"),
+    [activeMappings],
   );
   const participantDataEntries = useMemo(() => {
     if (!participant) return [];
 
     const entries = [
-      { label: 'Imię i nazwisko', value: participant.name },
-      { label: 'Email', value: participant.email },
+      { label: "Imię i nazwisko", value: participant.name },
+      { label: "Email", value: participant.email },
     ];
     const mappedValues = buildParticipantFieldValues(mappings, participant);
-    const seenLabels = new Set(['Imię i nazwisko', 'Email']);
+    const seenLabels = new Set(["Imię i nazwisko", "Email"]);
 
     for (const mapping of activeMappings) {
-      if (mapping.field_role === 'bib_number') continue;
-      const value = (mappedValues[mapping.alias] ?? '').trim();
+      if (mapping.field_role === "bib_number") continue;
+      const value = (mappedValues[mapping.alias] ?? "").trim();
       if (!value) continue;
       entries.push({ label: mapping.alias, value });
       seenLabels.add(mapping.alias);
     }
 
-    for (const [label, value] of Object.entries(participant.custom_fields ?? {})) {
+    for (const [label, value] of Object.entries(
+      participant.custom_fields ?? {},
+    )) {
       const normalizedLabel = label.trim();
       const normalizedValue = value.trim();
-      if (!normalizedLabel || !normalizedValue || seenLabels.has(normalizedLabel)) continue;
+      if (
+        !normalizedLabel ||
+        !normalizedValue ||
+        seenLabels.has(normalizedLabel)
+      )
+        continue;
       entries.push({ label: normalizedLabel, value: normalizedValue });
     }
 
@@ -173,10 +249,10 @@ export default function ParticipantDetails() {
   const timeline = useMemo(() => {
     if (!participant) return [];
 
-    const participantApiId = participant.id.replace(/^p-/, '');
+    const participantApiId = participant.id.replace(/^p-/, "");
     const participantLogs = activityLog
-      .filter(log => String(log.participant_id ?? '') === participantApiId)
-      .map(log => ({
+      .filter((log) => String(log.participant_id ?? "") === participantApiId)
+      .map((log) => ({
         time: formatParticipantDateTime(log.timestamp),
         desc: log.user_name ? `${log.action} (${log.user_name})` : log.action,
         icon: getTimelineIcon(log.action),
@@ -189,14 +265,39 @@ export default function ParticipantDetails() {
     const status = getParticipantStatusDefinition(participant.status);
 
     return [
-      { time: 'Brak dokładnej daty', desc: 'Uczestnik znajduje sie na liscie startowej', icon: Clock },
-      ...(participant.email_status === 'sent' ? [{ time: 'Brak dokładnej daty', desc: 'Kod QR został wysłany mailem', icon: Mail }] : []),
-      ...(participant.checked_in_at ? [{ time: formatParticipantDateTime(participant.checked_in_at), desc: status.label, icon: CheckCircle }] : []),
+      {
+        time: "Brak dokładnej daty",
+        desc: "Uczestnik znajduje sie na liscie startowej",
+        icon: Clock,
+      },
+      ...(participant.email_status === "sent"
+        ? [
+            {
+              time: "Brak dokładnej daty",
+              desc: "Kod QR został wysłany mailem",
+              icon: Mail,
+            },
+          ]
+        : []),
+      ...(participant.checked_in_at
+        ? [
+            {
+              time: formatParticipantDateTime(participant.checked_in_at),
+              desc: status.label,
+              icon: CheckCircle,
+            },
+          ]
+        : []),
     ];
   }, [activityLog, participant]);
 
   if (isLoading) return <DetailSkeleton />;
-  if (!participant) return <div className="text-center py-12 text-muted-foreground">Nie znaleziono uczestnika</div>;
+  if (!participant)
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        Nie znaleziono uczestnika
+      </div>
+    );
 
   const statusDefinition = getParticipantStatusDefinition(participant.status);
   const normalizedBibNumberValue = bibNumberValue.trim();
@@ -208,11 +309,15 @@ export default function ParticipantDetails() {
     try {
       const result = await sendParticipantQrEmail(participant.id);
       if (!result.ok) {
-        toast({ title: 'Nie udało się wysłać maila', description: result.error, variant: 'destructive' });
+        toast({
+          title: "Nie udało się wysłać maila",
+          description: result.error,
+          variant: "destructive",
+        });
         return;
       }
 
-      toast({ title: 'Mail z QR wysłany', description: participant.name });
+      toast({ title: "Mail z QR wysłany", description: participant.name });
     } finally {
       setIsSendingQr(false);
     }
@@ -225,11 +330,15 @@ export default function ParticipantDetails() {
     try {
       const result = await updateParticipantStatus(participant.id, statusValue);
       if (!result.ok) {
-        toast({ title: 'Nie udało się zmienić statusu', description: result.error, variant: 'destructive' });
+        toast({
+          title: "Nie udało się zmienić statusu",
+          description: result.error,
+          variant: "destructive",
+        });
         return;
       }
 
-      toast({ title: 'Status uczestnika zaktualizowany' });
+      toast({ title: "Status uczestnika zaktualizowany" });
     } finally {
       setIsSavingStatus(false);
     }
@@ -238,47 +347,73 @@ export default function ParticipantDetails() {
   const handleSaveBibNumber = async () => {
     const normalizedBibNumber = bibNumberValue.trim();
     if (normalizedBibNumber.length > 32) {
-      setBibNumberError('Numer startowy może mieć maksymalnie 32 znaki.');
+      setBibNumberError("Numer startowy może mieć maksymalnie 32 znaki.");
       return;
     }
 
     setBibNumberError(undefined);
     setIsSavingBibNumber(true);
     try {
-      const result = await updateParticipantBibNumber(participant.id, normalizedBibNumber);
+      const result = await updateParticipantBibNumber(
+        participant.id,
+        normalizedBibNumber,
+      );
       if (result.conflict) {
         setPendingBibNumberCandidate(result.conflict.bibNumber);
-        setBibNumberConflictParticipants(result.conflict.conflictingParticipants);
+        setBibNumberConflictParticipants(
+          result.conflict.conflictingParticipants,
+        );
         setBibNumberConflictOpen(true);
         return;
       }
       if (!result.ok) {
         setBibNumberError(result.error);
-        toast({ title: 'Nie udało się zapisać numeru startowego', description: result.error, variant: 'destructive' });
+        toast({
+          title: "Nie udało się zapisać numeru startowego",
+          description: result.error,
+          variant: "destructive",
+        });
         return;
       }
 
-      toast({ title: normalizedBibNumber ? 'Numer startowy zapisany' : 'Numer startowy wyczyszczony' });
+      toast({
+        title: normalizedBibNumber
+          ? "Numer startowy zapisany"
+          : "Numer startowy wyczyszczony",
+      });
     } finally {
       setIsSavingBibNumber(false);
     }
   };
 
-  const handleResolveBibNumberConflict = async (resolution: 'keep_duplicates' | 'delete_conflicts') => {
+  const handleResolveBibNumberConflict = async (
+    resolution: "keep_duplicates" | "delete_conflicts",
+  ) => {
     setIsSavingBibNumber(true);
     try {
-      const result = await updateParticipantBibNumber(participant.id, pendingBibNumberCandidate, { conflictResolution: resolution });
+      const result = await updateParticipantBibNumber(
+        participant.id,
+        pendingBibNumberCandidate,
+        { conflictResolution: resolution },
+      );
       if (!result.ok) {
         setBibNumberError(result.error);
-        toast({ title: 'Nie udało się zapisać numeru startowego', description: result.error, variant: 'destructive' });
+        toast({
+          title: "Nie udało się zapisać numeru startowego",
+          description: result.error,
+          variant: "destructive",
+        });
         return;
       }
 
       setBibNumberConflictOpen(false);
       setBibNumberConflictParticipants([]);
-      setPendingBibNumberCandidate('');
+      setPendingBibNumberCandidate("");
       toast({
-        title: resolution === 'delete_conflicts' ? 'Numer przeniesiony i konflikty usunięte' : 'Numer startowy zapisany dla wielu uczestników',
+        title:
+          resolution === "delete_conflicts"
+            ? "Numer przeniesiony i konflikty usunięte"
+            : "Numer startowy zapisany dla wielu uczestników",
       });
     } finally {
       setIsSavingBibNumber(false);
@@ -286,17 +421,27 @@ export default function ParticipantDetails() {
   };
 
   const handleTransferFieldChange = (alias: string, value: string) => {
-    setTransferFields(previous => ({ ...previous, [alias]: value }));
-    setTransferErrors(previous => ({ ...previous, fields: { ...previous.fields, [alias]: '' }, form: undefined }));
+    setTransferFields((previous) => ({ ...previous, [alias]: value }));
+    setTransferErrors((previous) => ({
+      ...previous,
+      fields: { ...previous.fields, [alias]: "" },
+      form: undefined,
+    }));
   };
 
   const handleTransferSubmit = async () => {
-    const fieldErrors = activeMappings.reduce<Record<string, string>>((accumulator, mapping) => {
-      if (mapping.field_role === 'bib_number') return accumulator;
-      const error = validateRequired(transferFields[mapping.alias] ?? '', `Uzupełnij pole: ${mapping.alias}.`);
-      if (error) accumulator[mapping.alias] = error;
-      return accumulator;
-    }, {});
+    const fieldErrors = activeMappings.reduce<Record<string, string>>(
+      (accumulator, mapping) => {
+        if (mapping.field_role === "bib_number") return accumulator;
+        const error = validateRequired(
+          transferFields[mapping.alias] ?? "",
+          `Uzupełnij pole: ${mapping.alias}.`,
+        );
+        if (error) accumulator[mapping.alias] = error;
+        return accumulator;
+      },
+      {},
+    );
     void fieldErrors;
     const nextErrors = {
       email: validateEmail(transferEmail),
@@ -311,16 +456,27 @@ export default function ParticipantDetails() {
     setTransferErrors({ fields: {} });
     setIsSavingTransfer(true);
     try {
-      const result = await updateParticipantDetails(participant.id, transferEmail, transferFields);
+      const result = await updateParticipantDetails(
+        participant.id,
+        transferEmail,
+        transferFields,
+      );
       if (!result.ok) {
-        setTransferErrors({ fields: {}, form: result.error ?? 'Nie udało się zapisać danych uczestnika.' });
-        toast({ title: 'Nie udało się zapisać danych uczestnika', description: result.error, variant: 'destructive' });
+        setTransferErrors({
+          fields: {},
+          form: result.error ?? "Nie udało się zapisać danych uczestnika.",
+        });
+        toast({
+          title: "Nie udało się zapisać danych uczestnika",
+          description: result.error,
+          variant: "destructive",
+        });
         return;
       }
 
       setTransferOpen(false);
       setTransferErrors({ fields: {} });
-      toast({ title: 'Dane uczestnika zaktualizowane' });
+      toast({ title: "Dane uczestnika zaktualizowane" });
     } finally {
       setIsSavingTransfer(false);
     }
@@ -332,38 +488,69 @@ export default function ParticipantDetails() {
     setIsDeletingParticipant(false);
 
     if (!result.ok) {
-      toast({ title: 'Nie udało się usunąć uczestnika', description: result.error, variant: 'destructive' });
+      toast({
+        title: "Nie udało się usunąć uczestnika",
+        description: result.error,
+        variant: "destructive",
+      });
       return;
     }
 
     setDeleteConfirmOpen(false);
-    toast({ title: 'Uczestnik usunięty' });
-    navigate('/participants');
+    toast({ title: "Uczestnik usunięty" });
+    navigate("/participants");
   };
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="touch-manipulation">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => navigate(-1)}
+        className="touch-manipulation"
+      >
         <ArrowLeft className="h-4 w-4 mr-1" /> Wróć
       </Button>
 
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{participant.name}</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">{participant.email}</p>
-          {event && <p className="text-xs text-muted-foreground mt-1">{event.name}</p>}
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
+            {participant.name}
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            {participant.email}
+          </p>
+          {event && (
+            <p className="text-xs text-muted-foreground mt-1">{event.name}</p>
+          )}
         </div>
         {canManageParticipantData && (
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setTransferOpen(true)} disabled={!isOnline}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto"
+              onClick={() => setTransferOpen(true)}
+              disabled={!isOnline}
+            >
               <UserRoundCog className="h-4 w-4 mr-1" />
               Edytuj dane uczestnika
             </Button>
             {canUseAdminActions && (
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setSendQrConfirmOpen(true)} disabled={isSendingQr || !isOnline}>
-              {isSendingQr ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Repeat className="h-4 w-4 mr-1" />}
-              Wyślij ponownie QR
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => setSendQrConfirmOpen(true)}
+                disabled={isSendingQr || !isOnline}
+              >
+                {isSendingQr ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Repeat className="h-4 w-4 mr-1" />
+                )}
+                Wyślij ponownie QR
+              </Button>
             )}
           </div>
         )}
@@ -371,7 +558,13 @@ export default function ParticipantDetails() {
 
       {canUseAdminActions && (
         <div className="flex justify-end">
-          <Button variant="destructive" size="sm" className="w-full sm:w-auto" onClick={() => setDeleteConfirmOpen(true)} disabled={!isOnline}>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => setDeleteConfirmOpen(true)}
+            disabled={!isOnline}
+          >
             <Trash2 className="h-4 w-4 mr-1" />
             Usuń uczestnika
           </Button>
@@ -384,23 +577,55 @@ export default function ParticipantDetails() {
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <Card>
-          <CardHeader><CardTitle className="text-base">Szczegóły uczestnika</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Szczegóły uczestnika</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
               <span className="text-muted-foreground">Numer startowy</span>
-              <span className="font-semibold tabular-nums">{formatBibNumber(participant.bib_number)}</span>
+              <span className="font-semibold tabular-nums">
+                {formatBibNumber(participant.bib_number)}
+              </span>
             </div>
-            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Status</span><Badge variant={statusDefinition.badgeVariant}>{statusDefinition.label}</Badge></div>
-            {(participant.sync_state === 'pending_sync' || participant.sync_state === 'requires_review') && (
+            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-muted-foreground">Status</span>
+              <Badge variant={statusDefinition.badgeVariant}>
+                {statusDefinition.label}
+              </Badge>
+            </div>
+            {(participant.sync_state === "pending_sync" ||
+              participant.sync_state === "requires_review") && (
               <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-muted-foreground">Synchronizacja</span>
-                <Badge variant={participant.sync_state === 'pending_sync' ? 'secondary' : 'destructive'}>
-                  {participant.sync_state === 'pending_sync' ? 'Oczekuje na synchronizację' : 'Wymaga weryfikacji'}
+                <Badge
+                  variant={
+                    participant.sync_state === "pending_sync"
+                      ? "secondary"
+                      : "destructive"
+                  }
+                >
+                  {participant.sync_state === "pending_sync"
+                    ? "Oczekuje na synchronizację"
+                    : "Wymaga weryfikacji"}
                 </Badge>
               </div>
             )}
-            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Mail z QR</span><Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'}>{participant.email_status === 'sent' ? 'Wysłany' : 'Oczekuje'}</Badge></div>
-            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-start sm:justify-between"><span className="text-muted-foreground">Token QR</span><span className="font-mono text-xs break-all sm:max-w-[18rem] sm:text-right">{participant.qr_code}</span></div>
+            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-muted-foreground">Mail z QR</span>
+              <Badge
+                variant={
+                  participant.email_status === "sent" ? "default" : "secondary"
+                }
+              >
+                {participant.email_status === "sent" ? "Wysłany" : "Oczekuje"}
+              </Badge>
+            </div>
+            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-start sm:justify-between">
+              <span className="text-muted-foreground">Token QR</span>
+              <span className="font-mono text-xs break-all sm:max-w-[18rem] sm:text-right">
+                {participant.qr_code}
+              </span>
+            </div>
             {canManageParticipantData && (
               <div className="space-y-2 pt-2">
                 <Label htmlFor="participant-bib-number">Numer startowy</Label>
@@ -408,49 +633,83 @@ export default function ParticipantDetails() {
                   <Input
                     id="participant-bib-number"
                     value={bibNumberValue}
-                    onChange={event => {
+                    onChange={(event) => {
                       setBibNumberValue(event.target.value);
                       setBibNumberError(undefined);
                     }}
                     placeholder="Np. 101"
                     className="sm:flex-1"
                     aria-invalid={Boolean(bibNumberError)}
-                    aria-describedby={bibNumberError ? 'participant-bib-number-error' : undefined}
+                    aria-describedby={
+                      bibNumberError
+                        ? "participant-bib-number-error"
+                        : undefined
+                    }
                   />
                   <Button
                     className="w-full sm:w-auto"
                     onClick={() => void handleSaveBibNumber()}
-                    disabled={isSavingBibNumber || normalizedBibNumberValue === normalizedCurrentBibNumber || !isOnline}
+                    disabled={
+                      isSavingBibNumber ||
+                      normalizedBibNumberValue === normalizedCurrentBibNumber ||
+                      !isOnline
+                    }
                   >
-                    {isSavingBibNumber && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                    {isSavingBibNumber && (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    )}
                     Zapisz numer
                   </Button>
                 </div>
-                <FieldError id="participant-bib-number-error">{bibNumberError}</FieldError>
-                <p className="text-xs text-muted-foreground">Pole może pozostać puste. Numer musi być unikalny w ramach wydarzenia.</p>
+                <FieldError id="participant-bib-number-error">
+                  {bibNumberError}
+                </FieldError>
+                <p className="text-xs text-muted-foreground">
+                  Pole może pozostać puste. Numer powinien być unikalny w ramach
+                  wydarzenia.
+                </p>
               </div>
             )}
             {canManageParticipantData && (
               <div className="space-y-2 pt-2">
                 <Label>Zmień status</Label>
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <Select value={statusValue} onValueChange={value => setStatusValue(value as ParticipantStatus)}>
-                    <SelectTrigger className="sm:flex-1"><SelectValue /></SelectTrigger>
+                  <Select
+                    value={statusValue}
+                    onValueChange={(value) =>
+                      setStatusValue(value as ParticipantStatus)
+                    }
+                  >
+                    <SelectTrigger className="sm:flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      {PARTICIPANT_STATUS_DEFINITIONS.map(status => (
+                      {PARTICIPANT_STATUS_DEFINITIONS.map((status) => (
                         <SelectItem key={status.code} value={status.code}>
                           {status.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button className="w-full sm:w-auto" onClick={() => void handleSaveStatus()} disabled={isSavingStatus || statusValue === participant.status || !isOnline}>
-                    {isSavingStatus && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                  <Button
+                    className="w-full sm:w-auto"
+                    onClick={() => void handleSaveStatus()}
+                    disabled={
+                      isSavingStatus ||
+                      statusValue === participant.status ||
+                      !isOnline
+                    }
+                  >
+                    {isSavingStatus && (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    )}
                     Zapisz status
                   </Button>
                 </div>
-                {statusValue === 'checked_in_not_starting' && (
-                  <p className="text-xs text-muted-foreground">Pakiet odebrany, uczestnik nie wystartuje.</p>
+                {statusValue === "checked_in_not_starting" && (
+                  <p className="text-xs text-muted-foreground">
+                    Pakiet odebrany, uczestnik nie wystartuje.
+                  </p>
                 )}
               </div>
             )}
@@ -458,7 +717,9 @@ export default function ParticipantDetails() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base">Podgląd QR</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Podgląd QR</CardTitle>
+          </CardHeader>
           <CardContent>
             {isQrLoading ? (
               <div className="aspect-square rounded-xl border border-dashed flex items-center justify-center text-muted-foreground">
@@ -467,10 +728,15 @@ export default function ParticipantDetails() {
             ) : qrPreview?.qr_code_svg_data_uri ? (
               <div className="space-y-3">
                 <div className="rounded-2xl border bg-white p-4">
-                  <img src={qrPreview.qr_code_svg_data_uri} alt={`Kod QR uczestnika ${participant.name}`} className="w-full h-auto" />
+                  <img
+                    src={qrPreview.qr_code_svg_data_uri}
+                    alt={`Kod QR uczestnika ${participant.name}`}
+                    className="w-full h-auto"
+                  />
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Ten kod jednoznacznie wskazuje uczestnika w wybranych zawodach.
+                  Ten kod jednoznacznie wskazuje uczestnika w wybranych
+                  zawodach.
                 </div>
               </div>
             ) : (
@@ -484,23 +750,35 @@ export default function ParticipantDetails() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Dane uczestnika</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Dane uczestnika</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-3">
-          {participantDataEntries.map(entry => (
-            <div key={entry.label} className="flex flex-col gap-1 text-sm sm:flex-row sm:items-start sm:justify-between">
+          {participantDataEntries.map((entry) => (
+            <div
+              key={entry.label}
+              className="flex flex-col gap-1 text-sm sm:flex-row sm:items-start sm:justify-between"
+            >
               <span className="text-muted-foreground">{entry.label}</span>
-              <span className="font-medium sm:max-w-[60%] sm:text-right break-words">{entry.value}</span>
+              <span className="font-medium sm:max-w-[60%] sm:text-right break-words">
+                {entry.value}
+              </span>
             </div>
           ))}
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Historia</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Historia</CardTitle>
+        </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {timeline.map(entry => (
-              <div key={`${entry.time}-${entry.desc}`} className="flex items-start gap-3">
+            {timeline.map((entry) => (
+              <div
+                key={`${entry.time}-${entry.desc}`}
+                className="flex items-start gap-3"
+              >
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted shrink-0">
                   <entry.icon className="h-4 w-4 text-muted-foreground" />
                 </div>
@@ -516,7 +794,7 @@ export default function ParticipantDetails() {
 
       <Dialog
         open={transferOpen}
-        onOpenChange={nextOpen => {
+        onOpenChange={(nextOpen) => {
           setTransferOpen(nextOpen);
           if (!nextOpen) setTransferErrors({ fields: {} });
         }}
@@ -532,16 +810,29 @@ export default function ParticipantDetails() {
                 id="transfer-participant-email"
                 type="email"
                 value={transferEmail}
-                onChange={event => {
+                onChange={(event) => {
                   setTransferEmail(event.target.value);
-                  setTransferErrors(previous => ({ ...previous, email: undefined, form: undefined }));
+                  setTransferErrors((previous) => ({
+                    ...previous,
+                    email: undefined,
+                    form: undefined,
+                  }));
                 }}
                 className="mt-2"
                 required
                 aria-invalid={Boolean(transferErrors.email)}
-                aria-describedby={transferErrors.email ? 'transfer-participant-email-error' : undefined}
+                aria-describedby={
+                  transferErrors.email
+                    ? "transfer-participant-email-error"
+                    : undefined
+                }
               />
-              <FieldError id="transfer-participant-email-error" className="mt-2">{transferErrors.email}</FieldError>
+              <FieldError
+                id="transfer-participant-email-error"
+                className="mt-2"
+              >
+                {transferErrors.email}
+              </FieldError>
             </div>
             {editableMappings.map((mapping, index) => {
               const fieldId = `transfer-participant-field-${index}`;
@@ -553,21 +844,39 @@ export default function ParticipantDetails() {
                   <Label htmlFor={fieldId}>{mapping.alias}</Label>
                   <Input
                     id={fieldId}
-                    value={transferFields[mapping.alias] ?? ''}
-                    onChange={event => handleTransferFieldChange(mapping.alias, event.target.value)}
+                    value={transferFields[mapping.alias] ?? ""}
+                    onChange={(event) =>
+                      handleTransferFieldChange(
+                        mapping.alias,
+                        event.target.value,
+                      )
+                    }
                     className="mt-2"
                     aria-invalid={Boolean(fieldError)}
                     aria-describedby={fieldError ? errorId : undefined}
                   />
-                  <FieldError id={errorId} className="mt-2">{fieldError}</FieldError>
+                  <FieldError id={errorId} className="mt-2">
+                    {fieldError}
+                  </FieldError>
                 </div>
               );
             })}
-            <FieldError id="transfer-participant-form-error" className="lg:col-span-2">{transferErrors.form}</FieldError>
+            <FieldError
+              id="transfer-participant-form-error"
+              className="lg:col-span-2"
+            >
+              {transferErrors.form}
+            </FieldError>
           </div>
           <DialogFooter className="px-6 py-4 border-t shrink-0">
-            <Button className="w-full sm:w-auto" onClick={() => void handleTransferSubmit()} disabled={isSavingTransfer}>
-              {isSavingTransfer && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            <Button
+              className="w-full sm:w-auto"
+              onClick={() => void handleTransferSubmit()}
+              disabled={isSavingTransfer}
+            >
+              {isSavingTransfer && (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              )}
               Zapisz zmiany
             </Button>
           </DialogFooter>
@@ -576,10 +885,10 @@ export default function ParticipantDetails() {
 
       <AlertDialog
         open={bibNumberConflictOpen}
-        onOpenChange={nextOpen => {
+        onOpenChange={(nextOpen) => {
           setBibNumberConflictOpen(nextOpen);
           if (!nextOpen) {
-            setPendingBibNumberCandidate('');
+            setPendingBibNumberCandidate("");
             setBibNumberConflictParticipants([]);
           }
         }}
@@ -588,16 +897,32 @@ export default function ParticipantDetails() {
           <AlertDialogHeader>
             <AlertDialogTitle>Ten numer jest już używany</AlertDialogTitle>
             <AlertDialogDescription>
-              Numer startowy <span className="font-medium text-foreground">{formatBibNumber(pendingBibNumberCandidate, pendingBibNumberCandidate || 'bez numeru')}</span> jest już przypisany do {bibNumberConflictParticipants.length === 1 ? 'innego uczestnika' : `innych uczestników (${bibNumberConflictParticipants.length})`}. Wybierz, co zrobić dalej.
+              Numer startowy{" "}
+              <span className="font-medium text-foreground">
+                {formatBibNumber(
+                  pendingBibNumberCandidate,
+                  pendingBibNumberCandidate || "bez numeru",
+                )}
+              </span>{" "}
+              jest już przypisany do{" "}
+              {bibNumberConflictParticipants.length === 1
+                ? "innego uczestnika"
+                : `innych uczestników (${bibNumberConflictParticipants.length})`}
+              . Wybierz, co zrobić dalej.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3">
-            {bibNumberConflictParticipants.map(conflictParticipant => (
-              <div key={conflictParticipant.id} className="rounded-xl border px-4 py-3">
+            {bibNumberConflictParticipants.map((conflictParticipant) => (
+              <div
+                key={conflictParticipant.id}
+                className="rounded-xl border px-4 py-3"
+              >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="font-medium">{conflictParticipant.name}</p>
-                    <p className="text-sm text-muted-foreground">{conflictParticipant.email}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {conflictParticipant.email}
+                    </p>
                   </div>
                   <a
                     href={`/participants/${conflictParticipant.id}`}
@@ -617,18 +942,26 @@ export default function ParticipantDetails() {
               {canUseAdminActions && (
                 <Button
                   variant="destructive"
-                  onClick={() => void handleResolveBibNumberConflict('delete_conflicts')}
+                  onClick={() =>
+                    void handleResolveBibNumberConflict("delete_conflicts")
+                  }
                   disabled={isSavingBibNumber}
                 >
-                  {isSavingBibNumber && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                  {isSavingBibNumber && (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  )}
                   Przenieś numer i usuń pozostałych uczestników
                 </Button>
               )}
               <Button
-                onClick={() => void handleResolveBibNumberConflict('keep_duplicates')}
+                onClick={() =>
+                  void handleResolveBibNumberConflict("keep_duplicates")
+                }
                 disabled={isSavingBibNumber}
               >
-                {isSavingBibNumber && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                {isSavingBibNumber && (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                )}
                 Zachowaj ten numer u wszystkich
               </Button>
             </div>
@@ -639,14 +972,27 @@ export default function ParticipantDetails() {
       <AlertDialog open={sendQrConfirmOpen} onOpenChange={setSendQrConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Potwierdź wysyłkę maila z kodem QR</AlertDialogTitle>
+            <AlertDialogTitle>
+              Potwierdź wysyłkę maila z kodem QR
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Do uczestnika <span className="font-medium text-foreground">{participant.name}</span> zostanie wysłany mail na adres <span className="font-medium text-foreground">{participant.email}</span>.
+              Do uczestnika{" "}
+              <span className="font-medium text-foreground">
+                {participant.name}
+              </span>{" "}
+              zostanie wysłany mail na adres{" "}
+              <span className="font-medium text-foreground">
+                {participant.email}
+              </span>
+              .
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Anuluj</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void handleSendQr()} disabled={isSendingQr}>
+            <AlertDialogAction
+              onClick={() => void handleSendQr()}
+              disabled={isSendingQr}
+            >
               {isSendingQr && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Wyślij mail
             </AlertDialogAction>
@@ -659,13 +1005,24 @@ export default function ParticipantDetails() {
           <AlertDialogHeader>
             <AlertDialogTitle>Usunąć uczestnika?</AlertDialogTitle>
             <AlertDialogDescription>
-              Uczestnik <span className="font-medium text-foreground">{participant.name}</span> zostanie trwale usunięty z wydarzenia. Tej operacji nie da się cofnąć.
+              Uczestnik{" "}
+              <span className="font-medium text-foreground">
+                {participant.name}
+              </span>{" "}
+              zostanie trwale usunięty z wydarzenia. Tej operacji nie da się
+              cofnąć.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Anuluj</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void handleDeleteParticipant()} disabled={isDeletingParticipant} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {isDeletingParticipant && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            <AlertDialogAction
+              onClick={() => void handleDeleteParticipant()}
+              disabled={isDeletingParticipant}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingParticipant && (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              )}
               Usuń uczestnika
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -50,10 +50,7 @@ import {
   validateNonNegativeInteger,
   validateRequired,
 } from "@/lib/form-validation";
-import {
-  getRoleLabel,
-  isScannerRole,
-} from "@/lib/roles";
+import { getRoleLabel, isScannerRole } from "@/lib/roles";
 import type { User } from "@/types";
 import {
   ArrowLeft,
@@ -82,15 +79,15 @@ function CollapsibleOrganizationSection({
   className?: string;
   action?: ReactNode;
 }) {
-  const displayTitle = title.startsWith("Archiwum") ? "Archiwum wydarzen" : title;
+  const displayTitle = title.startsWith("Archiwum")
+    ? "Archiwum wydarzen"
+    : title;
   const isStaticSection = title.startsWith("Archiwum");
 
   if (isStaticSection) {
     return (
       <div className={cn("event-detail-list-section", className)}>
-        <div className="event-detail-list-content space-y-4">
-          {children}
-        </div>
+        <div className="event-detail-list-content space-y-4">{children}</div>
       </div>
     );
   }
@@ -108,9 +105,7 @@ function CollapsibleOrganizationSection({
           {action ? <div className="shrink-0">{action}</div> : null}
         </div>
         <CollapsibleContent className="event-detail-collapsible-content">
-          <div className="event-detail-list-content space-y-4">
-            {children}
-          </div>
+          <div className="event-detail-list-content space-y-4">{children}</div>
         </CollapsibleContent>
       </div>
     </Collapsible>
@@ -398,12 +393,11 @@ export default function OrganizationDetails() {
       email: memberForm.email,
       role: memberForm.role,
       organization_id: organization.id,
-      assigned_events:
-        isScannerRole(memberForm.role)
-          ? memberForm.assigned_events.filter((eventId) =>
-              assignableScannerEventIds.has(eventId),
-            )
-          : [],
+      assigned_events: isScannerRole(memberForm.role)
+        ? memberForm.assigned_events.filter((eventId) =>
+            assignableScannerEventIds.has(eventId),
+          )
+        : [],
     });
     setIsSubmittingMember(false);
 
@@ -441,7 +435,10 @@ export default function OrganizationDetails() {
       "Podaj liczbę całkowitą większą lub równą 0.",
     );
     if (limitError || !Number.isInteger(parsed) || parsed < 0) {
-      setLimitErrors({ event_limit: limitError || "Podaj liczbę całkowitą większą lub równą 0." });
+      setLimitErrors({
+        event_limit:
+          limitError || "Podaj liczbę całkowitą większą lub równą 0.",
+      });
       toast({
         title: "Nieprawidłowy limit",
         description: "Podaj liczbę całkowitą większą lub równą 0.",
@@ -517,7 +514,9 @@ export default function OrganizationDetails() {
     setIsSavingOrganization(true);
     const result = await updateOrganization(organization.id, { name });
     if (!result.ok) {
-      setOrganizationErrors({ form: result.error ?? "Nie udało się zaktualizować organizacji." });
+      setOrganizationErrors({
+        form: result.error ?? "Nie udało się zaktualizować organizacji.",
+      });
       toast({
         title: "Nie udało się zaktualizować organizacji",
         description: result.error ?? "Spróbuj ponownie.",
@@ -532,7 +531,9 @@ export default function OrganizationDetails() {
       );
       if (!limitResult.ok) {
         setIsSavingOrganization(false);
-        setLimitErrors({ form: limitResult.error ?? "Nie udalo sie zapisac limitu." });
+        setLimitErrors({
+          form: limitResult.error ?? "Nie udalo sie zapisac limitu.",
+        });
         toast({
           title: "Nie udalo sie zapisac limitu",
           description: limitResult.error ?? "Sprobuj ponownie.",
@@ -550,7 +551,10 @@ export default function OrganizationDetails() {
   const handleAddEvent = async () => {
     const nextErrors = {
       name: validateRequired(eventForm.name, "Podaj nazwę wydarzenia."),
-      location: validateRequired(eventForm.location, "Podaj lokalizację wydarzenia."),
+      location: validateRequired(
+        eventForm.location,
+        "Podaj lokalizację wydarzenia.",
+      ),
       office_open_at: validateRequired(
         eventForm.office_open_at,
         "Podaj datę i godzinę otwarcia biura.",
@@ -600,7 +604,9 @@ export default function OrganizationDetails() {
     });
     setIsSubmittingEvent(false);
     if (!result.ok) {
-      setEventErrors({ form: result.error ?? "Nie udało się utworzyć wydarzenia." });
+      setEventErrors({
+        form: result.error ?? "Nie udało się utworzyć wydarzenia.",
+      });
       toast({
         title: "Nie udało się utworzyć wydarzenia",
         description: result.error ?? "Spróbuj ponownie.",
@@ -700,7 +706,10 @@ export default function OrganizationDetails() {
       prev && prev.id === scanner.id ? { ...prev, role } : prev,
     );
     toast({
-      title: role === "scanner" ? "Zmieniono rolę na operatora" : "Zmieniono rolę na operatora Plus",
+      title:
+        role === "scanner"
+          ? "Zmieniono rolę na operatora"
+          : "Zmieniono rolę na operatora Plus",
       description: scanner.name,
     });
   };
@@ -854,25 +863,33 @@ export default function OrganizationDetails() {
               }`}
             >
               <div className="border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-4 sm:px-6 lg:border-b-0 lg:border-r">
-                <span className="text-sm text-muted-foreground">Wydarzenia</span>
+                <span className="text-sm text-muted-foreground">
+                  Wydarzenia
+                </span>
                 <p className="mt-2 text-[1.85rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
                   {orgEvents.length}/{organization.event_limit}
                 </p>
               </div>
               <div className="hidden border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-4 sm:px-6 sm:border-l-0 lg:border-b-0 lg:border-r">
-                <span className="text-sm text-muted-foreground">Organizatorzy</span>
+                <span className="text-sm text-muted-foreground">
+                  Organizatorzy
+                </span>
                 <p className="mt-2 text-[1.85rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
                   {organizers.length}
                 </p>
               </div>
               <div className="hidden border-b border-[hsl(var(--button-highlight)/0.12)] px-5 py-4 sm:px-6 lg:border-b-0 lg:border-r">
-                <span className="text-sm text-muted-foreground">Operatorzy</span>
+                <span className="text-sm text-muted-foreground">
+                  Operatorzy
+                </span>
                 <p className="mt-2 text-[1.85rem] font-semibold leading-none tracking-[-0.03em] text-foreground">
                   {scanners.length}
                 </p>
               </div>
               <div className="hidden px-5 py-4 sm:px-6 lg:border-r lg:border-[hsl(var(--button-highlight)/0.12)]">
-                <span className="text-sm text-muted-foreground">Administratorzy</span>
+                <span className="text-sm text-muted-foreground">
+                  Administratorzy
+                </span>
                 <p className="mt-2 break-words text-lg font-semibold tracking-[-0.02em] text-foreground">
                   {adminLabel}
                 </p>
@@ -917,300 +934,325 @@ export default function OrganizationDetails() {
         >
           <div className="flex flex-col gap-4">
             {orgEvents.length === 0 ? (
-          <EmptyTableState
-            title="Brak wydarzeń"
-            description="Po dodaniu wydarzeń pojawi się tutaj ich lista."
-          />
-        ) : (
-            <div className="w-full">
-              <Table containerClassName={tableContainerClassName}>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                      Wydarzenie
-                    </TableHead>
-                    <TableHead className="hidden h-12 px-5 text-[0.72rem] tracking-[0.2em] md:table-cell sm:px-7">
-                      Lokalizacja
-                    </TableHead>
-                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                      Biuro
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orgEvents.map((event) => (
-                    <TableRow
-                      key={event.id}
-                      className="cursor-pointer border-0 transition-colors hover:bg-[hsl(var(--button-highlight)/0.06)] active:bg-[hsl(var(--button-highlight)/0.1)] [&>td]:py-4"
-                      onClick={() => navigate(`/events/${event.id}`)}
-                      onKeyDown={(keyboardEvent) => {
-                        if (
-                          keyboardEvent.key === "Enter" ||
-                          keyboardEvent.key === " "
-                        ) {
-                          keyboardEvent.preventDefault();
-                          navigate(`/events/${event.id}`);
-                        }
-                      }}
-                      tabIndex={0}
-                      aria-label={`Otwórz wydarzenie ${event.name}`}
-                    >
-                      <TableCell className="px-5 sm:px-7">
-                        <div>
-                          <span className="text-base font-medium text-foreground">
-                            {event.name}
-                          </span>
-                          <span className="mt-1 block text-sm text-muted-foreground md:hidden">
-                            {event.location}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden px-5 text-sm text-muted-foreground md:table-cell sm:px-7">
-                        {event.location}
-                      </TableCell>
-                      <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
-                        {formatEventOfficeWindow(event)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            )}
-          </div>
-        </CollapsibleOrganizationSection>
-      </section>
-
-      <section className={sectionClassName}>
-        <CollapsibleOrganizationSection title="Organizatorzy">
-          <div className="flex flex-col gap-4">
-            {canManageMembers && (
-              <Button
-                onClick={() => openMemberDialog("editor")}
-                className={sectionPrimaryButtonClassName}
-              >
-                <Plus className="mr-1 h-4 w-4" />
-                Dodaj organizatora
-              </Button>
-            )}
-            {organizers.length === 0 ? (
-          <EmptyTableState
-            title="Brak organizatorów"
-            description="Po dodaniu organizatorów pojawi się tutaj ich lista."
-          />
-        ) : (
-            <div className="w-full">
-              <Table containerClassName={tableContainerClassName}>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                      Imię i nazwisko
-                    </TableHead>
-                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                      Email
-                    </TableHead>
-                    {canManageMemberAccounts && (
-                      <TableHead className="h-12 w-[250px] px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                        Akcje
+              <EmptyTableState
+                title="Brak wydarzeń"
+                description="Po dodaniu wydarzeń pojawi się tutaj ich lista."
+              />
+            ) : (
+              <div className="w-full">
+                <Table containerClassName={tableContainerClassName}>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                        Wydarzenie
                       </TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {organizers.map((organizer) => (
-                    <TableRow
-                      key={organizer.id}
-                      className="border-0 hover:bg-[hsl(var(--button-highlight)/0.04)]"
-                    >
-                      <TableCell className="px-5 text-base font-medium sm:px-7">
-                        {organizer.name}
-                      </TableCell>
-                      <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
-                        {organizer.email}
-                      </TableCell>
-                      {canManageMemberAccounts && (
+                      <TableHead className="hidden h-12 px-5 text-[0.72rem] tracking-[0.2em] md:table-cell sm:px-7">
+                        Lokalizacja
+                      </TableHead>
+                      <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                        Biuro
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orgEvents.map((event) => (
+                      <TableRow
+                        key={event.id}
+                        className="cursor-pointer border-0 transition-colors hover:bg-[hsl(var(--button-highlight)/0.06)] active:bg-[hsl(var(--button-highlight)/0.1)] [&>td]:py-4"
+                        onClick={() => navigate(`/events/${event.id}`)}
+                        onKeyDown={(keyboardEvent) => {
+                          if (
+                            keyboardEvent.key === "Enter" ||
+                            keyboardEvent.key === " "
+                          ) {
+                            keyboardEvent.preventDefault();
+                            navigate(`/events/${event.id}`);
+                          }
+                        }}
+                        tabIndex={0}
+                        aria-label={`Otwórz wydarzenie ${event.name}`}
+                      >
                         <TableCell className="px-5 sm:px-7">
-                          <div className="flex flex-col gap-2 sm:flex-row">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className={`${actionButtonClassName} w-full sm:w-auto`}
-                              onClick={() => openPasswordResetDialog(organizer)}
-                            >
-                              <KeyRound className="mr-1 h-3.5 w-3.5" />
-                              Reset hasła
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className={`${actionButtonClassName} w-full sm:w-auto`}
-                              onClick={() => openArchiveUserDialog(organizer)}
-                            >
-                              <Trash2 className="mr-1 h-3.5 w-3.5" />
-                              Usuń
-                            </Button>
+                          <div>
+                            <span className="text-base font-medium text-foreground">
+                              {event.name}
+                            </span>
+                            <span className="mt-1 block text-sm text-muted-foreground md:hidden">
+                              {event.location}
+                            </span>
                           </div>
                         </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                        <TableCell className="hidden px-5 text-sm text-muted-foreground md:table-cell sm:px-7">
+                          {event.location}
+                        </TableCell>
+                        <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
+                          {formatEventOfficeWindow(event)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </div>
         </CollapsibleOrganizationSection>
       </section>
 
       <section className={sectionClassName}>
-        <CollapsibleOrganizationSection title="Operatorzy">
+        <CollapsibleOrganizationSection
+          title="Organizatorzy"
+          action={
+            canManageMembers ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => openMemberDialog("editor")}
+                className="h-9 rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)]"
+                disabled={remainingSlots <= 0}
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                Dodaj organizatora
+              </Button>
+            ) : null
+          }
+        >
           <div className="flex flex-col gap-4">
-            {canManageScanners && (
-              <div className="grid gap-3 sm:grid-cols-2">
+            {organizers.length === 0 ? (
+              <EmptyTableState
+                title="Brak organizatorów"
+                description="Po dodaniu organizatorów pojawi się tutaj ich lista."
+              />
+            ) : (
+              <div className="w-full">
+                <Table containerClassName={tableContainerClassName}>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                        Imię i nazwisko
+                      </TableHead>
+                      <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                        Email
+                      </TableHead>
+                      {canManageMemberAccounts && (
+                        <TableHead className="h-12 w-[250px] px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                          Akcje
+                        </TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {organizers.map((organizer) => (
+                      <TableRow
+                        key={organizer.id}
+                        className="border-0 hover:bg-[hsl(var(--button-highlight)/0.04)]"
+                      >
+                        <TableCell className="px-5 text-base font-medium sm:px-7">
+                          {organizer.name}
+                        </TableCell>
+                        <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
+                          {organizer.email}
+                        </TableCell>
+                        {canManageMemberAccounts && (
+                          <TableCell className="px-5 sm:px-7">
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className={`${actionButtonClassName} w-full sm:w-auto`}
+                                onClick={() =>
+                                  openPasswordResetDialog(organizer)
+                                }
+                              >
+                                <KeyRound className="mr-1 h-3.5 w-3.5" />
+                                Reset hasła
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className={`${actionButtonClassName} w-full sm:w-auto`}
+                                onClick={() => openArchiveUserDialog(organizer)}
+                              >
+                                <Trash2 className="mr-1 h-3.5 w-3.5" />
+                                Usuń
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </CollapsibleOrganizationSection>
+      </section>
+
+      <section className={sectionClassName}>
+        <CollapsibleOrganizationSection
+          title="Operatorzy"
+          action={
+            canManageScanners ? (
+              <div>
                 <Button
+                  size="sm"
+                  variant="outline"
                   onClick={() => openMemberDialog("scanner")}
-                  className={sectionPrimaryButtonClassName}
+                  className="h-9 rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)]"
+                  disabled={remainingSlots <= 0}
                 >
-                  <Plus className="mr-1 h-4 w-4" />
+                  <Plus className="mr-1 h-3.5 w-3.5" />
                   Dodaj operatora
                 </Button>
                 <Button
+                  size="sm"
                   variant="outline"
                   onClick={() => openMemberDialog("scanner_plus")}
-                  className={sectionSecondaryButtonClassName}
+                  className="h-9 rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)]"
+                  disabled={remainingSlots <= 0}
                 >
-                  <Plus className="mr-1 h-4 w-4" />
+                  <Plus className="mr-1 h-3.5 w-3.5" />
                   Dodaj Operator Plus
                 </Button>
               </div>
-            )}
+            ) : null
+          }
+        >
+          <div className="flex flex-col gap-4">
             {scanners.length === 0 ? (
-          <EmptyTableState
-            title="Brak operatorów"
-            description="Po dodaniu operatorów pojawi się tutaj ich lista."
-          />
-        ) : (
-            <div className="w-full">
-              <Table containerClassName={tableContainerClassName}>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                      Imię i nazwisko
-                    </TableHead>
-                    <TableHead className="hidden h-12 px-5 text-[0.72rem] tracking-[0.2em] md:table-cell sm:px-7">
-                      Email
-                    </TableHead>
-                    <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                      Przypisane wydarzenia
-                    </TableHead>
-                    {canManageScanners && (
-                      <TableHead className="h-12 w-[11.5rem] px-5 text-[0.72rem] tracking-[0.2em] sm:w-[13.5rem] sm:px-7 lg:w-[240px]">
-                        Akcje
+              <EmptyTableState
+                title="Brak operatorów"
+                description="Po dodaniu operatorów pojawi się tutaj ich lista."
+              />
+            ) : (
+              <div className="w-full">
+                <Table containerClassName={tableContainerClassName}>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                        Imię i nazwisko
                       </TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {scanners.map((scanner) => (
-                    <TableRow
-                      key={scanner.id}
-                      className="border-0 hover:bg-[hsl(var(--button-highlight)/0.04)]"
-                    >
-                      <TableCell className="px-5 sm:px-7">
-                        <div>
-                          <span className="text-base font-medium text-foreground">
-                            {scanner.name}
-                          </span>
-                          <span className="mt-1 block text-sm text-muted-foreground md:hidden">
-                            {scanner.email}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden px-5 text-sm text-muted-foreground md:table-cell sm:px-7">
-                        {scanner.email}
-                      </TableCell>
-                      <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
-                        {getEventNames(scanner.assigned_events)}
-                      </TableCell>
+                      <TableHead className="hidden h-12 px-5 text-[0.72rem] tracking-[0.2em] md:table-cell sm:px-7">
+                        Email
+                      </TableHead>
+                      <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                        Przypisane wydarzenia
+                      </TableHead>
                       {canManageScanners && (
-                        <TableCell className="min-w-[11.5rem] px-5 align-top sm:min-w-[13.5rem] sm:px-7 lg:min-w-[240px]">
-                          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
-                              onClick={() => openScannerEditDialog(scanner)}
-                            >
-                              <Pencil className="mr-1 h-3.5 w-3.5" />
-                              Edytuj dane
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
-                              onClick={() =>
-                                openScannerAssignmentsDialog(scanner.id)
-                              }
-                            >
-                              Przypisz wydarzenia
-                            </Button>
-                            {false && scanner.role === "scanner" && (
+                        <TableHead className="h-12 w-[11.5rem] px-5 text-[0.72rem] tracking-[0.2em] sm:w-[13.5rem] sm:px-7 lg:w-[240px]">
+                          Akcje
+                        </TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {scanners.map((scanner) => (
+                      <TableRow
+                        key={scanner.id}
+                        className="border-0 hover:bg-[hsl(var(--button-highlight)/0.04)]"
+                      >
+                        <TableCell className="px-5 sm:px-7">
+                          <div>
+                            <span className="text-base font-medium text-foreground">
+                              {scanner.name}
+                            </span>
+                            <span className="mt-1 block text-sm text-muted-foreground md:hidden">
+                              {scanner.email}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden px-5 text-sm text-muted-foreground md:table-cell sm:px-7">
+                          {scanner.email}
+                        </TableCell>
+                        <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
+                          {getEventNames(scanner.assigned_events)}
+                        </TableCell>
+                        {canManageScanners && (
+                          <TableCell className="min-w-[11.5rem] px-5 align-top sm:min-w-[13.5rem] sm:px-7 lg:min-w-[240px]">
+                            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
+                                onClick={() => openScannerEditDialog(scanner)}
+                              >
+                                <Pencil className="mr-1 h-3.5 w-3.5" />
+                                Edytuj dane
+                              </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
                                 onClick={() =>
-                                  void handleChangeScannerRole(
-                                    scanner,
-                                    "scanner_plus",
-                                  )
+                                  openScannerAssignmentsDialog(scanner.id)
                                 }
                               >
-                                Zmień na Operator Plus
+                                Przypisz wydarzenia
                               </Button>
-                            )}
-                            {false && scanner.role === "scanner_plus" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
-                                onClick={() => void handleChangeScannerRole(scanner, "scanner")}
-                              >
-                                Zmień na Operator
-                              </Button>
-                            )}
-                            {false && canManageMemberAccounts && (
-                              <>
+                              {false && scanner.role === "scanner" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
                                   onClick={() =>
-                                    openPasswordResetDialog(scanner)
+                                    void handleChangeScannerRole(
+                                      scanner,
+                                      "scanner_plus",
+                                    )
                                   }
                                 >
-                                  <KeyRound className="mr-1 h-3.5 w-3.5" />
-                                  Reset hasła
+                                  Zmień na Operator Plus
                                 </Button>
+                              )}
+                              {false && scanner.role === "scanner_plus" && (
                                 <Button
                                   size="sm"
-                                  variant="destructive"
+                                  variant="outline"
                                   className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
-                                  onClick={() => openArchiveUserDialog(scanner)}
+                                  onClick={() =>
+                                    void handleChangeScannerRole(
+                                      scanner,
+                                      "scanner",
+                                    )
+                                  }
                                 >
-                                  <Trash2 className="mr-1 h-3.5 w-3.5" />
-                                  Usuń
+                                  Zmień na Operator
                                 </Button>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                              )}
+                              {false && canManageMemberAccounts && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
+                                    onClick={() =>
+                                      openPasswordResetDialog(scanner)
+                                    }
+                                  >
+                                    <KeyRound className="mr-1 h-3.5 w-3.5" />
+                                    Reset hasła
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
+                                    onClick={() =>
+                                      openArchiveUserDialog(scanner)
+                                    }
+                                  >
+                                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                                    Usuń
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </div>
         </CollapsibleOrganizationSection>
@@ -1220,25 +1262,28 @@ export default function OrganizationDetails() {
         <CollapsibleOrganizationSection title="Archiwum wydarzeĹ„">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[hsl(var(--button-highlight)/0.22)] bg-[hsl(var(--background)/0.48)]">
-                <Archive className="h-4 w-4 text-[hsl(var(--button-highlight))]" />
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[hsl(var(--button-highlight)/0.22)] bg-[hsl(var(--background)/0.48)]">
+                  <Archive className="h-4 w-4 text-[hsl(var(--button-highlight))]" />
+                </div>
+                <p className="hidden text-sm text-muted-foreground">
+                  Archiwum wydarzeń
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Przegladaj zakonczone wydarzenia tej organizacji w osobnym
+                  widoku.
+                </p>
               </div>
-              <p className="hidden text-sm text-muted-foreground">
-                Archiwum wydarzeń
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Przegladaj zakonczone wydarzenia tej organizacji w osobnym widoku.
-              </p>
             </div>
-          </div>
-          <Button
-            variant="outline"
-            className="h-12 w-full rounded-[1rem] border-[hsl(var(--button-highlight)/0.38)] bg-transparent text-[hsl(var(--button-highlight))] hover:bg-[hsl(var(--button-highlight)/0.08)] hover:text-[hsl(var(--button-highlight))] sm:w-auto"
-            onClick={() => navigate(`/organizations/${organization.id}/archived-events`)}
-          >
-            Otwórz archiwum
-          </Button>
+            <Button
+              variant="outline"
+              className="h-12 w-full rounded-[1rem] border-[hsl(var(--button-highlight)/0.38)] bg-transparent text-[hsl(var(--button-highlight))] hover:bg-[hsl(var(--button-highlight)/0.08)] hover:text-[hsl(var(--button-highlight))] sm:w-auto"
+              onClick={() =>
+                navigate(`/organizations/${organization.id}/archived-events`)
+              }
+            >
+              Otwórz archiwum
+            </Button>
           </div>
         </CollapsibleOrganizationSection>
       </section>
@@ -1313,7 +1358,8 @@ export default function OrganizationDetails() {
                 {limitErrors.event_limit}
               </FieldError>
               <p className="mt-2 text-xs text-muted-foreground">
-                Minimalny limit to {orgEvents.length}, bo tyle wydarzen jest juz przypisanych.
+                Minimalny limit to {orgEvents.length}, bo tyle wydarzen jest juz
+                przypisanych.
               </p>
             </div>
             <FieldError id="organization-edit-form-error">
@@ -1629,7 +1675,9 @@ export default function OrganizationDetails() {
             <Button
               className="w-full sm:w-auto"
               onClick={handleSaveScanner}
-              disabled={isSavingScanner || isChangingScannerRole || !selectedScanner}
+              disabled={
+                isSavingScanner || isChangingScannerRole || !selectedScanner
+              }
             >
               Zapisz zmiany
             </Button>
@@ -1716,32 +1764,37 @@ export default function OrganizationDetails() {
               Po zapisaniu konto zostanie utworzone, a użytkownik dostanie mail
               z linkiem do ustawienia hasła.
             </p>
-            {isScannerRole(memberForm.role) && assignableScannerEvents.length > 0 && (
-              <div className="space-y-2">
-                <Label>Przypisane wydarzenia</Label>
-                <div className="space-y-2 rounded-xl border p-3">
-                  {assignableScannerEvents.map((event) => (
-                    <label
-                      key={event.id}
-                      className="flex items-center gap-3 text-sm"
-                    >
-                      <Checkbox
-                        checked={memberForm.assigned_events.includes(event.id)}
-                        onCheckedChange={(checked) =>
-                          toggleScannerEvent(event.id, checked === true)
-                        }
-                      />
-                      <span>{event.name}</span>
-                    </label>
-                  ))}
+            {isScannerRole(memberForm.role) &&
+              assignableScannerEvents.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Przypisane wydarzenia</Label>
+                  <div className="space-y-2 rounded-xl border p-3">
+                    {assignableScannerEvents.map((event) => (
+                      <label
+                        key={event.id}
+                        className="flex items-center gap-3 text-sm"
+                      >
+                        <Checkbox
+                          checked={memberForm.assigned_events.includes(
+                            event.id,
+                          )}
+                          onCheckedChange={(checked) =>
+                            toggleScannerEvent(event.id, checked === true)
+                          }
+                        />
+                        <span>{event.name}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            {isScannerRole(memberForm.role) && assignableScannerEvents.length === 0 && (
-              <p className="rounded-xl border border-dashed px-3 py-3 text-xs text-muted-foreground">
-                Operatora można przypisać tylko do aktualnie otwartych lub przyszłych wydarzeń.
-              </p>
-            )}
+              )}
+            {isScannerRole(memberForm.role) &&
+              assignableScannerEvents.length === 0 && (
+                <p className="rounded-xl border border-dashed px-3 py-3 text-xs text-muted-foreground">
+                  Operatora można przypisać tylko do aktualnie otwartych lub
+                  przyszłych wydarzeń.
+                </p>
+              )}
             <FieldError id="organization-member-form-error">
               {memberErrors.form}
             </FieldError>
@@ -1953,10 +2006,7 @@ export default function OrganizationDetails() {
             <Button
               className="w-full sm:w-auto"
               onClick={handleAddEvent}
-              disabled={
-                remainingSlots <= 0 ||
-                isSubmittingEvent
-              }
+              disabled={remainingSlots <= 0 || isSubmittingEvent}
             >
               <Plus className="mr-1 h-4 w-4" />
               Zapisz
