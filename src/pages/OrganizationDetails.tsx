@@ -1121,8 +1121,7 @@ export default function OrganizationDetails() {
                                 className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
                                 onClick={() => openScannerEditDialog(scanner)}
                               >
-                                <Pencil className="mr-1 h-3.5 w-3.5" />
-                                Edytuj dane
+                                Edytuj
                               </Button>
                               <Button
                                 size="sm"
@@ -1132,64 +1131,8 @@ export default function OrganizationDetails() {
                                   openScannerAssignmentsDialog(scanner.id)
                                 }
                               >
-                                Przypisz wydarzenia
+                                Przypisz
                               </Button>
-                              {scanner.role === "scanner" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
-                                  onClick={() =>
-                                    void handleChangeScannerRole(
-                                      scanner,
-                                      "scanner_plus",
-                                    )
-                                  }
-                                >
-                                  Zmień na Operator Plus
-                                </Button>
-                              )}
-                              {scanner.role === "scanner_plus" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
-                                  onClick={() =>
-                                    void handleChangeScannerRole(
-                                      scanner,
-                                      "scanner",
-                                    )
-                                  }
-                                >
-                                  Zmień na Operator
-                                </Button>
-                              )}
-                              {canManageMemberAccounts && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
-                                    onClick={() =>
-                                      openPasswordResetDialog(scanner)
-                                    }
-                                  >
-                                    <KeyRound className="mr-1 h-3.5 w-3.5" />
-                                    Reset hasła
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
-                                    onClick={() =>
-                                      openArchiveUserDialog(scanner)
-                                    }
-                                  >
-                                    <Trash2 className="mr-1 h-3.5 w-3.5" />
-                                    Usuń
-                                  </Button>
-                                </>
-                              )}
                             </div>
                           </TableCell>
                         )}

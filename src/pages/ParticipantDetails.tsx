@@ -549,7 +549,9 @@ export default function ParticipantDetails() {
                 ) : (
                   <Repeat className="h-4 w-4 mr-1" />
                 )}
-                Wyślij ponownie QR
+                {participant.email_status === "sent"
+                  ? "Wyślij ponownie QR"
+                  : "Wyślij QR"}
               </Button>
             )}
           </div>
