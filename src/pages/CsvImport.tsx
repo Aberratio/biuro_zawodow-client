@@ -258,10 +258,11 @@ export default function CsvImport() {
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/events/${eventId}`)}>
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/events/${eventId}`)}    className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
+  >
             <ArrowLeft className="h-4 w-4 mr-1" /> Wróć do wydarzenia
           </Button>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight mt-2">Import CSV</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight mt-8">Import CSV</h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Wydarzenie: <span className="font-medium text-foreground">{event.name}</span>
           </p>
