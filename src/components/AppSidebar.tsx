@@ -193,10 +193,7 @@ export function AppSidebar() {
   });
 
   const generalItems = items.filter((item) => !eventScopedUrls.has(item.url));
-  const adminOrganizations =
-    currentRole === "admin"
-      ? organizations
-      : [];
+  const adminOrganizations = currentRole === "admin" ? organizations : [];
   const selectedOrganization =
     adminOrganizations.find(
       (organization) => organization.id === selectedOrganizationId,
@@ -361,7 +358,7 @@ export function AppSidebar() {
             <button
               type="button"
               onClick={handleLogoClick}
-              className="block w-full cursor-pointer rounded-[0.95rem] border-0 bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+              className="flex justify-center w-full cursor-pointer rounded-[0.95rem] border-0 bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
               aria-label="Przejdź do strony głównej"
             >
               {collapsed ? (
@@ -370,13 +367,13 @@ export function AppSidebar() {
                   className="mx-auto h-11 w-11 object-contain"
                 />
               ) : (
-                <BrandLogo
-                  variant="long"
-                  className={sidebarLogoClassName}
-                />
+                <BrandLogo variant="long" className={sidebarLogoClassName} />
               )}
             </button>
-            <div className="mx-auto mt-4 h-px w-[70%] bg-sidebar-border/70" aria-hidden="true" />
+            <div
+              className="mx-auto mt-4 h-px w-[70%] bg-sidebar-border/70"
+              aria-hidden="true"
+            />
           </SidebarHeader>
 
           <SidebarContent className="!flex-none !overflow-visible gap-5 px-3 py-5 md:gap-4 md:px-2 md:py-4.5">
@@ -421,19 +418,17 @@ export function AppSidebar() {
                   </span>
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
-                  <div className="mx-0.5 rounded-[1.15rem] bg-[hsl(220_9%_11%/0.88)] p-3 md:mx-1">
-                    {currentRole === "admin" && (
-                      <div className="space-y-4 rounded-[0.95rem] bg-[hsl(220_7%_13%/0.68)] p-3.5">
-                        <p className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-sidebar-foreground/56">
-                          Wybrana organizacja
-                        </p>
-                        {organizationSelectContent}
-                        {eventWorkspaceCard}
-                      </div>
-                    )}
+                  {currentRole === "admin" && (
+                    <div className="space-y-4 rounded-[0.95rem] bg-[hsl(220_7%_13%/0.68)] p-3.5">
+                      <p className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-sidebar-foreground/56">
+                        Wybrana organizacja
+                      </p>
+                      {organizationSelectContent}
+                      {eventWorkspaceCard}
+                    </div>
+                  )}
 
-                    {currentRole !== "admin" && eventWorkspaceCard}
-                  </div>
+                  {currentRole !== "admin" && eventWorkspaceCard}
                 </SidebarGroupContent>
               </SidebarGroup>
             )}

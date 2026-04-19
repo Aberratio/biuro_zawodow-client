@@ -69,10 +69,27 @@ All colors MUST be HSL.
     @apply min-h-screen bg-background text-foreground antialiased;
     font-family: var(--font-sans);
     background-image:
-      radial-gradient(circle at top left, hsl(var(--surface-glow) / 0.22), transparent 24rem),
-      radial-gradient(circle at top right, hsl(var(--surface-warm) / 0.12), transparent 22rem),
-      radial-gradient(circle at 50% -10%, hsl(var(--foreground) / 0.04), transparent 34rem),
-      linear-gradient(180deg, hsl(220 13% 9%) 0%, hsl(var(--background)) 34%, hsl(220 15% 4%) 100%);
+      radial-gradient(
+        circle at top left,
+        hsl(var(--surface-glow) / 0.22),
+        transparent 24rem
+      ),
+      radial-gradient(
+        circle at top right,
+        hsl(var(--surface-warm) / 0.12),
+        transparent 22rem
+      ),
+      radial-gradient(
+        circle at 50% -10%,
+        hsl(var(--foreground) / 0.04),
+        transparent 34rem
+      ),
+      linear-gradient(
+        180deg,
+        hsl(220 13% 9%) 0%,
+        hsl(var(--background)) 34%,
+        hsl(220 15% 4%) 100%
+      );
     background-attachment: fixed;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
@@ -123,8 +140,16 @@ All colors MUST be HSL.
     inset: 0;
     pointer-events: none;
     background:
-      linear-gradient(180deg, hsl(var(--foreground) / 0.018), transparent 12rem),
-      radial-gradient(circle at top, hsl(var(--surface-warm) / 0.07), transparent 42%);
+      linear-gradient(
+        180deg,
+        hsl(var(--foreground) / 0.018),
+        transparent 12rem
+      ),
+      radial-gradient(
+        circle at top,
+        hsl(var(--surface-warm) / 0.07),
+        transparent 42%
+      );
     opacity: 0.72;
   }
 
@@ -148,7 +173,11 @@ All colors MUST be HSL.
     background-color: hsl(var(--card) / 0.92);
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.03), transparent 32%),
-      radial-gradient(circle at top left, hsl(var(--surface-warm) / 0.08), transparent 58%),
+      radial-gradient(
+        circle at top left,
+        hsl(var(--surface-warm) / 0.08),
+        transparent 58%
+      ),
       linear-gradient(180deg, hsl(220 9% 14% / 0.98), hsl(220 14% 7% / 0.98));
     border-color: hsl(var(--border) / 0.82);
     box-shadow:
@@ -171,7 +200,11 @@ All colors MUST be HSL.
     background-color: hsl(var(--background) / 0.78);
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.025), transparent 60%),
-      radial-gradient(circle at top left, hsl(var(--surface-warm) / 0.07), transparent 55%);
+      radial-gradient(
+        circle at top left,
+        hsl(var(--surface-warm) / 0.07),
+        transparent 55%
+      );
     border-color: hsl(var(--border) / 0.72);
     backdrop-filter: blur(24px);
   }
@@ -209,7 +242,11 @@ All colors MUST be HSL.
     background-color: hsl(var(--popover) / 0.95);
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.025), transparent 62%),
-      radial-gradient(circle at top left, hsl(var(--surface-warm) / 0.1), transparent 58%);
+      radial-gradient(
+        circle at top left,
+        hsl(var(--surface-warm) / 0.1),
+        transparent 58%
+      );
     border-color: hsl(var(--border) / 0.82);
     box-shadow: 0 22px 60px hsl(var(--surface-shadow) / 0.5);
     backdrop-filter: blur(22px);
@@ -219,7 +256,11 @@ All colors MUST be HSL.
     background-color: hsl(var(--sidebar-background) / 0.96);
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.02), transparent 36%),
-      radial-gradient(circle at top left, hsl(var(--sidebar-primary) / 0.08), transparent 44%),
+      radial-gradient(
+        circle at top left,
+        hsl(var(--sidebar-primary) / 0.08),
+        transparent 44%
+      ),
       linear-gradient(180deg, hsl(220 10% 9%), hsl(220 15% 6%));
     box-shadow:
       18px 0 40px hsl(var(--surface-shadow) / 0.28),
@@ -231,7 +272,11 @@ All colors MUST be HSL.
     border-color: hsl(var(--button-highlight) / 0.56);
     background-color: hsl(var(--secondary) / 0.96);
     background-image:
-      radial-gradient(circle at top left, hsl(var(--button-highlight) / 0.18), transparent 58%),
+      radial-gradient(
+        circle at top left,
+        hsl(var(--button-highlight) / 0.18),
+        transparent 58%
+      ),
       linear-gradient(180deg, hsl(var(--foreground) / 0.06), transparent 16%),
       linear-gradient(
         120deg,
@@ -241,15 +286,24 @@ All colors MUST be HSL.
         hsl(39 22% 29%) 76%,
         hsl(37 24% 25%) 100%
       );
-    background-size: 140% 140%, 100% 100%, 220% 100%;
-    background-position: 0% 0%, 0% 0%, 0% 50%;
+    background-size:
+      140% 140%,
+      100% 100%,
+      220% 100%;
+    background-position:
+      0% 0%,
+      0% 0%,
+      0% 50%;
     box-shadow:
       0 14px 30px hsl(var(--surface-shadow) / 0.4),
       inset 0 1px 0 hsl(var(--foreground) / 0.1);
   }
 
   .surface-button:hover {
-    background-position: 8% 10%, 0% 0%, 100% 50%;
+    background-position:
+      8% 10%,
+      0% 0%,
+      100% 50%;
     box-shadow:
       0 18px 40px hsl(var(--surface-shadow) / 0.48),
       0 0 0 1px hsl(var(--button-highlight) / 0.18),
@@ -261,8 +315,16 @@ All colors MUST be HSL.
     background-color: hsl(26 24% 14% / 0.94);
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.035), transparent 42%),
-      radial-gradient(circle at top left, hsl(var(--button-highlight) / 0.18), transparent 58%),
-      radial-gradient(circle at 85% 50%, hsl(var(--surface-warm) / 0.14), transparent 42%);
+      radial-gradient(
+        circle at top left,
+        hsl(var(--button-highlight) / 0.18),
+        transparent 58%
+      ),
+      radial-gradient(
+        circle at 85% 50%,
+        hsl(var(--surface-warm) / 0.14),
+        transparent 42%
+      );
     border-color: hsl(var(--button-highlight) / 0.38);
     box-shadow:
       0 18px 40px hsl(var(--surface-shadow) / 0.22),
@@ -295,7 +357,11 @@ All colors MUST be HSL.
     height: 12rem;
     pointer-events: none;
     background:
-      radial-gradient(circle at 50% 0%, hsl(var(--button-highlight) / 0.05), transparent 32%),
+      radial-gradient(
+        circle at 50% 0%,
+        hsl(var(--button-highlight) / 0.05),
+        transparent 32%
+      ),
       linear-gradient(180deg, hsl(var(--foreground) / 0.02), transparent 82%);
     opacity: 0.6;
   }
@@ -322,8 +388,16 @@ All colors MUST be HSL.
     background-color: hsl(220 12% 9% / 0.95);
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.03), transparent 22%),
-      radial-gradient(circle at 0% 50%, hsl(var(--button-highlight) / 0.12), transparent 20%),
-      radial-gradient(circle at 100% 50%, hsl(var(--button-highlight) / 0.12), transparent 20%),
+      radial-gradient(
+        circle at 0% 50%,
+        hsl(var(--button-highlight) / 0.12),
+        transparent 20%
+      ),
+      radial-gradient(
+        circle at 100% 50%,
+        hsl(var(--button-highlight) / 0.12),
+        transparent 20%
+      ),
       linear-gradient(180deg, hsl(220 13% 11% / 0.98), hsl(220 14% 8% / 0.98));
     box-shadow:
       0 32px 80px hsl(var(--surface-shadow) / 0.42),
@@ -334,24 +408,48 @@ All colors MUST be HSL.
   .event-detail-hero-open {
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.03), transparent 22%),
-      radial-gradient(circle at 12% 72%, hsl(147 62% 42% / 0.12), transparent 24%),
-      radial-gradient(circle at 88% 14%, hsl(var(--button-highlight) / 0.1), transparent 26%),
+      radial-gradient(
+        circle at 12% 72%,
+        hsl(147 62% 42% / 0.12),
+        transparent 24%
+      ),
+      radial-gradient(
+        circle at 88% 14%,
+        hsl(var(--button-highlight) / 0.1),
+        transparent 26%
+      ),
       linear-gradient(180deg, hsl(220 13% 11% / 0.98), hsl(220 14% 8% / 0.98));
   }
 
   .event-detail-hero-upcoming {
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.03), transparent 22%),
-      radial-gradient(circle at 12% 72%, hsl(39 88% 62% / 0.13), transparent 24%),
-      radial-gradient(circle at 88% 14%, hsl(var(--button-highlight) / 0.1), transparent 26%),
+      radial-gradient(
+        circle at 12% 72%,
+        hsl(39 88% 62% / 0.13),
+        transparent 24%
+      ),
+      radial-gradient(
+        circle at 88% 14%,
+        hsl(var(--button-highlight) / 0.1),
+        transparent 26%
+      ),
       linear-gradient(180deg, hsl(220 13% 11% / 0.98), hsl(220 14% 8% / 0.98));
   }
 
   .event-detail-hero-closed {
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.03), transparent 22%),
-      radial-gradient(circle at 12% 72%, hsl(var(--foreground) / 0.05), transparent 24%),
-      radial-gradient(circle at 88% 14%, hsl(var(--button-highlight) / 0.08), transparent 26%),
+      radial-gradient(
+        circle at 12% 72%,
+        hsl(var(--foreground) / 0.05),
+        transparent 24%
+      ),
+      radial-gradient(
+        circle at 88% 14%,
+        hsl(var(--button-highlight) / 0.08),
+        transparent 26%
+      ),
       linear-gradient(180deg, hsl(220 13% 11% / 0.98), hsl(220 14% 8% / 0.98));
   }
 
@@ -426,7 +524,11 @@ All colors MUST be HSL.
     border-color: hsl(var(--button-highlight) / 0.16);
     background:
       linear-gradient(180deg, hsl(var(--foreground) / 0.02), transparent 24%),
-      radial-gradient(circle at 0% 0%, hsl(var(--button-highlight) / 0.06), transparent 28%),
+      radial-gradient(
+        circle at 0% 0%,
+        hsl(var(--button-highlight) / 0.06),
+        transparent 28%
+      ),
       linear-gradient(180deg, hsl(220 11% 11% / 0.98), hsl(220 12% 8% / 0.98));
     box-shadow:
       0 24px 60px hsl(var(--surface-shadow) / 0.28),
@@ -466,7 +568,8 @@ All colors MUST be HSL.
     transition: transform 180ms ease;
   }
 
-  .event-detail-collapsible-trigger[data-state="open"] .event-detail-collapsible-chevron {
+  .event-detail-collapsible-trigger[data-state="open"]
+    .event-detail-collapsible-chevron {
     transform: rotate(180deg);
   }
 
@@ -496,8 +599,11 @@ All colors MUST be HSL.
 
   .event-detail-primary-action {
     border-color: hsl(var(--button-highlight) / 0.42) !important;
-    background:
-      linear-gradient(135deg, hsl(40 54% 58%) 0%, hsl(36 46% 43%) 100%) !important;
+    background: linear-gradient(
+      135deg,
+      hsl(40 54% 58%) 0%,
+      hsl(36 46% 43%) 100%
+    ) !important;
     color: hsl(24 18% 11%) !important;
     box-shadow:
       0 20px 42px hsl(30 40% 6% / 0.34),
@@ -505,8 +611,11 @@ All colors MUST be HSL.
   }
 
   .event-detail-primary-action:hover {
-    background:
-      linear-gradient(135deg, hsl(40 58% 62%) 0%, hsl(36 48% 47%) 100%) !important;
+    background: linear-gradient(
+      135deg,
+      hsl(40 58% 62%) 0%,
+      hsl(36 48% 47%) 100%
+    ) !important;
     color: hsl(24 18% 10%) !important;
   }
 
@@ -666,7 +775,7 @@ All colors MUST be HSL.
   }
 
   .event-detail-summary-strip {
-    padding-top: 0.25rem;
+    padding-top: 0.5rem;
     border-top: 1px solid hsl(var(--border) / 0.72);
   }
 
@@ -705,7 +814,11 @@ All colors MUST be HSL.
   .event-detail-primary-action {
     border-color: hsl(var(--button-highlight) / 0.38) !important;
     border-radius: 1rem !important;
-    background: linear-gradient(135deg, hsl(41 60% 60%) 0%, hsl(37 46% 46%) 100%) !important;
+    background: linear-gradient(
+      135deg,
+      hsl(41 60% 60%) 0%,
+      hsl(37 46% 46%) 100%
+    ) !important;
     color: hsl(24 18% 10%) !important;
     box-shadow: 0 18px 36px hsl(30 42% 5% / 0.28) !important;
   }
@@ -764,7 +877,9 @@ All colors MUST be HSL.
     background: transparent;
     text-align: left;
     color: inherit;
-    transition: background-color 160ms ease, color 160ms ease;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease;
   }
 
   .event-detail-collapsible-trigger:hover {
@@ -808,14 +923,26 @@ All colors MUST be HSL.
 
   .page-gradient {
     background-image:
-      radial-gradient(circle at top left, hsl(var(--surface-glow) / 0.22), transparent 28%),
-      radial-gradient(circle at top right, hsl(var(--surface-warm) / 0.14), transparent 26%),
+      radial-gradient(
+        circle at top left,
+        hsl(var(--surface-glow) / 0.22),
+        transparent 28%
+      ),
+      radial-gradient(
+        circle at top right,
+        hsl(var(--surface-warm) / 0.14),
+        transparent 26%
+      ),
       linear-gradient(180deg, hsl(var(--foreground) / 0.02), transparent 75%);
   }
 
   .app-page-gradient {
     background-image:
-      radial-gradient(circle at 50% 0%, hsl(var(--button-highlight) / 0.05), transparent 24rem),
+      radial-gradient(
+        circle at 50% 0%,
+        hsl(var(--button-highlight) / 0.05),
+        transparent 24rem
+      ),
       linear-gradient(180deg, hsl(var(--foreground) / 0.012), transparent 38%);
   }
 
@@ -850,8 +977,17 @@ All colors MUST be HSL.
     --surface-shadow: 220 30% 3%;
     --button-highlight: 39 72% 64%;
     background:
-      radial-gradient(circle at 50% 0%, hsl(var(--button-highlight) / 0.04), transparent 28rem),
-      linear-gradient(180deg, hsl(220 18% 5%) 0%, hsl(var(--background)) 30%, hsl(220 22% 3%) 100%);
+      radial-gradient(
+        circle at 50% 0%,
+        hsl(var(--button-highlight) / 0.04),
+        transparent 28rem
+      ),
+      linear-gradient(
+        180deg,
+        hsl(220 18% 5%) 0%,
+        hsl(var(--background)) 30%,
+        hsl(220 22% 3%) 100%
+      );
     color: hsl(var(--foreground));
     isolation: isolate;
   }
@@ -863,7 +999,11 @@ All colors MUST be HSL.
     pointer-events: none;
     background:
       linear-gradient(180deg, hsl(var(--foreground) / 0.008), transparent 9rem),
-      radial-gradient(circle at 50% 0%, hsl(var(--button-highlight) / 0.025), transparent 30%);
+      radial-gradient(
+        circle at 50% 0%,
+        hsl(var(--button-highlight) / 0.025),
+        transparent 30%
+      );
     opacity: 0.55;
   }
 
@@ -871,7 +1011,11 @@ All colors MUST be HSL.
     background-color: hsl(var(--card) / 0.94);
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.03), transparent 20%),
-      radial-gradient(circle at top right, hsl(var(--button-highlight) / 0.08), transparent 34%),
+      radial-gradient(
+        circle at top right,
+        hsl(var(--button-highlight) / 0.08),
+        transparent 34%
+      ),
       linear-gradient(180deg, hsl(220 10% 12% / 0.98), hsl(220 14% 8% / 0.98));
     border-color: hsl(var(--border) / 0.82);
     box-shadow:
@@ -884,7 +1028,11 @@ All colors MUST be HSL.
     background-color: hsl(var(--background) / 0.88);
     background-image:
       linear-gradient(180deg, hsl(var(--foreground) / 0.015), transparent 70%),
-      radial-gradient(circle at top right, hsl(var(--button-highlight) / 0.04), transparent 28%);
+      radial-gradient(
+        circle at top right,
+        hsl(var(--button-highlight) / 0.04),
+        transparent 28%
+      );
     border-color: hsl(var(--border) / 0.82);
     box-shadow: inset 0 -1px 0 hsl(var(--foreground) / 0.03);
   }
@@ -912,9 +1060,18 @@ All colors MUST be HSL.
     border-color: hsl(var(--button-highlight) / 0.52);
     background-color: hsl(var(--secondary) / 0.96);
     background-image:
-      radial-gradient(circle at top left, hsl(var(--button-highlight) / 0.18), transparent 56%),
+      radial-gradient(
+        circle at top left,
+        hsl(var(--button-highlight) / 0.18),
+        transparent 56%
+      ),
       linear-gradient(180deg, hsl(var(--foreground) / 0.07), transparent 18%),
-      linear-gradient(120deg, hsl(40 38% 44%) 0%, hsl(39 30% 33%) 38%, hsl(37 26% 25%) 100%);
+      linear-gradient(
+        120deg,
+        hsl(40 38% 44%) 0%,
+        hsl(39 30% 33%) 38%,
+        hsl(37 26% 25%) 100%
+      );
     box-shadow:
       0 16px 34px hsl(var(--surface-shadow) / 0.38),
       inset 0 1px 0 hsl(var(--foreground) / 0.12);
@@ -929,7 +1086,11 @@ All colors MUST be HSL.
 
   .app-shell .app-page-gradient {
     background-image:
-      radial-gradient(circle at 50% 0%, hsl(var(--button-highlight) / 0.035), transparent 24rem),
+      radial-gradient(
+        circle at 50% 0%,
+        hsl(var(--button-highlight) / 0.035),
+        transparent 24rem
+      ),
       linear-gradient(180deg, hsl(var(--foreground) / 0.008), transparent 34%);
   }
 
@@ -952,7 +1113,7 @@ All colors MUST be HSL.
 
   @media (max-width: 767px) {
     .app-shell [data-sidebar="sidebar"][data-mobile="true"] {
-      width: min(18.75rem, calc(100vw - 3rem));
+      width: 80vw;
       border-right: 1px solid hsl(var(--sidebar-border) / 0.86);
       border-top-right-radius: 1.9rem;
       border-bottom-right-radius: 1.9rem;
@@ -968,8 +1129,16 @@ All colors MUST be HSL.
       inset: 0;
       pointer-events: none;
       background:
-        linear-gradient(180deg, hsl(var(--foreground) / 0.018), transparent 7rem),
-        radial-gradient(circle at top left, hsl(var(--button-highlight) / 0.08), transparent 34%);
+        linear-gradient(
+          180deg,
+          hsl(var(--foreground) / 0.018),
+          transparent 7rem
+        ),
+        radial-gradient(
+          circle at top left,
+          hsl(var(--button-highlight) / 0.08),
+          transparent 34%
+        );
     }
 
     .app-shell [data-sidebar="sidebar"][data-mobile="true"] > div {
