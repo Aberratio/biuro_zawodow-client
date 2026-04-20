@@ -27,6 +27,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/ui/field-error";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -62,6 +67,7 @@ import {
   Building2,
   ChevronDown,
   KeyRound,
+  Loader2,
   Pencil,
   Plus,
   Trash2,
@@ -278,6 +284,10 @@ export default function OrganizationDetails() {
     organization.event_limit - orgEvents.length,
     0,
   );
+  const addEventDisabledReason =
+    remainingSlots <= 0
+      ? "Osiągnięto limit wydarzeń dla tej organizacji. Zwiększ limit, aby dodać kolejne wydarzenie."
+      : null;
   const assignableScannerEvents = orgEvents.filter((event) =>
     isEventCurrentOrUpcoming(event),
   );
@@ -407,12 +417,6 @@ export default function OrganizationDetails() {
     setIsSubmittingMember(false);
 
     if (!result.ok) {
-      setIsSavingOrganization(false);
-      setIsSavingOrganization(false);
-      setIsSavingOrganization(false);
-      setIsSavingOrganization(false);
-      setIsSavingOrganization(false);
-      setIsSavingOrganization(false);
       setMemberErrors({ form: result.error ?? "Nie udało się dodać konta." });
       toast({
         title: "Nie udało się dodać konta",
@@ -883,16 +887,25 @@ export default function OrganizationDetails() {
           defaultOpen
           action={
             canCreateEvent ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setEventDialogOpen(true)}
-                className="h-9 rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)]"
-                disabled={remainingSlots <= 0}
-              >
-                <Plus className="mr-1 h-3.5 w-3.5" />
-                Dodaj wydarzenie
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEventDialogOpen(true)}
+                      className="h-9 rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)]"
+                      disabled={remainingSlots <= 0}
+                    >
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      Dodaj wydarzenie
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {addEventDisabledReason ? (
+                  <TooltipContent>{addEventDisabledReason}</TooltipContent>
+                ) : null}
+              </Tooltip>
             ) : null
           }
         >
@@ -1159,9 +1172,23 @@ export default function OrganizationDetails() {
                       >
                         <TableCell className="px-5 sm:px-7">
                           <div>
-                            <span className="text-base font-medium text-foreground">
-                              {scanner.name}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-base font-medium text-foreground">
+                                {scanner.name}
+                              </span>
+                              <Badge
+                                variant={
+                                  scanner.role === "scanner_plus"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                                className="rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium shadow-none"
+                              >
+                                {scanner.role === "scanner_plus"
+                                  ? "Plus"
+                                  : "Operator"}
+                              </Badge>
+                            </div>
                             <span className="mt-1 block text-sm text-muted-foreground md:hidden">
                               {scanner.email}
                             </span>
@@ -1724,6 +1751,7 @@ export default function OrganizationDetails() {
                         className="flex items-center gap-3 text-sm"
                       >
                         <Checkbox
+                          className="rounded-[2px]"
                           checked={memberForm.assigned_events.includes(
                             event.id,
                           )}
@@ -1753,9 +1781,14 @@ export default function OrganizationDetails() {
               className="w-full sm:w-auto"
               onClick={handleAddMember}
               disabled={isSubmittingMember}
+              aria-busy={isSubmittingMember}
             >
-              <Plus className="mr-1 h-4 w-4" />
-              Zapisz
+              {isSubmittingMember ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-1 h-4 w-4" />
+              )}
+              {isSubmittingMember ? "Zapisywanie..." : "Zapisz"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1778,6 +1811,7 @@ export default function OrganizationDetails() {
                     className="flex items-center gap-3 text-sm"
                   >
                     <Checkbox
+                      className="rounded-[2px]"
                       checked={scannerAssignmentDraft.includes(event.id)}
                       onCheckedChange={(checked) =>
                         toggleScannerAssignmentDraft(event.id, checked === true)

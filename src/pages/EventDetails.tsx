@@ -4,6 +4,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { pl } from "date-fns/locale";
 import { useData } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import {
   Dialog,
@@ -65,7 +66,7 @@ import {
 } from "@/lib/participant-fields";
 import { participantCountsAsCheckedIn } from "@/lib/participant-status";
 import { validateEmail, validateRequired } from "@/lib/form-validation";
-import { isScannerRole } from "@/lib/roles";
+import { getRoleLabel, isScannerRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 
@@ -151,10 +152,22 @@ function getOfficeToneClasses(tone: OfficeStatusTone) {
 }
 
 function TeamMemberRow({ user }: { user: User }) {
+  const isScanner = isScannerRole(user.role);
+
   return (
     <div className="event-detail-member-row">
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold">{user.name}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="truncate text-sm font-semibold">{user.name}</p>
+          {isScanner ? (
+            <Badge
+              variant={user.role === "scanner_plus" ? "default" : "secondary"}
+              className="rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium shadow-none"
+            >
+              {user.role === "scanner_plus" ? "Plus" : getRoleLabel(user.role)}
+            </Badge>
+          ) : null}
+        </div>
         <p className="truncate text-xs text-muted-foreground">{user.email}</p>
       </div>
     </div>
