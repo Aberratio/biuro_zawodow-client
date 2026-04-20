@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ActivityLog, ConnectionState, Event, Organization, Participant, ParticipantFieldMapping, ParticipantQrPreview, ParticipantScanResult, ParticipantStatus, Role, ScannerMode, SnapshotSource, User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { API_BASE_URL, fetchJson, getApiErrorCode, isApiResponseError, isNetworkRequestError } from '@/lib/api';
-import { type ApiEvent, type ApiOrganization, type ApiParticipant, type ApiUser, type BootstrapResponse, type ParticipantQrPreviewResponse, type ParticipantScanApiResponse, OFFLINE_ACTION_MESSAGE, applyPendingMutations, buildOfflineSnapshot, createBootstrapSnapshotVersion, createClientMutationId, extractConflictParticipant, getDefaultCurrentUser, getDeviceId, getInitialConnectionState, getSelectableOrganizationsForUser, getSelectedEventStorageKey, getSelectedOrganizationStorageKey, getVisibleEventsForUser, mapApiOrganizationToUi, mapApiParticipantToUi, mapApiUserToUi, participantUiIdToApiId, readStoredSelectedEventId, readStoredSelectedOrganizationId, resolveSelectedEventId, resolveSelectedOrganizationId } from '@/lib/data-context-helpers';
+import { type ApiEvent, type ApiOrganization, type ApiParticipant, type ApiUser, type BootstrapResponse, type ParticipantQrPreviewResponse, type ParticipantScanApiResponse, OFFLINE_ACTION_MESSAGE, applyPendingMutations, buildOfflineSnapshot, createBootstrapSnapshotVersion, createClientMutationId, extractConflictParticipant, getDefaultCurrentUser, getDeviceId, getInitialConnectionState, getSelectableOrganizationsForUser, getVisibleEventsForUser, mapApiOrganizationToUi, mapApiParticipantToUi, mapApiUserToUi, participantUiIdToApiId, persistStoredSelectedEventId, persistStoredSelectedOrganizationId, readStoredSelectedEventId, readStoredSelectedOrganizationId, resolveSelectedEventId, resolveSelectedOrganizationId } from '@/lib/data-context-helpers';
 import { deletePendingMutation, loadBootstrapSnapshot, loadPendingMutations, loadSyncMeta, saveBootstrapSnapshot, savePendingMutation, saveSyncMeta, updatePendingMutation, type PendingParticipantMutation } from '@/lib/offline-store';
 import { isEventOfficeOpen } from '@/lib/events';
 
@@ -130,11 +130,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const persistSelectedOrganizationId = useCallback((organizationId: string, userId?: string | null) => {
     if (!userId) return;
-    try {
-      const key = getSelectedOrganizationStorageKey(userId);
-      if (organizationId) localStorage.setItem(key, organizationId);
-      else localStorage.removeItem(key);
-    } catch {}
+    persistStoredSelectedOrganizationId(userId, organizationId);
   }, []);
 
   const setSelectedOrganizationId = useCallback((organizationId: string) => {
@@ -144,11 +140,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const persistSelectedEventId = useCallback((eventId: string, userId?: string | null) => {
     if (!userId) return;
-    try {
-      const key = getSelectedEventStorageKey(userId);
-      if (eventId) localStorage.setItem(key, eventId);
-      else localStorage.removeItem(key);
-    } catch {}
+    persistStoredSelectedEventId(userId, eventId);
   }, []);
 
   const setSelectedEventId = useCallback((eventId: string) => {
@@ -298,14 +290,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setSelectedEventIdState(readStoredSelectedEventId(authUser.id));
     void loadPendingMutations(API_BASE_URL, authUser.id).then(setPendingMutations).catch(() => setPendingMutations([]));
     void loadSyncMeta(API_BASE_URL, authUser.id).then(meta => { if (!meta) return; setLastSyncAt(meta.lastSyncAt); setOfflineSinceAt(meta.offlineSinceAt); }).catch(() => undefined);
-  }, [authUser?.id]);
-  useEffect(() => {
-    if (!authUser?.id) return undefined;
-    const organizationStorageKey = getSelectedOrganizationStorageKey(authUser.id);
-    const eventStorageKey = getSelectedEventStorageKey(authUser.id);
-    const handleStorage = (event: StorageEvent) => { if (event.key === organizationStorageKey) setSelectedOrganizationIdState(event.newValue ?? ''); if (event.key === eventStorageKey) setSelectedEventIdState(event.newValue ?? ''); };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
   }, [authUser?.id]);
   useEffect(() => { const intervalId = window.setInterval(() => setNowTimestamp(Date.now()), 30_000); return () => window.clearInterval(intervalId); }, []);
   useEffect(() => {

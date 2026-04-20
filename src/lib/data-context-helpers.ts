@@ -77,14 +77,49 @@ export function getSelectedOrganizationStorageKey(userId: string) {
   return `${SELECTED_ORGANIZATION_STORAGE_KEY_PREFIX}:${userId}`;
 }
 
-export function readStoredSelectedOrganizationId(userId?: string | null): string {
-  if (!userId) return '';
+function readStoredContextValue(key: string): string {
+  try {
+    const sessionValue = sessionStorage.getItem(key);
+    if (sessionValue) return sessionValue;
+  } catch {
+    // Ignore unavailable sessionStorage.
+  }
 
   try {
-    return localStorage.getItem(getSelectedOrganizationStorageKey(userId)) ?? '';
+    return localStorage.getItem(key) ?? '';
   } catch {
     return '';
   }
+}
+
+function persistStoredContextValue(key: string, value: string): void {
+  let persistedInSession = false;
+
+  try {
+    if (value) sessionStorage.setItem(key, value);
+    else sessionStorage.removeItem(key);
+    persistedInSession = true;
+  } catch {
+    // Ignore unavailable sessionStorage and fall back below.
+  }
+
+  try {
+    if (persistedInSession) {
+      localStorage.removeItem(key);
+      return;
+    }
+
+    if (value) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
+  } catch {
+    // Ignore unavailable localStorage.
+  }
+}
+
+export function readStoredSelectedOrganizationId(userId?: string | null): string {
+  if (!userId) return '';
+
+  return readStoredContextValue(getSelectedOrganizationStorageKey(userId));
 }
 
 export function getSelectedEventStorageKey(userId: string) {
@@ -94,11 +129,15 @@ export function getSelectedEventStorageKey(userId: string) {
 export function readStoredSelectedEventId(userId?: string | null): string {
   if (!userId) return '';
 
-  try {
-    return localStorage.getItem(getSelectedEventStorageKey(userId)) ?? '';
-  } catch {
-    return '';
-  }
+  return readStoredContextValue(getSelectedEventStorageKey(userId));
+}
+
+export function persistStoredSelectedOrganizationId(userId: string, organizationId: string): void {
+  persistStoredContextValue(getSelectedOrganizationStorageKey(userId), organizationId);
+}
+
+export function persistStoredSelectedEventId(userId: string, eventId: string): void {
+  persistStoredContextValue(getSelectedEventStorageKey(userId), eventId);
 }
 
 export function mapApiParticipantToUi(participant: ApiParticipant, fallbackEventId: string): Participant {

@@ -206,6 +206,8 @@ describe('DataProvider bootstrap loading', () => {
     await flushEffects();
 
     expect(screen.getByTestId('selected-event').textContent).toBe('event-2');
+    expect(window.sessionStorage.getItem('selected_event_context:admin-1')).toBe('event-2');
+    expect(window.localStorage.getItem('selected_event_context:admin-1')).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -241,8 +243,10 @@ describe('DataProvider bootstrap loading', () => {
 
     expect(screen.getByTestId('selected-organization').textContent).toBe('org-1');
     expect(screen.getByTestId('selected-event').textContent).toBe('event-1');
-    expect(window.localStorage.getItem('selected_organization_context:admin-1')).toBe('org-1');
-    expect(window.localStorage.getItem('selected_event_context:admin-1')).toBe('event-1');
+    expect(window.sessionStorage.getItem('selected_organization_context:admin-1')).toBe('org-1');
+    expect(window.sessionStorage.getItem('selected_event_context:admin-1')).toBe('event-1');
+    expect(window.localStorage.getItem('selected_organization_context:admin-1')).toBeNull();
+    expect(window.localStorage.getItem('selected_event_context:admin-1')).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -277,7 +281,54 @@ describe('DataProvider bootstrap loading', () => {
 
     expect(screen.getByTestId('selected-organization').textContent).toBe('org-2');
     expect(screen.getByTestId('selected-event')).toBeEmptyDOMElement();
-    expect(window.localStorage.getItem('selected_organization_context:admin-1')).toBe('org-2');
+    expect(window.sessionStorage.getItem('selected_organization_context:admin-1')).toBe('org-2');
+    expect(window.sessionStorage.getItem('selected_event_context:admin-1')).toBeNull();
+    expect(window.localStorage.getItem('selected_organization_context:admin-1')).toBeNull();
+    expect(window.localStorage.getItem('selected_event_context:admin-1')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores external localStorage changes after selecting an event in the current tab', async () => {
+    const adminUser: User = {
+      id: 'admin-1',
+      name: 'Admin',
+      email: 'admin@example.com',
+      password: '',
+      role: 'superadmin',
+      assigned_events: [],
+    };
+
+    authState.user = adminUser;
+    window.sessionStorage.setItem('selected_event_context:admin-1', 'event-1');
+
+    const fetchMock = vi.fn(async () => createBootstrapResponse(adminUser, [createEvent('event-1'), createEvent('event-2')]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <TestConsumer />
+      </DataProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('selected-event').textContent).toBe('event-1'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'select-event-2' }));
+    await flushEffects();
+
+    act(() => {
+      window.localStorage.removeItem('selected_event_context:admin-1');
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'selected_event_context:admin-1',
+        oldValue: 'event-1',
+        newValue: null,
+        storageArea: window.localStorage,
+      }));
+    });
+
+    await flushEffects();
+
+    expect(screen.getByTestId('selected-event').textContent).toBe('event-2');
+    expect(window.sessionStorage.getItem('selected_event_context:admin-1')).toBe('event-2');
     expect(window.localStorage.getItem('selected_event_context:admin-1')).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
