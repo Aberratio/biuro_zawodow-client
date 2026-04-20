@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { PasswordRequirements } from '@/components/PasswordRequirements';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -189,6 +190,7 @@ export default function Profile() {
                   <RefreshCw className="mr-1 h-4 w-4" /> Generuj
                 </Button>
               </div>
+              <PasswordRequirements password={newPassword} />
               <FieldError id="profile-new-password-error">{errors.newPassword}</FieldError>
             </div>
             <div className="space-y-1.5">

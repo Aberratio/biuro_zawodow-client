@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { PasswordRequirements } from '@/components/PasswordRequirements';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -113,6 +114,7 @@ export default function ResetPassword() {
                     <RefreshCw className="mr-1 h-4 w-4" /> Generuj
                   </Button>
                 </div>
+                <PasswordRequirements password={password} />
                 <FieldError id="reset-password-error">{errors.password}</FieldError>
               </div>
               <div className="space-y-1.5">

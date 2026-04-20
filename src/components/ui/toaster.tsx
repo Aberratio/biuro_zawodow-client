@@ -1,11 +1,18 @@
+import * as React from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Toast, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastViewport } from "@/components/ui/toast";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 export function Toaster() {
   const { toasts } = useToast();
+  const [mounted, setMounted] = React.useState(false);
 
-  return (
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const content = (
     <ToastProvider duration={2800}>
       {toasts.map(function ({ id, title, description, action, variant, ...props }) {
         const isDestructive = variant === "destructive";
@@ -36,4 +43,10 @@ export function Toaster() {
       <ToastViewport />
     </ToastProvider>
   );
+
+  if (!mounted) {
+    return null;
+  }
+
+  return createPortal(content, document.body);
 }

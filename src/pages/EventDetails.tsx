@@ -60,6 +60,7 @@ import {
   isEventOfficeStartAtOrAfterNow,
   isEventOfficeOpen,
   isValidEventOfficeRange,
+  toLocalDateTimeValue,
 } from "@/lib/events";
 import {
   buildEmptyParticipantFieldValues,
@@ -91,8 +92,8 @@ function buildEditFormFromEvent(event: {
   return {
     name: event.name,
     location: event.location,
-    office_open_at: event.office_open_at.slice(0, 16),
-    office_close_at: event.office_close_at.slice(0, 16),
+    office_open_at: toLocalDateTimeValue(event.office_open_at),
+    office_close_at: toLocalDateTimeValue(event.office_close_at),
   };
 }
 
@@ -696,11 +697,11 @@ export default function EventDetails() {
 
   const handleEditSubmit = async () => {
     const submittedOfficeOpenAt = isFinishedEvent
-      ? event.office_open_at
-      : editForm.office_open_at;
+      ? toLocalDateTimeValue(event.office_open_at)
+      : toLocalDateTimeValue(editForm.office_open_at);
     const submittedOfficeCloseAt = isFinishedEvent
-      ? event.office_close_at
-      : editForm.office_close_at;
+      ? toLocalDateTimeValue(event.office_close_at)
+      : toLocalDateTimeValue(editForm.office_close_at);
     const nextErrors = {
       name: validateRequired(editForm.name, "Podaj nazwę wydarzenia."),
       location: validateRequired(
