@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/ui/field-error";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Collapsible,
   CollapsibleContent,
@@ -205,35 +206,49 @@ function CollapsibleSection({
   );
 }
 
-function TeamRoleCard({
-  title,
+function TeamRoleTabPanel({
+  role,
   users,
   emptyText,
   action,
-  defaultOpen = false,
 }: {
-  title: string;
+  role: ManagedScannerRole;
   users: User[];
   emptyText: string;
   action?: ReactNode;
-  defaultOpen?: boolean;
 }) {
+  const permissionDescription =
+    role === "scanner"
+      ? "Operator może pracować na uczestnikach przypisanych do wydarzenia i obsługiwać standardowy proces odprawy."
+      : "Operator Plus ma rozszerzone uprawnienia do pracy na uczestnikach i obsługi przypisanego wydarzenia.";
+
   return (
-    <CollapsibleSection
-      title={title}
-      defaultOpen={defaultOpen}
-      action={action ? <div className="flex justify-end">{action}</div> : null}
-    >
-      {users.length === 0 ? (
-        <div className="event-detail-empty-state px-4 py-5 text-sm text-muted-foreground">
-          {emptyText}
+    <div className="event-detail-list-section">
+      <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            Uprawnienia roli
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {permissionDescription}
+          </p>
         </div>
-      ) : (
-        users.map((user) => <TeamMemberRow key={user.id} user={user} />)
-      )}
-    </CollapsibleSection>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      <div className="event-detail-list-content space-y-4">
+        {users.length === 0 ? (
+          <div className="event-detail-empty-state px-4 py-5 text-sm text-muted-foreground">
+            {emptyText}
+          </div>
+        ) : (
+          users.map((user) => <TeamMemberRow key={user.id} user={user} />)
+        )}
+      </div>
+    </div>
   );
 }
+
+type ManagedScannerRole = "scanner" | "scanner_plus";
 
 export default function EventDetails() {
   const { id } = useParams<{ id: string }>();
@@ -250,6 +265,7 @@ export default function EventDetails() {
     isLoading,
     getParticipantFieldMappings,
     addParticipantManually,
+    addUser,
     assignScannerEvents,
     updateEvent,
     deleteEvent,
@@ -261,8 +277,24 @@ export default function EventDetails() {
   const [manualOpen, setManualOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [scannerDialogOpen, setScannerDialogOpen] = useState(false);
+  const [managedScannerRole, setManagedScannerRole] =
+    useState<ManagedScannerRole>("scanner");
+  const [scannerManagerTab, setScannerManagerTab] = useState<
+    "existing" | "new"
+  >("existing");
+  const [scannerSearchQuery, setScannerSearchQuery] = useState("");
   const [scannerSelection, setScannerSelection] = useState<string[]>([]);
   const [scannerSaving, setScannerSaving] = useState(false);
+  const [scannerCreateSaving, setScannerCreateSaving] = useState(false);
+  const [scannerCreateForm, setScannerCreateForm] = useState({
+    name: "",
+    email: "",
+  });
+  const [scannerCreateErrors, setScannerCreateErrors] = useState<{
+    name?: string;
+    email?: string;
+    form?: string;
+  }>({});
   const [manualEmail, setManualEmail] = useState("");
   const [manualFields, setManualFields] = useState<Record<string, string>>({});
   const [manualErrors, setManualErrors] = useState<{
@@ -314,26 +346,54 @@ export default function EventDetails() {
       ),
     [event?.organization_id, users],
   );
+  const organizationStandardScanners = useMemo(
+    () =>
+      organizationScanners
+        .filter((user) => user.role === "scanner")
+        .sort((a, b) => a.name.localeCompare(b.name, "pl")),
+    [organizationScanners],
+  );
+  const organizationPlusScanners = useMemo(
+    () =>
+      organizationScanners
+        .filter((user) => user.role === "scanner_plus")
+        .sort((a, b) => a.name.localeCompare(b.name, "pl")),
+    [organizationScanners],
+  );
   const assignedScanners = useMemo(
     () =>
-      organizationScanners.filter((scanner) =>
+      organizationStandardScanners.filter((scanner) =>
         scanner.assigned_events.includes(event?.id ?? ""),
       ),
-    [event?.id, organizationScanners],
+    [event?.id, organizationStandardScanners],
   );
-  const organizationEditors = useMemo(
+  const assignedScannerPlus = useMemo(
     () =>
-      users.filter(
-        (user) =>
-          user.role === "editor" &&
-          user.organization_id === event?.organization_id,
+      organizationPlusScanners.filter((scanner) =>
+        scanner.assigned_events.includes(event?.id ?? ""),
       ),
-    [event?.organization_id, users],
+    [event?.id, organizationPlusScanners],
   );
-  const organizationAdmins = useMemo(
-    () => users.filter((user) => user.role === "admin"),
-    [users],
+  const managedRoleScanners = useMemo(
+    () =>
+      managedScannerRole === "scanner"
+        ? organizationStandardScanners
+        : organizationPlusScanners,
+    [managedScannerRole, organizationPlusScanners, organizationStandardScanners],
   );
+  const filteredManagedRoleScanners = useMemo(() => {
+    const normalizedQuery = scannerSearchQuery.trim().toLocaleLowerCase("pl-PL");
+
+    if (!normalizedQuery) {
+      return managedRoleScanners;
+    }
+
+    return managedRoleScanners.filter((scanner) =>
+      `${scanner.name} ${scanner.email}`
+        .toLocaleLowerCase("pl-PL")
+        .includes(normalizedQuery),
+    );
+  }, [managedRoleScanners, scannerSearchQuery]);
   const canManageScanners = useMemo(() => {
     if (!event) return false;
     if (currentRole === "superadmin") return true;
@@ -403,9 +463,7 @@ export default function EventDetails() {
   const officeStatus = getOfficeStatusSummary(event, now);
   const officeToneClasses = getOfficeToneClasses(officeStatus.tone);
   const hasAnyTeamMembers =
-    organizationAdmins.length > 0 ||
-    organizationEditors.length > 0 ||
-    assignedScanners.length > 0;
+    assignedScanners.length > 0 || assignedScannerPlus.length > 0;
   const officeCloseAt = getEventOfficeCloseAt(event);
   const isFinishedEvent = officeCloseAt !== null && now > officeCloseAt;
   const canArchiveEvent =
@@ -433,14 +491,27 @@ export default function EventDetails() {
     );
   };
 
-  const openScannerDialog = () => {
-    setScannerSelection(assignedScanners.map((scanner) => scanner.id));
+  const resetScannerDialogState = () => {
+    setScannerManagerTab("existing");
+    setScannerSearchQuery("");
+    setScannerCreateForm({ name: "", email: "" });
+    setScannerCreateErrors({});
+  };
+
+  const openScannerDialog = (role: ManagedScannerRole) => {
+    setManagedScannerRole(role);
+    setScannerSelection(
+      (role === "scanner" ? assignedScanners : assignedScannerPlus).map(
+        (scanner) => scanner.id,
+      ),
+    );
+    resetScannerDialogState();
     setScannerDialogOpen(true);
   };
 
   const handleSaveScannerAssignments = async () => {
     const selectedScannerIds = new Set(scannerSelection);
-    const changedScanners = organizationScanners.filter((scanner) => {
+    const changedScanners = managedRoleScanners.filter((scanner) => {
       const wasAssigned = scanner.assigned_events.includes(event.id);
       const shouldBeAssigned = selectedScannerIds.has(scanner.id);
       return wasAssigned !== shouldBeAssigned;
@@ -448,6 +519,7 @@ export default function EventDetails() {
 
     if (changedScanners.length === 0) {
       setScannerDialogOpen(false);
+      resetScannerDialogState();
       return;
     }
 
@@ -467,7 +539,9 @@ export default function EventDetails() {
         );
         if (!result.ok) {
           toast({
-            title: "Nie udało się zapisać przypisań operatorów",
+            title: `Nie udało się zapisać przypisań ${getRoleLabel(
+              managedScannerRole,
+            ).toLocaleLowerCase("pl-PL")}`,
             description:
               result.error ??
               `Nie udało się zaktualizować operatora ${scanner.name}.`,
@@ -478,10 +552,69 @@ export default function EventDetails() {
       }
 
       setScannerDialogOpen(false);
-      toast({ title: "Zapisano przypisania operatorów" });
+      resetScannerDialogState();
+      toast({
+        title: `Zapisano przypisania ${getRoleLabel(
+          managedScannerRole,
+        ).toLocaleLowerCase("pl-PL")}`,
+      });
     } finally {
       setScannerSaving(false);
     }
+  };
+
+  const handleCreateScanner = async () => {
+    const nextErrors = {
+      name: validateRequired(
+        scannerCreateForm.name,
+        "Podaj imię i nazwisko operatora.",
+      ),
+      email: validateEmail(scannerCreateForm.email),
+    };
+
+    if (nextErrors.name || nextErrors.email) {
+      setScannerCreateErrors(nextErrors);
+      return;
+    }
+
+    setScannerCreateErrors({});
+    setScannerCreateSaving(true);
+    const result = await addUser({
+      name: scannerCreateForm.name,
+      email: scannerCreateForm.email,
+      role: managedScannerRole,
+      organization_id: event.organization_id,
+      assigned_events: [event.id],
+    });
+    setScannerCreateSaving(false);
+
+    if (!result.ok) {
+      setScannerCreateErrors({
+        form:
+          result.error ??
+          `Nie udało się dodać ${getRoleLabel(managedScannerRole).toLocaleLowerCase(
+            "pl-PL",
+          )}.`,
+      });
+      toast({
+        title: `Nie udało się dodać ${getRoleLabel(
+          managedScannerRole,
+        ).toLocaleLowerCase("pl-PL")}`,
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setScannerDialogOpen(false);
+    resetScannerDialogState();
+    toast({
+      title:
+        managedScannerRole === "scanner"
+          ? "Dodano operatora i przypisano do wydarzenia"
+          : "Dodano operatora Plus i przypisano do wydarzenia",
+      description: "Użytkownik otrzyma e-mail z linkiem do ustawienia hasła.",
+    });
   };
 
   const handleManualSubmit = async () => {
@@ -790,7 +923,7 @@ export default function EventDetails() {
           </div>
         </div>
 
-        {(canUseActiveEventTools || canEditEvent || canArchiveEvent) && (
+        {((!isArchivedEvent && event) || canUseActiveEventTools || canEditEvent || canArchiveEvent) && (
           <aside className="event-detail-actions-panel">
             {canUseActiveEventTools && (
               <Button
@@ -803,7 +936,7 @@ export default function EventDetails() {
                 <ScanLine className="mr-1 h-4 w-4" /> Otwórz skaner
               </Button>
             )}
-            {canUseActiveEventTools && (
+            {!isArchivedEvent && event && (
               <Button
                 variant="outline"
                 onClick={() => {
@@ -855,34 +988,22 @@ export default function EventDetails() {
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
               {isFinishedEvent
-                ? "Sprawdź, czy organizacja miała przypisanych organizatorów lub operatorów."
-                : "Dodaj operatorów lub sprawdź, czy organizacja ma przypisanych organizatorów."}
+                ? "Sprawdź, czy do wydarzenia byli przypisani operatorzy lub operatorzy Plus."
+                : "Dodaj operatorów albo operatorów Plus i przypisz ich do tego wydarzenia."}
             </p>
           </div>
         )}
 
         <div className="event-detail-section-group">
-          <TeamRoleCard
-            title="Organizatorzy"
-            users={organizationEditors}
-            emptyText="Brak organizatorów."
-            defaultOpen={false}
-          />
-          <TeamRoleCard
-            title={
-              isFinishedEvent
-                ? "Operatorzy pracujący przy wydarzeniu"
-                : "Operatorzy wydarzenia"
-            }
-            users={assignedScanners}
-            emptyText="Brak operatorów."
+          <CollapsibleSection
+            title={`Operatorzy (${assignedScanners.length})`}
             defaultOpen={false}
             action={
               canManageScanners && canAssignScannersToEvent ? (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={openScannerDialog}
+                  onClick={() => openScannerDialog("scanner")}
                   className="event-detail-secondary-action"
                   disabled={!isOnline}
                 >
@@ -890,7 +1011,37 @@ export default function EventDetails() {
                 </Button>
               ) : undefined
             }
-          />
+          >
+            <TeamRoleTabPanel
+              role="scanner"
+              users={assignedScanners}
+              emptyText="Brak operatorów przypisanych do tego wydarzenia."
+            />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title={`Operatorzy Plus (${assignedScannerPlus.length})`}
+            defaultOpen={false}
+            action={
+              canManageScanners && canAssignScannersToEvent ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openScannerDialog("scanner_plus")}
+                  className="event-detail-secondary-action"
+                  disabled={!isOnline}
+                >
+                  Zarządzaj
+                </Button>
+              ) : undefined
+            }
+          >
+            <TeamRoleTabPanel
+              role="scanner_plus"
+              users={assignedScannerPlus}
+              emptyText="Brak operatorów Plus przypisanych do tego wydarzenia."
+            />
+          </CollapsibleSection>
         </div>
       </section>
 
@@ -1240,46 +1391,210 @@ export default function EventDetails() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={scannerDialogOpen} onOpenChange={setScannerDialogOpen}>
-        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Przypisz operatorów do wydarzenia</DialogTitle>
+      <Dialog
+        open={scannerDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setScannerDialogOpen(nextOpen);
+          if (!nextOpen) {
+            resetScannerDialogState();
+          }
+        }}
+      >
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-3xl">
+          <DialogHeader className="shrink-0 px-6 pb-2 pt-6">
+            <DialogTitle>
+              Zarządzaj{" "}
+              {managedScannerRole === "scanner"
+                ? "operatorami"
+                : "operatorami Plus"}
+            </DialogTitle>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Dodaj nowe konto do organizacji i od razu przypisz je do
+              wydarzenia albo wybierz istniejące konto z bazy organizacji.
+            </p>
           </DialogHeader>
-          <div className="space-y-3">
-            {organizationScanners.length > 0 ? (
-              <div className="space-y-2 rounded-xl border p-3">
-                {organizationScanners.map((scanner) => (
-                  <label
-                    key={scanner.id}
-                    className="flex items-center gap-3 text-sm"
-                  >
-                    <Checkbox
-                      checked={scannerSelection.includes(scanner.id)}
-                      onCheckedChange={(checked) =>
-                        toggleScannerSelection(scanner.id, checked === true)
-                      }
-                    />
-                    <span className="min-w-0 truncate">{scanner.name}</span>
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                Brak operatorów w organizacji tego wydarzenia.
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              className="w-full sm:w-auto"
-              onClick={handleSaveScannerAssignments}
-              disabled={scannerSaving || organizationScanners.length === 0}
+          <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4">
+            <Tabs
+              value={scannerManagerTab}
+              onValueChange={(value) =>
+                setScannerManagerTab(value as "existing" | "new")
+              }
+              className="space-y-4"
             >
-              {scannerSaving && (
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-              )}
-              Zapisz przypisania
-            </Button>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="existing">Z bazy organizacji</TabsTrigger>
+                <TabsTrigger value="new">Nowe konto</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="existing" className="mt-0 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="event-scanner-search">
+                    Szukaj po imieniu lub adresie e-mail
+                  </Label>
+                  <Input
+                    id="event-scanner-search"
+                    value={scannerSearchQuery}
+                    onChange={(eventValue) =>
+                      setScannerSearchQuery(eventValue.target.value)
+                    }
+                    placeholder="Np. Jan Kowalski albo jan@firma.pl"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {filteredManagedRoleScanners.length ===
+                    managedRoleScanners.length
+                      ? `Dostępne konta: ${managedRoleScanners.length}`
+                      : `Wyniki: ${filteredManagedRoleScanners.length} z ${managedRoleScanners.length}`}
+                  </p>
+                </div>
+
+                {managedRoleScanners.length > 0 ? (
+                  <div className="max-h-[26rem] space-y-2 overflow-y-auto rounded-xl border p-3">
+                    {filteredManagedRoleScanners.length > 0 ? (
+                      filteredManagedRoleScanners.map((scanner) => (
+                        <label
+                          key={scanner.id}
+                          className="flex items-start gap-3 rounded-lg px-2 py-2 text-sm hover:bg-muted/40"
+                        >
+                          <Checkbox
+                            checked={scannerSelection.includes(scanner.id)}
+                            onCheckedChange={(checked) =>
+                              toggleScannerSelection(
+                                scanner.id,
+                                checked === true,
+                              )
+                            }
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium">
+                              {scanner.name}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {scanner.email}
+                            </p>
+                          </div>
+                        </label>
+                      ))
+                    ) : (
+                      <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                        Brak wyników dla podanej frazy.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                    {managedScannerRole === "scanner"
+                      ? "Organizacja nie ma jeszcze żadnych operatorów."
+                      : "Organizacja nie ma jeszcze żadnych operatorów Plus."}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="new" className="mt-0 space-y-4">
+                <div>
+                  <Label htmlFor="event-scanner-create-name">
+                    Imię i nazwisko
+                  </Label>
+                  <Input
+                    id="event-scanner-create-name"
+                    value={scannerCreateForm.name}
+                    onChange={(eventValue) => {
+                      setScannerCreateForm((current) => ({
+                        ...current,
+                        name: eventValue.target.value,
+                      }));
+                      setScannerCreateErrors((current) => ({
+                        ...current,
+                        name: undefined,
+                        form: undefined,
+                      }));
+                    }}
+                    className="mt-2"
+                    aria-invalid={Boolean(scannerCreateErrors.name)}
+                    aria-describedby={
+                      scannerCreateErrors.name
+                        ? "event-scanner-create-name-error"
+                        : undefined
+                    }
+                  />
+                  <FieldError
+                    id="event-scanner-create-name-error"
+                    className="mt-2"
+                  >
+                    {scannerCreateErrors.name}
+                  </FieldError>
+                </div>
+
+                <div>
+                  <Label htmlFor="event-scanner-create-email">Email</Label>
+                  <Input
+                    id="event-scanner-create-email"
+                    type="email"
+                    value={scannerCreateForm.email}
+                    onChange={(eventValue) => {
+                      setScannerCreateForm((current) => ({
+                        ...current,
+                        email: eventValue.target.value,
+                      }));
+                      setScannerCreateErrors((current) => ({
+                        ...current,
+                        email: undefined,
+                        form: undefined,
+                      }));
+                    }}
+                    className="mt-2"
+                    aria-invalid={Boolean(scannerCreateErrors.email)}
+                    aria-describedby={
+                      scannerCreateErrors.email
+                        ? "event-scanner-create-email-error"
+                        : undefined
+                    }
+                  />
+                  <FieldError
+                    id="event-scanner-create-email-error"
+                    className="mt-2"
+                  >
+                    {scannerCreateErrors.email}
+                  </FieldError>
+                </div>
+
+                <p className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                  Konto zostanie dodane do organizacji i od razu przypisane do
+                  tego wydarzenia. Użytkownik dostanie e-mail z linkiem do
+                  ustawienia hasła.
+                </p>
+
+                <FieldError id="event-scanner-create-form-error">
+                  {scannerCreateErrors.form}
+                </FieldError>
+              </TabsContent>
+            </Tabs>
+          </div>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
+            {scannerManagerTab === "existing" ? (
+              <Button
+                className="w-full sm:w-auto"
+                onClick={handleSaveScannerAssignments}
+                disabled={scannerSaving || managedRoleScanners.length === 0}
+              >
+                {scannerSaving && (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                )}
+                Zapisz przypisania
+              </Button>
+            ) : (
+              <Button
+                className="w-full sm:w-auto"
+                onClick={handleCreateScanner}
+                disabled={scannerCreateSaving}
+              >
+                {scannerCreateSaving ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="mr-1 h-4 w-4" />
+                )}
+                Dodaj i przypisz
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
