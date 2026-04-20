@@ -78,6 +78,10 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | null>(null);
 const OFFLINE_MUTATION_LIMIT = 20;
 const OFFLINE_MUTATION_WINDOW_MS = 60_000;
+const CONNECTION_RECOVERY_INTERVAL_MS = 15_000;
+const NETWORK_FAILURE_THRESHOLD = 2;
+const PARTICIPANT_FIELD_MAPPINGS_CACHE_TTL_MS = 60_000;
+const PARTICIPANT_FIELD_MAPPINGS_FAILURE_COOLDOWN_MS = 10_000;
 
 interface ParticipantUpdatePayload {
   status?: ParticipantStatus;
@@ -109,6 +113,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [offlineSinceAt, setOfflineSinceAt] = useState<string | null>(() => getInitialConnectionState() === 'offline' ? new Date().toISOString() : null);
   const [pendingMutations, setPendingMutations] = useState<PendingParticipantMutation[]>([]);
   const syncRef = useRef(false);
+  const networkFailureCountRef = useRef(0);
+  const participantFieldMappingsCacheRef = useRef(new Map<string, { fetchedAt: number; mappings: ParticipantFieldMapping[] }>());
+  const participantFieldMappingsInFlightRef = useRef(new Map<string, Promise<ParticipantFieldMapping[]>>());
+  const participantFieldMappingsFailureUntilRef = useRef(new Map<string, number>());
 
   const participants = useMemo(() => applyPendingMutations(participantRecords, pendingMutations), [participantRecords, pendingMutations]);
   const currentUser = useMemo(() => !authUser ? getDefaultCurrentUser() : users.find(user => user.id === authUser.id) || authUser, [users, authUser]);
@@ -167,6 +175,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setSelectedEventIdState('');
     setSnapshotSource('none');
     setLastSyncAt(null);
+    participantFieldMappingsCacheRef.current.clear();
+    participantFieldMappingsInFlightRef.current.clear();
+    participantFieldMappingsFailureUntilRef.current.clear();
+    networkFailureCountRef.current = 0;
+  }, []);
+
+  const markConnectionHealthy = useCallback(() => {
+    networkFailureCountRef.current = 0;
+    setConnectionState('online');
+    setOfflineSinceAt(null);
   }, []);
 
   const setDegradedState = useCallback((source?: SnapshotSource) => {
@@ -178,7 +196,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const ensureOnline = useCallback((message = OFFLINE_ACTION_MESSAGE) => connectionState === 'online' ? null : message, [connectionState]);
-  const handleNetworkFailure = useCallback((error: unknown) => { if (isNetworkRequestError(error)) setDegradedState(); }, [setDegradedState]);
+  const handleNetworkFailure = useCallback((error: unknown, options?: { immediate?: boolean }) => {
+    if (!isNetworkRequestError(error)) return;
+    networkFailureCountRef.current += 1;
+    if (options?.immediate || networkFailureCountRef.current >= NETWORK_FAILURE_THRESHOLD) {
+      setDegradedState();
+    }
+  }, [setDegradedState]);
   const replaceParticipantRecord = useCallback((participant: Participant) => setParticipantRecords(previous => previous.map(item => item.id === participant.id ? { ...participant, sync_state: 'synced', sync_error: undefined } : item)), []);
   const addLog = useCallback((action: string, participantName?: string) => setActivityLog(previous => [{ id: `log-${Date.now()}`, timestamp: new Date().toISOString(), action, participant_name: participantName, user_name: currentUser.name }, ...previous]), [currentUser.name]);
 
@@ -190,21 +214,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const offlineError = ensureOnline(offlineMessage);
     if (offlineError) throw new Error(offlineError);
     try {
-      return await executor();
+      const result = await executor();
+      markConnectionHealthy();
+      return result;
     } catch (error) {
       handleNetworkFailure(error);
       throw error;
     }
-  }, [ensureOnline, handleNetworkFailure]);
+  }, [ensureOnline, handleNetworkFailure, markConnectionHealthy]);
 
   const runMutation = useCallback(async (executor: () => Promise<MutationResult>): Promise<MutationResult> => {
     try {
-      return await executor();
+      const result = await executor();
+      markConnectionHealthy();
+      return result;
     } catch (error) {
       handleNetworkFailure(error);
       return { ok: false, error: error instanceof Error ? error.message : 'Wystąpił błąd.' };
     }
-  }, [handleNetworkFailure]);
+  }, [handleNetworkFailure, markConnectionHealthy]);
 
   const hydrateData = useCallback((responseData: BootstrapResponse['data'], source: SnapshotSource, generatedAt: string, preferredOrganizationId = '', preferredEventId = '') => {
     if (!authUser) return;
@@ -242,8 +270,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const generatedAt = response.generated_at ?? new Date().toISOString();
       const snapshotVersion = response.snapshot_version ?? createBootstrapSnapshotVersion(response.data);
       hydrateData(response.data, 'network', generatedAt);
-      setConnectionState('online');
-      setOfflineSinceAt(null);
+      markConnectionHealthy();
       await saveBootstrapSnapshot(buildOfflineSnapshot({ userId: authUser.id, selectedOrganizationId: readStoredSelectedOrganizationId(authUser.id), selectedEventId: readStoredSelectedEventId(authUser.id), organizations: Array.isArray(response.data.organizations) ? response.data.organizations.map(mapApiOrganizationToUi) : [], events: Array.isArray(response.data.events) ? response.data.events : [], archivedEvents: Array.isArray(response.data.archivedEvents) ? response.data.archivedEvents : [], users: (response.data.users ?? []).map(mapApiUserToUi), participants: (response.data.participants ?? []).map(participant => mapApiParticipantToUi(participant, readStoredSelectedEventId(authUser.id))), activityLog: Array.isArray(response.data.activityLog) ? response.data.activityLog : [], generatedAt, snapshotVersion }));
       await updateSyncMeta(authUser.id, generatedAt, null);
     } catch (error) {
@@ -251,12 +278,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
         clearSession();
         resetState();
       } else if (!(await restoreCachedBootstrap())) {
-        setDegradedState();
+        if (isNetworkRequestError(error)) {
+          handleNetworkFailure(error, { immediate: true });
+        } else {
+          setDegradedState();
+        }
       }
     } finally {
       setIsLoading(false);
     }
-  }, [authUser, clearSession, getAuthHeaders, hydrateData, resetState, restoreCachedBootstrap, setDegradedState, token, updateSyncMeta]);
+  }, [authUser, clearSession, getAuthHeaders, handleNetworkFailure, hydrateData, markConnectionHealthy, resetState, restoreCachedBootstrap, setDegradedState, token, updateSyncMeta]);
 
   const refreshData = useCallback(async () => { await loadBootstrap(); }, [loadBootstrap]);
 
@@ -283,6 +314,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline);
     return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
   }, [loadBootstrap]);
+  useEffect(() => {
+    if (!authUser?.id || !token || connectionState === 'online') return undefined;
+    const intervalId = window.setInterval(() => { void loadBootstrap(true); }, CONNECTION_RECOVERY_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [authUser?.id, connectionState, loadBootstrap, token]);
   useEffect(() => { if (authUser?.id) void updateSyncMeta(authUser.id, lastSyncAt, offlineSinceAt); }, [authUser?.id, lastSyncAt, offlineSinceAt, updateSyncMeta]);
   useEffect(() => { if (currentRole !== 'admin') { if (selectedOrganizationId !== '') setSelectedOrganizationId(''); return; } const nextSelectedOrganizationId = resolveSelectedOrganizationId(selectableOrganizations, selectedOrganizationId); if (nextSelectedOrganizationId !== selectedOrganizationId) setSelectedOrganizationId(nextSelectedOrganizationId); }, [currentRole, selectableOrganizations, selectedOrganizationId, setSelectedOrganizationId]);
   useEffect(() => { const nextVisibleEventId = eventSelectionScope[0]?.id ?? ''; if (eventSelectionScope.some(event => event.id === selectedEventId) || nextVisibleEventId === selectedEventId) return; setSelectedEventId(nextVisibleEventId); }, [eventSelectionScope, selectedEventId, setSelectedEventId]);
@@ -450,13 +486,54 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     return payload.data;
   }, [applyOnlineOnly, getAuthHeaders]);
-  const confirmParticipantImportMapping = useCallback(async (eventId: string, payload: ParticipantImportMappingPayload) => ((await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/events/${eventId}/participant-imports/confirm`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(payload) }))).payload as { data?: ParticipantFieldMapping[] }).data ?? [], [applyOnlineOnly, getAuthHeaders]);
+  const confirmParticipantImportMapping = useCallback(async (eventId: string, payload: ParticipantImportMappingPayload) => {
+    const mappings = ((await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/events/${eventId}/participant-imports/confirm`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(payload) }))).payload as { data?: ParticipantFieldMapping[] }).data ?? [];
+    participantFieldMappingsCacheRef.current.set(eventId, { fetchedAt: Date.now(), mappings });
+    participantFieldMappingsFailureUntilRef.current.delete(eventId);
+    return mappings;
+  }, [applyOnlineOnly, getAuthHeaders]);
   const runParticipantImport = useCallback(async (eventId: string, csvContent: string) => {
     const payload = (await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/events/${eventId}/participant-imports/run`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ csv_content: csvContent }) }))).payload as { data?: Record<string, unknown> };
     const data = payload.data ?? {}; const createdParticipants = Array.isArray(data.participants) ? data.participants.map((participant: ApiParticipant) => mapApiParticipantToUi(participant, eventId)) : []; setParticipantRecords(previous => [...previous, ...createdParticipants]); if (createdParticipants.length > 0) addLog(`Import CSV (${createdParticipants.length} uczestników)`);
     return { created_count: Number(data.created_count ?? 0), duplicate_count: Number(data.duplicate_count ?? 0), invalid_count: Number(data.invalid_count ?? 0), invalid_rows: Array.isArray(data.invalid_rows) ? data.invalid_rows.map((row: number) => Number(row)) : [], participants: createdParticipants };
   }, [addLog, applyOnlineOnly, getAuthHeaders]);
-  const getParticipantFieldMappings = useCallback(async (eventId: string) => ((await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/events/${eventId}/participant-field-mappings`, { headers: getAuthHeaders() }), 'Mapowanie pól uczestników jest dostępne tylko po połączeniu z serwerem.')).payload as { data?: { mappings?: ParticipantFieldMapping[] } }).data?.mappings ?? [], [applyOnlineOnly, getAuthHeaders]);
+  const getParticipantFieldMappings = useCallback(async (eventId: string) => {
+    const cachedEntry = participantFieldMappingsCacheRef.current.get(eventId);
+    if (cachedEntry && Date.now() - cachedEntry.fetchedAt < PARTICIPANT_FIELD_MAPPINGS_CACHE_TTL_MS) {
+      return cachedEntry.mappings;
+    }
+
+    const cooldownUntil = participantFieldMappingsFailureUntilRef.current.get(eventId) ?? 0;
+    if (cooldownUntil > Date.now()) {
+      if (cachedEntry) return cachedEntry.mappings;
+      throw new Error('Trwa ponowne nawiązywanie połączenia z serwerem. Spróbuj ponownie za chwilę.');
+    }
+
+    const pendingRequest = participantFieldMappingsInFlightRef.current.get(eventId);
+    if (pendingRequest) {
+      return pendingRequest;
+    }
+
+    const request = (async () => {
+      try {
+        const payload = (await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/events/${eventId}/participant-field-mappings`, { headers: getAuthHeaders() }), 'Mapowanie pól uczestników jest dostępne tylko po połączeniu z serwerem.')).payload as { data?: { mappings?: ParticipantFieldMapping[] } };
+        const mappings = payload.data?.mappings ?? [];
+        participantFieldMappingsCacheRef.current.set(eventId, { fetchedAt: Date.now(), mappings });
+        participantFieldMappingsFailureUntilRef.current.delete(eventId);
+        return mappings;
+      } catch (error) {
+        if (isNetworkRequestError(error)) {
+          participantFieldMappingsFailureUntilRef.current.set(eventId, Date.now() + PARTICIPANT_FIELD_MAPPINGS_FAILURE_COOLDOWN_MS);
+        }
+        throw error;
+      } finally {
+        participantFieldMappingsInFlightRef.current.delete(eventId);
+      }
+    })();
+
+    participantFieldMappingsInFlightRef.current.set(eventId, request);
+    return request;
+  }, [applyOnlineOnly, getAuthHeaders]);
 
   const addParticipantManually = useCallback(async (eventId: string, email: string, fieldValues: Record<string, string>) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };

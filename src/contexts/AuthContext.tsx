@@ -26,6 +26,7 @@ interface AuthMeResponse {
 const AuthContext = createContext<AuthContextType | null>(null);
 const AUTH_USER_KEY = 'auth_user';
 const AUTH_TOKEN_KEY = 'auth_token';
+const SESSION_REVALIDATION_INTERVAL_MS = 15_000;
 
 function normalizeUser(user: (Omit<User, 'password'> & { password?: string }) | null | undefined): User | null {
   if (!user?.id || !user.email || !user.role || !user.name) {
@@ -113,55 +114,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return headers;
   }, [token]);
 
+  const revalidateStoredSession = useCallback(async () => {
+    const storedToken = loadToken();
+    const storedUser = loadUser();
+
+    if (!storedToken || !storedUser) {
+      clearSession();
+      return;
+    }
+
+    if (isJwtExpired(storedToken)) {
+      clearSession();
+      return;
+    }
+
+    try {
+      const { payload } = await fetchJson(`${API_BASE_URL}/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${storedToken}`,
+        },
+      });
+
+      const nextUser = normalizeUser((payload as AuthMeResponse).data);
+      if (!nextUser) {
+        clearSession();
+        return;
+      }
+
+      persistSession(nextUser, storedToken, 'online');
+    } catch (error) {
+      if (isApiResponseError(error) && (error.status === 401 || error.status === 403)) {
+        clearSession();
+      } else if (isNetworkRequestError(error)) {
+        setUser(storedUser);
+        setToken(storedToken);
+        setSessionState('offline_cached');
+      } else {
+        clearSession();
+      }
+    }
+  }, [clearSession, persistSession]);
+
   useEffect(() => {
     const validateStoredSession = async () => {
-      const storedToken = loadToken();
-      const storedUser = loadUser();
-
-      if (!storedToken || !storedUser) {
-        clearSession();
-        setIsAuthLoading(false);
-        return;
-      }
-
-      if (isJwtExpired(storedToken)) {
-        clearSession();
-        setIsAuthLoading(false);
-        return;
-      }
-
       try {
-        const { payload } = await fetchJson(`${API_BASE_URL}/auth/me`, {
-          headers: {
-            Authorization: `Bearer ${storedToken}`,
-          },
-        });
-
-        const nextUser = normalizeUser((payload as AuthMeResponse).data);
-        if (!nextUser) {
-          clearSession();
-          setIsAuthLoading(false);
-          return;
-        }
-
-        persistSession(nextUser, storedToken, 'online');
-      } catch (error) {
-        if (isApiResponseError(error) && (error.status === 401 || error.status === 403)) {
-          clearSession();
-        } else if (isNetworkRequestError(error)) {
-          setUser(storedUser);
-          setToken(storedToken);
-          setSessionState('offline_cached');
-        } else {
-          clearSession();
-        }
+        await revalidateStoredSession();
       } finally {
         setIsAuthLoading(false);
       }
     };
 
     void validateStoredSession();
-  }, [clearSession, persistSession]);
+  }, [revalidateStoredSession]);
+
+  useEffect(() => {
+    if (sessionState !== 'offline_cached' || !user || !token) {
+      return undefined;
+    }
+
+    const handleOnline = () => {
+      void revalidateStoredSession();
+    };
+
+    const intervalId = window.setInterval(() => {
+      void revalidateStoredSession();
+    }, SESSION_REVALIDATION_INTERVAL_MS);
+
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [revalidateStoredSession, sessionState, token, user]);
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     try {

@@ -39,17 +39,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import EventsSkeleton from "@/components/skeletons/EventsSkeleton";
 import { toast } from "@/hooks/use-toast";
 import {
   formatEventOfficeWindow,
+  getEventOfficeRangeValidationResult,
   getEventOfficeOpenAt,
   isEventOfficeStartAtOrAfterNow,
   isEventOfficeOpen,
+  parseEventDateTime,
   isValidEventOfficeRange,
 } from "@/lib/events";
 import { validateRequired } from "@/lib/form-validation";
 import { isScannerRole } from "@/lib/roles";
+import { cn } from "@/lib/utils";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 
 const EVENTS_PAGE_SIZE = 20;
@@ -70,16 +74,36 @@ function getEventTimingStatus(
     return "upcoming";
   }
 
-  const closeAt = new Date(
-    event.office_close_at.includes(" ")
-      ? event.office_close_at.replace(" ", "T")
-      : event.office_close_at,
-  );
-  if (!Number.isNaN(closeAt.getTime()) && now > closeAt) {
+  const closeAt = parseEventDateTime(event.office_close_at);
+  if (closeAt && now > closeAt) {
     return "finished";
   }
 
   return "upcoming";
+}
+
+function getEventStatusPresentation(status: EventTimingStatus) {
+  if (status === "active") {
+    return {
+      label: "Otwarte",
+      className:
+        "border border-emerald-400/14 bg-emerald-500/10 text-emerald-200/90 hover:bg-emerald-500/10",
+    };
+  }
+
+  if (status === "upcoming") {
+    return {
+      label: "Nadchodzące",
+      className:
+        "border border-sky-400/16 bg-sky-500/10 text-sky-100/90 hover:bg-sky-500/10",
+    };
+  }
+
+  return {
+    label: "Zamknięte",
+    className:
+      "border border-[hsl(var(--button-highlight)/0.18)] bg-[hsl(var(--button-highlight)/0.08)] text-[hsl(40_18%_78%)] hover:bg-[hsl(var(--button-highlight)/0.08)]",
+  };
 }
 
 function buildPaginationModel(
@@ -441,10 +465,28 @@ export default function Events() {
       return;
     }
 
+    const officeRangeValidation = getEventOfficeRangeValidationResult(
+      form.office_open_at,
+      form.office_close_at,
+    );
+
+    if (officeRangeValidation === "shorter_than_minimum") {
+      setFormErrors({
+        office_close_at: "Biuro musi być otwarte przez co najmniej 1 godzinę.",
+      });
+      toast({
+        title: "Nieprawidłowe godziny biura",
+        description:
+          "Ustaw godziny biura tak, aby było otwarte przez co najmniej 1 godzinę.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (
       !form.office_open_at ||
       !form.office_close_at ||
-      !isValidEventOfficeRange(form.office_open_at, form.office_close_at)
+      officeRangeValidation !== "valid"
     ) {
       setFormErrors({
         office_close_at: "Zamknięcie biura musi być później niż otwarcie.",
@@ -629,7 +671,10 @@ export default function Events() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedRows.map((event) => (
+                {paginatedRows.map((event) => {
+                  const status = getEventStatusPresentation(event.timingStatus);
+
+                  return (
                   <TableRow
                     key={event.id}
                     className="cursor-pointer active:bg-accent/50"
@@ -660,9 +705,19 @@ export default function Events() {
                   >
                     <TableCell>
                       <div>
-                        <span className="font-medium text-sm">
-                          {event.name}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-sm">
+                            {event.name}
+                          </span>
+                          <Badge
+                            className={cn(
+                              "rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium shadow-none",
+                              status.className,
+                            )}
+                          >
+                            {status.label}
+                          </Badge>
+                        </div>
                         <span className="block truncate text-xs text-muted-foreground md:hidden">
                           {event.location}
                         </span>
@@ -685,7 +740,8 @@ export default function Events() {
                       {formatEventOfficeWindow(event)}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

@@ -48,6 +48,7 @@ import TableSkeleton from "@/components/skeletons/TableSkeleton";
 import { toast } from "@/hooks/use-toast";
 import {
   formatEventOfficeWindow,
+  getEventOfficeRangeValidationResult,
   isEventCurrentOrUpcoming,
   isEventOfficeOpen,
   isEventOfficeStartAtOrAfterNow,
@@ -454,7 +455,7 @@ export default function OrganizationDetails() {
         memberForm.role === "editor"
           ? "Dodano organizatora"
           : `Dodano ${getRoleLabel(memberForm.role).toLocaleLowerCase("pl-PL")}`,
-      description: "Użytkownik otrzyma e-mail z linkiem do ustawienia hasła.",
+      description: "Użytkownik otrzyma e-mail z linkiem do ustawienia hasła ważnym przez 7 dni.",
     });
   };
 
@@ -616,6 +617,24 @@ export default function OrganizationDetails() {
         title: "Nieprawidłowa data otwarcia",
         description:
           "Data i godzina otwarcia biura zawodów nie może być wcześniejsza niż teraz.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (
+      getEventOfficeRangeValidationResult(
+        eventForm.office_open_at,
+        eventForm.office_close_at,
+      ) === "shorter_than_minimum"
+    ) {
+      setEventErrors({
+        office_close_at: "Biuro musi być otwarte przez co najmniej 1 godzinę.",
+      });
+      toast({
+        title: "Nieprawidłowe godziny biura",
+        description:
+          "Ustaw godziny biura tak, aby było otwarte przez co najmniej 1 godzinę.",
         variant: "destructive",
       });
       return;
