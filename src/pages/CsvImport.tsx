@@ -112,8 +112,22 @@ export default function CsvImport() {
   const multipleEmailCandidates = (analysis?.email_candidates.length ?? 0) > 1;
   const canRunWithSavedMapping = !!analysis?.has_mapping && (analysis.missing_required_columns?.length ?? 0) === 0;
   const displayNamePartsCount = mappingDrafts.filter(field => field.field_role === 'display_name_part').length;
+  const shouldWaitForEmailSelection = !analysis?.has_mapping && multipleEmailCandidates && !selectedEmailColumn;
+  const bibNumberColumn = mappingDrafts.find(field => field.field_role === 'bib_number')?.source_column_name ?? null;
 
   const activeDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role !== 'ignore'), [mappingDrafts]);
+  const previewHeaderLabels = useMemo(() => {
+    if (!analysis || analysis.has_mapping) {
+      return new Map<string, string>();
+    }
+
+    return new Map(
+      mappingDrafts.map(field => [
+        field.source_column_name,
+        field.alias.trim() || field.source_column_name,
+      ]),
+    );
+  }, [analysis, mappingDrafts]);
   const previewHeaders = useMemo(() => {
     if (!analysis) return [];
     if (analysis.has_mapping) return analysis.headers;
@@ -346,7 +360,7 @@ export default function CsvImport() {
             </CardContent>
           </Card>
 
-          {!analysis.has_mapping && (
+          {!shouldWaitForEmailSelection && !analysis.has_mapping && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Mapowanie kolumn</CardTitle>
@@ -361,7 +375,7 @@ export default function CsvImport() {
                     </div>
                     <div className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Numer startowy</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Mapuje kolumnę z numerem startowym, jeśli występuje w pliku.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Mapuje kolumnę z numerem startowym, jeśli występuje w pliku. Tę rolę można przypisać tylko jednej kolumnie.</p>
                     </div>
                     <div className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Pole własne / Ignoruj</p>
@@ -372,7 +386,12 @@ export default function CsvImport() {
 
                 <div className="space-y-2.5">
                   {mappingDrafts.map((field, index) => (
-                    <div key={field.source_column_name} className="rounded-lg border border-border/60 bg-card/60 p-3">
+                    <div
+                      key={field.source_column_name}
+                      className={field.field_role === 'bib_number'
+                        ? 'rounded-lg border border-amber-400/70 bg-amber-500/10 p-3 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.18)]'
+                        : 'rounded-lg border border-border/60 bg-card/60 p-3'}
+                    >
                       <div className="grid gap-3 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.95fr)_220px] md:items-end">
                         <div className="space-y-1.5">
                           <Label htmlFor={`csv-source-column-${index}`}>Kolumna CSV</Label>
@@ -408,7 +427,9 @@ export default function CsvImport() {
                             <SelectContent>
                               <SelectItem value="ignore">Ignoruj</SelectItem>
                               <SelectItem value="display_name_part">Część nazwy</SelectItem>
-                              <SelectItem value="bib_number">Numer startowy</SelectItem>
+                              <SelectItem value="bib_number" disabled={Boolean(bibNumberColumn && bibNumberColumn !== field.source_column_name)}>
+                                Numer startowy
+                              </SelectItem>
                               <SelectItem value="custom">Pole własne</SelectItem>
                             </SelectContent>
                           </Select>
@@ -422,7 +443,7 @@ export default function CsvImport() {
             </Card>
           )}
 
-          {analysis.has_mapping && (
+          {!shouldWaitForEmailSelection && analysis.has_mapping && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Dopasowanie mapowania do pliku</CardTitle>
@@ -441,46 +462,50 @@ export default function CsvImport() {
             </Card>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Podgląd danych</CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {previewHeaders.map(header => (
-                      <TableHead key={header}>{header}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {analysis.sample_rows.map((row, index) => (
-                    <TableRow key={index}>
+          {!shouldWaitForEmailSelection && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Podgląd danych (5 pierwszych wierszy)</CardTitle>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
                       {previewHeaders.map(header => (
-                        <TableCell key={`${index}-${header}`}>{row[header] || <span className="text-muted-foreground">-</span>}</TableCell>
+                        <TableHead key={header}>{previewHeaderLabels.get(header) ?? header}</TableHead>
                       ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {analysis.sample_rows.map((row, index) => (
+                      <TableRow key={index}>
+                        {previewHeaders.map(header => (
+                          <TableCell key={`${index}-${header}`}>{row[header] || <span className="text-muted-foreground">-</span>}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
 
-          <div className="flex flex-wrap gap-3">
-            {!analysis.has_mapping && (
-              <Button onClick={handleSaveMappingAndImport} disabled={runningAction === 'confirm' || runningAction === 'run' || !isOnline}>
-                {(runningAction === 'confirm' || runningAction === 'run') ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}
-                Zapisz mapowanie i importuj
-              </Button>
-            )}
-            {analysis.has_mapping && (
-              <Button onClick={handleRunExistingImport} disabled={!canRunWithSavedMapping || runningAction === 'run' || !isOnline}>
-                {runningAction === 'run' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
-                Importuj z zapisanym mapowaniem
-              </Button>
-            )}
-          </div>
+          {!shouldWaitForEmailSelection && (
+            <div className="flex flex-wrap gap-3">
+              {!analysis.has_mapping && (
+                <Button onClick={handleSaveMappingAndImport} disabled={runningAction === 'confirm' || runningAction === 'run' || !isOnline}>
+                  {(runningAction === 'confirm' || runningAction === 'run') ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}
+                  Zapisz mapowanie i importuj
+                </Button>
+              )}
+              {analysis.has_mapping && (
+                <Button onClick={handleRunExistingImport} disabled={!canRunWithSavedMapping || runningAction === 'run' || !isOnline}>
+                  {runningAction === 'run' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
+                  Importuj z zapisanym mapowaniem
+                </Button>
+              )}
+            </div>
+          )}
 
           {summary && (
             <Card className="border-primary/20 bg-primary/5">

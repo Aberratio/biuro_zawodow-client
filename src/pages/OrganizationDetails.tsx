@@ -1,7 +1,8 @@
-import { useMemo, useState, type ReactNode } from "react";
+﻿import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,8 +44,10 @@ import { toast } from "@/hooks/use-toast";
 import {
   formatEventOfficeWindow,
   isEventCurrentOrUpcoming,
+  isEventOfficeOpen,
   isEventOfficeStartAtOrAfterNow,
   isValidEventOfficeRange,
+  parseEventDateTime,
 } from "@/lib/events";
 import {
   validateEmail,
@@ -916,8 +919,27 @@ export default function OrganizationDetails() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {orgEvents.map((event) => (
-                      <TableRow
+                    {orgEvents.map((event) => {
+                      const now = new Date();
+                      const openAt = parseEventDateTime(event.office_open_at);
+                      const isOfficeOpen = isEventOfficeOpen(event, now);
+                      const isUpcoming =
+                        !isOfficeOpen &&
+                        openAt !== null &&
+                        openAt.getTime() > now.getTime();
+                      const statusLabel = isOfficeOpen
+                        ? "Otwarte"
+                        : isUpcoming
+                          ? "Nadchodzące"
+                          : "Zamknięte";
+                      const statusClassName = isOfficeOpen
+                        ? "border border-emerald-400/14 bg-emerald-500/10 text-emerald-200/90 hover:bg-emerald-500/10"
+                        : isUpcoming
+                          ? "border border-sky-400/16 bg-sky-500/10 text-sky-100/90 hover:bg-sky-500/10"
+                          : "border border-[hsl(var(--button-highlight)/0.18)] bg-[hsl(var(--button-highlight)/0.08)] text-[hsl(40_18%_78%)] hover:bg-[hsl(var(--button-highlight)/0.08)]";
+
+                      return (
+                        <TableRow
                         key={event.id}
                         className="cursor-pointer border-0 transition-colors hover:bg-[hsl(var(--button-highlight)/0.06)] active:bg-[hsl(var(--button-highlight)/0.1)] [&>td]:py-4"
                         onClick={() =>
@@ -947,9 +969,19 @@ export default function OrganizationDetails() {
                       >
                         <TableCell className="px-5 sm:px-7">
                           <div>
-                            <span className="text-base font-medium text-foreground">
-                              {event.name}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-base font-medium text-foreground">
+                                {event.name}
+                              </span>
+                              <Badge
+                                className={cn(
+                                  "rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium shadow-none",
+                                  statusClassName
+                                )}
+                              >
+                                {statusLabel}
+                              </Badge>
+                            </div>
                             <span className="mt-1 block text-sm text-muted-foreground md:hidden">
                               {event.location}
                             </span>
@@ -961,8 +993,9 @@ export default function OrganizationDetails() {
                         <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
                           {formatEventOfficeWindow(event)}
                         </TableCell>
-                      </TableRow>
-                    ))}
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -1950,3 +1983,5 @@ function EmptyTableState({
     </Card>
   );
 }
+
+
