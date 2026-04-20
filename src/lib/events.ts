@@ -2,12 +2,24 @@ import type { Event } from '@/types';
 
 const MIN_EVENT_OFFICE_DURATION_MS = 60 * 60 * 1000;
 
+export type EventOfficeRangeValidationResult =
+  | 'valid'
+  | 'invalid'
+  | 'close_not_after_open'
+  | 'shorter_than_minimum';
+
 function normalizeDateTimeInput(value: string): string {
   return value.includes(' ') ? value.replace(' ', 'T') : value;
 }
 
 function padDateTimePart(value: number): string {
   return String(value).padStart(2, '0');
+}
+
+function truncateDateToMinute(date: Date): Date {
+  const truncated = new Date(date);
+  truncated.setSeconds(0, 0);
+  return truncated;
 }
 
 const LOCAL_DATE_TIME_PATTERN =
@@ -47,18 +59,31 @@ export function isEventOfficeOpen(event: Pick<Event, 'office_open_at' | 'office_
 }
 
 export function isValidEventOfficeRange(openAt: string, closeAt: string): boolean {
+  return getEventOfficeRangeValidationResult(openAt, closeAt) === 'valid';
+}
+
+export function getEventOfficeRangeValidationResult(openAt: string, closeAt: string): EventOfficeRangeValidationResult {
   const parsedOpenAt = parseEventDateTime(openAt);
   const parsedCloseAt = parseEventDateTime(closeAt);
 
-  if (!parsedOpenAt || !parsedCloseAt) return false;
-  return parsedCloseAt.getTime() - parsedOpenAt.getTime() >= MIN_EVENT_OFFICE_DURATION_MS;
+  if (!parsedOpenAt || !parsedCloseAt) return 'invalid';
+
+  if (parsedCloseAt.getTime() <= parsedOpenAt.getTime()) {
+    return 'close_not_after_open';
+  }
+
+  if (parsedCloseAt.getTime() - parsedOpenAt.getTime() < MIN_EVENT_OFFICE_DURATION_MS) {
+    return 'shorter_than_minimum';
+  }
+
+  return 'valid';
 }
 
 export function isEventOfficeStartAtOrAfterNow(openAt: string, now = new Date()): boolean {
   const parsedOpenAt = parseEventDateTime(openAt);
 
   if (!parsedOpenAt) return false;
-  return parsedOpenAt.getTime() >= now.getTime();
+  return parsedOpenAt.getTime() >= truncateDateToMinute(now).getTime();
 }
 
 export function getEventOfficeOpenAt(event: Pick<Event, 'office_open_at'>): Date | null {

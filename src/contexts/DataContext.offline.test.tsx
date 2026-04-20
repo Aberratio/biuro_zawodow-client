@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider, useData } from '@/contexts/DataContext';
@@ -26,6 +27,17 @@ const authState: {
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => authState,
 }));
+
+function createJsonResponse(status: number, payload: unknown) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: {
+      get: (name: string) => name.toLowerCase() === 'content-type' ? 'application/json' : null,
+    },
+    json: async () => payload,
+  };
+}
 
 function OfflineConsumer() {
   const {
@@ -60,6 +72,24 @@ function OfflineConsumer() {
   );
 }
 
+function FieldMappingsConsumer() {
+  const { getParticipantFieldMappings } = useData();
+  const [status, setStatus] = React.useState('idle');
+
+  React.useEffect(() => {
+    void Promise.all([
+      getParticipantFieldMappings('event-1'),
+      getParticipantFieldMappings('event-1'),
+    ]).then(() => {
+      setStatus('loaded');
+    }).catch(() => {
+      setStatus('failed');
+    });
+  }, [getParticipantFieldMappings]);
+
+  return <div data-testid="field-mappings-status">{status}</div>;
+}
+
 describe('DataProvider offline cache and queue', () => {
   beforeEach(async () => {
     window.localStorage.clear();
@@ -80,6 +110,7 @@ describe('DataProvider offline cache and queue', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -194,4 +225,134 @@ describe('DataProvider offline cache and queue', () => {
     expect(screen.getByTestId('participant-status').textContent).toBe('checked_in');
     expect(screen.getByTestId('participant-sync').textContent).toBe('pending_sync');
   });
-}
+
+  it('recovers from a transient bootstrap failure without a page reload', async () => {
+    vi.useFakeTimers();
+
+    await saveBootstrapSnapshot({
+      key: 'http://localhost:8080::admin-1',
+      apiBaseUrl: 'http://localhost:8080',
+      userId: 'admin-1',
+      savedAt: '2099-04-12T07:00:00.000Z',
+      generatedAt: '2099-04-12T07:00:00.000Z',
+      snapshotVersion: 'snapshot-3',
+      selectedOrganizationId: 'org-1',
+      selectedEventId: 'event-1',
+      data: {
+        organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5 }],
+        events: [{
+          id: 'event-1',
+          name: 'Event 1',
+          location: 'Warsaw',
+          organization_id: 'org-1',
+          office_open_at: '2099-04-12T07:00:00',
+          office_close_at: '2099-04-12T15:00:00',
+        }],
+        archivedEvents: [],
+        users: [authState.user!],
+        participants: [],
+        activityLog: [],
+      },
+    });
+
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(async () => {
+        throw new Error('Temporary outage');
+      })
+      .mockImplementation(async () => createJsonResponse(200, {
+        generated_at: '2099-04-12T08:00:00.000Z',
+        snapshot_version: 'snapshot-4',
+        data: {
+          organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5 }],
+          events: [{
+            id: 'event-1',
+            name: 'Event 1',
+            location: 'Warsaw',
+            organization_id: 'org-1',
+            office_open_at: '2099-04-12T07:00:00',
+            office_close_at: '2099-04-12T15:00:00',
+          }],
+          archivedEvents: [],
+          users: [authState.user!],
+          participants: [],
+          activityLog: [],
+        },
+      }));
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <OfflineConsumer />
+      </DataProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('connection-state').textContent).toMatch(/degraded|offline/));
+
+    await act(async () => {
+      vi.advanceTimersByTime(15_000);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(screen.getByTestId('connection-state').textContent).toBe('online'));
+    vi.useRealTimers();
+  });
+
+  it('deduplicates participant field mappings requests for the same event', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.endsWith('/bootstrap')) {
+        return createJsonResponse(200, {
+          generated_at: '2099-04-12T08:00:00.000Z',
+          snapshot_version: 'snapshot-5',
+          data: {
+            organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5 }],
+            events: [{
+              id: 'event-1',
+              name: 'Event 1',
+              location: 'Warsaw',
+              organization_id: 'org-1',
+              office_open_at: '2099-04-12T07:00:00',
+              office_close_at: '2099-04-12T15:00:00',
+            }],
+            archivedEvents: [],
+            users: [authState.user!],
+            participants: [],
+            activityLog: [],
+          },
+        });
+      }
+
+      if (url.endsWith('/participant-field-mappings')) {
+        return createJsonResponse(200, {
+          data: {
+            mappings: [{
+              source_column_name: 'first_name',
+              alias: 'Imię',
+              field_role: 'display_name_part',
+              display_order: 1,
+              is_required: true,
+              is_active: true,
+            }],
+          },
+        });
+      }
+
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <FieldMappingsConsumer />
+      </DataProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('field-mappings-status').textContent).toBe('loaded'));
+
+    const fieldMappingsCalls = fetchMock.mock.calls.filter(([input]) => String(input).endsWith('/participant-field-mappings'));
+    expect(fieldMappingsCalls).toHaveLength(1);
+  });
+});

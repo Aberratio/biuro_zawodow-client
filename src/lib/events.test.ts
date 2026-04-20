@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getEventOfficeRangeValidationResult,
   isEventCurrentOrUpcoming,
   isEventOfficeStartAtOrAfterNow,
   isValidEventOfficeRange,
@@ -46,12 +47,30 @@ describe('isValidEventOfficeRange', () => {
   it('returns false when office stays open for less than one hour', () => {
     expect(isValidEventOfficeRange('2099-04-12T07:00:00', '2099-04-12T07:59:00')).toBe(false);
   });
+
+  it('distinguishes close time earlier than or equal to open time', () => {
+    expect(
+      getEventOfficeRangeValidationResult('2099-04-12T07:00:00', '2099-04-12T07:00:00'),
+    ).toBe('close_not_after_open');
+  });
+
+  it('distinguishes office duration shorter than one hour', () => {
+    expect(
+      getEventOfficeRangeValidationResult('2099-04-12T05:30:00', '2099-04-12T05:31:00'),
+    ).toBe('shorter_than_minimum');
+  });
 });
 
 describe('isEventOfficeStartAtOrAfterNow', () => {
   it('returns true when office opens exactly now', () => {
     expect(
       isEventOfficeStartAtOrAfterNow('2099-04-12T07:00:00', new Date('2099-04-12T07:00:00')),
+    ).toBe(true);
+  });
+
+  it('returns true when office opens in the current minute', () => {
+    expect(
+      isEventOfficeStartAtOrAfterNow('2099-04-12T07:00:00', new Date('2099-04-12T07:00:45')),
     ).toBe(true);
   });
 

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 
@@ -74,6 +74,51 @@ describe('AuthProvider offline session handling', () => {
     expect(screen.getByTestId('user-id').textContent).toBe('user-1');
   });
 
+  it('restores the online session after connectivity returns', async () => {
+    const token = createToken(3600);
+    window.sessionStorage.setItem('auth_token', token);
+    window.sessionStorage.setItem('auth_user', JSON.stringify({
+      id: 'user-1',
+      name: 'Offline User',
+      email: 'offline@example.com',
+      password: '',
+      role: 'admin',
+      assigned_events: [],
+    }));
+
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(async () => {
+        throw new Error('Network down');
+      })
+      .mockImplementation(async () => createJsonResponse(200, {
+        data: {
+          id: 'user-1',
+          name: 'Offline User',
+          email: 'offline@example.com',
+          role: 'admin',
+          assigned_events: [],
+        },
+      }));
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <AuthProvider>
+        <AuthConsumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('session-state').textContent).toBe('offline_cached'));
+
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
+
+    await waitFor(() => expect(screen.getByTestId('session-state').textContent).toBe('online'));
+    expect(screen.getByTestId('auth-state').textContent).toBe('authenticated');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('clears the session when auth/me returns 401', async () => {
     const token = createToken(3600);
     window.sessionStorage.setItem('auth_token', token);
@@ -98,4 +143,4 @@ describe('AuthProvider offline session handling', () => {
     expect(screen.getByTestId('auth-state').textContent).toBe('anonymous');
     expect(screen.getByTestId('user-id').textContent).toBe('');
   });
-}
+});

@@ -55,6 +55,7 @@ import {
   formatEventOfficeEnd,
   formatEventOfficeStart,
   formatEventOfficeWindow,
+  getEventOfficeRangeValidationResult,
   getEventOfficeCloseAt,
   getEventOfficeOpenAt,
   isEventOfficeStartAtOrAfterNow,
@@ -639,7 +640,7 @@ export default function EventDetails() {
         managedScannerRole === "scanner"
           ? "Dodano operatora i przypisano do wydarzenia"
           : "Dodano operatora Plus i przypisano do wydarzenia",
-      description: "Użytkownik otrzyma e-mail z linkiem do ustawienia hasła.",
+      description: "Użytkownik otrzyma e-mail z linkiem do ustawienia hasła ważnym przez 7 dni.",
     });
   };
 
@@ -742,6 +743,24 @@ export default function EventDetails() {
         title: "Nieprawidłowa data otwarcia",
         description:
           "Data i godzina otwarcia biura zawodów musi być nie wcześniejsza niż teraz.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (
+      getEventOfficeRangeValidationResult(
+        submittedOfficeOpenAt,
+        submittedOfficeCloseAt,
+      ) === "shorter_than_minimum"
+    ) {
+      setEditErrors({
+        office_close_at: "Biuro musi być otwarte przez co najmniej 1 godzinę.",
+      });
+      toast({
+        title: "Nieprawidłowe godziny biura",
+        description:
+          "Ustaw godziny biura tak, aby było otwarte przez co najmniej 1 godzinę.",
         variant: "destructive",
       });
       return;
