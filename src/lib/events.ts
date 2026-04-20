@@ -6,11 +6,36 @@ function normalizeDateTimeInput(value: string): string {
   return value.includes(' ') ? value.replace(' ', 'T') : value;
 }
 
+function padDateTimePart(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+const LOCAL_DATE_TIME_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/;
+
 export function parseEventDateTime(value: string): Date | null {
   if (!value) return null;
 
   const parsed = new Date(normalizeDateTimeInput(value));
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+export function toLocalDateTimeValue(value: string): string {
+  const normalizedInput = normalizeDateTimeInput(value.trim());
+  const match = normalizedInput.match(LOCAL_DATE_TIME_PATTERN);
+
+  if (match) {
+    const [, year, month, day, hour, minute, second = '00'] = match;
+    return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+  }
+
+  const parsed = parseEventDateTime(value);
+
+  if (!parsed) {
+    return normalizedInput;
+  }
+
+  return `${parsed.getFullYear()}-${padDateTimePart(parsed.getMonth() + 1)}-${padDateTimePart(parsed.getDate())}T${padDateTimePart(parsed.getHours())}:${padDateTimePart(parsed.getMinutes())}:${padDateTimePart(parsed.getSeconds())}`;
 }
 
 export function isEventOfficeOpen(event: Pick<Event, 'office_open_at' | 'office_close_at'>, now = new Date()): boolean {
