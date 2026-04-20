@@ -25,6 +25,20 @@ interface MappingDraft {
   field_role: EditableFieldRole;
 }
 
+function getMappingFieldCardClassName(fieldRole: EditableFieldRole): string {
+  switch (fieldRole) {
+    case 'bib_number':
+      return 'rounded-lg border border-amber-400/70 bg-amber-500/10 p-3 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.18)]';
+    case 'display_name_part':
+      return 'rounded-lg border border-sky-400/70 bg-sky-500/10 p-3 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.16)]';
+    case 'ignore':
+      return 'rounded-lg border border-border/50 bg-card/35 p-3 opacity-60';
+    case 'custom':
+    default:
+      return 'rounded-lg border border-border/60 bg-card/60 p-3';
+  }
+}
+
 function decodeCsvFile(buffer: ArrayBuffer): string {
   const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
   try {
@@ -369,11 +383,11 @@ export default function CsvImport() {
                 <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
                   <p className="text-sm font-medium">Legenda ról</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    <div className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
+                    <div className="rounded-md border border-sky-400/50 bg-sky-500/10 px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Część nazwy</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Buduje nazwę uczestnika. Wybierz co najmniej jedną taką kolumnę.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Buduje nazwę uczestnika (zazwyczaj kolumny imię i nazwisko). Wybierz co najmniej jedną taką kolumnę.</p>
                     </div>
-                    <div className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
+                    <div className="rounded-md border border-amber-400/50 bg-amber-500/10 px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Numer startowy</p>
                       <p className="mt-1 text-xs text-muted-foreground">Mapuje kolumnę z numerem startowym, jeśli występuje w pliku. Tę rolę można przypisać tylko jednej kolumnie.</p>
                     </div>
@@ -388,9 +402,7 @@ export default function CsvImport() {
                   {mappingDrafts.map((field, index) => (
                     <div
                       key={field.source_column_name}
-                      className={field.field_role === 'bib_number'
-                        ? 'rounded-lg border border-amber-400/70 bg-amber-500/10 p-3 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.18)]'
-                        : 'rounded-lg border border-border/60 bg-card/60 p-3'}
+                      className={getMappingFieldCardClassName(field.field_role)}
                     >
                       <div className="grid gap-3 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.95fr)_220px] md:items-end">
                         <div className="space-y-1.5">
