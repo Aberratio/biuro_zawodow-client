@@ -391,7 +391,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     bibNumber: string,
     options?: ParticipantBibNumberUpdateOptions
   ): Promise<ParticipantBibNumberUpdateResult> => {
-    const offlineError = ensureOnline('Zmiana numeru startowego jest dostÄ™pna tylko po poĹ‚Ä…czeniu z serwerem.');
+    const offlineError = ensureOnline('Zmiana numeru startowego jest dostępna tylko po poĹ‚ączeniu z serwerem.');
     if (offlineError) return { ok: false, error: offlineError };
 
     try {
