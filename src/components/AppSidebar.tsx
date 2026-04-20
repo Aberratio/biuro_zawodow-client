@@ -63,6 +63,12 @@ const allItems = [
     roles: ["admin", "superadmin"] as Role[],
   },
   {
+    title: "Organizacja",
+    url: "/organization",
+    icon: Building2,
+    roles: ["editor"] as Role[],
+  },
+  {
     title: "Wydarzenia",
     url: "/events",
     icon: CalendarDays,
@@ -182,15 +188,26 @@ export function AppSidebar() {
 
   const scannerHasActiveEvents =
     !isScannerRole(currentRole) || visibleEvents.length > 0;
-  const items = allItems.filter((item) => {
-    if (!item.roles.includes(currentRole)) return false;
-    if (!isScannerRole(currentRole)) return true;
-    if (item.url === "/participants" || item.url === "/scanner") {
-      return scannerHasActiveEvents;
-    }
-    if (item.url === "/scanner-info") return !scannerHasActiveEvents;
-    return true;
-  });
+  const items = allItems
+    .filter((item) => {
+      if (!item.roles.includes(currentRole)) return false;
+      if (!isScannerRole(currentRole)) return true;
+      if (item.url === "/participants" || item.url === "/scanner") {
+        return scannerHasActiveEvents;
+      }
+      if (item.url === "/scanner-info") return !scannerHasActiveEvents;
+      return true;
+    })
+    .map((item) =>
+      item.url === "/organization"
+        ? {
+            ...item,
+            url: currentUser.organization_id
+              ? `/organizations/${currentUser.organization_id}`
+              : "/organizations",
+          }
+        : item,
+    );
 
   const generalItems = items.filter((item) => !eventScopedUrls.has(item.url));
   const adminOrganizations = currentRole === "admin" ? organizations : [];

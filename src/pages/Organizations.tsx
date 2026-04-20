@@ -53,6 +53,13 @@ export default function Organizations() {
     return () => window.clearInterval(intervalId);
   }, []);
 
+  useEffect(() => {
+    if (isLoading) return;
+    if (currentRole !== 'editor') return;
+    if (!currentUser.organization_id) return;
+    navigate(`/organizations/${currentUser.organization_id}`, { replace: true });
+  }, [currentRole, currentUser.organization_id, isLoading, navigate]);
+
   const visibleOrganizations = useMemo(() => {
     if (currentRole === 'superadmin') return organizations;
     if (currentRole === 'admin') return organizations;

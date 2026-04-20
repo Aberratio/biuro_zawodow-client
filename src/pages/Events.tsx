@@ -123,6 +123,21 @@ function scrollAppContentToTop() {
   scrollRoot?.scrollTo({ top: 0 });
 }
 
+function formatEventCount(value: number) {
+  const mod10 = value % 10;
+  const mod100 = value % 100;
+
+  if (value === 1) {
+    return `${value} wydarzenie`;
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${value} wydarzenia`;
+  }
+
+  return `${value} wydarzeń`;
+}
+
 export default function Events() {
   const {
     visibleEvents,
@@ -826,11 +841,11 @@ export default function Events() {
             </div>
             {formOrganization && (
               <p className="text-[10px] text-muted-foreground">
-                Limit organizacji: {formOrganizationUsedSlots}/
-                {formOrganization.event_limit} wydarzeń.
+                Limit organizacji:{" "}
+                {formatEventCount(formOrganization.event_limit)}. Utworzono{" "}
+                {formatEventCount(formOrganizationUsedSlots)}.
               </p>
             )}
-            <FieldError id="event-create-form-error">
               {formErrors.form}
             </FieldError>
           </div>
