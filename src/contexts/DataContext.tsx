@@ -467,12 +467,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const createEvent = useCallback(async (eventData: EventMutationInput) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
-    const organization = organizations.find(entry => entry.id === eventData.organization_id); const organizationEventCount = events.filter(event => event.organization_id === eventData.organization_id).length;
+    const organization = organizations.find(entry => entry.id === eventData.organization_id); const organizationEventCount = [...events, ...archivedEvents].filter(event => event.organization_id === eventData.organization_id).length;
     if (organization && organizationEventCount >= organization.event_limit) return { ok: false, error: 'Limit wydarzeń dla tej organizacji został osiągnięty' };
     const payload = (await fetchJson(`${API_BASE_URL}/events`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(eventData) })).payload as { data?: ApiEvent };
     if (!payload.data) return { ok: false, error: 'API event create returned empty payload' };
     setEvents(previous => [...previous, payload.data]); addLog(`Utworzono wydarzenie: ${payload.data.name}`); return { ok: true };
-  }), [addLog, ensureOnline, events, getAuthHeaders, organizations, runMutation]);
+  }), [addLog, archivedEvents, ensureOnline, events, getAuthHeaders, organizations, runMutation]);
 
   const updateEvent = useCallback(async (eventId: string, data: EventMutationInput) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };

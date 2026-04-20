@@ -251,6 +251,7 @@ export default function OrganizationDetails() {
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
     [archivedEvents, organization?.id],
   );
+  const totalOrganizationEvents = orgEvents.length + orgArchivedEvents.length;
   const organizers = useMemo(
     () =>
       users
@@ -281,12 +282,12 @@ export default function OrganizationDetails() {
     );
 
   const remainingSlots = Math.max(
-    organization.event_limit - orgEvents.length,
+    organization.event_limit - totalOrganizationEvents,
     0,
   );
   const addEventDisabledReason =
     remainingSlots <= 0
-      ? "Osiągnięto limit wydarzeń dla tej organizacji. Zwiększ limit, aby dodać kolejne wydarzenie."
+      ? "Osiągnięto limit wydarzeń dla tej organizacji, łącznie z wydarzeniami w archiwum. Zwiększ limit, aby dodać kolejne wydarzenie."
       : null;
   const assignableScannerEvents = orgEvents.filter((event) =>
     isEventCurrentOrUpcoming(event),
@@ -455,13 +456,13 @@ export default function OrganizationDetails() {
       });
       return;
     }
-    if (parsed < orgEvents.length) {
+    if (parsed < totalOrganizationEvents) {
       setLimitErrors({
-        event_limit: `Limit wydarzeń nie może być mniejszy niż ${orgEvents.length}.`,
+        event_limit: `Limit wydarzeń nie może być mniejszy niż ${totalOrganizationEvents}.`,
       });
       toast({
         title: "Nieprawidłowy limit",
-        description: `Limit wydarzeń nie może być mniejszy niż ${orgEvents.length}.`,
+        description: `Limit wydarzeń nie może być mniejszy niż ${totalOrganizationEvents}.`,
         variant: "destructive",
       });
       return;
@@ -507,13 +508,13 @@ export default function OrganizationDetails() {
       });
       return;
     }
-    if (parsedLimit < orgEvents.length) {
+    if (parsedLimit < totalOrganizationEvents) {
       setLimitErrors({
-        event_limit: `Limit wydarzen nie moze byc mniejszy niz ${orgEvents.length}.`,
+        event_limit: `Limit wydarzen nie moze byc mniejszy niz ${totalOrganizationEvents}.`,
       });
       toast({
         title: "Nieprawidlowy limit",
-        description: `Limit wydarzen nie moze byc mniejszy niz ${orgEvents.length}.`,
+        description: `Limit wydarzen nie moze byc mniejszy niz ${totalOrganizationEvents}.`,
         variant: "destructive",
       });
       return;
@@ -903,7 +904,14 @@ export default function OrganizationDetails() {
                   </span>
                 </TooltipTrigger>
                 {addEventDisabledReason ? (
-                  <TooltipContent>{addEventDisabledReason}</TooltipContent>
+                  <TooltipContent
+                    side="bottom"
+                    align="end"
+                    collisionPadding={16}
+                    className="max-w-[min(18rem,calc(100vw-2rem))] whitespace-normal break-words"
+                  >
+                    {addEventDisabledReason}
+                  </TooltipContent>
                 ) : null}
               </Tooltip>
             ) : null
@@ -978,7 +986,7 @@ export default function OrganizationDetails() {
                           }
                         }}
                         tabIndex={0}
-                        aria-label={`Otwórz wydarzenie ${event.name}`}
+                        aria-label={`Wyświetl wydarzenie ${event.name}`}
                       >
                         <TableCell className="px-5 sm:px-7">
                           <div>
@@ -1027,7 +1035,6 @@ export default function OrganizationDetails() {
                 variant="outline"
                 onClick={() => openMemberDialog("editor")}
                 className="h-9 rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)]"
-                disabled={remainingSlots <= 0}
               >
                 <Plus className="mr-1 h-3.5 w-3.5" />
                 Dodaj organizatora
@@ -1118,7 +1125,6 @@ export default function OrganizationDetails() {
                   variant="outline"
                   onClick={() => openMemberDialog("scanner")}
                   className="h-9 rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)]"
-                  disabled={remainingSlots <= 0}
                 >
                   <Plus className="mr-1 h-3.5 w-3.5" />
                   Dodaj operatora
@@ -1128,10 +1134,9 @@ export default function OrganizationDetails() {
                   variant="outline"
                   onClick={() => openMemberDialog("scanner_plus")}
                   className="h-9 rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)]"
-                  disabled={remainingSlots <= 0}
                 >
                   <Plus className="mr-1 h-3.5 w-3.5" />
-                  Dodaj Operator Plus
+                  Dodaj operatora plus
                 </Button>
               </div>
             ) : null
@@ -1311,7 +1316,7 @@ export default function OrganizationDetails() {
               <Input
                 id="organization-edit-limit"
                 type="number"
-                min={String(orgEvents.length)}
+                min={String(totalOrganizationEvents)}
                 value={limitDraft || String(organization.event_limit)}
                 onChange={(event) => {
                   setLimitDraft(event.target.value);
@@ -1334,8 +1339,8 @@ export default function OrganizationDetails() {
                 {limitErrors.event_limit}
               </FieldError>
               <p className="mt-2 text-xs text-muted-foreground">
-                Minimalny limit to {orgEvents.length}, bo tyle wydarzen jest juz
-                przypisanych.
+                Minimalny limit to {totalOrganizationEvents}, bo tyle wydarzen,
+                lacznie z archiwalnymi, jest juz przypisanych.
               </p>
             </div>
             <FieldError id="organization-edit-form-error">
@@ -1376,7 +1381,7 @@ export default function OrganizationDetails() {
               <Input
                 id="organization-event-limit"
                 type="number"
-                min={String(orgEvents.length)}
+                min={String(totalOrganizationEvents)}
                 value={limitDraft || String(organization.event_limit)}
                 onChange={(event) => {
                   setLimitDraft(event.target.value);
@@ -1400,8 +1405,9 @@ export default function OrganizationDetails() {
               </FieldError>
             </div>
             <p className="text-xs text-muted-foreground">
-              Minimalny dozwolony limit to {orgEvents.length}, bo tyle wydarzeń
-              jest już przypisanych do tej organizacji.
+              Minimalny dozwolony limit to {totalOrganizationEvents}, bo tyle
+              wydarzeń, łącznie z archiwalnymi, jest już przypisanych do tej
+              organizacji.
             </p>
             <FieldError id="organization-limit-form-error">
               {limitErrors.form}
@@ -1978,8 +1984,8 @@ export default function OrganizationDetails() {
               </FieldError>
             </div>
             <p className="text-xs text-muted-foreground">
-              Limit organizacji: {orgEvents.length}/{organization.event_limit}{" "}
-              wydarzeń.
+              Limit organizacji: {totalOrganizationEvents}/
+              {organization.event_limit} wydarzeń, łącznie z archiwalnymi.
             </p>
             <FieldError id="organization-event-form-error">
               {eventErrors.form}
@@ -2017,5 +2023,3 @@ function EmptyTableState({
     </Card>
   );
 }
-
-

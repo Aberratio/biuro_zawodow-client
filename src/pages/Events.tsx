@@ -556,7 +556,7 @@ export default function Events() {
                       }
                     }}
                     tabIndex={0}
-                    aria-label={`Otwórz wydarzenie ${event.name}`}
+                    aria-label={`Wyświetl wydarzenie ${event.name}`}
                   >
                     <TableCell>
                       <div>

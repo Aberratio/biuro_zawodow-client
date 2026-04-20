@@ -309,7 +309,7 @@ function ActiveEventCard({
 
         <div className="flex justify-end">
           <Button className="h-10 rounded-[0.95rem] border-[hsl(var(--button-highlight)/0.3)] px-[1.125rem] text-[0.9rem] font-semibold text-[hsl(39_28%_96%)] shadow-[0_12px_28px_hsl(var(--surface-shadow)/0.34),inset_0_1px_0_hsl(var(--foreground)/0.08)]" onClick={onOpen}>
-            Otwórz wydarzenie
+            Wyświetl wydarzenie
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
