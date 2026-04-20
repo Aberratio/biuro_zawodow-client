@@ -20,6 +20,7 @@ interface DateTimePickerProps
   extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onChange" | "type" | "value"> {
   value: string;
   onChange: (value: string) => void;
+  onCommit?: (value: string) => void;
   placeholder?: string;
 }
 
@@ -103,14 +104,16 @@ function PickerPanel({
 }: PickerPanelProps) {
   return (
     <>
-      <Calendar
-        mode="single"
-        selected={draftDate}
-        onSelect={onSelectDate}
-        locale={pl}
-        initialFocus={!isMobile}
-        className="mx-auto"
-      />
+      <div className="flex justify-center px-3 pt-3">
+        <Calendar
+          mode="single"
+          selected={draftDate}
+          onSelect={onSelectDate}
+          locale={pl}
+          initialFocus={!isMobile}
+          className="p-0"
+        />
+      </div>
       <div className="space-y-3 border-t border-border p-3">
         <div className="space-y-2">
           <label htmlFor={timeInputId} className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -153,6 +156,7 @@ function PickerPanel({
 export function DateTimePicker({
   value,
   onChange,
+  onCommit,
   placeholder = "wybierz datę i godzinę",
   className,
   disabled,
@@ -185,12 +189,15 @@ export function DateTimePicker({
 
   const handleClear = () => {
     onChange("");
+    onCommit?.("");
     setOpen(false);
   };
 
   const handleSave = () => {
     if (!draftDate) return;
-    onChange(formatDateTimeValue(draftDate, draftTime));
+    const nextValue = formatDateTimeValue(draftDate, draftTime);
+    onChange(nextValue);
+    onCommit?.(nextValue);
     setOpen(false);
   };
 
@@ -249,7 +256,7 @@ export function DateTimePicker({
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent
-        align="start"
+        align="center"
         collisionPadding={16}
         className="w-[min(calc(100vw-2rem),22rem)] max-h-[min(36rem,var(--radix-popover-content-available-height))] overflow-y-auto p-0"
       >

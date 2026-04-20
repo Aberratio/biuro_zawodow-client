@@ -54,6 +54,7 @@ import { ParticipantFieldMapping, User } from "@/types";
 import {
   formatEventOfficeEnd,
   formatEventOfficeStart,
+  getEventOfficeValidationErrors,
   formatEventOfficeWindow,
   getEventOfficeRangeValidationResult,
   getEventOfficeCloseAt,
@@ -499,6 +500,28 @@ export default function EventDetails() {
     }
 
     setEditForm(buildEditFormFromEvent(event));
+  };
+
+  const applyEditOfficeValidationErrors = (
+    officeOpenAt: string,
+    officeCloseAt: string,
+  ) => {
+    const officeErrors = getEventOfficeValidationErrors(
+      officeOpenAt,
+      officeCloseAt,
+      {
+        allowPastOpenAt: isEventOfficeOpen(event),
+      },
+    );
+
+    setEditErrors((current) => ({
+      ...current,
+      office_open_at: officeErrors.office_open_at,
+      office_close_at: officeErrors.office_close_at,
+      form: undefined,
+    }));
+
+    return officeErrors;
   };
 
   const handleManualFieldChange = (alias: string, value: string) => {
@@ -1281,6 +1304,9 @@ export default function EventDetails() {
                     form: undefined,
                   }));
                 }}
+                onCommit={(value) => {
+                  applyEditOfficeValidationErrors(value, editForm.office_close_at);
+                }}
                 aria-invalid={Boolean(editErrors.office_open_at)}
                 aria-describedby={
                   editErrors.office_open_at
@@ -1315,6 +1341,9 @@ export default function EventDetails() {
                     office_close_at: undefined,
                     form: undefined,
                   }));
+                }}
+                onCommit={(value) => {
+                  applyEditOfficeValidationErrors(editForm.office_open_at, value);
                 }}
                 aria-invalid={Boolean(editErrors.office_close_at)}
                 aria-describedby={

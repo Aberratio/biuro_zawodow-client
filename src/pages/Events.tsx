@@ -44,12 +44,13 @@ import EventsSkeleton from "@/components/skeletons/EventsSkeleton";
 import { toast } from "@/hooks/use-toast";
 import {
   formatEventOfficeWindow,
-  getEventOfficeRangeValidationResult,
+  getEventOfficeValidationErrors,
   getEventOfficeOpenAt,
+  getEventOfficeRangeValidationResult,
   isEventOfficeStartAtOrAfterNow,
   isEventOfficeOpen,
-  parseEventDateTime,
   isValidEventOfficeRange,
+  parseEventDateTime,
 } from "@/lib/events";
 import { validateRequired } from "@/lib/form-validation";
 import { isScannerRole } from "@/lib/roles";
@@ -375,6 +376,26 @@ export default function Events() {
     () => buildPaginationModel(currentPage, totalPages),
     [currentPage, totalPages],
   );
+  const getOfficeValidationErrors = (
+    officeOpenAt: string,
+    officeCloseAt: string,
+  ) => getEventOfficeValidationErrors(officeOpenAt, officeCloseAt);
+
+  const applyOfficeValidationErrors = (
+    officeOpenAt: string,
+    officeCloseAt: string,
+  ) => {
+    const officeErrors = getOfficeValidationErrors(officeOpenAt, officeCloseAt);
+
+    setFormErrors((current) => ({
+      ...current,
+      office_open_at: officeErrors.office_open_at,
+      office_close_at: officeErrors.office_close_at,
+      form: undefined,
+    }));
+
+    return officeErrors;
+  };
 
   useEffect(() => {
     if (currentRole !== "superadmin" && currentRole !== "admin") {
@@ -449,10 +470,12 @@ export default function Events() {
       return;
     }
 
-    if (
-      !form.office_open_at ||
-      !isEventOfficeStartAtOrAfterNow(form.office_open_at)
-    ) {
+    const officeErrors = getOfficeValidationErrors(
+      form.office_open_at,
+      form.office_close_at,
+    );
+
+    if (officeErrors.office_open_at) {
       setFormErrors({
         office_open_at: "Otwarcie biura nie może być ustawione w przeszłości.",
       });
@@ -934,6 +957,9 @@ export default function Events() {
                     form: undefined,
                   }));
                 }}
+                onCommit={(value) => {
+                  applyOfficeValidationErrors(value, form.office_close_at);
+                }}
                 aria-invalid={Boolean(formErrors.office_open_at)}
                 aria-describedby={
                   formErrors.office_open_at
@@ -962,6 +988,9 @@ export default function Events() {
                     office_close_at: undefined,
                     form: undefined,
                   }));
+                }}
+                onCommit={(value) => {
+                  applyOfficeValidationErrors(form.office_open_at, value);
                 }}
                 aria-invalid={Boolean(formErrors.office_close_at)}
                 aria-describedby={
