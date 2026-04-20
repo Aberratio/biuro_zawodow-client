@@ -40,7 +40,7 @@ function getClosestOrganizationEventLabel(organizationEvents: Event[], now: Date
 
 export default function Organizations() {
   const navigate = useNavigate();
-  const { organizations, events, currentRole, currentUser, createOrganization, isLoading, connectionState } = useData();
+  const { organizations, events, archivedEvents, currentRole, currentUser, createOrganization, isLoading, connectionState } = useData();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
@@ -76,14 +76,15 @@ export default function Organizations() {
       .filter(org => !normalizedQuery || org.name.toLocaleLowerCase('pl-PL').includes(normalizedQuery))
       .map(org => {
         const organizationEvents = events.filter(event => event.organization_id === org.id);
+        const organizationArchivedEvents = archivedEvents.filter(event => event.organization_id === org.id);
 
         return {
           ...org,
-          eventCount: organizationEvents.length,
+          eventCount: organizationEvents.length + organizationArchivedEvents.length,
           nextEventLabel: getClosestOrganizationEventLabel(organizationEvents, now),
         };
       });
-  }, [events, normalizedQuery, now, visibleOrganizations]);
+  }, [archivedEvents, events, normalizedQuery, now, visibleOrganizations]);
 
   if (isLoading) return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
 

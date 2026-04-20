@@ -8,6 +8,15 @@ export type EventOfficeRangeValidationResult =
   | 'close_not_after_open'
   | 'shorter_than_minimum';
 
+interface EventOfficeValidationOptions {
+  allowPastOpenAt?: boolean;
+}
+
+interface EventOfficeValidationErrors {
+  office_open_at?: string;
+  office_close_at?: string;
+}
+
 function normalizeDateTimeInput(value: string): string {
   return value.includes(' ') ? value.replace(' ', 'T') : value;
 }
@@ -60,6 +69,40 @@ export function isEventOfficeOpen(event: Pick<Event, 'office_open_at' | 'office_
 
 export function isValidEventOfficeRange(openAt: string, closeAt: string): boolean {
   return getEventOfficeRangeValidationResult(openAt, closeAt) === 'valid';
+}
+
+export function getEventOfficeValidationErrors(
+  openAt: string,
+  closeAt: string,
+  options: EventOfficeValidationOptions = {},
+): EventOfficeValidationErrors {
+  const { allowPastOpenAt = false } = options;
+
+  if (openAt && !allowPastOpenAt && !isEventOfficeStartAtOrAfterNow(openAt)) {
+    return {
+      office_open_at: 'Otwarcie biura nie może być ustawione w przeszłości.',
+    };
+  }
+
+  if (!openAt || !closeAt) {
+    return {};
+  }
+
+  const rangeValidation = getEventOfficeRangeValidationResult(openAt, closeAt);
+
+  if (rangeValidation === 'shorter_than_minimum') {
+    return {
+      office_close_at: 'Biuro musi być otwarte przez co najmniej 1 godzinę.',
+    };
+  }
+
+  if (rangeValidation !== 'valid') {
+    return {
+      office_close_at: 'Zamknięcie biura musi być później niż otwarcie.',
+    };
+  }
+
+  return {};
 }
 
 export function getEventOfficeRangeValidationResult(openAt: string, closeAt: string): EventOfficeRangeValidationResult {
