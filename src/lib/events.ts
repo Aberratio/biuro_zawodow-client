@@ -1,5 +1,7 @@
 import type { Event } from '@/types';
 
+const MIN_EVENT_OFFICE_DURATION_MS = 60 * 60 * 1000;
+
 function normalizeDateTimeInput(value: string): string {
   return value.includes(' ') ? value.replace(' ', 'T') : value;
 }
@@ -24,7 +26,14 @@ export function isValidEventOfficeRange(openAt: string, closeAt: string): boolea
   const parsedCloseAt = parseEventDateTime(closeAt);
 
   if (!parsedOpenAt || !parsedCloseAt) return false;
-  return parsedOpenAt < parsedCloseAt;
+  return parsedCloseAt.getTime() - parsedOpenAt.getTime() >= MIN_EVENT_OFFICE_DURATION_MS;
+}
+
+export function isEventOfficeStartAtOrAfterNow(openAt: string, now = new Date()): boolean {
+  const parsedOpenAt = parseEventDateTime(openAt);
+
+  if (!parsedOpenAt) return false;
+  return parsedOpenAt.getTime() >= now.getTime();
 }
 
 export function getEventOfficeOpenAt(event: Pick<Event, 'office_open_at'>): Date | null {

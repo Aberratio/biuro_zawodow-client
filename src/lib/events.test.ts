@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { isEventCurrentOrUpcoming } from '@/lib/events';
+import {
+  isEventCurrentOrUpcoming,
+  isEventOfficeStartAtOrAfterNow,
+  isValidEventOfficeRange,
+} from '@/lib/events';
 import type { Event } from '@/types';
 
 function createEvent(overrides: Partial<Event> = {}): Event {
@@ -30,6 +34,30 @@ describe('isEventCurrentOrUpcoming', () => {
         createEvent({ office_close_at: '2099-04-12T09:00:00' }),
         new Date('2099-04-12T10:00:00'),
       ),
+    ).toBe(false);
+  });
+});
+
+describe('isValidEventOfficeRange', () => {
+  it('returns true when office stays open for at least one hour', () => {
+    expect(isValidEventOfficeRange('2099-04-12T07:00:00', '2099-04-12T08:00:00')).toBe(true);
+  });
+
+  it('returns false when office stays open for less than one hour', () => {
+    expect(isValidEventOfficeRange('2099-04-12T07:00:00', '2099-04-12T07:59:00')).toBe(false);
+  });
+});
+
+describe('isEventOfficeStartAtOrAfterNow', () => {
+  it('returns true when office opens exactly now', () => {
+    expect(
+      isEventOfficeStartAtOrAfterNow('2099-04-12T07:00:00', new Date('2099-04-12T07:00:00')),
+    ).toBe(true);
+  });
+
+  it('returns false when office opens in the past', () => {
+    expect(
+      isEventOfficeStartAtOrAfterNow('2099-04-12T06:59:00', new Date('2099-04-12T07:00:00')),
     ).toBe(false);
   });
 });

@@ -43,6 +43,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   formatEventOfficeWindow,
   isEventCurrentOrUpcoming,
+  isEventOfficeStartAtOrAfterNow,
   isValidEventOfficeRange,
 } from "@/lib/events";
 import {
@@ -573,6 +574,22 @@ export default function OrganizationDetails() {
       nextErrors.office_close_at
     ) {
       setEventErrors(nextErrors);
+      return;
+    }
+
+    if (
+      !eventForm.office_open_at ||
+      !isEventOfficeStartAtOrAfterNow(eventForm.office_open_at)
+    ) {
+      setEventErrors({
+        office_open_at: "Otwarcie biura nie może być ustawione w przeszłości.",
+      });
+      toast({
+        title: "Nieprawidłowa data otwarcia",
+        description:
+          "Data i godzina otwarcia biura zawodów musi być nie wcześniejsza niż teraz.",
+        variant: "destructive",
+      });
       return;
     }
 
