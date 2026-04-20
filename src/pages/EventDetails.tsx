@@ -82,6 +82,20 @@ interface OfficeStatusSummary {
   timingValue: string;
 }
 
+function buildEditFormFromEvent(event: {
+  name: string;
+  location: string;
+  office_open_at: string;
+  office_close_at: string;
+}) {
+  return {
+    name: event.name,
+    location: event.location,
+    office_open_at: event.office_open_at.slice(0, 16),
+    office_close_at: event.office_close_at.slice(0, 16),
+  };
+}
+
 function getOfficeStatusSummary(
   eventOffice: { office_open_at: string; office_close_at: string },
   now: Date,
@@ -442,12 +456,7 @@ export default function EventDetails() {
   useEffect(() => {
     if (!event) return;
 
-    setEditForm({
-      name: event.name,
-      location: event.location,
-      office_open_at: event.office_open_at.slice(0, 16),
-      office_close_at: event.office_close_at.slice(0, 16),
-    });
+    setEditForm(buildEditFormFromEvent(event));
   }, [event]);
 
   if (isLoading) return <DetailSkeleton />;
@@ -473,6 +482,22 @@ export default function EventDetails() {
     now > officeCloseAt;
   const canAssignScannersToEvent =
     !isArchivedEvent && officeCloseAt !== null && now <= officeCloseAt;
+
+  const resetEditState = () => {
+    setEditErrors({});
+
+    if (!event) {
+      setEditForm({
+        name: "",
+        location: "",
+        office_open_at: "",
+        office_close_at: "",
+      });
+      return;
+    }
+
+    setEditForm(buildEditFormFromEvent(event));
+  };
 
   const handleManualFieldChange = (alias: string, value: string) => {
     setManualFields((previous) => ({ ...previous, [alias]: value }));
@@ -1156,7 +1181,7 @@ export default function EventDetails() {
         open={editOpen}
         onOpenChange={(nextOpen) => {
           setEditOpen(nextOpen);
-          if (!nextOpen) setEditErrors({});
+          if (!nextOpen) resetEditState();
         }}
       >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
@@ -1288,8 +1313,18 @@ export default function EventDetails() {
           </div>
           <DialogFooter>
             <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto sm:mr-auto"
+              onClick={resetEditState}
+              disabled={editSaving}
+            >
+              Przywróć
+            </Button>
+            <Button
+              type="button"
               className="w-full sm:w-auto"
-              onClick={handleEditSubmit}
+              onClick={() => void handleEditSubmit()}
               disabled={editSaving}
             >
               {editSaving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
