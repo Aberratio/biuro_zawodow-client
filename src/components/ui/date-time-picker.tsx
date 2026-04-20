@@ -153,7 +153,7 @@ function PickerPanel({
 export function DateTimePicker({
   value,
   onChange,
-  placeholder = "Wybierz date i godzine",
+  placeholder = "wybierz datę i godzinę",
   className,
   disabled,
   ...triggerProps
@@ -233,7 +233,7 @@ export function DateTimePicker({
         <DrawerTrigger asChild>{trigger}</DrawerTrigger>
         <DrawerContent className="max-h-[90dvh]">
           <DrawerHeader className="pb-2 text-left">
-            <DrawerTitle>Wybierz date i godzine</DrawerTitle>
+            <DrawerTitle>wybierz datę i godzinę</DrawerTitle>
           </DrawerHeader>
           <div className="overflow-y-auto px-4 pb-4">
             <div className="overflow-hidden rounded-lg border border-border bg-background">
