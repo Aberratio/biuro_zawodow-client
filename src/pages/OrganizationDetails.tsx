@@ -48,6 +48,7 @@ import TableSkeleton from "@/components/skeletons/TableSkeleton";
 import { toast } from "@/hooks/use-toast";
 import {
   formatEventOfficeWindow,
+  getEventOfficeValidationErrors,
   getEventOfficeRangeValidationResult,
   isEventCurrentOrUpcoming,
   isEventOfficeOpen,
@@ -577,6 +578,25 @@ export default function OrganizationDetails() {
     setOrganizationEditOpen(false);
     setOrganizationErrors({});
     toast({ title: "Zaktualizowano organizację" });
+  };
+
+  const applyEventOfficeValidationErrors = (
+    officeOpenAt: string,
+    officeCloseAt: string,
+  ) => {
+    const officeErrors = getEventOfficeValidationErrors(
+      officeOpenAt,
+      officeCloseAt,
+    );
+
+    setEventErrors((current) => ({
+      ...current,
+      office_open_at: officeErrors.office_open_at,
+      office_close_at: officeErrors.office_close_at,
+      form: undefined,
+    }));
+
+    return officeErrors;
   };
 
   const handleAddEvent = async () => {
@@ -1999,6 +2019,9 @@ export default function OrganizationDetails() {
                     form: undefined,
                   }));
                 }}
+                onCommit={(value) => {
+                  applyEventOfficeValidationErrors(value, eventForm.office_close_at);
+                }}
                 className="mt-2"
                 aria-invalid={Boolean(eventErrors.office_open_at)}
                 aria-describedby={
@@ -2031,6 +2054,9 @@ export default function OrganizationDetails() {
                     office_close_at: undefined,
                     form: undefined,
                   }));
+                }}
+                onCommit={(value) => {
+                  applyEventOfficeValidationErrors(eventForm.office_open_at, value);
                 }}
                 className="mt-2"
                 aria-invalid={Boolean(eventErrors.office_close_at)}
