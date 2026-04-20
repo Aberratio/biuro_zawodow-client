@@ -1,6 +1,7 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,12 +10,11 @@ import { Label } from '@/components/ui/label';
 import { FieldError } from '@/components/ui/field-error';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, FileUp, Loader2, Mail, RefreshCcw, Sparkles } from 'lucide-react';
+import { ArrowLeft, FileUp, Info, Loader2, Mail, RefreshCcw, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { formatEventOfficeWindow } from '@/lib/events';
 import { validateRequired } from '@/lib/form-validation';
-import { ParticipantFieldMapping } from '@/types';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 
 type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom';
@@ -67,7 +67,6 @@ export default function CsvImport() {
     analyzeParticipantImport,
     confirmParticipantImportMapping,
     runParticipantImport,
-    getParticipantFieldMappings,
     isLoading,
     connectionState,
   } = useData();
@@ -83,8 +82,6 @@ export default function CsvImport() {
   const [runningAction, setRunningAction] = useState<'analyze' | 'confirm' | 'run' | ''>('');
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof runParticipantImport>> | null>(null);
   const [mappingErrors, setMappingErrors] = useState<{ emailColumn?: string; aliases: Record<string, string>; form?: string }>({ aliases: {} });
-  const [savedMappings, setSavedMappings] = useState<ParticipantFieldMapping[]>([]);
-  const [savedMappingsLoading, setSavedMappingsLoading] = useState(false);
   const isOnline = connectionState === 'online';
 
   useEffect(() => {
@@ -92,19 +89,6 @@ export default function CsvImport() {
       setSelectedEventId(routeEventId);
     }
   }, [routeEventId, setSelectedEventId]);
-
-  useEffect(() => {
-    if (!eventId || !isOnline) {
-      setSavedMappings([]);
-      return;
-    }
-
-    setSavedMappingsLoading(true);
-    getParticipantFieldMappings(eventId)
-      .then(data => setSavedMappings(data.filter(mapping => mapping.is_active)))
-      .catch(() => setSavedMappings([]))
-      .finally(() => setSavedMappingsLoading(false));
-  }, [eventId, getParticipantFieldMappings, isOnline]);
 
   useEffect(() => {
     if (!analysis || analysis.has_mapping) {
@@ -121,14 +105,13 @@ export default function CsvImport() {
           source_column_name: header,
           alias: header,
           field_role: 'custom',
-        }))
+        })),
     );
   }, [analysis, selectedEmailColumn]);
 
   const multipleEmailCandidates = (analysis?.email_candidates.length ?? 0) > 1;
   const canRunWithSavedMapping = !!analysis?.has_mapping && (analysis.missing_required_columns?.length ?? 0) === 0;
   const displayNamePartsCount = mappingDrafts.filter(field => field.field_role === 'display_name_part').length;
-  const hasSavedMapping = savedMappings.length > 0;
 
   const activeDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role !== 'ignore'), [mappingDrafts]);
   const previewHeaders = useMemo(() => {
@@ -252,21 +235,25 @@ export default function CsvImport() {
   };
 
   if (isLoading) return <TableSkeleton rows={5} cols={4} subtitle="" />;
-  if (!event) return <div className="text-center py-12 text-muted-foreground">Nie znaleziono wydarzenia</div>;
+  if (!event) return <div className="py-12 text-center text-muted-foreground">Nie znaleziono wydarzenia</div>;
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/events/${eventId}`)}    className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
-  >
-            <ArrowLeft className="h-4 w-4 mr-1" /> Wróć do wydarzenia
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/events/${eventId}`)}
+            className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" /> Wróć do wydarzenia
           </Button>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight mt-8">Import CSV</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+          <h1 className="mt-8 text-xl font-bold tracking-tight sm:text-2xl">Import CSV</h1>
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
             Wydarzenie: <span className="font-medium text-foreground">{event.name}</span>
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="mt-1 text-xs text-muted-foreground">
             Biuro zawodów: {formatEventOfficeWindow(event)}
           </p>
         </div>
@@ -277,90 +264,55 @@ export default function CsvImport() {
       )}
 
       <Card className="border-dashed">
-        <CardContent className="py-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-medium text-sm">Załaduj plik CSV do analizy</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              System usunie puste kolumny, wykryje kolumny email i użyje zapisanego mapowania wydarzenia, jeśli już istnieje.
+            <p className="text-sm font-medium">Załaduj plik CSV do analizy</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              System usunie puste kolumny, wykryje kolumny email i użyje zapisanego mapowania, jeśli już istnieje.
             </p>
           </div>
           <div className="flex items-center gap-3">
             <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFilePicked} />
             <Button onClick={() => fileInputRef.current?.click()} disabled={runningAction === 'analyze' || !isOnline}>
-              {runningAction === 'analyze' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileUp className="h-4 w-4 mr-1" />}
+              {runningAction === 'analyze' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FileUp className="mr-1 h-4 w-4" />}
               Wybierz plik
             </Button>
-            {fileName && <span className="text-xs text-muted-foreground max-w-52 truncate">{fileName}</span>}
+            {fileName && <span className="max-w-52 truncate text-xs text-muted-foreground">{fileName}</span>}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Mapowanie wydarzenia</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm">
-            <span className="text-muted-foreground">Status: </span>
-            <span className="font-medium">
-              {savedMappingsLoading ? 'Ładowanie…' : hasSavedMapping ? 'Gotowe' : 'Brak zapisanego mapowania'}
-            </span>
-          </p>
-          {hasSavedMapping && (
-            <div className="flex flex-wrap gap-2">
-              {savedMappings.map(mapping => (
-                <Badge key={`${mapping.source_column_name}-${mapping.alias}`} variant="outline">
-                  {mapping.source_column_name} → {mapping.alias} ({mapping.field_role})
-                </Badge>
-              ))}
-            </div>
-          )}
-          {!savedMappingsLoading && !hasSavedMapping && (
-            <p className="text-sm text-muted-foreground">
-              Pierwszy import dla tego wydarzenia pozwoli zapisać mapowanie kolumn.
-            </p>
-          )}
         </CardContent>
       </Card>
 
       {analysis && (
         <>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-xs text-muted-foreground">Kolumny po czyszczeniu</p>
-                <p className="text-2xl font-bold mt-1">{analysis.headers.length}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-xs text-muted-foreground">Wiersze danych</p>
-                <p className="text-2xl font-bold mt-1">{analysis.row_count}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-xs text-muted-foreground">Tryb importu</p>
-                <p className="text-sm font-semibold mt-2">{analysis.has_mapping ? 'Użycie zapisanego mapowania' : 'Pierwsze mapowanie dla wydarzenia'}</p>
-              </CardContent>
-            </Card>
-          </div>
-
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Kolumny email</CardTitle>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <CardTitle className="text-base">Kolumny email</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Wykryto {analysis.headers.length} kolumn i {analysis.row_count} wierszy.
+                </p>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
+              <Alert className="border-border/60 bg-muted/30 px-4 py-3 [&>svg]:left-3 [&>svg]:top-3 [&>svg~*]:pl-8">
+                <Info className="h-4 w-4" />
+                <AlertTitle className="text-sm">Jak wybrać kolumnę email</AlertTitle>
+                <AlertDescription className="text-xs text-muted-foreground">
+                  Wskaż kolumnę z adresem email uczestnika. Ta wartość służy do rozpoznania osoby i ograniczania duplikatów podczas importu.
+                </AlertDescription>
+              </Alert>
+
               <div className="flex flex-wrap gap-2">
                 {analysis.email_candidates.map(candidate => (
-                  <Badge key={candidate.column} variant="secondary" className="gap-1">
+                  <Badge key={candidate.column} variant="secondary" className="gap-1 rounded-full px-3 py-1">
                     <Mail className="h-3 w-3" /> {candidate.column} ({candidate.matched_count})
                   </Badge>
                 ))}
               </div>
+
               {!analysis.has_mapping && multipleEmailCandidates && (
-                <div className="max-w-sm">
-                  <Label htmlFor="csv-email-column">Wskaż kolumnę email użytkownika</Label>
+                <div className="max-w-md space-y-2">
+                  <Label htmlFor="csv-email-column">Wybierz kolumnę z emailem uczestnika</Label>
                   <Select
                     value={selectedEmailColumn}
                     onValueChange={value => {
@@ -370,7 +322,7 @@ export default function CsvImport() {
                   >
                     <SelectTrigger
                       id="csv-email-column"
-                      className="mt-2"
+                      className="h-10"
                       aria-invalid={Boolean(mappingErrors.emailColumn)}
                       aria-describedby={mappingErrors.emailColumn ? 'csv-email-column-error' : undefined}
                     >
@@ -382,9 +334,10 @@ export default function CsvImport() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <FieldError id="csv-email-column-error" className="mt-2">{mappingErrors.emailColumn}</FieldError>
+                  <FieldError id="csv-email-column-error">{mappingErrors.emailColumn}</FieldError>
                 </div>
               )}
+
               {!analysis.has_mapping && !multipleEmailCandidates && selectedEmailColumn && (
                 <p className="text-sm text-muted-foreground">
                   Kolumna email została wybrana automatycznie: <span className="font-medium text-foreground">{selectedEmailColumn}</span>
@@ -395,49 +348,71 @@ export default function CsvImport() {
 
           {!analysis.has_mapping && (
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-base">Mapowanie kolumn</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Dla każdej istotnej kolumny wpisz alias i przypisz rolę. Przynajmniej jedna kolumna musi budować nazwę uczestnika.
-                </p>
-                <div className="space-y-3">
+                <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+                  <p className="text-sm font-medium">Legenda ról</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Część nazwy</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Buduje nazwę uczestnika. Wybierz co najmniej jedną taką kolumnę.</p>
+                    </div>
+                    <div className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Numer startowy</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Mapuje kolumnę z numerem startowym, jeśli występuje w pliku.</p>
+                    </div>
+                    <div className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Pole własne / Ignoruj</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Pole własne zapisuje dodatkową wartość. Ignoruj całkowicie pomija kolumnę.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
                   {mappingDrafts.map((field, index) => (
-                    <div key={field.source_column_name} className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr] items-end border rounded-lg p-3">
-                      <div>
-                        <Label htmlFor={`csv-source-column-${index}`}>Nazwa w CSV</Label>
-                        <Input id={`csv-source-column-${index}`} value={field.source_column_name} disabled className="mt-2" />
-                      </div>
-                      <div>
-                        <Label htmlFor={`csv-alias-${index}`}>Alias</Label>
-                        <Input
-                          id={`csv-alias-${index}`}
-                          value={field.alias}
-                          onChange={eventValue => handleFieldChange(field.source_column_name, { alias: eventValue.target.value })}
-                          className="mt-2"
-                          required={field.field_role !== 'ignore'}
-                          aria-invalid={Boolean(mappingErrors.aliases[field.source_column_name])}
-                          aria-describedby={mappingErrors.aliases[field.source_column_name] ? `csv-alias-${index}-error` : undefined}
-                        />
-                        <FieldError id={`csv-alias-${index}-error`} className="mt-2">{mappingErrors.aliases[field.source_column_name]}</FieldError>
-                      </div>
-                      <div>
-                        <Label htmlFor={`csv-role-${index}`}>Rola</Label>
-                        <Select
-                          value={field.field_role}
-                          onValueChange={value => handleFieldChange(field.source_column_name, { field_role: value as EditableFieldRole })}
-                        >
-                          <SelectTrigger id={`csv-role-${index}`} className="mt-2">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ignore">Ignoruj</SelectItem>
-                            <SelectItem value="display_name_part">Część nazwy</SelectItem>
-                            <SelectItem value="bib_number">Numer startowy</SelectItem>
-                            <SelectItem value="custom">Pole własne</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    <div key={field.source_column_name} className="rounded-lg border border-border/60 bg-card/60 p-3">
+                      <div className="grid gap-3 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.95fr)_220px] md:items-end">
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`csv-source-column-${index}`}>Kolumna CSV</Label>
+                          <Input
+                            id={`csv-source-column-${index}`}
+                            value={field.source_column_name}
+                            disabled
+                            className="h-9 bg-muted/40"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`csv-alias-${index}`}>Alias w systemie</Label>
+                          <Input
+                            id={`csv-alias-${index}`}
+                            value={field.alias}
+                            onChange={eventValue => handleFieldChange(field.source_column_name, { alias: eventValue.target.value })}
+                            className="h-9"
+                            required={field.field_role !== 'ignore'}
+                            aria-invalid={Boolean(mappingErrors.aliases[field.source_column_name])}
+                            aria-describedby={mappingErrors.aliases[field.source_column_name] ? `csv-alias-${index}-error` : undefined}
+                          />
+                          <FieldError id={`csv-alias-${index}-error`}>{mappingErrors.aliases[field.source_column_name]}</FieldError>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`csv-role-${index}`}>Rola</Label>
+                          <Select
+                            value={field.field_role}
+                            onValueChange={value => handleFieldChange(field.source_column_name, { field_role: value as EditableFieldRole })}
+                          >
+                            <SelectTrigger id={`csv-role-${index}`} className="h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ignore">Ignoruj</SelectItem>
+                              <SelectItem value="display_name_part">Część nazwy</SelectItem>
+                              <SelectItem value="bib_number">Numer startowy</SelectItem>
+                              <SelectItem value="custom">Pole własne</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -495,13 +470,13 @@ export default function CsvImport() {
           <div className="flex flex-wrap gap-3">
             {!analysis.has_mapping && (
               <Button onClick={handleSaveMappingAndImport} disabled={runningAction === 'confirm' || runningAction === 'run' || !isOnline}>
-                {(runningAction === 'confirm' || runningAction === 'run') ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                {(runningAction === 'confirm' || runningAction === 'run') ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}
                 Zapisz mapowanie i importuj
               </Button>
             )}
             {analysis.has_mapping && (
               <Button onClick={handleRunExistingImport} disabled={!canRunWithSavedMapping || runningAction === 'run' || !isOnline}>
-                {runningAction === 'run' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-1" />}
+                {runningAction === 'run' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
                 Importuj z zapisanym mapowaniem
               </Button>
             )}

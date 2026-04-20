@@ -55,6 +55,7 @@ import {
   formatEventOfficeWindow,
   getEventOfficeCloseAt,
   getEventOfficeOpenAt,
+  isEventOfficeStartAtOrAfterNow,
   isEventOfficeOpen,
   isValidEventOfficeRange,
 } from "@/lib/events";
@@ -552,6 +553,25 @@ export default function EventDetails() {
       nextErrors.office_close_at
     ) {
       setEditErrors(nextErrors);
+      return;
+    }
+
+    const canKeepPastOfficeOpenAt = isEventOfficeOpen(event);
+
+    if (
+      !submittedOfficeOpenAt ||
+      (!canKeepPastOfficeOpenAt &&
+        !isEventOfficeStartAtOrAfterNow(submittedOfficeOpenAt))
+    ) {
+      setEditErrors({
+        office_open_at: "Otwarcie biura nie może być ustawione w przeszłości.",
+      });
+      toast({
+        title: "Nieprawidłowa data otwarcia",
+        description:
+          "Data i godzina otwarcia biura zawodów musi być nie wcześniejsza niż teraz.",
+        variant: "destructive",
+      });
       return;
     }
 
