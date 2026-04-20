@@ -135,12 +135,13 @@ function formatEventCount(value: number) {
     return `${value} wydarzenia`;
   }
 
-  return `${value} wydarzeń`;
+  return `${value} wydarze\u0144`;
 }
 
 export default function Events() {
   const {
     visibleEvents,
+    archivedEvents,
     organizations,
     createEvent,
     currentUser,
@@ -164,6 +165,22 @@ export default function Events() {
     () => organizations.filter((org) => adminOrganizationIds.includes(org.id)),
     [adminOrganizationIds, organizations],
   );
+  const accessibleOrganizations = useMemo(() => {
+    if (currentRole === "superadmin") {
+      return organizations;
+    }
+
+    if (currentRole === "admin") {
+      return organizations.filter((org) => adminOrganizationIds.includes(org.id));
+    }
+
+    return organizations.filter((org) => org.id === currentUser.organization_id);
+  }, [
+    adminOrganizationIds,
+    currentRole,
+    currentUser.organization_id,
+    organizations,
+  ]);
   const organizationNames = useMemo(
     () => Object.fromEntries(organizations.map((org) => [org.id, org.name])),
     [organizations],
@@ -302,13 +319,32 @@ export default function Events() {
     () => organizations.find((org) => org.id === form.organization_id),
     [form.organization_id, organizations],
   );
-  const formOrganizationUsedSlots = useMemo(
+  const totalEventsByOrganizationId = useMemo(
     () =>
-      visibleEvents.filter(
-        (event) => event.organization_id === form.organization_id,
-      ).length,
-    [form.organization_id, visibleEvents],
+      [...visibleEvents, ...archivedEvents].reduce<Record<string, number>>(
+        (counts, event) => {
+          counts[event.organization_id] = (counts[event.organization_id] ?? 0) + 1;
+          return counts;
+        },
+        {},
+      ),
+    [archivedEvents, visibleEvents],
   );
+  const creatableOrganizations = useMemo(
+    () =>
+      accessibleOrganizations.filter(
+        (org) => (totalEventsByOrganizationId[org.id] ?? 0) < org.event_limit,
+      ),
+    [accessibleOrganizations, totalEventsByOrganizationId],
+  );
+  const canCreateForAnyOrganization = creatableOrganizations.length > 0;
+  const formOrganizationUsedSlots = useMemo(
+    () => totalEventsByOrganizationId[form.organization_id] ?? 0,
+    [form.organization_id, totalEventsByOrganizationId],
+  );
+  const formOrganizationLimitReached = formOrganization
+    ? formOrganizationUsedSlots >= formOrganization.event_limit
+    : false;
   const hasActiveFilters =
     searchQuery.trim().length > 0 || statusFilter !== "all";
   const paginationModel = useMemo(
@@ -316,9 +352,48 @@ export default function Events() {
     [currentPage, totalPages],
   );
 
+  useEffect(() => {
+    if (currentRole !== "superadmin" && currentRole !== "admin") {
+      return;
+    }
+
+    if (creatableOrganizations.length === 0) {
+      if (form.organization_id) {
+        setForm((current) => ({
+          ...current,
+          organization_id: "",
+        }));
+      }
+      return;
+    }
+
+    if (
+      !form.organization_id ||
+      !creatableOrganizations.some((org) => org.id === form.organization_id)
+    ) {
+      setForm((current) => ({
+        ...current,
+        organization_id: creatableOrganizations[0]?.id ?? "",
+      }));
+    }
+  }, [creatableOrganizations, currentRole, form.organization_id]);
+
   if (isLoading) return <EventsSkeleton />;
 
   const handleCreate = async () => {
+    if (formOrganizationLimitReached) {
+      const message = "Limit wydarzeń dla tej organizacji został osiągnięty.";
+      setFormErrors({
+        form: message,
+      });
+      toast({
+        title: "Nie udało się utworzyć wydarzenia",
+        description: message,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const nextErrors = {
       name: validateRequired(form.name, "Podaj nazwę wydarzenia."),
       location: validateRequired(
@@ -413,10 +488,7 @@ export default function Events() {
       office_close_at: "",
       organization_id:
         currentRole === "admin"
-          ? selectedOrganizationId ||
-            adminOrganizationIds[0] ||
-            organizations[0]?.id ||
-            ""
+          ? creatableOrganizations[0]?.id || ""
           : currentUser.organization_id || organizations[0]?.id || "",
     });
     setFormErrors({});
@@ -437,7 +509,12 @@ export default function Events() {
             onClick={() => setOpen(true)}
             size="sm"
             className="w-full sm:w-auto sm:self-auto"
-            disabled={!isOnline}
+            disabled={!isOnline || !canCreateForAnyOrganization}
+            title={
+              !canCreateForAnyOrganization
+                ? "Wszystkie dostępne organizacje osiągnęły już limit wydarzeń."
+                : undefined
+            }
           >
             <Plus className="mr-1 h-4 w-4" /> Nowe wydarzenie
           </Button>
@@ -446,6 +523,14 @@ export default function Events() {
 
       {!isOnline && canCreateEvent && (
         <OnlineOnlyNotice description="Tworzenie i edycja wydarzeń wymagają aktywnego połączenia z serwerem. Lista wydarzeń pozostaje dostępna do odczytu z lokalnego snapshotu." />
+      )}
+
+      {isOnline && canCreateEvent && !canCreateForAnyOrganization && (
+        <Card className="border-dashed">
+          <CardContent className="py-4 text-sm text-muted-foreground">
+            Wszystkie dostępne organizacje osiągnęły już limit wydarzeń.
+          </CardContent>
+        </Card>
       )}
 
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
@@ -706,17 +791,11 @@ export default function Events() {
                     <SelectValue placeholder="Wybierz organizację" />
                   </SelectTrigger>
                   <SelectContent>
-                    {organizations
-                      .filter(
-                        (org) =>
-                          currentRole === "superadmin" ||
-                          adminOrganizationIds.includes(org.id),
-                      )
-                      .map((org) => (
-                        <SelectItem key={org.id} value={org.id}>
-                          {org.name}
-                        </SelectItem>
-                      ))}
+                    {creatableOrganizations.map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FieldError
@@ -846,17 +925,21 @@ export default function Events() {
                 {formatEventCount(formOrganizationUsedSlots)}.
               </p>
             )}
+            {(currentRole === "superadmin" || currentRole === "admin") &&
+              creatableOrganizations.length === 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  Brak organizacji, dla których można jeszcze utworzyć
+                  wydarzenie.
+                </p>
+              )}
+            <FieldError id="event-create-form-error">
               {formErrors.form}
             </FieldError>
           </div>
           <DialogFooter>
             <Button
               onClick={handleCreate}
-              disabled={
-                (formOrganization
-                  ? formOrganizationUsedSlots >= formOrganization.event_limit
-                  : false) || isSubmitting
-              }
+              disabled={formOrganizationLimitReached || isSubmitting}
               className="h-11 w-full sm:h-10 sm:w-auto"
             >
               <Plus className="mr-1 h-4 w-4" />
