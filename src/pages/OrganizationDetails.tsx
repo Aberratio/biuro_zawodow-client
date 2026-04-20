@@ -92,7 +92,7 @@ function CollapsibleOrganizationSection({
   action?: ReactNode;
 }) {
   const displayTitle = title.startsWith("Archiwum")
-    ? "Archiwum wydarzen"
+    ? "Archiwum wydarzeń"
     : title;
   const isStaticSection = title.startsWith("Archiwum");
 
@@ -269,7 +269,7 @@ export default function OrganizationDetails() {
   );
   const totalOrganizationEvents = orgEvents.length + orgArchivedEvents.length;
   const archivedEventsSummaryLabel =
-    orgArchivedEvents.length === 1 ? "wydarzenie" : "wydarzeĹ„";
+    orgArchivedEvents.length === 1 ? "wydarzenie" : "wydarzeń";
   const organizers = useMemo(
     () =>
       users
@@ -305,7 +305,7 @@ export default function OrganizationDetails() {
   );
   const addEventDisabledReason =
     remainingSlots <= 0
-      ? "OsiÄ…gniÄ™to limit wydarzeĹ„ dla tej organizacji, Ĺ‚Ä…cznie z wydarzeniami w archiwum. ZwiÄ™ksz limit, aby dodaÄ‡ kolejne wydarzenie."
+      ? "Osiągnięto limit wydarzeń dla tej organizacji, łącznie z wydarzeniami w archiwum. Zwiększ limit, aby dodać kolejne wydarzenie."
       : null;
   const assignableScannerEvents = orgEvents.filter((event) =>
     isEventCurrentOrUpcoming(event),
@@ -408,12 +408,12 @@ export default function OrganizationDetails() {
     const names = orgEvents
       .filter((event) => eventIds.includes(event.id) && !event.archived_at)
       .map((event) => event.name);
-    return names.length > 0 ? names.join(", ") : "Brak przypisanych wydarzeĹ„";
+    return names.length > 0 ? names.join(", ") : "Brak przypisanych wydarzeń";
   };
 
   const handleAddMember = async () => {
     const nextErrors = {
-      name: validateRequired(memberForm.name, "Podaj imiÄ™ i nazwisko."),
+      name: validateRequired(memberForm.name, "Podaj imię i nazwisko."),
       email: validateEmail(memberForm.email),
     };
 
@@ -438,10 +438,10 @@ export default function OrganizationDetails() {
     setIsSubmittingMember(false);
 
     if (!result.ok) {
-      setMemberErrors({ form: result.error ?? "Nie udaĹ‚o siÄ™ dodaÄ‡ konta." });
+      setMemberErrors({ form: result.error ?? "Nie udało się dodać konta." });
       toast({
-        title: "Nie udaĹ‚o siÄ™ dodaÄ‡ konta",
-        description: result.error ?? "SprĂłbuj ponownie.",
+        title: "Nie udało się dodać konta",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
@@ -454,7 +454,7 @@ export default function OrganizationDetails() {
         memberForm.role === "editor"
           ? "Dodano organizatora"
           : `Dodano ${getRoleLabel(memberForm.role).toLocaleLowerCase("pl-PL")}`,
-      description: "UĹĽytkownik otrzyma mail z linkiem do ustawienia hasĹ‚a.",
+      description: "Użytkownik otrzyma e-mail z linkiem do ustawienia hasła.",
     });
   };
 
@@ -462,27 +462,27 @@ export default function OrganizationDetails() {
     const parsed = Number(limitDraft || organization.event_limit);
     const limitError = validateNonNegativeInteger(
       limitDraft || String(organization.event_limit),
-      "Podaj liczbÄ™ caĹ‚kowitÄ… wiÄ™kszÄ… lub rĂłwnÄ… 0.",
+      "Podaj liczbę całkowitą większą lub równą 0.",
     );
     if (limitError || !Number.isInteger(parsed) || parsed < 0) {
       setLimitErrors({
         event_limit:
-          limitError || "Podaj liczbÄ™ caĹ‚kowitÄ… wiÄ™kszÄ… lub rĂłwnÄ… 0.",
+          limitError || "Podaj liczbę całkowitą większą lub równą 0.",
       });
       toast({
-        title: "NieprawidĹ‚owy limit",
-        description: "Podaj liczbÄ™ caĹ‚kowitÄ… wiÄ™kszÄ… lub rĂłwnÄ… 0.",
+        title: "Nieprawidłowy limit",
+        description: "Podaj liczbę całkowitą większą lub równą 0.",
         variant: "destructive",
       });
       return;
     }
     if (parsed < totalOrganizationEvents) {
       setLimitErrors({
-        event_limit: `Limit wydarzeĹ„ nie moĹĽe byÄ‡ mniejszy niĹĽ ${totalOrganizationEvents}.`,
+        event_limit: `Limit wydarzeń nie może być mniejszy niż ${totalOrganizationEvents}.`,
       });
       toast({
-        title: "NieprawidĹ‚owy limit",
-        description: `Limit wydarzeĹ„ nie moĹĽe byÄ‡ mniejszy niĹĽ ${totalOrganizationEvents}.`,
+        title: "Nieprawidłowy limit",
+        description: `Limit wydarzeń nie może być mniejszy niż ${totalOrganizationEvents}.`,
         variant: "destructive",
       });
       return;
@@ -490,17 +490,17 @@ export default function OrganizationDetails() {
     setLimitErrors({});
     const result = await updateOrganizationEventLimit(organization.id, parsed);
     if (!result.ok) {
-      setLimitErrors({ form: result.error ?? "Nie udaĹ‚o siÄ™ zapisaÄ‡ limitu." });
+      setLimitErrors({ form: result.error ?? "Nie udało się zapisać limitu." });
       toast({
-        title: "Nie udaĹ‚o siÄ™ zapisaÄ‡ limitu",
-        description: result.error ?? "SprĂłbuj ponownie.",
+        title: "Nie udało się zapisać limitu",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
     }
     setLimitDialogOpen(false);
     setLimitErrors({});
-    toast({ title: "Zaktualizowano limit wydarzeĹ„" });
+    toast({ title: "Zaktualizowano limit wydarzeń" });
   };
 
   const handleSaveOrganization = async () => {
@@ -508,9 +508,9 @@ export default function OrganizationDetails() {
     const parsedLimit = Number(limitDraft || organization.event_limit);
     const limitError = validateNonNegativeInteger(
       limitDraft || String(organization.event_limit),
-      "Podaj liczbĂ„â„˘ caÄąâ€škowitĂ„â€¦ wiĂ„â„˘kszĂ„â€¦ lub rÄ‚Ĺ‚wnĂ„â€¦ 0.",
+      "Podaj liczbę całkowitą większą lub równą 0.",
     );
-    const nameError = validateRequired(name, "Podaj nazwÄ™ organizacji.");
+    const nameError = validateRequired(name, "Podaj nazwę organizacji.");
     if (nameError) {
       setOrganizationErrors({ name: nameError });
       toast({ title: "Nazwa jest wymagana", variant: "destructive" });
@@ -519,22 +519,22 @@ export default function OrganizationDetails() {
     if (limitError || !Number.isInteger(parsedLimit) || parsedLimit < 0) {
       setLimitErrors({
         event_limit:
-          limitError || "Podaj liczbe calkowita wieksza lub rowna 0.",
+          limitError || "Podaj liczbę całkowitą większą lub równą 0.",
       });
       toast({
-        title: "Nieprawidlowy limit",
-        description: "Podaj liczbe calkowita wieksza lub rowna 0.",
+        title: "Nieprawidłowy limit",
+        description: "Podaj liczbę całkowitą większą lub równą 0.",
         variant: "destructive",
       });
       return;
     }
     if (parsedLimit < totalOrganizationEvents) {
       setLimitErrors({
-        event_limit: `Limit wydarzen nie moze byc mniejszy niz ${totalOrganizationEvents}.`,
+        event_limit: `Limit wydarzeń nie może być mniejszy niż ${totalOrganizationEvents}.`,
       });
       toast({
-        title: "Nieprawidlowy limit",
-        description: `Limit wydarzen nie moze byc mniejszy niz ${totalOrganizationEvents}.`,
+        title: "Nieprawidłowy limit",
+        description: `Limit wydarzeń nie może być mniejszy niż ${totalOrganizationEvents}.`,
         variant: "destructive",
       });
       return;
@@ -545,11 +545,11 @@ export default function OrganizationDetails() {
     const result = await updateOrganization(organization.id, { name });
     if (!result.ok) {
       setOrganizationErrors({
-        form: result.error ?? "Nie udaĹ‚o siÄ™ zaktualizowaÄ‡ organizacji.",
+        form: result.error ?? "Nie udało się zaktualizować organizacji.",
       });
       toast({
-        title: "Nie udaĹ‚o siÄ™ zaktualizowaÄ‡ organizacji",
-        description: result.error ?? "SprĂłbuj ponownie.",
+        title: "Nie udało się zaktualizować organizacji",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
@@ -562,11 +562,11 @@ export default function OrganizationDetails() {
       if (!limitResult.ok) {
         setIsSavingOrganization(false);
         setLimitErrors({
-          form: limitResult.error ?? "Nie udalo sie zapisac limitu.",
+          form: limitResult.error ?? "Nie udało się zapisać limitu.",
         });
         toast({
-          title: "Nie udalo sie zapisac limitu",
-          description: limitResult.error ?? "Sprobuj ponownie.",
+          title: "Nie udało się zapisać limitu",
+          description: limitResult.error ?? "Spróbuj ponownie.",
           variant: "destructive",
         });
         return;
@@ -575,23 +575,23 @@ export default function OrganizationDetails() {
     setIsSavingOrganization(false);
     setOrganizationEditOpen(false);
     setOrganizationErrors({});
-    toast({ title: "Zaktualizowano organizacjÄ™" });
+    toast({ title: "Zaktualizowano organizację" });
   };
 
   const handleAddEvent = async () => {
     const nextErrors = {
-      name: validateRequired(eventForm.name, "Podaj nazwÄ™ wydarzenia."),
+      name: validateRequired(eventForm.name, "Podaj nazwę wydarzenia."),
       location: validateRequired(
         eventForm.location,
-        "Podaj lokalizacjÄ™ wydarzenia.",
+        "Podaj lokalizację wydarzenia.",
       ),
       office_open_at: validateRequired(
         eventForm.office_open_at,
-        "Podaj datÄ™ i godzinÄ™ otwarcia biura.",
+        "Podaj datę i godzinę otwarcia biura.",
       ),
       office_close_at: validateRequired(
         eventForm.office_close_at,
-        "Podaj datÄ™ i godzinÄ™ zamkniÄ™cia biura.",
+        "Podaj datę i godzinę zamknięcia biura.",
       ),
     };
 
@@ -610,12 +610,12 @@ export default function OrganizationDetails() {
       !isEventOfficeStartAtOrAfterNow(eventForm.office_open_at)
     ) {
       setEventErrors({
-        office_open_at: "Otwarcie biura nie moĹĽe byÄ‡ ustawione w przeszĹ‚oĹ›ci.",
+        office_open_at: "Otwarcie biura nie może być ustawione w przeszłości.",
       });
       toast({
-        title: "NieprawidĹ‚owa data otwarcia",
+        title: "Nieprawidłowa data otwarcia",
         description:
-          "Data i godzina otwarcia biura zawodĂłw musi byÄ‡ nie wczeĹ›niejsza niĹĽ teraz.",
+          "Data i godzina otwarcia biura zawodów nie może być wcześniejsza niż teraz.",
         variant: "destructive",
       });
       return;
@@ -630,11 +630,11 @@ export default function OrganizationDetails() {
       )
     ) {
       setEventErrors({
-        office_close_at: "ZamkniÄ™cie biura musi byÄ‡ pĂłĹşniej niĹĽ otwarcie.",
+        office_close_at: "Zamknięcie biura musi być późniejsze niż otwarcie.",
       });
       toast({
-        title: "NieprawidĹ‚owe godziny biura",
-        description: "Podaj poprawny czas otwarcia i zamkniÄ™cia biura zawodĂłw.",
+        title: "Nieprawidłowe godziny biura",
+        description: "Podaj poprawny czas otwarcia i zamknięcia biura zawodów.",
         variant: "destructive",
       });
       return;
@@ -651,11 +651,11 @@ export default function OrganizationDetails() {
     setIsSubmittingEvent(false);
     if (!result.ok) {
       setEventErrors({
-        form: result.error ?? "Nie udaĹ‚o siÄ™ utworzyÄ‡ wydarzenia.",
+        form: result.error ?? "Nie udało się utworzyć wydarzenia.",
       });
       toast({
-        title: "Nie udaĹ‚o siÄ™ utworzyÄ‡ wydarzenia",
-        description: result.error ?? "SprĂłbuj ponownie.",
+        title: "Nie udało się utworzyć wydarzenia",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
@@ -683,8 +683,8 @@ export default function OrganizationDetails() {
     setIsSavingScannerAssignments(false);
     if (!result.ok) {
       toast({
-        title: "Nie udaĹ‚o siÄ™ zapisaÄ‡ przypisaĹ„ operatora",
-        description: result.error ?? "SprĂłbuj ponownie.",
+        title: "Nie udało się zapisać przypisań operatora",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
@@ -697,7 +697,7 @@ export default function OrganizationDetails() {
     if (!selectedScanner) return;
 
     const nextErrors = {
-      name: validateRequired(scannerDraft.name, "Podaj imiÄ™ i nazwisko."),
+      name: validateRequired(scannerDraft.name, "Podaj imię i nazwisko."),
       email: validateEmail(scannerDraft.email),
     };
 
@@ -716,11 +716,11 @@ export default function OrganizationDetails() {
 
     if (!result.ok) {
       setScannerErrors({
-        form: result.error ?? "Nie udaĹ‚o siÄ™ zaktualizowaÄ‡ operatora.",
+        form: result.error ?? "Nie udało się zaktualizować operatora.",
       });
       toast({
-        title: "Nie udaĹ‚o siÄ™ zapisaÄ‡ danych operatora",
-        description: result.error ?? "SprĂłbuj ponownie.",
+        title: "Nie udało się zapisać danych operatora",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
@@ -741,8 +741,8 @@ export default function OrganizationDetails() {
     setIsChangingScannerRole(false);
     if (!result.ok) {
       toast({
-        title: "Nie udaĹ‚o siÄ™ zmieniÄ‡ uprawnieĹ„ operatora",
-        description: result.error ?? "SprĂłbuj ponownie.",
+        title: "Nie udało się zmienić uprawnień operatora",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
@@ -754,8 +754,8 @@ export default function OrganizationDetails() {
     toast({
       title:
         role === "scanner"
-          ? "Zmieniono rolÄ™ na operatora"
-          : "Zmieniono rolÄ™ na operatora Plus",
+          ? "Zmieniono rolę na operatora"
+          : "Zmieniono rolę na operatora Plus",
       description: scanner.name,
     });
   };
@@ -766,16 +766,16 @@ export default function OrganizationDetails() {
     setIsDeletingOrganization(false);
     if (!result.ok) {
       toast({
-        title: "Nie udaĹ‚o siÄ™ usunÄ…Ä‡ organizacji",
+        title: "Nie udało się usunąć organizacji",
         description:
           result.error ??
-          "UsuĹ„ najpierw wydarzenia i uĹĽytkownikĂłw przypisanych do organizacji.",
+          "Usuń najpierw wydarzenia i użytkowników przypisanych do organizacji.",
         variant: "destructive",
       });
       return;
     }
     setDeleteOrganizationConfirmOpen(false);
-    toast({ title: "Organizacja usuniÄ™ta" });
+    toast({ title: "Organizacja usunięta" });
     navigate("/organizations");
   };
 
@@ -788,8 +788,8 @@ export default function OrganizationDetails() {
 
     if (!result.ok) {
       toast({
-        title: "Nie udaĹ‚o siÄ™ usunÄ…Ä‡ konta",
-        description: result.error ?? "SprĂłbuj ponownie.",
+        title: "Nie udało się usunąć konta",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
@@ -806,10 +806,10 @@ export default function OrganizationDetails() {
     toast({
       title:
         archivedUser.role === "editor"
-          ? "UsuniÄ™to organizatora"
-          : "UsuniÄ™to operatora",
+          ? "Usunięto organizatora"
+          : "Usunięto operatora",
       description:
-        "Konto zostaĹ‚o zarchiwizowane. Ta osoba nie zaloguje siÄ™ juĹĽ na stare konto, a ten email moĹĽna wykorzystaÄ‡ ponownie.",
+        "Konto zostało zarchiwizowane. Ta osoba nie zaloguje się już na stare konto, a ten adres e-mail będzie można wykorzystać ponownie.",
     });
   };
 
@@ -822,8 +822,8 @@ export default function OrganizationDetails() {
 
     if (!result.ok) {
       toast({
-        title: "Nie udaĹ‚o siÄ™ wysĹ‚aÄ‡ resetu hasĹ‚a",
-        description: result.error ?? "SprĂłbuj ponownie.",
+        title: "Nie udało się wysłać resetu hasła",
+        description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
       return;
@@ -833,8 +833,8 @@ export default function OrganizationDetails() {
     setPasswordResetConfirmOpen(false);
     setSelectedActionUser(null);
     toast({
-      title: "WysĹ‚ano reset hasĹ‚a",
-      description: `Email z resetem hasĹ‚a zostaĹ‚ wysĹ‚any do ${targetUser.email}.`,
+      title: "Wysłano reset hasła",
+      description: `E-mail z resetem hasła został wysłany do ${targetUser.email}.`,
     });
   };
 
@@ -847,7 +847,7 @@ export default function OrganizationDetails() {
         className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
       >
         <ArrowLeft className="mr-1 h-4 w-4" />
-        WrĂłÄ‡ do listy wszystkich organizacji
+        Wróć do listy wszystkich organizacji
       </Button>
 
       <div className="flex flex-col gap-4">
@@ -870,7 +870,7 @@ export default function OrganizationDetails() {
                         setLimitDraft(String(organization.event_limit));
                         setOrganizationEditOpen(true);
                       }}
-                      aria-label="Edytuj organizacjÄ™"
+                      aria-label="Edytuj organizację"
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -887,7 +887,7 @@ export default function OrganizationDetails() {
                 onClick={openLimitDialog}
               >
                 <Calculator className="mr-1 h-4 w-4" />
-                ZmieĹ„ limit wydarzeĹ„
+                Zmień limit wydarzeń
               </Button>
               <Button
                 variant="destructive"
@@ -895,7 +895,7 @@ export default function OrganizationDetails() {
                 onClick={() => setDeleteOrganizationConfirmOpen(true)}
               >
                 <Trash2 className="mr-1 h-4 w-4" />
-                UsuĹ„ organizacjÄ™
+                Usuń organizację
               </Button>
             </div>
           )}
@@ -940,8 +940,8 @@ export default function OrganizationDetails() {
           <div className="flex flex-col gap-4">
             {orgEvents.length === 0 ? (
               <EmptyTableState
-                title="Brak wydarzeĹ„"
-                description="Po dodaniu wydarzeĹ„ pojawi siÄ™ tutaj ich lista."
+                title="Brak wydarzeń"
+                description="Po dodaniu wydarzeń pojawi się tutaj ich lista."
               />
             ) : (
               <div className="w-full space-y-3">
@@ -971,8 +971,8 @@ export default function OrganizationDetails() {
                       const statusLabel = isOfficeOpen
                         ? "Otwarte"
                         : isUpcoming
-                          ? "NadchodzÄ…ce"
-                          : "ZamkniÄ™te";
+                          ? "Nadchodzące"
+                          : "Zamknięte";
                       const statusClassName = isOfficeOpen
                         ? "border border-emerald-400/14 bg-emerald-500/10 text-emerald-200/90 hover:bg-emerald-500/10"
                         : isUpcoming
@@ -987,7 +987,7 @@ export default function OrganizationDetails() {
                           navigate(`/events/${event.id}`, {
                             state: {
                               backTo: `/organizations/${organization.id}`,
-                              backLabel: "WrĂłÄ‡ do szczegĂłĹ‚Ăłw organizacji",
+                              backLabel: "Wróć do szczegółów organizacji",
                             },
                           })
                         }
@@ -1000,13 +1000,13 @@ export default function OrganizationDetails() {
                             navigate(`/events/${event.id}`, {
                               state: {
                                 backTo: `/organizations/${organization.id}`,
-                                backLabel: "WrĂłÄ‡ do szczegĂłĹ‚Ăłw organizacji",
+                                backLabel: "Wróć do szczegółów organizacji",
                               },
                             });
                           }
                         }}
                         tabIndex={0}
-                        aria-label={`WyĹ›wietl wydarzenie ${event.name}`}
+                        aria-label={`Wyświetl wydarzenie ${event.name}`}
                       >
                         <TableCell className="px-5 sm:px-7">
                           <div>
@@ -1075,8 +1075,8 @@ export default function OrganizationDetails() {
           <div className="flex flex-col gap-4">
             {organizers.length === 0 ? (
               <EmptyTableState
-                title="Brak organizatorĂłw"
-                description="Po dodaniu organizatorĂłw pojawi siÄ™ tutaj ich lista."
+                title="Brak organizatorów"
+                description="Po dodaniu organizatorów pojawi się tutaj ich lista."
               />
             ) : (
               <div className="w-full">
@@ -1084,7 +1084,7 @@ export default function OrganizationDetails() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                        ImiÄ™ i nazwisko
+                        Imię i nazwisko
                       </TableHead>
                       <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
                         Email
@@ -1120,7 +1120,7 @@ export default function OrganizationDetails() {
                                 }
                               >
                                 <KeyRound className="mr-1 h-3.5 w-3.5" />
-                                Reset hasĹ‚a
+                                Reset hasła
                               </Button>
                               <Button
                                 size="sm"
@@ -1129,7 +1129,7 @@ export default function OrganizationDetails() {
                                 onClick={() => openArchiveUserDialog(organizer)}
                               >
                                 <Trash2 className="mr-1 h-3.5 w-3.5" />
-                                UsuĹ„
+                                Usuń
                               </Button>
                             </div>
                           </TableCell>
@@ -1142,8 +1142,8 @@ export default function OrganizationDetails() {
                   <p className="rounded-xl border border-dashed px-4 py-3 text-xs text-muted-foreground mt-3">
                                         
 
-                    Skontaktuj siÄ™ z administratorem, jeĹ›li chcesz
-                    usunÄ…Ä‡ konto organizatora.
+                    Skontaktuj się z administratorem, jeśli chcesz
+                    usunąć konto organizatora.
                   </p>
                 )}
               </div>
@@ -1183,8 +1183,8 @@ export default function OrganizationDetails() {
           <div className="flex flex-col gap-4">
             {scanners.length === 0 ? (
               <EmptyTableState
-                title="Brak operatorĂłw"
-                description="Po dodaniu operatorĂłw pojawi siÄ™ tutaj ich lista."
+                title="Brak operatorów"
+                description="Po dodaniu operatorów pojawi się tutaj ich lista."
               />
             ) : (
               <div className="w-full">
@@ -1192,7 +1192,7 @@ export default function OrganizationDetails() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                        ImiÄ™ i nazwisko
+                        Imię i nazwisko
                       </TableHead>
                       <TableHead className="hidden h-12 px-5 text-[0.72rem] tracking-[0.2em] md:table-cell sm:px-7">
                         Email
@@ -1281,7 +1281,7 @@ export default function OrganizationDetails() {
         id="organization-archive"
         className="rounded-[1.9rem] border border-[hsl(var(--button-highlight)/0.3)] bg-[linear-gradient(180deg,hsl(var(--button-highlight)/0.12),hsl(var(--background)/0.82))] px-5 py-5 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04)] sm:px-6"
       >
-        <CollapsibleOrganizationSection title="Archiwum wydarzeÄąâ€ž">
+        <CollapsibleOrganizationSection title="Archiwum wydarzeń">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-3">
@@ -1289,10 +1289,10 @@ export default function OrganizationDetails() {
                   <Archive className="h-4 w-4 text-[hsl(var(--button-highlight))]" />
                 </div>
                 <p className="hidden text-sm text-muted-foreground">
-                  Archiwum wydarzeĹ„
+                  Archiwum wydarzeń
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Przegladaj zakonczone wydarzenia tej organizacji w osobnym
+                  Przeglądaj zakończone wydarzenia tej organizacji w osobnym
                   widoku.
                 </p>
               </div>
@@ -1304,7 +1304,7 @@ export default function OrganizationDetails() {
                 navigate(`/organizations/${organization.id}/archived-events`)
               }
             >
-              OtwĂłrz archiwum
+              Otwórz archiwum
             </Button>
           </div>
         </CollapsibleOrganizationSection>
@@ -1323,7 +1323,7 @@ export default function OrganizationDetails() {
       >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edytuj organizacjÄ™</DialogTitle>
+            <DialogTitle>Edytuj organizację</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -1353,7 +1353,7 @@ export default function OrganizationDetails() {
               </FieldError>
             </div>
             <div>
-              <Label htmlFor="organization-edit-limit">Limit wydarzen</Label>
+              <Label htmlFor="organization-edit-limit">Limit wydarzeń</Label>
               <Input
                 id="organization-edit-limit"
                 type="number"
@@ -1380,8 +1380,8 @@ export default function OrganizationDetails() {
                 {limitErrors.event_limit}
               </FieldError>
               <p className="mt-2 text-xs text-muted-foreground">
-                Minimalny limit to {totalOrganizationEvents}, bo tyle wydarzen,
-                lacznie z archiwalnymi, jest juz przypisanych.
+                Minimalny limit to {totalOrganizationEvents}, ponieważ tyle wydarzeń,
+                łącznie z archiwalnymi, jest już przypisanych.
               </p>
             </div>
             <FieldError id="organization-edit-form-error">
@@ -1412,12 +1412,12 @@ export default function OrganizationDetails() {
       >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Limit wydarzeĹ„</DialogTitle>
+            <DialogTitle>Limit wydarzeń</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label htmlFor="organization-event-limit">
-                Limit wydarzeĹ„ dla organizacji
+                Limit wydarzeń dla organizacji
               </Label>
               <Input
                 id="organization-event-limit"
@@ -1446,8 +1446,8 @@ export default function OrganizationDetails() {
               </FieldError>
             </div>
             <p className="text-xs text-muted-foreground">
-              Minimalny dozwolony limit to {totalOrganizationEvents}, bo tyle
-              wydarzeĹ„, Ĺ‚Ä…cznie z archiwalnymi, jest juĹĽ przypisanych do tej
+              Minimalny dozwolony limit to {totalOrganizationEvents}, ponieważ tyle
+              wydarzeń, łącznie z archiwalnymi, jest już przypisanych do tej
               organizacji.
             </p>
             <FieldError id="organization-limit-form-error">
@@ -1468,14 +1468,14 @@ export default function OrganizationDetails() {
       >
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>UsunÄ…Ä‡ organizacjÄ™?</AlertDialogTitle>
+            <AlertDialogTitle>Usunąć organizację?</AlertDialogTitle>
             <AlertDialogDescription>
               Organizacja{" "}
               <span className="font-medium text-foreground">
                 {organization.name}
               </span>{" "}
-              zostanie usuniÄ™ta tylko wtedy, gdy nie ma juĹĽ przypisanych
-              wydarzeĹ„ ani uĹĽytkownikĂłw. Tej operacji nie da siÄ™ cofnÄ…Ä‡.
+              zostanie usunięta tylko wtedy, gdy nie ma już przypisanych
+              wydarzeń ani użytkowników. Tej operacji nie da się cofnąć.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1485,7 +1485,7 @@ export default function OrganizationDetails() {
               disabled={isDeletingOrganization || !canDeleteOrganization}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              UsuĹ„ organizacjÄ™
+              Usuń organizację
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1502,15 +1502,15 @@ export default function OrganizationDetails() {
       >
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>UsunÄ…Ä‡ konto?</AlertDialogTitle>
+            <AlertDialogTitle>Usunąć konto?</AlertDialogTitle>
             <AlertDialogDescription>
               Konto{" "}
               <span className="font-medium text-foreground">
                 {selectedActionUser?.name}
               </span>{" "}
-              zostanie usuniÄ™te z widoku organizacji. W backendzie konto
-              zostanie zarchiwizowane, ta osoba nie zaloguje siÄ™ juĹĽ na stare
-              konto, a ten email bÄ™dzie moĹĽna wykorzystaÄ‡ ponownie.
+              zostanie usunięte z widoku organizacji. W backendzie konto
+              zostanie zarchiwizowane. Ta osoba nie zaloguje się już na stare
+              konto, a ten adres e-mail będzie można wykorzystać ponownie.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1520,7 +1520,7 @@ export default function OrganizationDetails() {
               disabled={isArchivingUser || !selectedActionUser}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              UsuĹ„ konto
+              Usuń konto
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1537,13 +1537,13 @@ export default function OrganizationDetails() {
       >
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>WysĹ‚aÄ‡ reset hasĹ‚a?</AlertDialogTitle>
+            <AlertDialogTitle>Wysłać reset hasła?</AlertDialogTitle>
             <AlertDialogDescription>
               Do{" "}
               <span className="font-medium text-foreground">
                 {selectedActionUser?.email}
               </span>{" "}
-              zostanie wysĹ‚any email z linkiem do ustawienia nowego hasĹ‚a dla
+              zostanie wysłany e-mail z linkiem do ustawienia nowego hasła dla
               konta{" "}
               <span className="font-medium text-foreground">
                 {selectedActionUser?.name}
@@ -1557,7 +1557,7 @@ export default function OrganizationDetails() {
               onClick={() => void handleTriggerPasswordReset()}
               disabled={isSendingPasswordReset || !selectedActionUser}
             >
-              WyĹ›lij reset hasĹ‚a
+              Wyślij reset hasła
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1579,7 +1579,7 @@ export default function OrganizationDetails() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="scanner-edit-name">ImiÄ™ i nazwisko</Label>
+              <Label htmlFor="scanner-edit-name">Imię i nazwisko</Label>
               <Input
                 id="scanner-edit-name"
                 value={scannerDraft.name}
@@ -1658,8 +1658,8 @@ export default function OrganizationDetails() {
                   disabled={isChangingScannerRole || isSavingScanner}
                 >
                   {selectedScanner.role === "scanner"
-                    ? "ZmieĹ„ na Operator Plus"
-                    : "ZmieĹ„ na Operator"}
+                    ? "Zmień na Operator Plus"
+                    : "Zmień na Operator"}
                 </Button>
               </div>
             )}
@@ -1729,7 +1729,7 @@ export default function OrganizationDetails() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="organization-member-name">ImiÄ™ i nazwisko</Label>
+              <Label htmlFor="organization-member-name">Imię i nazwisko</Label>
               <Input
                 id="organization-member-name"
                 value={memberForm.name}
@@ -1788,8 +1788,8 @@ export default function OrganizationDetails() {
               </FieldError>
             </div>
             <p className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              Po zapisaniu konto zostanie utworzone, a uĹĽytkownik dostanie mail
-              z linkiem do ustawienia hasĹ‚a.
+              Po zapisaniu konto zostanie utworzone, a użytkownik dostanie e-mail
+              z linkiem do ustawienia hasła.
             </p>
             {isScannerRole(memberForm.role) &&
               assignableScannerEvents.length > 0 && (
@@ -1819,8 +1819,8 @@ export default function OrganizationDetails() {
             {isScannerRole(memberForm.role) &&
               assignableScannerEvents.length === 0 && (
                 <p className="rounded-xl border border-dashed px-3 py-3 text-xs text-muted-foreground">
-                  Operatora moĹĽna przypisaÄ‡ tylko do aktualnie otwartych lub
-                  przyszĹ‚ych wydarzeĹ„.
+                  Operatora można przypisać tylko do aktualnie otwartych lub
+                  przyszłych wydarzeń.
                 </p>
               )}
             <FieldError id="organization-member-form-error">
@@ -1874,7 +1874,7 @@ export default function OrganizationDetails() {
               </div>
             ) : (
               <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                Brak aktualnie otwartych lub przyszĹ‚ych wydarzeĹ„ do przypisania.
+                Brak aktualnie otwartych lub przyszłych wydarzeń do przypisania.
               </div>
             )}
           </div>
@@ -1963,7 +1963,7 @@ export default function OrganizationDetails() {
             </div>
             <div>
               <Label htmlFor="organization-event-office-open">
-                Data i godzina otwarcia biura zawodĂłw
+                Data i godzina otwarcia biura zawodów
               </Label>
               <DateTimePicker
                 id="organization-event-office-open"
@@ -1997,7 +1997,7 @@ export default function OrganizationDetails() {
             </div>
             <div>
               <Label htmlFor="organization-event-office-close">
-                Data i godzina zamkniÄ™cia biura zawodĂłw
+                Data i godzina zamknięcia biura zawodów
               </Label>
               <DateTimePicker
                 id="organization-event-office-close"
@@ -2031,7 +2031,7 @@ export default function OrganizationDetails() {
             <p className="text-xs text-muted-foreground">
               Limit organizacji: {formatEventCount(organization.event_limit)}.
               Utworzono {formatEventCount(totalOrganizationEvents)}.
-              Limit obejmuje tak\u017ce wydarzenia archiwalne.
+              Limit obejmuje także wydarzenia archiwalne.
             </p>
             <FieldError id="organization-event-form-error">
               {eventErrors.form}
