@@ -1,9 +1,8 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
@@ -56,12 +55,20 @@ import {
   getActiveParticipantMappings,
 } from "@/lib/participant-fields";
 import { formatBibNumber } from "@/lib/participants";
+import { ParticipantBibNumberConflictDialog } from "@/components/ParticipantBibNumberConflictDialog";
 import {
   getParticipantStatusDefinition,
   PARTICIPANT_STATUS_DEFINITIONS,
 } from "@/lib/participant-status";
 import { validateEmail, validateRequired } from "@/lib/form-validation";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
+import {
+  canManageParticipantData as canManageParticipantDataForRole,
+  canUseParticipantAdminActions,
+} from "@/lib/roles";
+import {
+  buildEventParticipantsPath,
+} from "@/lib/routes";
 
 function formatParticipantDateTime(value: string): string {
   const normalizedValue = value.includes(" ") ? value.replace(" ", "T") : value;
@@ -78,15 +85,6 @@ function formatParticipantDateTime(value: string): string {
     minute: "2-digit",
     second: "2-digit",
   }).format(parsed);
-}
-
-function getParticipantInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
 }
 
 function getTimelineIcon(action: string) {
@@ -106,10 +104,11 @@ function getTimelineIcon(action: string) {
 }
 
 export default function ParticipantDetails() {
-  const { id } = useParams<{ id: string }>();
-  const location = useLocation();
+  const { id: routeEventId = "", participantId = "" } = useParams<{
+    id: string;
+    participantId: string;
+  }>();
   const navigate = useNavigate();
-  const routeEventId = new URLSearchParams(location.search).get("eventId") ?? "";
   const {
     participants,
     events,
@@ -126,7 +125,7 @@ export default function ParticipantDetails() {
     isLoading,
     connectionState,
   } = useData();
-  const participant = participants.find((entry) => entry.id === id);
+  const participant = participants.find((entry) => entry.id === participantId);
   const event = events.find((entry) => entry.id === participant?.event_id);
   const [qrPreview, setQrPreview] = useState<ParticipantQrPreview | null>(null);
   const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
@@ -158,14 +157,8 @@ export default function ParticipantDetails() {
   const [isSavingTransfer, setIsSavingTransfer] = useState(false);
   const [isDeletingParticipant, setIsDeletingParticipant] = useState(false);
   const canManageParticipantData =
-    currentRole === "editor" ||
-    currentRole === "admin" ||
-    currentRole === "superadmin" ||
-    currentRole === "scanner_plus";
-  const canUseAdminActions =
-    currentRole === "editor" ||
-    currentRole === "admin" ||
-    currentRole === "superadmin";
+    canManageParticipantDataForRole(currentRole);
+  const canUseAdminActions = canUseParticipantAdminActions(currentRole);
   const isOnline = connectionState === "online";
 
   useEffect(() => {
@@ -319,12 +312,12 @@ export default function ParticipantDetails() {
     );
 
   const participantEventId = routeEventId || participant.event_id || event?.id || "";
-  const backTo =
-    location.state?.backTo ??
-    (participantEventId ? `/events/${participantEventId}` : "/participants");
-  const backLabel =
-    location.state?.backLabel ??
-    (participantEventId ? "Wróć do wydarzenia" : "Wróć do uczestników");
+  const backTo = participantEventId
+    ? buildEventParticipantsPath(participantEventId)
+    : "/events";
+  const backLabel = participantEventId
+    ? "Wróć do uczestników"
+    : "Wróć do wydarzeń";
 
   const statusDefinition = getParticipantStatusDefinition(participant.status);
   const normalizedBibNumberValue = bibNumberValue.trim();
@@ -527,18 +520,10 @@ export default function ParticipantDetails() {
     toast({ title: "Uczestnik usunięty" });
     navigate(
       participant.event_id
-        ? `/participants?eventId=${participant.event_id}`
-        : "/participants",
+        ? buildEventParticipantsPath(participant.event_id)
+        : "/events",
     );
   };
-
-  const hasSingleBibConflict = bibNumberConflictParticipants.length === 1;
-  const conflictDeleteButtonLabel = hasSingleBibConflict
-    ? "Przenieś numer i usuń poprzedniego uczestnika"
-    : "Przenieś numer i usuń poprzednich uczestników";
-  const conflictKeepButtonLabel = hasSingleBibConflict
-    ? "Zachowaj numer u obu uczestników"
-    : "Zachowaj numer u wszystkich uczestników";
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -924,7 +909,7 @@ export default function ParticipantDetails() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog
+      <ParticipantBibNumberConflictDialog
         open={bibNumberConflictOpen}
         onOpenChange={(nextOpen) => {
           setBibNumberConflictOpen(nextOpen);
@@ -933,105 +918,12 @@ export default function ParticipantDetails() {
             setBibNumberConflictParticipants([]);
           }
         }}
-      >
-        <AlertDialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
-          <AlertDialogHeader className="shrink-0 px-4 pt-4 text-left sm:px-6 sm:pt-6">
-            <AlertDialogTitle className="text-lg sm:text-xl">
-              Ten numer jest już używany
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm leading-6">
-              Numer{" "}
-              <span className="font-semibold text-foreground">
-                {formatBibNumber(
-                  pendingBibNumberCandidate,
-                  pendingBibNumberCandidate || "bez numeru",
-                )}
-              </span>{" "}
-              ma już{" "}
-              {bibNumberConflictParticipants.length === 1
-                ? "innego uczestnika"
-                : `${bibNumberConflictParticipants.length} uczestników`}
-              .
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <div className="themed-scrollbar flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-            <div className="space-y-2">
-              {bibNumberConflictParticipants.map((conflictParticipant) => (
-                <div
-                  key={conflictParticipant.id}
-                  className="flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="text-xs font-semibold">
-                        {getParticipantInitials(conflictParticipant.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-foreground">
-                        {conflictParticipant.name}
-                      </p>
-                      <p className="truncate text-sm text-muted-foreground">
-                        {conflictParticipant.email}
-                      </p>
-                    </div>
-                  </div>
-                  <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <a
-                      href={`/participants/${conflictParticipant.id}?eventId=${encodeURIComponent(conflictParticipant.event_id)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Otwórz profil
-                    </a>
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <AlertDialogFooter className="!flex-col shrink-0 gap-2 border-t px-4 py-4 sm:px-6">
-            <div className="w-full space-y-2 sm:px-1">
-              {canUseAdminActions && (
-                <Button
-                  className="w-full"
-                  variant="destructive"
-                  onClick={() =>
-                    void handleResolveBibNumberConflict("delete_conflicts")
-                  }
-                  disabled={isSavingBibNumber}
-                >
-                  {isSavingBibNumber ? (
-                    <Loader2 className="hidden h-4 w-4 animate-spin sm:inline-flex" />
-                  ) : (
-                    <Trash2 className="hidden h-4 w-4 sm:inline-flex" />
-                  )}
-                  {conflictDeleteButtonLabel}
-                </Button>
-              )}
-
-              <Button
-                className="w-full"
-                onClick={() =>
-                  void handleResolveBibNumberConflict("keep_duplicates")
-                }
-                disabled={isSavingBibNumber}
-              >
-                {isSavingBibNumber ? (
-                  <Loader2 className="hidden h-4 w-4 animate-spin sm:inline-flex" />
-                ) : (
-                  <Repeat className="hidden h-4 w-4 sm:inline-flex" />
-                )}
-                {conflictKeepButtonLabel}
-              </Button>
-              <AlertDialogCancel className="mt-0 w-full">
-                Cofnij
-              </AlertDialogCancel>
-            </div>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        bibNumber={pendingBibNumberCandidate}
+        conflictingParticipants={bibNumberConflictParticipants}
+        allowDeleteConflicts={canUseAdminActions}
+        isSaving={isSavingBibNumber}
+        onResolve={handleResolveBibNumberConflict}
+      />
 
       <AlertDialog open={sendQrConfirmOpen} onOpenChange={setSendQrConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">

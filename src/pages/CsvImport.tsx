@@ -16,6 +16,7 @@ import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { formatEventOfficeWindow } from '@/lib/events';
 import { validateRequired } from '@/lib/form-validation';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
+import { buildEventPath } from '@/lib/routes';
 
 type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom';
 
@@ -72,7 +73,7 @@ function decodeCsvFile(buffer: ArrayBuffer): string {
 }
 
 export default function CsvImport() {
-  const { id: routeEventId } = useParams<{ id: string }>();
+  const { id: routeEventId = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const {
     events,
@@ -84,7 +85,7 @@ export default function CsvImport() {
     isLoading,
     connectionState,
   } = useData();
-  const eventId = routeEventId ?? selectedEventId;
+  const eventId = routeEventId || selectedEventId;
   const event = events.find(item => item.id === eventId);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -272,7 +273,7 @@ export default function CsvImport() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate(`/events/${eventId}`)}
+            onClick={() => navigate(buildEventPath(eventId))}
             className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
           >
             <ArrowLeft className="mr-1 h-4 w-4" /> Wróć do wydarzenia

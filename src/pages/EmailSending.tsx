@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle, Info, Loader2, Mail, RefreshCcw,
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
+import { buildEventPath } from '@/lib/routes';
 
 type PendingEmailAction =
   | { kind: 'send-missing'; count: number }
@@ -27,7 +28,7 @@ type PendingEmailAction =
 
 export default function EmailSending() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { id: routeEventId = '' } = useParams<{ id: string }>();
   const {
     participants,
     events,
@@ -43,10 +44,7 @@ export default function EmailSending() {
   const [sendingParticipantId, setSendingParticipantId] = useState<string | null>(null);
   const [lastErrors, setLastErrors] = useState<Array<{ participant_name: string; error: string }>>([]);
   const [pendingAction, setPendingAction] = useState<PendingEmailAction | null>(null);
-  const routeEventId = searchParams.get('eventId') ?? '';
-  const activeEventId = events.some(event => event.id === routeEventId)
-    ? routeEventId
-    : selectedEventId;
+  const activeEventId = routeEventId || selectedEventId;
 
   useEffect(() => {
     if (!routeEventId || routeEventId === selectedEventId) {
@@ -126,7 +124,7 @@ export default function EmailSending() {
   return (
     <div className="space-y-6">
       <div>
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/events/${activeEventId}`)} className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
+        <Button variant="ghost" size="sm" onClick={() => navigate(buildEventPath(activeEventId))} className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
           >
         <ArrowLeft className="h-4 w-4 mr-1" /> Wróć do wydarzenia
       </Button>

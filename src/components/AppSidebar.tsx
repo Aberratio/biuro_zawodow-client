@@ -48,6 +48,12 @@ import {
 import type { Role } from "@/types";
 import { isEventOfficeOpen } from "@/lib/events";
 import { isScannerRole } from "@/lib/roles";
+import {
+  buildEventEmailsPath,
+  buildEventImportPath,
+  buildEventParticipantsPath,
+  buildEventPath,
+} from "@/lib/routes";
 
 const allItems = [
   {
@@ -176,7 +182,7 @@ export function AppSidebar() {
 
   const handleEventChange = (eventId: string) => {
     setSelectedEventId(eventId);
-    navigate(`/events/${eventId}`);
+    navigate(buildEventPath(eventId));
   };
 
   const handleLogoClick = () => {
@@ -317,7 +323,7 @@ export function AppSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
                 <NavLink
-                  to={`/events/${selectedEvent.id}`}
+                  to={buildEventPath(selectedEvent.id)}
                   end
                   className={workspaceNavItemClassName}
                   activeClassName={workspaceNavItemActiveClassName}
@@ -333,12 +339,14 @@ export function AppSidebar() {
                   <NavLink
                     to={
                       item.url === "/import"
-                        ? `/events/${selectedEvent.id}/import`
-                        : item.url === "/participants" || item.url === "/emails"
-                          ? `${item.url}?eventId=${selectedEvent.id}`
+                        ? buildEventImportPath(selectedEvent.id)
+                        : item.url === "/participants"
+                          ? buildEventParticipantsPath(selectedEvent.id)
+                          : item.url === "/emails"
+                            ? buildEventEmailsPath(selectedEvent.id)
                           : item.url
                     }
-                    end={item.url !== "/import"}
+                    end={item.url !== "/participants"}
                     className={workspaceNavItemClassName}
                     activeClassName={workspaceNavItemActiveClassName}
                   >

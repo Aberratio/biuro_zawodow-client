@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +56,12 @@ import {
 import { validateEmail, validateRequired } from "@/lib/form-validation";
 import { isScannerRole } from "@/lib/roles";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
+import {
+  buildEventImportPath,
+  buildEventParticipantPath,
+  buildEventParticipantsPath,
+  buildEventPath,
+} from "@/lib/routes";
 
 type ParticipantSortKey = "name" | "email" | "bib_number" | "status";
 type SortDirection = "asc" | "desc";
@@ -74,7 +80,7 @@ export default function Participants() {
     refreshData,
   } = useData();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { id: routeEventId = "" } = useParams<{ id: string }>();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortKey, setSortKey] = useState<ParticipantSortKey>("name");
@@ -90,10 +96,7 @@ export default function Participants() {
     form?: string;
   }>({ fields: {} });
   const isOnline = connectionState === "online";
-  const routeEventId = searchParams.get("eventId") ?? "";
-  const activeEventId = events.some((event) => event.id === routeEventId)
-    ? routeEventId
-    : selectedEventId;
+  const activeEventId = routeEventId || selectedEventId;
 
   useEffect(() => {
     if (!routeEventId || routeEventId === selectedEventId) {
@@ -278,7 +281,7 @@ export default function Participants() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate(`/events/${activeEventId}`)}
+            onClick={() => navigate(buildEventPath(activeEventId))}
             className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
           >
             <ArrowLeft className="h-4 w-4 mr-1" /> Wróć do wydarzenia
@@ -307,7 +310,7 @@ export default function Participants() {
           {canImportParticipants && (
             <Button
               variant="outline"
-              onClick={() => navigate(`/events/${activeEventId}/import`)}
+              onClick={() => navigate(buildEventImportPath(activeEventId))}
               disabled={!isOnline}
               className="h-11 w-full sm:h-10 sm:w-auto"
             >
@@ -400,9 +403,11 @@ export default function Participants() {
                     key={participant.id}
                     className="cursor-pointer active:bg-accent/50"
                     onClick={() =>
-                      navigate(`/participants/${participant.id}?eventId=${encodeURIComponent(participant.event_id)}`, {
+                      navigate(buildEventParticipantPath(participant.event_id, participant.id), {
                         state: {
-                          backTo: `/events/${participant.event_id}`,
+                          backTo: buildEventParticipantsPath(
+                            participant.event_id,
+                          ),
                           backLabel: "Wróć do wydarzenia",
                         },
                       })

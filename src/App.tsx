@@ -51,16 +51,6 @@ function HomeRoute() {
   return <Dashboard />;
 }
 
-function ScannerParticipantsRoute() {
-  const { currentRole, visibleEvents } = useData();
-
-  if (isScannerRole(currentRole) && visibleEvents.length === 0) {
-    return <Navigate to="/scanner-info" replace />;
-  }
-
-  return <Participants />;
-}
-
 function ScannerRoute() {
   const { currentRole, visibleEvents } = useData();
 
@@ -83,16 +73,6 @@ function ScannerInfoRoute() {
   }
 
   return <ScannerInfo />;
-}
-
-function ImportRedirect() {
-  const { selectedEventId } = useData();
-
-  if (!selectedEventId) {
-    return <NotFound />;
-  }
-
-  return <Navigate to={`/events/${selectedEventId}/import`} replace />;
 }
 
 function EventAccessRoute({
@@ -130,7 +110,10 @@ function EventAccessRoute({
 }
 
 function ParticipantAccessRoute({ children }: { children: JSX.Element }) {
-  const { id } = useParams<{ id: string }>();
+  const { id, participantId } = useParams<{
+    id: string;
+    participantId: string;
+  }>();
   const { participants, canAccessEvent, isLoading } = useData();
 
   if (isLoading) {
@@ -141,12 +124,16 @@ function ParticipantAccessRoute({ children }: { children: JSX.Element }) {
     );
   }
 
-  const participant = participants.find((entry) => entry.id === id);
+  const participant = participants.find((entry) => entry.id === participantId);
   if (!participant) {
     return <NotFound />;
   }
 
-  if (!participant.event_id || !canAccessEvent(participant.event_id)) {
+  if (participant.event_id !== id) {
+    return <NotFound />;
+  }
+
+  if (!participant.event_id || !canAccessEvent(id)) {
     return <Forbidden />;
   }
 
@@ -205,19 +192,32 @@ function ProtectedAppRoutes() {
               </EventAccessRoute>
             }
           />
-          <Route path="/participants" element={<ScannerParticipantsRoute />} />
           <Route
-            path="/participants/:id"
+            path="/events/:id/participants"
+            element={
+              <EventAccessRoute>
+                <Participants />
+              </EventAccessRoute>
+            }
+          />
+          <Route
+            path="/events/:id/participants/:participantId"
             element={
               <ParticipantAccessRoute>
                 <ParticipantDetails />
               </ParticipantAccessRoute>
             }
           />
+          <Route
+            path="/events/:id/emails"
+            element={
+              <EventAccessRoute>
+                <EmailSending />
+              </EventAccessRoute>
+            }
+          />
           <Route path="/scanner" element={<ScannerRoute />} />
           <Route path="/scanner-info" element={<ScannerInfoRoute />} />
-          <Route path="/import" element={<ImportRedirect />} />
-          <Route path="/emails" element={<EmailSending />} />
           <Route path="/organizations" element={<Organizations />} />
           <Route
             path="/organizations/:id"
