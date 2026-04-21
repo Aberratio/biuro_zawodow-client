@@ -37,6 +37,7 @@ import {
   FileUp,
   Loader2,
   Plus,
+  RefreshCcw,
   Search,
   UserPlus,
 } from "lucide-react";
@@ -70,6 +71,7 @@ export default function Participants() {
     getParticipantFieldMappings,
     addParticipantManually,
     connectionState,
+    refreshData,
   } = useData();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -286,6 +288,22 @@ export default function Participants() {
           </h1>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => void refreshData()}
+            disabled={!activeEventId || !isOnline || isLoading}
+            title={
+              !isOnline
+                ? "Odświeżanie danych wymaga połączenia z serwerem."
+                : undefined
+            }
+            className="h-11 w-full sm:h-10 sm:w-auto"
+          >
+            <RefreshCcw
+              className={`h-4 w-4 mr-1 ${isLoading ? "animate-spin" : ""}`}
+            />
+            Odśwież dane
+          </Button>
           {canImportParticipants && (
             <Button
               variant="outline"
@@ -307,6 +325,12 @@ export default function Participants() {
           )}
         </div>
       </div>
+
+      {!isOnline && (
+        <p className="text-xs text-muted-foreground sm:text-right">
+          Odświeżanie listy z bazy jest niedostępne bez połączenia z serwerem.
+        </p>
+      )}
 
       {!isOnline && !isScannerRole(currentRole) && (
         <OnlineOnlyNotice description="Import CSV i ręczne dodawanie uczestników są dostępne tylko po połączeniu z serwerem. Lista pozostaje dostępna do odczytu z lokalnego snapshotu." />
@@ -376,7 +400,7 @@ export default function Participants() {
                     key={participant.id}
                     className="cursor-pointer active:bg-accent/50"
                     onClick={() =>
-                      navigate(`/participants/${participant.id}`, {
+                      navigate(`/participants/${participant.id}?eventId=${encodeURIComponent(participant.event_id)}`, {
                         state: {
                           backTo: `/events/${participant.event_id}`,
                           backLabel: "Wróć do wydarzenia",

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
@@ -79,6 +80,15 @@ function formatParticipantDateTime(value: string): string {
   }).format(parsed);
 }
 
+function getParticipantInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 function getTimelineIcon(action: string) {
   const normalizedAction = action.toLocaleLowerCase("pl-PL");
 
@@ -99,6 +109,7 @@ export default function ParticipantDetails() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const routeEventId = new URLSearchParams(location.search).get("eventId") ?? "";
   const {
     participants,
     events,
@@ -307,12 +318,13 @@ export default function ParticipantDetails() {
       </div>
     );
 
+  const participantEventId = routeEventId || participant.event_id || event?.id || "";
   const backTo =
     location.state?.backTo ??
-    (participant.event_id ? `/events/${participant.event_id}` : "/participants");
+    (participantEventId ? `/events/${participantEventId}` : "/participants");
   const backLabel =
     location.state?.backLabel ??
-    (participant.event_id ? "Wróć do wydarzenia" : "Wróć do uczestników");
+    (participantEventId ? "Wróć do wydarzenia" : "Wróć do uczestników");
 
   const statusDefinition = getParticipantStatusDefinition(participant.status);
   const normalizedBibNumberValue = bibNumberValue.trim();
@@ -519,6 +531,14 @@ export default function ParticipantDetails() {
         : "/participants",
     );
   };
+
+  const hasSingleBibConflict = bibNumberConflictParticipants.length === 1;
+  const conflictDeleteButtonLabel = hasSingleBibConflict
+    ? "Przenieś numer i usuń poprzedniego uczestnika"
+    : "Przenieś numer i usuń poprzednich uczestników";
+  const conflictKeepButtonLabel = hasSingleBibConflict
+    ? "Zachowaj numer u obu uczestników"
+    : "Zachowaj numer u wszystkich uczestników";
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -914,77 +934,100 @@ export default function ParticipantDetails() {
           }
         }}
       >
-        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Ten numer jest już używany</AlertDialogTitle>
-            <AlertDialogDescription>
-              Numer startowy{" "}
-              <span className="font-medium text-foreground">
+        <AlertDialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-2xl">
+          <AlertDialogHeader className="shrink-0 px-4 pt-4 text-left sm:px-6 sm:pt-6">
+            <AlertDialogTitle className="text-lg sm:text-xl">
+              Ten numer jest już używany
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm leading-6">
+              Numer{" "}
+              <span className="font-semibold text-foreground">
                 {formatBibNumber(
                   pendingBibNumberCandidate,
                   pendingBibNumberCandidate || "bez numeru",
                 )}
               </span>{" "}
-              jest już przypisany do{" "}
+              ma już{" "}
               {bibNumberConflictParticipants.length === 1
                 ? "innego uczestnika"
-                : `innych uczestników (${bibNumberConflictParticipants.length})`}
-              . Wybierz, co zrobić dalej.
+                : `${bibNumberConflictParticipants.length} uczestników`}
+              .
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-3">
-            {bibNumberConflictParticipants.map((conflictParticipant) => (
-              <div
-                key={conflictParticipant.id}
-                className="rounded-xl border px-4 py-3"
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="font-medium">{conflictParticipant.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {conflictParticipant.email}
-                    </p>
+
+          <div className="themed-scrollbar flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+            <div className="space-y-2">
+              {bibNumberConflictParticipants.map((conflictParticipant) => (
+                <div
+                  key={conflictParticipant.id}
+                  className="flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="text-xs font-semibold">
+                        {getParticipantInitials(conflictParticipant.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-foreground">
+                        {conflictParticipant.name}
+                      </p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {conflictParticipant.email}
+                      </p>
+                    </div>
                   </div>
-                  <a
-                    href={`/participants/${conflictParticipant.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex h-9 items-center justify-center rounded-md border px-3 text-sm font-medium transition-colors hover:bg-accent"
-                  >
-                    Otwórz profil
-                  </a>
+                  <Button variant="outline" asChild className="w-full sm:w-auto">
+                    <a
+                      href={`/participants/${conflictParticipant.id}?eventId=${encodeURIComponent(conflictParticipant.event_id)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Otwórz profil
+                    </a>
+                  </Button>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-          <AlertDialogFooter className="gap-2 sm:justify-between">
-            <AlertDialogCancel>Cofnij operację</AlertDialogCancel>
-            <div className="flex flex-col gap-2 sm:flex-row">
+
+          <AlertDialogFooter className="!flex-col shrink-0 gap-2 border-t px-4 py-4 sm:px-6">
+            <div className="w-full space-y-2 sm:px-1">
               {canUseAdminActions && (
                 <Button
+                  className="w-full"
                   variant="destructive"
                   onClick={() =>
                     void handleResolveBibNumberConflict("delete_conflicts")
                   }
                   disabled={isSavingBibNumber}
                 >
-                  {isSavingBibNumber && (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  {isSavingBibNumber ? (
+                    <Loader2 className="hidden h-4 w-4 animate-spin sm:inline-flex" />
+                  ) : (
+                    <Trash2 className="hidden h-4 w-4 sm:inline-flex" />
                   )}
-                  Przenieś numer i usuń pozostałych uczestników
+                  {conflictDeleteButtonLabel}
                 </Button>
               )}
+
               <Button
+                className="w-full"
                 onClick={() =>
                   void handleResolveBibNumberConflict("keep_duplicates")
                 }
                 disabled={isSavingBibNumber}
               >
-                {isSavingBibNumber && (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                {isSavingBibNumber ? (
+                  <Loader2 className="hidden h-4 w-4 animate-spin sm:inline-flex" />
+                ) : (
+                  <Repeat className="hidden h-4 w-4 sm:inline-flex" />
                 )}
-                Zachowaj ten numer u wszystkich
+                {conflictKeepButtonLabel}
               </Button>
+              <AlertDialogCancel className="mt-0 w-full">
+                Cofnij
+              </AlertDialogCancel>
             </div>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -41,6 +41,7 @@ function AuthConsumer() {
 describe('AuthProvider offline session handling', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+    window.localStorage.clear();
   });
 
   afterEach(() => {
@@ -142,5 +143,39 @@ describe('AuthProvider offline session handling', () => {
     await waitFor(() => expect(screen.getByTestId('session-state').textContent).toBe('expired'));
     expect(screen.getByTestId('auth-state').textContent).toBe('anonymous');
     expect(screen.getByTestId('user-id').textContent).toBe('');
+  });
+
+  it('restores the session from localStorage when a new tab has no sessionStorage state', async () => {
+    const token = createToken(3600);
+    window.localStorage.setItem('auth_token', token);
+    window.localStorage.setItem('auth_user', JSON.stringify({
+      id: 'user-1',
+      name: 'Persisted User',
+      email: 'persisted@example.com',
+      password: '',
+      role: 'admin',
+      assigned_events: [],
+    }));
+
+    vi.stubGlobal('fetch', vi.fn(async () => createJsonResponse(200, {
+      data: {
+        id: 'user-1',
+        name: 'Persisted User',
+        email: 'persisted@example.com',
+        role: 'admin',
+        assigned_events: [],
+      },
+    })));
+
+    render(
+      <AuthProvider>
+        <AuthConsumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('session-state').textContent).toBe('online'));
+    expect(screen.getByTestId('auth-state').textContent).toBe('authenticated');
+    expect(screen.getByTestId('user-id').textContent).toBe('user-1');
+    expect(window.sessionStorage.getItem('auth_token')).toBe(token);
   });
 });

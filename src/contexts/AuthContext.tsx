@@ -44,9 +44,54 @@ function normalizeUser(user: (Omit<User, 'password'> & { password?: string }) | 
   };
 }
 
+function readStoredValue(key: string): string | null {
+  try {
+    const sessionValue = sessionStorage.getItem(key);
+    if (sessionValue) {
+      return sessionValue;
+    }
+  } catch {
+    // Ignore unavailable sessionStorage and fall back below.
+  }
+
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function persistStoredValue(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // Ignore unavailable sessionStorage and continue below.
+  }
+
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore unavailable localStorage.
+  }
+}
+
+function clearStoredValue(key: string): void {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // Ignore unavailable sessionStorage and continue below.
+  }
+
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Ignore unavailable localStorage.
+  }
+}
+
 function loadUser(): User | null {
   try {
-    const stored = sessionStorage.getItem(AUTH_USER_KEY);
+    const stored = readStoredValue(AUTH_USER_KEY);
     if (!stored) return null;
     return normalizeUser(JSON.parse(stored) as User);
   } catch {
@@ -56,7 +101,7 @@ function loadUser(): User | null {
 
 function loadToken(): string | null {
   try {
-    return sessionStorage.getItem(AUTH_TOKEN_KEY);
+    return readStoredValue(AUTH_TOKEN_KEY);
   } catch {
     return null;
   }
@@ -82,12 +127,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setSessionState('expired');
 
-    try {
-      sessionStorage.removeItem(AUTH_USER_KEY);
-      sessionStorage.removeItem(AUTH_TOKEN_KEY);
-    } catch {
-      // Ignore unavailable sessionStorage.
-    }
+    clearStoredValue(AUTH_USER_KEY);
+    clearStoredValue(AUTH_TOKEN_KEY);
 
     if (currentUserId) {
       void clearOfflineData(API_BASE_URL, currentUserId);
@@ -98,8 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(nextUser);
     setToken(nextToken);
     setSessionState(nextSessionState);
-    sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
-    sessionStorage.setItem(AUTH_TOKEN_KEY, nextToken);
+    persistStoredValue(AUTH_USER_KEY, JSON.stringify(nextUser));
+    persistStoredValue(AUTH_TOKEN_KEY, nextToken);
   }, []);
 
   const getAuthHeaders = useCallback((includeJsonContentType = false) => {
