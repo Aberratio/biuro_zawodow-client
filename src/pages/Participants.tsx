@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +62,9 @@ type SortDirection = "asc" | "desc";
 export default function Participants() {
   const {
     participants,
+    events,
     selectedEventId,
+    setSelectedEventId,
     currentRole,
     isLoading,
     getParticipantFieldMappings,
@@ -70,6 +72,7 @@ export default function Participants() {
     connectionState,
   } = useData();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortKey, setSortKey] = useState<ParticipantSortKey>("name");
@@ -85,13 +88,27 @@ export default function Participants() {
     form?: string;
   }>({ fields: {} });
   const isOnline = connectionState === "online";
+  const routeEventId = searchParams.get("eventId") ?? "";
+  const activeEventId = events.some((event) => event.id === routeEventId)
+    ? routeEventId
+    : selectedEventId;
+
+  useEffect(() => {
+    if (!routeEventId || routeEventId === selectedEventId) {
+      return;
+    }
+
+    if (events.some((event) => event.id === routeEventId)) {
+      setSelectedEventId(routeEventId);
+    }
+  }, [events, routeEventId, selectedEventId, setSelectedEventId]);
 
   const eventParticipants = useMemo(
     () =>
       participants.filter(
-        (participant) => participant.event_id === selectedEventId,
+        (participant) => participant.event_id === activeEventId,
       ),
-    [participants, selectedEventId],
+    [activeEventId, participants],
   );
 
   const filtered = useMemo(() => {
@@ -130,13 +147,13 @@ export default function Participants() {
   }, [filtered, sortDirection, sortKey]);
 
   useEffect(() => {
-    if (!selectedEventId || !isOnline) {
+    if (!activeEventId || !isOnline) {
       setMappings([]);
       setManualFields({});
       return;
     }
 
-    void getParticipantFieldMappings(selectedEventId)
+    void getParticipantFieldMappings(activeEventId)
       .then((data) => {
         setMappings(data);
         setManualFields(buildEmptyParticipantFieldValues(data));
@@ -145,14 +162,14 @@ export default function Participants() {
         setMappings([]);
         setManualFields({});
       });
-  }, [getParticipantFieldMappings, isOnline, selectedEventId]);
+  }, [activeEventId, getParticipantFieldMappings, isOnline]);
 
   const activeMappings = useMemo(
     () => getActiveParticipantMappings(mappings),
     [mappings],
   );
   const canImportParticipants =
-    Boolean(selectedEventId) && !isScannerRole(currentRole);
+    Boolean(activeEventId) && !isScannerRole(currentRole);
   const canAddManually =
     eventParticipants.length > 0 &&
     mappings.length > 0 &&
@@ -223,7 +240,7 @@ export default function Participants() {
     setManualErrors({ fields: {} });
     setManualSaving(true);
     const result = await addParticipantManually(
-      selectedEventId,
+      activeEventId,
       manualEmail,
       manualFields,
     );
@@ -259,7 +276,7 @@ export default function Participants() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate(`/events/${selectedEventId}`)}
+            onClick={() => navigate(`/events/${activeEventId}`)}
             className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
           >
             <ArrowLeft className="h-4 w-4 mr-1" /> Wróć do wydarzenia
@@ -272,7 +289,7 @@ export default function Participants() {
           {canImportParticipants && (
             <Button
               variant="outline"
-              onClick={() => navigate(`/events/${selectedEventId}/import`)}
+              onClick={() => navigate(`/events/${activeEventId}/import`)}
               disabled={!isOnline}
               className="h-11 w-full sm:h-10 sm:w-auto"
             >
@@ -358,7 +375,14 @@ export default function Participants() {
                   <TableRow
                     key={participant.id}
                     className="cursor-pointer active:bg-accent/50"
-                    onClick={() => navigate(`/participants/${participant.id}`)}
+                    onClick={() =>
+                      navigate(`/participants/${participant.id}`, {
+                        state: {
+                          backTo: `/events/${participant.event_id}`,
+                          backLabel: "Wróć do wydarzenia",
+                        },
+                      })
+                    }
                   >
                     <TableCell>
                       <div>

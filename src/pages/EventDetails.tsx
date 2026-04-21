@@ -40,6 +40,7 @@ import {
   ChevronDown,
   Download,
   FileUp,
+  Info,
   Loader2,
   Mail,
   MapPin,
@@ -477,7 +478,12 @@ export default function EventDetails() {
   const hasAnyTeamMembers =
     assignedScanners.length > 0 || assignedScannerPlus.length > 0;
   const officeCloseAt = getEventOfficeCloseAt(event);
+  const officeOpenAt = getEventOfficeOpenAt(event);
   const isFinishedEvent = officeCloseAt !== null && now > officeCloseAt;
+  const canSendQrForEvent =
+    !isArchivedEvent &&
+    officeOpenAt !== null &&
+    now < officeOpenAt;
   const canArchiveEvent =
     canEditEvent &&
     !isArchivedEvent &&
@@ -1005,14 +1011,14 @@ export default function EventDetails() {
               </Button>
             )}
             {!isArchivedEvent && event && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedEventId(event.id);
-                  navigate("/participants");
-                }}
-                className="event-detail-secondary-action h-12 w-full"
-              >
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedEventId(event.id);
+                    navigate(`/participants?eventId=${event.id}`);
+                  }}
+                  className="event-detail-secondary-action h-12 w-full"
+                >
                 <Users className="mr-1 h-4 w-4" /> Uczestnicy
               </Button>
             )}
@@ -1135,17 +1141,19 @@ export default function EventDetails() {
                 >
                   <FileUp className="mr-1 h-4 w-4" /> Import uczestników CSV
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedEventId(event.id);
-                    navigate("/emails");
-                  }}
-                  className="event-detail-operation-button h-11 justify-start"
-                  disabled={!isOnline}
-                >
-                  <Mail className="mr-1 h-4 w-4" /> Wyślij QR do uczestników
-                </Button>
+                {canSendQrForEvent && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedEventId(event.id);
+                      navigate(`/emails?eventId=${event.id}`);
+                    }}
+                    className="event-detail-operation-button h-11 justify-start"
+                    disabled={!isOnline}
+                  >
+                    <Mail className="mr-1 h-4 w-4" /> Wyślij QR do uczestników
+                  </Button>
+                )}
                 {hasSavedMapping && (
                   <Button
                     variant="outline"
@@ -1155,6 +1163,15 @@ export default function EventDetails() {
                   >
                     <Plus className="mr-1 h-4 w-4" /> Dodaj uczestnika ręcznie
                   </Button>
+                )}
+                {isFinishedEvent && (
+                  <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>
+                      Dla zakończonych wydarzeń wysyłka kodów QR jest wyłączona,
+                      dlatego ta opcja nie jest tutaj dostępna.
+                    </p>
+                  </div>
                 )}
               </div>
             </CollapsibleSection>
