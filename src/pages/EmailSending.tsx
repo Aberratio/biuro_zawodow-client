@@ -63,6 +63,7 @@ export default function EmailSending() {
   const selectedEvent = events.find(event => event.id === activeEventId);
   const sent = eventParticipants.filter(participant => participant.email_status === 'sent').length;
   const pending = eventParticipants.length - sent;
+  const hasSentEmails = sent > 0;
   const isConfirmingAction = sendingAll || resendingAll || sendingParticipantId !== null;
   const isOnline = connectionState === 'online';
 
@@ -143,8 +144,8 @@ export default function EmailSending() {
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <div className="space-y-1 text-xs text-muted-foreground">
-              <p>"Wyślij brakujące" wyśle wiadomości tylko do uczestników bez statusu wysyłki.</p>
-              <p>"Wyślij ponownie wszystkim" wymusi ponowną wysyłkę dla całego wydarzenia.</p>
+              <p>"Wyślij brakujące" wyśle wiadomości tylko do uczestników mających status wysyłki inny niż "Wysłano".</p>
+              <p>{hasSentEmails ? '"Wyślij ponownie wszystkim" wymusi ponowną wysyłkę dla całego wydarzenia.' : '"Wyślij wszystkim" wyśle wiadomości do wszystkich uczestników wydarzenia.'}</p>
             </div>
           </div>
         </CardContent>
@@ -166,7 +167,7 @@ export default function EmailSending() {
               </Button>
               <Button variant="outline" className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'resend-all', count: eventParticipants.length })} disabled={resendingAll || eventParticipants.length === 0 || !isOnline || !activeEventId}>
                 {resendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
-                Wyślij ponownie wszystkim
+                {hasSentEmails ? 'Wyślij ponownie wszystkim' : 'Wyślij wszystkim'}
               </Button>
             </div>
           </CardContent>
@@ -238,7 +239,11 @@ export default function EmailSending() {
                         participantEmail: participant.email,
                       })}
                     >
-                      {sendingParticipantId === participant.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Wyślij ponownie'}
+                      {sendingParticipantId === participant.id
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : participant.email_status === 'sent'
+                          ? 'Wyślij ponownie'
+                          : 'Wyślij'}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -256,7 +261,9 @@ export default function EmailSending() {
               {pendingAction?.kind === 'send-one'
                 ? <>Do uczestnika <span className="font-medium text-foreground">{pendingAction.participantName}</span> zostanie wysłany mail na adres <span className="font-medium text-foreground">{pendingAction.participantEmail}</span>.</>
                 : pendingAction?.kind === 'resend-all'
-                  ? <>Ta operacja ponownie wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestników wydarzenia.</>
+                  ? <>{hasSentEmails
+                    ? <>Ta operacja ponownie wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestników wydarzenia.</>
+                    : <>Ta operacja wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestników wydarzenia.</>}</>
                   : <>Ta operacja wyśle brakujące maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia.</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
