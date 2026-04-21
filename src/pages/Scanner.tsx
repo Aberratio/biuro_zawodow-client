@@ -174,6 +174,7 @@ export default function Scanner() {
         return;
       }
 
+      const queuedLocally = result.queued === true;
       const updatedParticipant: Participant = {
         ...scannedParticipant,
         status,
@@ -187,15 +188,15 @@ export default function Scanner() {
       }
 
       toast({
-        title: connectionState === 'online' ? successTitle : 'Zmiana zapisana lokalnie',
-        description: connectionState === 'online'
-          ? scannedParticipant.name
-          : `${scannedParticipant.name} czeka na synchronizację po odzyskaniu połączenia.`,
+        title: queuedLocally ? 'Zmiana zapisana lokalnie' : successTitle,
+        description: queuedLocally
+          ? `${scannedParticipant.name} czeka na synchronizacje po odzyskaniu polaczenia.`
+          : scannedParticipant.name,
       });
     } finally {
       setIsMutating(false);
     }
-  }, [connectionState, isReadOnly, scannedParticipant, showSuccessScreen, updateParticipantStatus]);
+  }, [isReadOnly, scannedParticipant, showSuccessScreen, updateParticipantStatus]);
 
   const mappedParticipantFields = useMemo(() => {
     if (!scannedParticipant) {

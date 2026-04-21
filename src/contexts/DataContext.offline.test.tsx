@@ -226,6 +226,94 @@ describe('DataProvider offline cache and queue', () => {
     expect(screen.getByTestId('participant-sync').textContent).toBe('pending_sync');
   });
 
+  it('updates participant status directly in API when scanner is online', async () => {
+    let participantStatus = 'not_checked_in';
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url.endsWith('/bootstrap')) {
+        return createJsonResponse(200, {
+          generated_at: '2099-04-12T08:00:00.000Z',
+          snapshot_version: `snapshot-${participantStatus}`,
+          data: {
+            organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5 }],
+            events: [{
+              id: 'event-1',
+              name: 'Event 1',
+              location: 'Warsaw',
+              organization_id: 'org-1',
+              office_open_at: '2099-04-12T07:00:00',
+              office_close_at: '2099-04-12T15:00:00',
+            }],
+            archivedEvents: [],
+            users: [authState.user!],
+            participants: [{
+              id: 1,
+              event_id: 'event-1',
+              first_name: 'Anna',
+              last_name: 'Test',
+              display_name: 'Anna Test',
+              email: 'anna@example.com',
+              bib_number: '101',
+              qr_code: 'QR-101',
+              status: participantStatus,
+              email_status: 'not_sent',
+              checked_in_at: participantStatus === 'checked_in' ? '2099-04-12T09:00:00.000Z' : null,
+              custom_fields: {},
+            }],
+            activityLog: [],
+          },
+        });
+      }
+
+      if (url.endsWith('/participants/1') && init?.method === 'PATCH') {
+        participantStatus = 'checked_in';
+
+        return createJsonResponse(200, {
+          data: {
+            id: 1,
+            event_id: 'event-1',
+            first_name: 'Anna',
+            last_name: 'Test',
+            display_name: 'Anna Test',
+            email: 'anna@example.com',
+            bib_number: '101',
+            qr_code: 'QR-101',
+            status: 'checked_in',
+            email_status: 'not_sent',
+            checked_in_at: '2099-04-12T09:00:00.000Z',
+            custom_fields: {},
+          },
+        });
+      }
+
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <OfflineConsumer />
+      </DataProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('connection-state').textContent).toBe('online'));
+    await waitFor(() => expect(screen.getByTestId('participant-status').textContent).toBe('not_checked_in'));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'queue-status' }));
+    });
+
+    await waitFor(() => expect(screen.getByTestId('participant-status').textContent).toBe('checked_in'));
+    expect(screen.getByTestId('pending-count').textContent).toBe('0');
+    expect(screen.getByTestId('participant-sync').textContent).toBe('synced');
+
+    const patchCalls = fetchMock.mock.calls.filter(([input, init]) => String(input).endsWith('/participants/1') && init?.method === 'PATCH');
+    expect(patchCalls).toHaveLength(1);
+  });
+
   it('recovers from a transient bootstrap failure without a page reload', async () => {
     vi.useFakeTimers();
 

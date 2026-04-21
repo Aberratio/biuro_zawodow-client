@@ -9,7 +9,7 @@ import { isEventOfficeOpen } from '@/lib/events';
 type UserCreateInput = Omit<User, 'id' | 'password'>;
 type EventMutationInput = Omit<Event, 'id' | 'archived_at'>;
 
-interface MutationResult { ok: boolean; error?: string; entityId?: string; }
+interface MutationResult { ok: boolean; error?: string; entityId?: string; queued?: boolean; }
 interface ParticipantBibNumberConflict { bibNumber: string; conflictingParticipants: Participant[]; }
 interface ParticipantBibNumberUpdateResult extends MutationResult { conflict?: ParticipantBibNumberConflict; }
 interface EventQrEmailResult { ok: boolean; sent_count: number; error_count: number; errors: Array<{ participant_id: number; participant_name: string; error: string }>; error?: string; }
@@ -150,9 +150,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const syncStoredAuthUser = useCallback((updater: (user: User) => User) => {
     try {
-      const raw = sessionStorage.getItem('auth_user');
+      const raw = sessionStorage.getItem('auth_user') ?? localStorage.getItem('auth_user');
       if (!raw) return;
-      sessionStorage.setItem('auth_user', JSON.stringify(updater(JSON.parse(raw) as User)));
+
+      const nextValue = JSON.stringify(updater(JSON.parse(raw) as User));
+      sessionStorage.setItem('auth_user', nextValue);
+      localStorage.setItem('auth_user', nextValue);
     } catch {}
   }, []);
 
@@ -240,7 +243,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const scopedEvents = nextCurrentUser.role === 'admin' ? nextVisibleEvents.filter(event => event.organization_id === nextSelectedOrganization) : nextVisibleEvents;
     const preferredEvt = readStoredSelectedEventId(authUser.id) || preferredEventId;
     const nextSelectedEvent = resolveSelectedEventId(scopedEvents, preferredEvt);
-    const nextParticipants = (responseData.participants ?? []).map(participant => mapApiParticipantToUi(participant, nextSelectedEvent));
+    const nextParticipants = (responseData.participants ?? []).map(participant => mapApiParticipantToUi(participant, ''));
     setOrganizations(nextOrganizations); setEvents(nextEvents); setArchivedEvents(nextArchivedEvents); setUsers(nextUsers); setParticipantRecords(nextParticipants); setActivityLog(Array.isArray(responseData.activityLog) ? responseData.activityLog : []); setSelectedOrganizationIdState(nextSelectedOrganization); setSelectedEventIdState(nextSelectedEvent); persistSelectedOrganizationId(nextSelectedOrganization, authUser.id); persistSelectedEventId(nextSelectedEvent, authUser.id); setSnapshotSource(source); setLastSyncAt(generatedAt);
   }, [authUser, persistSelectedEventId, persistSelectedOrganizationId]);
 
@@ -263,7 +266,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const snapshotVersion = response.snapshot_version ?? createBootstrapSnapshotVersion(response.data);
       hydrateData(response.data, 'network', generatedAt);
       markConnectionHealthy();
-      await saveBootstrapSnapshot(buildOfflineSnapshot({ userId: authUser.id, selectedOrganizationId: readStoredSelectedOrganizationId(authUser.id), selectedEventId: readStoredSelectedEventId(authUser.id), organizations: Array.isArray(response.data.organizations) ? response.data.organizations.map(mapApiOrganizationToUi) : [], events: Array.isArray(response.data.events) ? response.data.events : [], archivedEvents: Array.isArray(response.data.archivedEvents) ? response.data.archivedEvents : [], users: (response.data.users ?? []).map(mapApiUserToUi), participants: (response.data.participants ?? []).map(participant => mapApiParticipantToUi(participant, readStoredSelectedEventId(authUser.id))), activityLog: Array.isArray(response.data.activityLog) ? response.data.activityLog : [], generatedAt, snapshotVersion }));
+      await saveBootstrapSnapshot(buildOfflineSnapshot({ userId: authUser.id, selectedOrganizationId: readStoredSelectedOrganizationId(authUser.id), selectedEventId: readStoredSelectedEventId(authUser.id), organizations: Array.isArray(response.data.organizations) ? response.data.organizations.map(mapApiOrganizationToUi) : [], events: Array.isArray(response.data.events) ? response.data.events : [], archivedEvents: Array.isArray(response.data.archivedEvents) ? response.data.archivedEvents : [], users: (response.data.users ?? []).map(mapApiUserToUi), participants: (response.data.participants ?? []).map(participant => mapApiParticipantToUi(participant, '')), activityLog: Array.isArray(response.data.activityLog) ? response.data.activityLog : [], generatedAt, snapshotVersion }));
       await updateSyncMeta(authUser.id, generatedAt, null);
     } catch (error) {
       if (isApiResponseError(error) && error.status === 401) {
@@ -328,8 +331,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const updateParticipantInApi = useCallback(async (participantId: string, data: ParticipantUpdatePayload) => {
     const payload = (await fetchJson(`${API_BASE_URL}/participants/${participantUiIdToApiId(participantId)}`, { method: 'PATCH', headers: getAuthHeaders(true), body: JSON.stringify(data) })).payload as { data?: ApiParticipant };
     if (!payload.data) throw new Error('API participant update returned empty payload');
-    return mapApiParticipantToUi(payload.data, selectedEventId);
-  }, [getAuthHeaders, selectedEventId]);
+    return mapApiParticipantToUi(payload.data, participants.find(participant => participant.id === participantId)?.event_id ?? '');
+  }, [getAuthHeaders, participants]);
 
   const syncPendingMutations = useCallback(async () => {
     if (syncRef.current || !authUser?.id || !token || connectionState !== 'online') return;
@@ -370,7 +373,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [authUser?.id, clearSession, connectionState, handleNetworkFailure, pendingMutations, replaceParticipantRecord, token, updateParticipantInApi, updateSyncMeta]);
 
-  const queueStatusUpdate = useCallback(async (participantId: string, status: ParticipantStatus): Promise<MutationResult> => {
+  const enqueueStatusUpdate = useCallback(async (
+    participantId: string,
+    status: ParticipantStatus,
+    options?: { syncImmediately?: boolean },
+  ): Promise<MutationResult> => {
     const participant = participants.find(item => item.id === participantId);
     if (!participant) return { ok: false, error: 'Nie znaleziono uczestnika.' };
     if (scannerMode === 'read_only' && connectionState !== 'online') return { ok: false, error: 'Skaner jest teraz tylko do odczytu, bo dane są zbyt stare albo kolejka zmian jest zbyt długa.' };
@@ -378,15 +385,48 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await savePendingMutation(mutation);
     setPendingMutations(previous => [...previous, mutation]);
     addLog('Zmieniono status uczestnika (oczekuje na synchronizację)', participant.name);
-    if (connectionState === 'online') void syncPendingMutations();
-    else setDegradedState();
-    return { ok: true };
+    if (options?.syncImmediately) {
+      void syncPendingMutations();
+    } else {
+      setDegradedState();
+    }
+    return { ok: true, queued: true };
   }, [addLog, authUser?.id, connectionState, participants, scannerMode, setDegradedState, syncPendingMutations]);
+
+  const queueStatusUpdate = useCallback(async (participantId: string, status: ParticipantStatus): Promise<MutationResult> => (
+    enqueueStatusUpdate(participantId, status, { syncImmediately: connectionState === 'online' })
+  ), [connectionState, enqueueStatusUpdate]);
 
   useEffect(() => { if (connectionState === 'online' && pendingMutations.some(mutation => mutation.state === 'queued')) void syncPendingMutations(); }, [connectionState, pendingMutations, syncPendingMutations]);
 
   const updateParticipantStatus = useCallback(async (participantId: string, status: ParticipantStatus, options?: ParticipantUpdateOptions) => {
-    if (options?.allowOfflineQueue) return queueStatusUpdate(participantId, status);
+    if (options?.allowOfflineQueue) {
+      if (connectionState !== 'online') {
+        return queueStatusUpdate(participantId, status);
+      }
+
+      try {
+        const participant = await updateParticipantInApi(participantId, { status });
+        replaceParticipantRecord(participant);
+        await loadBootstrap(true);
+        markConnectionHealthy();
+        return { ok: true, queued: false };
+      } catch (error) {
+        if (isApiResponseError(error) && error.status === 401) {
+          clearSession();
+          resetState();
+          return { ok: false, error: error.message };
+        }
+
+        if (isNetworkRequestError(error)) {
+          handleNetworkFailure(error, { immediate: true });
+          return enqueueStatusUpdate(participantId, status, { syncImmediately: false });
+        }
+
+        handleNetworkFailure(error);
+        return { ok: false, error: error instanceof Error ? error.message : 'Wystapil blad.' };
+      }
+    }
     return runMutation(async () => {
       const offlineError = ensureOnline('Zmiana statusu uczestnika jest dostępna tylko po połączeniu z serwerem.');
       if (offlineError) return { ok: false, error: offlineError };
@@ -395,7 +435,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       await loadBootstrap(true);
       return { ok: true };
     });
-  }, [ensureOnline, loadBootstrap, queueStatusUpdate, replaceParticipantRecord, runMutation, updateParticipantInApi]);
+  }, [clearSession, connectionState, enqueueStatusUpdate, ensureOnline, handleNetworkFailure, loadBootstrap, markConnectionHealthy, queueStatusUpdate, replaceParticipantRecord, resetState, runMutation, updateParticipantInApi]);
 
   const updateParticipantBibNumberLegacy = useCallback(async (participantId: string, bibNumber: string) => runMutation(async () => {
     const offlineError = ensureOnline('Zmiana numeru startowego jest dostępna tylko po połączeniu z serwerem.');
@@ -438,7 +478,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           conflict: {
             bibNumber: String(payload.data?.bib_number ?? bibNumber.trim()),
             conflictingParticipants: Array.isArray(payload.data?.conflicting_participants)
-              ? payload.data.conflicting_participants.map(conflictParticipant => mapApiParticipantToUi(conflictParticipant, selectedEventId))
+              ? payload.data.conflicting_participants.map(conflictParticipant => mapApiParticipantToUi(conflictParticipant, participants.find(participant => participant.id === participantId)?.event_id ?? ''))
               : [],
           },
         };
@@ -446,7 +486,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się zapisać numeru startowego.' };
     }
-  }, [ensureOnline, handleNetworkFailure, loadBootstrap, replaceParticipantRecord, selectedEventId, updateParticipantInApi]);
+  }, [ensureOnline, handleNetworkFailure, loadBootstrap, participants, replaceParticipantRecord, updateParticipantInApi]);
 
   const updateParticipantDetails = useCallback(async (participantId: string, email: string, fieldValues: Record<string, string>) => runMutation(async () => {
     const offlineError = ensureOnline();
@@ -619,8 +659,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const payload = (await fetchJson(`${API_BASE_URL}/participants/${participantUiIdToApiId(participantId)}/send-qr-email`, { method: 'POST', headers: getAuthHeaders() })).payload as { data?: ApiParticipant };
     if (!payload.data) return { ok: false, error: 'API QR email send failed' };
-    replaceParticipantRecord(mapApiParticipantToUi(payload.data, selectedEventId)); await loadBootstrap(true); return { ok: true };
-  }), [ensureOnline, getAuthHeaders, loadBootstrap, replaceParticipantRecord, runMutation, selectedEventId]);
+    replaceParticipantRecord(mapApiParticipantToUi(payload.data, participants.find(participant => participant.id === participantId)?.event_id ?? '')); await loadBootstrap(true); return { ok: true };
+  }), [ensureOnline, getAuthHeaders, loadBootstrap, participants, replaceParticipantRecord, runMutation]);
 
   const sendEventQrEmails = useCallback(async (eventId: string, resendAll = false): Promise<EventQrEmailResult> => {
     try {
