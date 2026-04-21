@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -97,12 +97,14 @@ function getTimelineIcon(action: string) {
 
 export default function ParticipantDetails() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const {
     participants,
     events,
     activityLog,
     currentRole,
+    setSelectedEventId,
     updateParticipantStatus,
     updateParticipantBibNumber,
     updateParticipantDetails,
@@ -165,6 +167,12 @@ export default function ParticipantDetails() {
     setPendingBibNumberCandidate("");
     setTransferEmail(participant.email);
   }, [participant]);
+
+  useEffect(() => {
+    if (!participant?.event_id) return;
+
+    setSelectedEventId(participant.event_id);
+  }, [participant?.event_id, setSelectedEventId]);
 
   useEffect(() => {
     if (!participant?.event_id || !canManageParticipantData || !isOnline)
@@ -298,6 +306,13 @@ export default function ParticipantDetails() {
         Nie znaleziono uczestnika
       </div>
     );
+
+  const backTo =
+    location.state?.backTo ??
+    (participant.event_id ? `/events/${participant.event_id}` : "/participants");
+  const backLabel =
+    location.state?.backLabel ??
+    (participant.event_id ? "Wróć do wydarzenia" : "Wróć do uczestników");
 
   const statusDefinition = getParticipantStatusDefinition(participant.status);
   const normalizedBibNumberValue = bibNumberValue.trim();
@@ -498,7 +513,11 @@ export default function ParticipantDetails() {
 
     setDeleteConfirmOpen(false);
     toast({ title: "Uczestnik usunięty" });
-    navigate("/participants");
+    navigate(
+      participant.event_id
+        ? `/participants?eventId=${participant.event_id}`
+        : "/participants",
+    );
   };
 
   return (
@@ -506,10 +525,10 @@ export default function ParticipantDetails() {
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => navigate(-1)}
+        onClick={() => navigate(backTo)}
         className="touch-manipulation"
       >
-        <ArrowLeft className="h-4 w-4 mr-1" /> Wróć
+        <ArrowLeft className="h-4 w-4 mr-1" /> {backLabel}
       </Button>
 
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">

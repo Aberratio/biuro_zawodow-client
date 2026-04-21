@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,10 +27,12 @@ type PendingEmailAction =
 
 export default function EmailSending() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     participants,
     events,
     selectedEventId,
+    setSelectedEventId,
     sendEventQrEmails,
     sendParticipantQrEmail,
     isLoading,
@@ -41,12 +43,26 @@ export default function EmailSending() {
   const [sendingParticipantId, setSendingParticipantId] = useState<string | null>(null);
   const [lastErrors, setLastErrors] = useState<Array<{ participant_name: string; error: string }>>([]);
   const [pendingAction, setPendingAction] = useState<PendingEmailAction | null>(null);
+  const routeEventId = searchParams.get('eventId') ?? '';
+  const activeEventId = events.some(event => event.id === routeEventId)
+    ? routeEventId
+    : selectedEventId;
+
+  useEffect(() => {
+    if (!routeEventId || routeEventId === selectedEventId) {
+      return;
+    }
+
+    if (events.some(event => event.id === routeEventId)) {
+      setSelectedEventId(routeEventId);
+    }
+  }, [events, routeEventId, selectedEventId, setSelectedEventId]);
 
   const eventParticipants = useMemo(
-    () => participants.filter(participant => participant.event_id === selectedEventId),
-    [participants, selectedEventId],
+    () => participants.filter(participant => participant.event_id === activeEventId),
+    [activeEventId, participants],
   );
-  const selectedEvent = events.find(event => event.id === selectedEventId);
+  const selectedEvent = events.find(event => event.id === activeEventId);
   const sent = eventParticipants.filter(participant => participant.email_status === 'sent').length;
   const pending = eventParticipants.length - sent;
   const isConfirmingAction = sendingAll || resendingAll || sendingParticipantId !== null;
@@ -65,7 +81,7 @@ export default function EmailSending() {
     }
 
     try {
-      const result = await sendEventQrEmails(selectedEventId, resendAll);
+      const result = await sendEventQrEmails(activeEventId, resendAll);
       if (!result.ok) {
         toast({ title: 'Nie udało się wysłać kodów QR', description: result.error, variant: 'destructive' });
         return;
@@ -110,7 +126,7 @@ export default function EmailSending() {
   return (
     <div className="space-y-6">
       <div>
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/events/${selectedEventId}`)} className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
+        <Button variant="ghost" size="sm" onClick={() => navigate(`/events/${activeEventId}`)} className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
           >
         <ArrowLeft className="h-4 w-4 mr-1" /> Wróć do wydarzenia
       </Button>
@@ -146,11 +162,11 @@ export default function EmailSending() {
               <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${eventParticipants.length ? (sent / eventParticipants.length) * 100 : 0}%` }} />
             </div>
             <div className="mt-4 grid gap-2">
-              <Button className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || pending === 0 || !isOnline}>
+              <Button className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || pending === 0 || !isOnline || !activeEventId}>
                 {sendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />}
                 {pending === 0 ? 'Brak zaległych wiadomości' : `Wyślij brakujące (${pending})`}
               </Button>
-              <Button variant="outline" className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'resend-all', count: eventParticipants.length })} disabled={resendingAll || eventParticipants.length === 0 || !isOnline}>
+              <Button variant="outline" className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'resend-all', count: eventParticipants.length })} disabled={resendingAll || eventParticipants.length === 0 || !isOnline || !activeEventId}>
                 {resendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
                 Wyślij ponownie wszystkim
               </Button>

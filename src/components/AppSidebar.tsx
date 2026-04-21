@@ -225,10 +225,13 @@ export function AppSidebar() {
     scopedVisibleEvents.find((event) => event.id === selectedEventId) ?? null;
   const selectedEventOfficeOpen =
     selectedEvent !== null && isEventOfficeOpen(selectedEvent);
+  const selectedEventCanSendQr =
+    selectedEvent !== null && !selectedEventOfficeOpen;
   const eventScopedItems = items
     .filter((item) => eventScopedUrls.has(item.url))
-    .filter((item) => item.url !== "/import" && item.url !== "/emails")
-    .filter((item) => item.url !== "/scanner" || selectedEventOfficeOpen);
+    .filter((item) => item.url !== "/import")
+    .filter((item) => item.url !== "/scanner" || selectedEventOfficeOpen)
+    .filter((item) => item.url !== "/emails" || selectedEventCanSendQr);
   const showOrganizationSelectControl = adminOrganizations.length > 1;
   const showEventSelectControl =
     scopedVisibleEvents.length > 1 || !isScannerRole(currentRole);
@@ -331,7 +334,9 @@ export function AppSidebar() {
                     to={
                       item.url === "/import"
                         ? `/events/${selectedEvent.id}/import`
-                        : item.url
+                        : item.url === "/participants" || item.url === "/emails"
+                          ? `${item.url}?eventId=${selectedEvent.id}`
+                          : item.url
                     }
                     end={item.url !== "/import"}
                     className={workspaceNavItemClassName}
