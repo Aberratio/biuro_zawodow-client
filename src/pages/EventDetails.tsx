@@ -74,6 +74,11 @@ import { validateEmail, validateRequired } from "@/lib/form-validation";
 import { getRoleLabel, isScannerRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
+import {
+  buildEventEmailsPath,
+  buildEventImportPath,
+  buildEventParticipantsPath,
+} from "@/lib/routes";
 
 type OfficeStatusTone = "open" | "upcoming" | "closed";
 
@@ -1015,7 +1020,7 @@ export default function EventDetails() {
                   variant="outline"
                   onClick={() => {
                     setSelectedEventId(event.id);
-                    navigate(`/participants?eventId=${event.id}`);
+                    navigate(buildEventParticipantsPath(event.id));
                   }}
                   className="event-detail-secondary-action h-12 w-full"
                 >
@@ -1132,10 +1137,10 @@ export default function EventDetails() {
               <div className="flex flex-col gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setSelectedEventId(event.id);
-                    navigate(`/events/${event.id}/import`);
-                  }}
+                    onClick={() => {
+                      setSelectedEventId(event.id);
+                      navigate(buildEventImportPath(event.id));
+                    }}
                   className="event-detail-operation-button h-11 justify-start"
                   disabled={!isOnline}
                 >
@@ -1146,7 +1151,7 @@ export default function EventDetails() {
                     variant="outline"
                     onClick={() => {
                       setSelectedEventId(event.id);
-                      navigate(`/emails?eventId=${event.id}`);
+                      navigate(buildEventEmailsPath(event.id));
                     }}
                     className="event-detail-operation-button h-11 justify-start"
                     disabled={!isOnline}

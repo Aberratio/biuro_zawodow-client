@@ -2,9 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Loader2, Undo2, UserX2 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
+import { ParticipantBibNumberConflictDialog } from '@/components/ParticipantBibNumberConflictDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { FieldError } from '@/components/ui/field-error';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import type { Participant, ParticipantFieldMapping } from '@/types';
 import QrScannerView from '@/components/QrScannerView';
@@ -14,7 +19,7 @@ import { buildParticipantFieldValues } from '@/lib/participant-fields';
 import { formatBibNumber } from '@/lib/participants';
 import { getParticipantStatusDefinition } from '@/lib/participant-status';
 import { formatEventOfficeWindow, isEventOfficeOpen } from '@/lib/events';
-import { isScannerRole } from '@/lib/roles';
+import { canManageParticipantData, canUseParticipantAdminActions, isScannerRole } from '@/lib/roles';
 
 type ScannerView = 'idle' | 'success' | 'error' | 'detail';
 type ParticipantFieldEntry = {
@@ -56,6 +61,7 @@ export default function Scanner() {
     selectedEventId,
     selectedOrganizationId,
     updateParticipantStatus,
+    updateParticipantBibNumber,
     currentRole,
     scanParticipantQr,
     isLoading,
@@ -72,12 +78,22 @@ export default function Scanner() {
   const [isMutating, setIsMutating] = useState(false);
   const [participantMappings, setParticipantMappings] = useState<ParticipantFieldMapping[]>([]);
   const [errorMessage, setErrorMessage] = useState('Nie znaleziono uczestnika dla tego kodu QR.');
+  const [manualBibNumberOpen, setManualBibNumberOpen] = useState(false);
+  const [bibNumberValue, setBibNumberValue] = useState('');
+  const [bibNumberError, setBibNumberError] = useState<string | undefined>();
+  const [bibNumberConflictOpen, setBibNumberConflictOpen] = useState(false);
+  const [bibNumberConflictParticipants, setBibNumberConflictParticipants] = useState<Participant[]>([]);
+  const [pendingBibNumberCandidate, setPendingBibNumberCandidate] = useState('');
+  const [isSavingBibNumber, setIsSavingBibNumber] = useState(false);
   const successTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const selectedEvent = visibleEvents.find(event => event.id === selectedEventId) ?? null;
   const scannerAvailable = selectedEvent !== null && isEventOfficeOpen(selectedEvent);
   const activeEventId = selectedEvent?.id ?? selectedEventId;
   const isReadOnly = scannerMode === 'read_only';
   const isOfflineQueue = scannerMode === 'offline_queue';
+  const isOnline = connectionState === 'online';
+  const hasParticipantDataManagementAccess = canManageParticipantData(currentRole);
+  const canUseParticipantAdminConflictActions = canUseParticipantAdminActions(currentRole);
 
   const eventParticipants = useMemo(
     () => participants.filter(participant => participant.event_id === activeEventId),
@@ -102,8 +118,40 @@ export default function Scanner() {
       .catch(() => setParticipantMappings([]));
   }, [activeEventId, connectionState, getParticipantFieldMappings]);
 
+  useEffect(() => {
+    if (!scannedParticipant) {
+      return;
+    }
+
+    const refreshedParticipant = participants.find(participant => participant.id === scannedParticipant.id);
+    if (!refreshedParticipant || refreshedParticipant === scannedParticipant) {
+      return;
+    }
+
+    setScannedParticipant(refreshedParticipant);
+    setRecentScans(previous =>
+      previous.map(entry => (entry.id === refreshedParticipant.id ? refreshedParticipant : entry)),
+    );
+  }, [participants, scannedParticipant]);
+
+  useEffect(() => {
+    setBibNumberValue(scannedParticipant?.bib_number ?? '');
+    setBibNumberError(undefined);
+    setManualBibNumberOpen(false);
+    setBibNumberConflictOpen(false);
+    setBibNumberConflictParticipants([]);
+    setPendingBibNumberCandidate('');
+  }, [scannedParticipant?.bib_number, scannedParticipant?.id]);
+
   const addToRecent = useCallback((participant: Participant) => {
     setRecentScans(previous => [participant, ...previous.filter(entry => entry.id !== participant.id)].slice(0, 5));
+  }, []);
+
+  const syncParticipantInView = useCallback((participant: Participant) => {
+    setScannedParticipant(participant);
+    setRecentScans(previous =>
+      previous.map(entry => (entry.id === participant.id ? participant : entry)),
+    );
   }, []);
 
   const showSuccessScreen = useCallback((participant: Participant) => {
@@ -182,7 +230,7 @@ export default function Scanner() {
       };
 
       if (status === 'not_checked_in') {
-        setScannedParticipant(updatedParticipant);
+        syncParticipantInView(updatedParticipant);
       } else {
         showSuccessScreen(updatedParticipant);
       }
@@ -196,7 +244,96 @@ export default function Scanner() {
     } finally {
       setIsMutating(false);
     }
-  }, [isReadOnly, scannedParticipant, showSuccessScreen, updateParticipantStatus]);
+  }, [isReadOnly, scannedParticipant, showSuccessScreen, syncParticipantInView, updateParticipantStatus]);
+
+  const handleSaveBibNumber = useCallback(async () => {
+    if (!scannedParticipant) {
+      return;
+    }
+
+    const normalizedBibNumber = bibNumberValue.trim();
+    if (normalizedBibNumber.length > 32) {
+      setBibNumberError('Numer startowy może mieć maksymalnie 32 znaki.');
+      return;
+    }
+
+    setBibNumberError(undefined);
+    setIsSavingBibNumber(true);
+    try {
+      const result = await updateParticipantBibNumber(
+        scannedParticipant.id,
+        normalizedBibNumber,
+      );
+
+      if (result.conflict) {
+        setPendingBibNumberCandidate(result.conflict.bibNumber);
+        setBibNumberConflictParticipants(result.conflict.conflictingParticipants);
+        setBibNumberConflictOpen(true);
+        return;
+      }
+
+      if (!result.ok) {
+        setBibNumberError(result.error);
+        toast({
+          title: 'Nie udało się zapisać numeru startowego',
+          description: result.error,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      syncParticipantInView({ ...scannedParticipant, bib_number: normalizedBibNumber });
+      setManualBibNumberOpen(false);
+      toast({ title: 'Numer startowy zapisany' });
+    } finally {
+      setIsSavingBibNumber(false);
+    }
+  }, [bibNumberValue, scannedParticipant, syncParticipantInView, updateParticipantBibNumber]);
+
+  const handleResolveBibNumberConflict = useCallback(async (
+    resolution: 'keep_duplicates' | 'delete_conflicts',
+  ) => {
+    if (!scannedParticipant) {
+      return;
+    }
+
+    setIsSavingBibNumber(true);
+    try {
+      const result = await updateParticipantBibNumber(
+        scannedParticipant.id,
+        pendingBibNumberCandidate,
+        { conflictResolution: resolution },
+      );
+
+      if (!result.ok) {
+        setBibNumberError(result.error);
+        toast({
+          title: 'Nie udało się zapisać numeru startowego',
+          description: result.error,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      syncParticipantInView({
+        ...scannedParticipant,
+        bib_number: pendingBibNumberCandidate,
+      });
+      setBibNumberValue(pendingBibNumberCandidate);
+      setManualBibNumberOpen(false);
+      setBibNumberConflictOpen(false);
+      setBibNumberConflictParticipants([]);
+      setPendingBibNumberCandidate('');
+      toast({
+        title:
+          resolution === 'delete_conflicts'
+            ? 'Numer przeniesiony i konflikty usunięte'
+            : 'Numer startowy zapisany dla wielu uczestników',
+      });
+    } finally {
+      setIsSavingBibNumber(false);
+    }
+  }, [pendingBibNumberCandidate, scannedParticipant, syncParticipantInView, updateParticipantBibNumber]);
 
   const mappedParticipantFields = useMemo(() => {
     if (!scannedParticipant) {
@@ -256,6 +393,9 @@ export default function Scanner() {
       || mappedParticipantFields.additional.length > 0
       || mappedParticipantFields.fallback.length > 0
     );
+  const canAssignManualBibNumber = hasParticipantDataManagementAccess
+    && Boolean(scannedParticipant)
+    && !scannedParticipant.bib_number.trim();
 
   const renderFieldGrid = (title: string, description: string, fields: ParticipantFieldEntry[]) => {
     if (fields.length === 0) {
@@ -471,6 +611,17 @@ export default function Scanner() {
               </div>
 
               <div className="grid gap-2">
+                {canAssignManualBibNumber && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setManualBibNumberOpen(true)}
+                    disabled={isMutating || isSavingBibNumber || isReadOnly || !isOnline}
+                  >
+                    {isSavingBibNumber ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                    Nadaj numer startowy
+                  </Button>
+                )}
                 {scannedParticipant.status !== 'checked_in' && (
                   <Button className="w-full" onClick={() => void mutateStatus('checked_in', 'Uczestnik odprawiony')} disabled={isMutating || isReadOnly}>
                     {isMutating ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-1 h-4 w-4" />}
@@ -494,6 +645,71 @@ export default function Scanner() {
           </Card>
         </div>
       )}
+
+      <Dialog
+        open={manualBibNumberOpen}
+        onOpenChange={nextOpen => {
+          setManualBibNumberOpen(nextOpen);
+          if (!nextOpen) {
+            setBibNumberValue(scannedParticipant?.bib_number ?? '');
+            setBibNumberError(undefined);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nadaj numer startowy</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="scanner-manual-bib-number">Numer startowy</Label>
+              <Input
+                id="scanner-manual-bib-number"
+                value={bibNumberValue}
+                onChange={event => {
+                  setBibNumberValue(event.target.value);
+                  setBibNumberError(undefined);
+                }}
+                placeholder="Np. 101"
+                aria-invalid={Boolean(bibNumberError)}
+                aria-describedby={bibNumberError ? 'scanner-manual-bib-number-error' : undefined}
+              />
+              <FieldError id="scanner-manual-bib-number-error">
+                {bibNumberError}
+              </FieldError>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Numer powinien być unikalny w ramach wydarzenia.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              className="w-full sm:w-auto"
+              onClick={() => void handleSaveBibNumber()}
+              disabled={isSavingBibNumber || !bibNumberValue.trim() || isReadOnly || !isOnline}
+            >
+              {isSavingBibNumber ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+              Zapisz numer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ParticipantBibNumberConflictDialog
+        open={bibNumberConflictOpen}
+        onOpenChange={nextOpen => {
+          setBibNumberConflictOpen(nextOpen);
+          if (!nextOpen) {
+            setPendingBibNumberCandidate('');
+            setBibNumberConflictParticipants([]);
+          }
+        }}
+        bibNumber={pendingBibNumberCandidate}
+        conflictingParticipants={bibNumberConflictParticipants}
+        allowDeleteConflicts={canUseParticipantAdminConflictActions}
+        isSaving={isSavingBibNumber}
+        onResolve={handleResolveBibNumberConflict}
+      />
 
       {recentScans.length > 0 && view === 'idle' && (
         <div className="px-4 md:px-0">
