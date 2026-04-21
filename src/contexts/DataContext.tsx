@@ -625,7 +625,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const sendEventQrEmails = useCallback(async (eventId: string, resendAll = false): Promise<EventQrEmailResult> => {
     try {
       const offlineError = ensureOnline(); if (offlineError) return { ok: false, sent_count: 0, error_count: 0, errors: [], error: offlineError };
-      const payload = (await fetchJson(`${API_BASE_URL}/events/${eventId}/send-qr-emails`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ resend_all: resendAll }) })).payload as { data?: { sent_count?: number; error_count?: number; errors?: Array<{ participant_id: number; participant_name: string; error: string }> } };
+      const payload = (await fetchJson(`${API_BASE_URL}/events/${eventId}/send-qr-emails`, {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({ resend_all: resendAll }),
+        timeoutMs: 120_000,
+      })).payload as { data?: { sent_count?: number; error_count?: number; errors?: Array<{ participant_id: number; participant_name: string; error: string }> } };
       await loadBootstrap(true);
       return { ok: true, sent_count: Number(payload.data?.sent_count ?? 0), error_count: Number(payload.data?.error_count ?? 0), errors: Array.isArray(payload.data?.errors) ? payload.data!.errors : [] };
     } catch (error) {
