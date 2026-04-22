@@ -166,7 +166,7 @@ export function AppSidebar() {
     selectedOrganizationId,
     setSelectedOrganizationId,
     selectedEventId,
-    setSelectedEventId,
+    selectEventContext,
   } = useData();
   const { logout } = useAuth();
 
@@ -181,7 +181,7 @@ export function AppSidebar() {
   };
 
   const handleEventChange = (eventId: string) => {
-    setSelectedEventId(eventId);
+    selectEventContext(eventId);
     navigate(buildEventPath(eventId));
   };
 
@@ -209,7 +209,7 @@ export function AppSidebar() {
         ? {
             ...item,
             url: currentUser.organization_id
-              ? `/organizations/${currentUser.organization_id}`
+              ? buildOrganizationPath(currentUser.organization_id)
               : "/organizations",
           }
         : item,

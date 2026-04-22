@@ -35,6 +35,7 @@ interface DataContextType {
   setSelectedOrganizationId: (id: string) => void;
   selectedEventId: string;
   setSelectedEventId: (id: string) => void;
+  selectEventContext: (eventId: string) => void;
   updateParticipantStatus: (participantId: string, status: ParticipantStatus, options?: ParticipantUpdateOptions) => Promise<MutationResult>;
   updateParticipantBibNumber: (participantId: string, bibNumber: string, options?: ParticipantBibNumberUpdateOptions) => Promise<ParticipantBibNumberUpdateResult>;
   updateParticipantDetails: (participantId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
@@ -147,6 +148,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setSelectedEventIdState(eventId);
     persistSelectedEventId(eventId, authUser?.id);
   }, [authUser?.id, persistSelectedEventId]);
+
+  const selectEventContext = useCallback((eventId: string) => {
+    const nextEventId = eventId.trim();
+    const nextEvent = visibleEvents.find(event => event.id === nextEventId) ?? events.find(event => event.id === nextEventId);
+
+    if (currentRole === 'admin') {
+      const nextOrganizationId = nextEvent?.organization_id ?? '';
+      if (nextOrganizationId !== selectedOrganizationId) {
+        setSelectedOrganizationIdState(nextOrganizationId);
+        persistSelectedOrganizationId(nextOrganizationId, authUser?.id);
+      }
+    }
+
+    setSelectedEventIdState(nextEventId);
+    persistSelectedEventId(nextEventId, authUser?.id);
+  }, [authUser?.id, currentRole, events, persistSelectedEventId, persistSelectedOrganizationId, selectedOrganizationId, visibleEvents]);
 
   const syncStoredAuthUser = useCallback((updater: (user: User) => User) => {
     try {
@@ -733,7 +750,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [ensureOnline, getAuthHeaders, handleNetworkFailure]);
 
   return (
-    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
+    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
       {children}
     </DataContext.Provider>
   );

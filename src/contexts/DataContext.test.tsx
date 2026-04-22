@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider, useData } from '@/contexts/DataContext';
+import Participants from '@/pages/Participants';
 import type { Event, Organization, User } from '@/types';
 
 const authState: {
@@ -24,6 +26,7 @@ function TestConsumer() {
     selectedOrganizationId,
     setSelectedOrganizationId,
     selectedEventId,
+    selectEventContext,
     visibleEvents,
     setSelectedEventId,
     canAccessEvent,
@@ -46,6 +49,9 @@ function TestConsumer() {
       </button>
       <button type="button" onClick={() => setSelectedEventId('event-2')}>
         select-event-2
+      </button>
+      <button type="button" onClick={() => selectEventContext('event-2')}>
+        sync-event-2
       </button>
     </div>
   );
@@ -330,6 +336,90 @@ describe('DataProvider bootstrap loading', () => {
     expect(screen.getByTestId('selected-event').textContent).toBe('event-2');
     expect(window.sessionStorage.getItem('selected_event_context:admin-1')).toBe('event-2');
     expect(window.localStorage.getItem('selected_event_context:admin-1')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('syncs admin organization before persisting a route-selected event context', async () => {
+    const adminUser: User = {
+      id: 'admin-1',
+      name: 'Admin',
+      email: 'admin@example.com',
+      password: '',
+      role: 'admin',
+      assigned_events: [],
+    };
+
+    authState.user = adminUser;
+    window.localStorage.setItem('selected_organization_context:admin-1', 'org-1');
+    window.localStorage.setItem('selected_event_context:admin-1', 'event-1');
+
+    const organizations = [createOrganization('org-1'), createOrganization('org-2')];
+    const fetchMock = vi.fn(async () => createBootstrapResponse(
+      adminUser,
+      [createEvent('event-1', 'org-1'), createEvent('event-3', 'org-2'), createEvent('event-2', 'org-2')],
+      organizations,
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <TestConsumer />
+      </DataProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('selected-organization').textContent).toBe('org-1'));
+    await waitFor(() => expect(screen.getByTestId('selected-event').textContent).toBe('event-1'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'sync-event-2' }));
+
+    await waitFor(() => expect(screen.getByTestId('selected-organization').textContent).toBe('org-2'));
+    await waitFor(() => expect(screen.getByTestId('selected-event').textContent).toBe('event-2'));
+
+    expect(window.sessionStorage.getItem('selected_organization_context:admin-1')).toBe('org-2');
+    expect(window.sessionStorage.getItem('selected_event_context:admin-1')).toBe('event-2');
+    expect(window.localStorage.getItem('selected_organization_context:admin-1')).toBeNull();
+    expect(window.localStorage.getItem('selected_event_context:admin-1')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps route-selected participants event stable for admin after switching organizations', async () => {
+    const adminUser: User = {
+      id: 'admin-1',
+      name: 'Admin',
+      email: 'admin@example.com',
+      password: '',
+      role: 'admin',
+      assigned_events: [],
+    };
+
+    authState.user = adminUser;
+    window.localStorage.setItem('selected_organization_context:admin-1', 'org-1');
+    window.localStorage.setItem('selected_event_context:admin-1', 'event-1');
+
+    const organizations = [createOrganization('org-1'), createOrganization('org-2')];
+    const fetchMock = vi.fn(async () => createBootstrapResponse(
+      adminUser,
+      [createEvent('event-1', 'org-1'), createEvent('event-3', 'org-2'), createEvent('event-2', 'org-2')],
+      organizations,
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={['/events/event-2/participants']}>
+        <DataProvider>
+          <Routes>
+            <Route path="/events/:id/participants" element={<Participants />} />
+          </Routes>
+          <TestConsumer />
+        </DataProvider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('selected-organization').textContent).toBe('org-2'));
+    await waitFor(() => expect(screen.getByTestId('selected-event').textContent).toBe('event-2'));
+
+    expect(window.sessionStorage.getItem('selected_organization_context:admin-1')).toBe('org-2');
+    expect(window.sessionStorage.getItem('selected_event_context:admin-1')).toBe('event-2');
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
