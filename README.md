@@ -114,13 +114,14 @@ Main application routes:
 - `/events`
 - `/events/:id`
 - `/events/:id/import`
-- `/participants`
-- `/participants/:id`
+- `/events/:id/participants`
+- `/events/:id/participants/:participantId`
 - `/scanner`
 - `/scanner-info`
-- `/emails`
+- `/events/:id/emails`
 - `/organizations`
 - `/organizations/:id`
+- `/organizations/:id/archived-events`
 - `/profile`
 - `/login`
 - `/reset-password`
@@ -128,7 +129,7 @@ Main application routes:
 Scanner specific behavior:
 
 - scanners without currently available assignments are redirected to `/scanner-info`
-- scanners can use `/scanner` and `/participants` only when they have at least one assigned event with an open race office window
+- scanners can use `/scanner` and `/events/:id/participants` only when they have at least one assigned event with an open race office window
 
 ## Role behavior
 
@@ -204,3 +205,5 @@ Preview the built app locally:
 ```powershell
 npm run preview
 ```
+
+If the production build is hosted under Apache or XAMPP with `BrowserRouter`, keep the generated `.htaccess` from `public/.htaccess` next to `index.html`. Without that rewrite, refreshing deep routes such as `/events/:id`, `/events/:id/participants/:participantId`, `/organizations/:id`, or `/profile` will return the server `404` instead of booting the SPA.

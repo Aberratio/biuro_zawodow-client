@@ -1,0 +1,13 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Serve real files and directories directly.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Keep backend/API endpoints out of the SPA fallback.
+  RewriteCond %{REQUEST_URI} !^/(auth|bootstrap|docs|events|health|openapi\.json|organizations|participants|qr-images|users)(/|$) [NC]
+  RewriteRule ^ index.html [L]
+</IfModule>
