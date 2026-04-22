@@ -496,8 +496,6 @@ export default function EventDetails() {
     !isArchivedEvent &&
     officeOpenAt !== null &&
     now < officeOpenAt;
-  const canArchiveEvent =
-    canDeleteEvent && officeCloseAt !== null && now > officeCloseAt;
   const canAssignScannersToEvent =
     !isArchivedEvent && officeCloseAt !== null && now <= officeCloseAt;
 
@@ -1049,7 +1047,7 @@ export default function EventDetails() {
                 variant="destructive"
                 onClick={() => setDeleteConfirmOpen(true)}
                 className="event-detail-archive-action h-12 w-full"
-                disabled={!isOnline || !canArchiveEvent}
+                disabled={!isOnline}
               >
                 <Trash2 className="mr-1 h-4 w-4" /> Usuń wydarzenie
               </Button>
@@ -1231,7 +1229,7 @@ export default function EventDetails() {
               <span className="font-medium text-foreground">{event.name}</span>{" "}
               zniknie z aktywnych list i przypisań. Dane zostaną zachowane w
               archiwum organizacji. Tę operację mogą wykonać tylko
-              administratorzy i organizatorzy po zakończeniu wydarzenia.
+              administratorzy i organizatorzy.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
