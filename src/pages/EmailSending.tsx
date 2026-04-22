@@ -55,7 +55,11 @@ export default function EmailSending() {
   const selectedEvent = events.find(event => event.id === activeEventId);
   const sent = eventParticipants.filter(participant => participant.email_status === 'sent').length;
   const pending = eventParticipants.length - sent;
+  const hasParticipants = eventParticipants.length > 0;
   const hasSentEmails = sent > 0;
+  const hasPendingEmails = pending > 0;
+  const hasNoSentEmails = sent === 0;
+  const hasPartialDelivery = hasSentEmails && hasPendingEmails;
   const isConfirmingAction = sendingAll || resendingAll || sendingParticipantId !== null;
   const isOnline = connectionState === 'online';
 
@@ -136,8 +140,16 @@ export default function EmailSending() {
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <div className="space-y-1 text-xs text-muted-foreground">
-              <p>"Wyślij brakujące" wyśle wiadomości tylko do uczestników mających status wysyłki inny niż "Wysłano".</p>
-              <p>{hasSentEmails ? '"Wyślij ponownie wszystkim" wymusi ponowną wysyłkę dla całego wydarzenia.' : '"Wyślij wszystkim" wyśle wiadomości do wszystkich uczestników wydarzenia.'}</p>
+              {hasNoSentEmails ? (
+                <p>"Wyślij kody QR do wszystkich uczestników" wyśle pierwszą wiadomość do całej listy uczestników wydarzenia.</p>
+              ) : (
+                <>
+                  <p>"Wyślij ponownie kody QR do wszystkich uczestników" wymusi ponowną wysyłkę dla całego wydarzenia.</p>
+                  {hasPartialDelivery && (
+                    <p>"Wyślij brakujące kody QR" wyśle wiadomości tylko do uczestników, którzy nie dostali jeszcze maila z kodem QR.</p>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </CardContent>
@@ -153,14 +165,25 @@ export default function EmailSending() {
               <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${eventParticipants.length ? (sent / eventParticipants.length) * 100 : 0}%` }} />
             </div>
             <div className="mt-4 grid gap-2">
-              <Button className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || pending === 0 || !isOnline || !activeEventId}>
-                {sendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />}
-                {pending === 0 ? 'Brak zaległych wiadomości' : `Wyślij brakujące (${pending})`}
-              </Button>
-              <Button variant="outline" className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'resend-all', count: eventParticipants.length })} disabled={resendingAll || eventParticipants.length === 0 || !isOnline || !activeEventId}>
-                {resendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
-                {hasSentEmails ? 'Wyślij ponownie wszystkim' : 'Wyślij wszystkim'}
-              </Button>
+              {hasNoSentEmails ? (
+                <Button className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || !hasParticipants || !isOnline || !activeEventId}>
+                  {sendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />}
+                  Wyślij kody QR do wszystkich uczestników
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'resend-all', count: eventParticipants.length })} disabled={resendingAll || !hasParticipants || !isOnline || !activeEventId}>
+                    {resendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
+                    Wyślij ponownie kody QR do wszystkich uczestników
+                  </Button>
+                  {hasPartialDelivery && (
+                    <Button className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || !hasPendingEmails || !isOnline || !activeEventId}>
+                      {sendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />}
+                      Wyślij brakujące kody QR
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -253,10 +276,10 @@ export default function EmailSending() {
               {pendingAction?.kind === 'send-one'
                 ? <>Do uczestnika <span className="font-medium text-foreground">{pendingAction.participantName}</span> zostanie wysłany mail na adres <span className="font-medium text-foreground">{pendingAction.participantEmail}</span>.</>
                 : pendingAction?.kind === 'resend-all'
-                  ? <>{hasSentEmails
-                    ? <>Ta operacja ponownie wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestników wydarzenia.</>
-                    : <>Ta operacja wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestników wydarzenia.</>}</>
-                  : <>Ta operacja wyśle brakujące maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia.</>}
+                  ? <>Ta operacja ponownie wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestników wydarzenia.</>
+                  : hasNoSentEmails
+                    ? <>Ta operacja wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia.</>
+                    : <>Ta operacja wyśle brakujące maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia.</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

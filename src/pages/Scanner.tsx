@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Loader2, Undo2, UserX2 } from 'lucide-react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
 import { ParticipantBibNumberConflictDialog } from '@/components/ParticipantBibNumberConflictDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import { buildParticipantFieldValues } from '@/lib/participant-fields';
 import { formatBibNumber } from '@/lib/participants';
 import { getParticipantStatusDefinition } from '@/lib/participant-status';
 import { formatEventOfficeWindow, isEventOfficeOpen } from '@/lib/events';
+import { buildEventParticipantPath } from '@/lib/routes';
 import { canManageParticipantData, canUseParticipantAdminActions, isScannerRole } from '@/lib/roles';
 
 type ScannerView = 'idle' | 'success' | 'error' | 'detail';
@@ -56,6 +57,7 @@ function formatScannerDateTime(value?: string) {
 }
 
 export default function Scanner() {
+  const navigate = useNavigate();
   const {
     participants,
     selectedEventId,
@@ -620,6 +622,16 @@ export default function Scanner() {
                   >
                     {isSavingBibNumber ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
                     Nadaj numer startowy
+                  </Button>
+                )}
+                {hasParticipantDataManagementAccess && selectedEvent && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate(buildEventParticipantPath(selectedEvent.id, scannedParticipant.id))}
+                    disabled={isMutating}
+                  >
+                    Edytuj dane uczestnika
                   </Button>
                 )}
                 {scannedParticipant.status !== 'checked_in' && (
