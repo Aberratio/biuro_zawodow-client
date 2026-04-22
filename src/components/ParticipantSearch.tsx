@@ -11,6 +11,10 @@ interface ParticipantSearchProps {
   autoFocus?: boolean;
 }
 
+function normalizeSearchText(value: string | null | undefined) {
+  return String(value ?? '');
+}
+
 export default function ParticipantSearch({
   participants,
   onSelect,
@@ -53,12 +57,19 @@ export default function ParticipantSearch({
     setLoading(true);
     setOpen(true);
     debounceRef.current = setTimeout(() => {
-      const q = nextQuery.toLowerCase().trim();
+      const q = nextQuery.toLocaleLowerCase('pl').trim();
       const response = participants.filter(
-        participant =>
-          participant.name.toLowerCase().includes(q) ||
-          participant.email.toLowerCase().includes(q) ||
-          participant.bib_number === q
+        participant => {
+          const participantName = normalizeSearchText(participant.name).toLocaleLowerCase('pl');
+          const participantEmail = normalizeSearchText(participant.email).toLocaleLowerCase('pl');
+          const participantBibNumber = normalizeSearchText(participant.bib_number);
+
+          return (
+            participantName.includes(q) ||
+            participantEmail.includes(q) ||
+            participantBibNumber === q
+          );
+        }
       );
       setResults(response.slice(0, 5));
       setLoading(false);
@@ -108,6 +119,8 @@ export default function ParticipantSearch({
           ) : (
             results.map(participant => {
               const status = getParticipantStatusDefinition(participant.status);
+              const participantName = normalizeSearchText(participant.name) || 'Nieznany uczestnik';
+              const participantEmail = normalizeSearchText(participant.email);
 
               return (
                 <button
@@ -116,8 +129,8 @@ export default function ParticipantSearch({
                   onClick={() => handleSelect(participant)}
                 >
                   <div className="min-w-0">
-                    <p className="font-semibold text-sm truncate">{participant.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{participant.email}</p>
+                    <p className="font-semibold text-sm truncate">{participantName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{participantEmail}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-3">
                     <span className="text-sm font-bold tabular-nums text-primary">
