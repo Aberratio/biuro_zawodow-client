@@ -56,6 +56,15 @@ function formatScannerDateTime(value?: string) {
   }).format(parsed);
 }
 
+function isScannerBibNumberMissing(value?: string | null) {
+  const normalizedValue = (value ?? '').trim();
+  return normalizedValue === '' || normalizedValue === '0';
+}
+
+function normalizeScannerBibNumberInput(value?: string | null) {
+  return isScannerBibNumberMissing(value) ? '' : (value ?? '').trim();
+}
+
 export default function Scanner() {
   const navigate = useNavigate();
   const {
@@ -137,9 +146,8 @@ export default function Scanner() {
   }, [participants, scannedParticipant]);
 
   useEffect(() => {
-    setBibNumberValue(scannedParticipant?.bib_number ?? '');
+    setBibNumberValue(normalizeScannerBibNumberInput(scannedParticipant?.bib_number));
     setBibNumberError(undefined);
-    setManualBibNumberOpen(false);
     setBibNumberConflictOpen(false);
     setBibNumberConflictParticipants([]);
     setPendingBibNumberCandidate('');
@@ -285,8 +293,9 @@ export default function Scanner() {
       }
 
       syncParticipantInView({ ...scannedParticipant, bib_number: normalizedBibNumber });
-      setManualBibNumberOpen(false);
-      toast({ title: 'Numer startowy zapisany' });
+      toast({
+        title: normalizedBibNumber ? 'Numer startowy zapisany' : 'Numer startowy wyczyszczony',
+      });
     } finally {
       setIsSavingBibNumber(false);
     }
@@ -322,7 +331,6 @@ export default function Scanner() {
         bib_number: pendingBibNumberCandidate,
       });
       setBibNumberValue(pendingBibNumberCandidate);
-      setManualBibNumberOpen(false);
       setBibNumberConflictOpen(false);
       setBibNumberConflictParticipants([]);
       setPendingBibNumberCandidate('');
@@ -382,22 +390,36 @@ export default function Scanner() {
 
     return {
       contact: entries.filter(entry => entry.role === 'email'),
-      identity: entries.filter(entry => entry.role === 'display_name_part' || entry.role === 'bib_number'),
+      identity: entries.filter(entry => entry.role === 'display_name_part'),
       additional: entries.filter(entry => entry.role === 'custom'),
       fallback: fallbackEntries,
     };
   }, [participantMappings, scannedParticipant]);
 
-  const hasParticipantDataPanel = Boolean(scannedParticipant)
+  const primaryParticipantFields = useMemo(() => {
+    if (!scannedParticipant) {
+      return [] as ParticipantFieldEntry[];
+    }
+
+    return [
+      ...mappedParticipantFields.identity,
+      ...(mappedParticipantFields.contact.length > 0
+        ? mappedParticipantFields.contact
+        : [{
+            label: 'Email',
+            value: scannedParticipant.email,
+            role: 'system' as const,
+          }]),
+    ];
+  }, [mappedParticipantFields.contact, mappedParticipantFields.identity, scannedParticipant]);
+
+  const hasRemainingParticipantData = Boolean(scannedParticipant)
     && (
-      mappedParticipantFields.contact.length > 0
-      || mappedParticipantFields.identity.length > 0
-      || mappedParticipantFields.additional.length > 0
+      mappedParticipantFields.additional.length > 0
       || mappedParticipantFields.fallback.length > 0
     );
-  const canAssignManualBibNumber = hasParticipantDataManagementAccess
-    && Boolean(scannedParticipant)
-    && !scannedParticipant.bib_number.trim();
+
+  const normalizedCurrentBibNumber = normalizeScannerBibNumberInput(scannedParticipant?.bib_number);
 
   const renderFieldGrid = (title: string, description: string, fields: ParticipantFieldEntry[]) => {
     if (fields.length === 0) {
@@ -524,13 +546,17 @@ export default function Scanner() {
         )}
       </div>
 
-      <div className="px-4 md:px-0">
-        <ParticipantSearch participants={eventParticipants} onSelect={handleSearchSelect} autoFocus={view === 'idle'} />
-      </div>
+      {view === 'idle' && (
+        <>
+          <div className="px-4 md:px-0">
+            <ParticipantSearch participants={eventParticipants} onSelect={handleSearchSelect} autoFocus />
+          </div>
 
-      <div className="px-4 md:px-0">
-        <QrScannerView onScan={decodedText => { void handleQrScan(decodedText); }} paused={view !== 'idle'} />
-      </div>
+          <div className="px-4 md:px-0">
+            <QrScannerView onScan={decodedText => { void handleQrScan(decodedText); }} paused={false} />
+          </div>
+        </>
+      )}
 
       {view === 'detail' && scannedParticipant && (
         <div className="px-4 md:px-0">
@@ -541,7 +567,11 @@ export default function Scanner() {
                   <CardTitle className="truncate text-lg sm:text-xl">{scannedParticipant.name}</CardTitle>
                   <p className="mt-1 break-all text-sm text-muted-foreground">{scannedParticipant.email}</p>
                 </div>
-                <span className="shrink-0 text-2xl font-black tabular-nums text-primary sm:text-3xl">{formatBibNumber(scannedParticipant.bib_number)}</span>
+                <span className={`shrink-0 text-2xl font-black tabular-nums sm:text-3xl ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'text-muted-foreground' : 'text-primary'}`}>
+                  {isScannerBibNumberMissing(scannedParticipant.bib_number)
+                    ? 'Do uzupełnienia'
+                    : formatBibNumber(scannedParticipant.bib_number)}
+                </span>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge variant={getParticipantStatusDefinition(scannedParticipant.status).badgeVariant}>
@@ -556,13 +586,84 @@ export default function Scanner() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4 pb-4">
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+                <div className="rounded-2xl border bg-muted/20 p-3 sm:p-4">
+                  <div className="mb-3">
+                    <p className="text-sm font-semibold text-foreground">Dane do weryfikacji</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Najważniejsze informacje potrzebne przy obsłudze uczestnika.
+                    </p>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {primaryParticipantFields.map(field => (
+                      <div key={`primary-${field.role}-${field.label}`} className="rounded-xl border bg-background/90 px-3 py-2 shadow-sm">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          {formatParticipantFieldLabel(field.label)}
+                        </p>
+                        <p className={`mt-1 break-words text-sm font-medium ${field.value ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          {field.value || 'Brak danych'}
+                        </p>
+                      </div>
+                    ))}
+                    <div className="rounded-xl border bg-background/90 px-3 py-2 shadow-sm sm:col-span-2">
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="scanner-inline-bib-number" className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          Numer startowy
+                        </Label>
+                        {hasParticipantDataManagementAccess ? (
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <Input
+                              id="scanner-inline-bib-number"
+                              value={bibNumberValue}
+                              onChange={event => {
+                                setBibNumberValue(event.target.value);
+                                setBibNumberError(undefined);
+                              }}
+                              placeholder="Wpisz numer startowy"
+                              className="sm:flex-1"
+                              aria-invalid={Boolean(bibNumberError)}
+                              aria-describedby={bibNumberError ? 'scanner-inline-bib-number-error' : undefined}
+                              disabled={isSavingBibNumber || isReadOnly || !isOnline}
+                            />
+                            <Button
+                              className="w-full sm:w-auto"
+                              onClick={() => void handleSaveBibNumber()}
+                              disabled={
+                                isSavingBibNumber
+                                || isReadOnly
+                                || !isOnline
+                                || bibNumberValue.trim() === normalizedCurrentBibNumber
+                              }
+                            >
+                              {isSavingBibNumber ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                              Zapisz numer
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className={`text-sm font-medium ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'text-muted-foreground' : 'text-foreground'}`}>
+                            {isScannerBibNumberMissing(scannedParticipant.bib_number)
+                              ? 'Do uzupełnienia'
+                              : formatBibNumber(scannedParticipant.bib_number)}
+                          </p>
+                        )}
+                        <FieldError id="scanner-inline-bib-number-error">
+                          {bibNumberError}
+                        </FieldError>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="rounded-2xl border bg-muted/20 p-3 sm:p-4">
                   <p className="text-sm font-semibold text-foreground">Podsumowanie odprawy</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <div className="rounded-xl border bg-background/90 px-3 py-2 shadow-sm">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Numer startowy</p>
-                      <p className="mt-1 text-sm font-medium text-foreground">{formatBibNumber(scannedParticipant.bib_number)}</p>
+                      <p className={`mt-1 text-sm font-medium ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'text-muted-foreground' : 'text-foreground'}`}>
+                        {isScannerBibNumberMissing(scannedParticipant.bib_number)
+                          ? 'Do uzupełnienia'
+                          : formatBibNumber(scannedParticipant.bib_number)}
+                      </p>
                     </div>
                     <div className="rounded-xl border bg-background/90 px-3 py-2 shadow-sm">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Status</p>
@@ -585,50 +686,14 @@ export default function Scanner() {
                     )}
                   </div>
                 </div>
-
-                <div className="space-y-3">
-                  {renderFieldGrid(
-                    'Dane kontaktowe',
-                    'Pola wykorzystywane do kontaktu z uczestnikiem.',
-                    mappedParticipantFields.contact,
-                  )}
-                  {renderFieldGrid(
-                    'Dane identyfikacyjne',
-                    'Pola biorace udzial w identyfikacji uczestnika podczas odprawy.',
-                    mappedParticipantFields.identity,
-                  )}
-                  {renderFieldGrid(
-                    'Dodatkowe informacje',
-                    participantMappings.length > 0
-                      ? 'Wszystkie aktywne pola z mapowania kolumn dla tego wydarzenia.'
-                      : 'Dane zapisane przy uczestniku, gdy mapowanie nie jest aktualnie dostepne.',
-                    mappedParticipantFields.additional.length > 0 ? mappedParticipantFields.additional : mappedParticipantFields.fallback,
-                  )}
-                  {!hasParticipantDataPanel && (
-                    <div className="rounded-2xl border border-dashed bg-muted/10 px-4 py-5 text-sm text-muted-foreground">
-                      Dla tego uczestnika nie ma dodatkowych pol do pokazania.
-                    </div>
-                  )}
-                </div>
               </div>
 
               <div className="grid gap-2">
-                {canAssignManualBibNumber && (
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setManualBibNumberOpen(true)}
-                    disabled={isMutating || isSavingBibNumber || isReadOnly || !isOnline}
-                  >
-                    {isSavingBibNumber ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-                    Nadaj numer startowy
-                  </Button>
-                )}
                 {hasParticipantDataManagementAccess && selectedEvent && (
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => navigate(buildEventParticipantPath(selectedEvent.id, scannedParticipant.id))}
+                    onClick={() => navigate(buildEventParticipantPath(selectedEvent.id, scannedParticipant.id), { state: { openEdit: true } })}
                     disabled={isMutating}
                   >
                     Edytuj dane uczestnika
@@ -652,7 +717,23 @@ export default function Scanner() {
                     Cofnij odprawę
                   </Button>
                 )}
+                <Button variant="ghost" className="w-full" onClick={resetToIdle}>
+                  Wróć do skanera
+                </Button>
               </div>
+
+              {renderFieldGrid(
+                'Pozostałe dane uczestnika',
+                participantMappings.length > 0
+                  ? 'Pozostałe aktywne pola z mapowania kolumn dla tego wydarzenia.'
+                  : 'Dane zapisane przy uczestniku, gdy mapowanie nie jest aktualnie dostępne.',
+                mappedParticipantFields.additional.length > 0 ? mappedParticipantFields.additional : mappedParticipantFields.fallback,
+              )}
+              {!hasRemainingParticipantData && (
+                <div className="rounded-2xl border border-dashed bg-muted/10 px-4 py-5 text-sm text-muted-foreground">
+                  Dla tego uczestnika nie ma dodatkowych pól do pokazania.
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -663,7 +744,7 @@ export default function Scanner() {
         onOpenChange={nextOpen => {
           setManualBibNumberOpen(nextOpen);
           if (!nextOpen) {
-            setBibNumberValue(scannedParticipant?.bib_number ?? '');
+            setBibNumberValue(normalizeScannerBibNumberInput(scannedParticipant?.bib_number));
             setBibNumberError(undefined);
           }
         }}

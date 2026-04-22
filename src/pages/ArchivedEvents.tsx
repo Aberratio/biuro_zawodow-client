@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Archive, ArrowLeft } from "lucide-react";
 import { useData } from "@/contexts/DataContext";
+import { useRouteOrganizationContext } from "@/hooks/use-route-organization-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +20,7 @@ import { participantCountsAsCheckedIn } from "@/lib/participant-status";
 
 export default function ArchivedEvents() {
   const { id } = useParams<{ id: string }>();
+  useRouteOrganizationContext(id ?? "");
   const navigate = useNavigate();
   const { archivedEvents, organizations, participants, isLoading } = useData();
 

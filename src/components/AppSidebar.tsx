@@ -28,6 +28,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSkeleton,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { Role } from "@/types";
 import { isEventOfficeOpen } from "@/lib/events";
 import { isScannerRole } from "@/lib/roles";
@@ -155,6 +157,48 @@ const workspaceInfoCardClassName =
 
 const sidebarLogoClassName = "h-[3.5rem] w-auto object-contain";
 
+function EventWorkspaceSkeleton({
+  showOrganizationSection,
+}: {
+  showOrganizationSection: boolean;
+}) {
+  const eventCard = (
+    <div className="rounded-[0.95rem] bg-[hsl(220_7%_13%/0.72)] p-3.5">
+      <Skeleton className="h-3 w-32 bg-sidebar-foreground/10" />
+      <div className="mt-3 rounded-[0.85rem] bg-[hsl(220_7%_11%/0.94)] px-4 py-3">
+        <Skeleton className="h-5 w-full max-w-[13.5rem] bg-sidebar-foreground/10" />
+      </div>
+      <div className="mt-4 border-t border-sidebar-border/35 pt-3">
+        <SidebarMenu className="gap-1">
+          {Array.from({ length: 3 }, (_, index) => (
+            <SidebarMenuSkeleton
+              key={index}
+              showIcon
+              className="h-10 rounded-[0.8rem] px-3"
+            />
+          ))}
+        </SidebarMenu>
+      </div>
+    </div>
+  );
+
+  if (!showOrganizationSection) {
+    return eventCard;
+  }
+
+  return (
+    <div className="space-y-4 rounded-[0.95rem] bg-[hsl(220_7%_13%/0.68)] p-3.5">
+      <div>
+        <Skeleton className="h-3 w-36 bg-sidebar-foreground/10" />
+        <div className="mt-3 rounded-[0.85rem] bg-[hsl(220_7%_11%/0.94)] px-4 py-3">
+          <Skeleton className="h-5 w-full max-w-[12.5rem] bg-sidebar-foreground/10" />
+        </div>
+      </div>
+      {eventCard}
+    </div>
+  );
+}
+
 export function AppSidebar() {
   const { state, isMobile, openMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
@@ -164,6 +208,7 @@ export function AppSidebar() {
     currentUser,
     organizations,
     visibleEvents,
+    isLoading,
     selectedOrganizationId,
     setSelectedOrganizationId,
     selectedEventId,
@@ -194,7 +239,7 @@ export function AppSidebar() {
   };
 
   const scannerHasActiveEvents =
-    !isScannerRole(currentRole) || visibleEvents.length > 0;
+    isLoading || !isScannerRole(currentRole) || visibleEvents.length > 0;
   const items = allItems
     .filter((item) => {
       if (!item.roles.includes(currentRole)) return false;
@@ -242,12 +287,14 @@ export function AppSidebar() {
   const showOrganizationSelectControl = adminOrganizations.length > 1;
   const showEventSelectControl =
     scopedVisibleEvents.length > 1 || !isScannerRole(currentRole);
+  const showEventWorkspaceSkeleton = !collapsed && isLoading;
   const showEventWorkspace =
-    !collapsed &&
-    eventScopedItems.length > 0 &&
-    (currentRole === "admin"
-      ? adminOrganizations.length > 0
-      : visibleEvents.length > 0);
+    showEventWorkspaceSkeleton ||
+    (!collapsed &&
+      eventScopedItems.length > 0 &&
+      (currentRole === "admin"
+        ? adminOrganizations.length > 0
+        : visibleEvents.length > 0));
   const organizationSelectContent = showOrganizationSelectControl ? (
     <div className="mt-3">
       <Select
@@ -449,7 +496,11 @@ export function AppSidebar() {
                   </span>
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
-                  {currentRole === "admin" && (
+                  {showEventWorkspaceSkeleton ? (
+                    <EventWorkspaceSkeleton
+                      showOrganizationSection={currentRole === "admin"}
+                    />
+                  ) : currentRole === "admin" ? (
                     <div className="space-y-4 rounded-[0.95rem] bg-[hsl(220_7%_13%/0.68)] p-3.5">
                       <p className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-sidebar-foreground/56">
                         Wybrana organizacja
@@ -457,9 +508,9 @@ export function AppSidebar() {
                       {organizationSelectContent}
                       {eventWorkspaceCard}
                     </div>
+                  ) : (
+                    eventWorkspaceCard
                   )}
-
-                  {currentRole !== "admin" && eventWorkspaceCard}
                 </SidebarGroupContent>
               </SidebarGroup>
             )}
