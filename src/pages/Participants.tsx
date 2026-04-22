@@ -66,6 +66,10 @@ import {
 type ParticipantSortKey = "name" | "email" | "bib_number" | "status";
 type SortDirection = "asc" | "desc";
 
+function normalizeParticipantText(value: string | null | undefined) {
+  return String(value ?? "");
+}
+
 export default function Participants() {
   const {
     participants,
@@ -119,12 +123,22 @@ export default function Participants() {
   const filtered = useMemo(() => {
     return eventParticipants
       .filter((participant) => {
-        const query = search.toLowerCase();
+        const query = search.toLocaleLowerCase("pl");
+        const participantName = normalizeParticipantText(
+          participant.name,
+        ).toLocaleLowerCase("pl");
+        const participantEmail = normalizeParticipantText(
+          participant.email,
+        ).toLocaleLowerCase("pl");
+        const participantBibNumber = normalizeParticipantText(
+          participant.bib_number,
+        );
+
         return (
           !query ||
-          participant.name.toLowerCase().includes(query) ||
-          participant.email.toLowerCase().includes(query) ||
-          participant.bib_number.includes(query)
+          participantName.includes(query) ||
+          participantEmail.includes(query) ||
+          participantBibNumber.includes(query)
         );
       })
       .filter(
@@ -397,6 +411,12 @@ export default function Participants() {
                 const status = getParticipantStatusDefinition(
                   participant.status,
                 );
+                const participantName = normalizeParticipantText(
+                  participant.name,
+                ) || "Nieznany uczestnik";
+                const participantEmail = normalizeParticipantText(
+                  participant.email,
+                );
 
                 return (
                   <TableRow
@@ -416,15 +436,15 @@ export default function Participants() {
                     <TableCell>
                       <div>
                         <span className="font-medium text-sm">
-                          {participant.name}
+                          {participantName}
                         </span>
                         <span className="block md:hidden text-xs text-muted-foreground truncate">
-                          {participant.email}
+                          {participantEmail}
                         </span>
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                      {participant.email}
+                      {participantEmail}
                     </TableCell>
                     <TableCell className="tabular-nums text-sm">
                       {formatBibNumber(participant.bib_number)}

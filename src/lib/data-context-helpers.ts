@@ -140,20 +140,51 @@ export function persistStoredSelectedEventId(userId: string, eventId: string): v
   persistStoredContextValue(getSelectedEventStorageKey(userId), eventId);
 }
 
-export function mapApiParticipantToUi(participant: ApiParticipant, fallbackEventId: string): Participant {
-  const eventId = participant.event_id ?? fallbackEventId;
+type ParticipantLike = Partial<ApiParticipant> & Partial<Participant>;
+
+function toTrimmedString(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value).trim();
+  return '';
+}
+
+function normalizeCustomFields(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, fieldValue]) => [key, toTrimmedString(fieldValue)])
+  );
+}
+
+export function mapApiParticipantToUi(participant: ParticipantLike | null | undefined, fallbackEventId: string): Participant {
+  const eventId = toTrimmedString(participant?.event_id) || fallbackEventId;
+  const displayName = toTrimmedString(participant?.display_name);
+  const cachedName = toTrimmedString(participant?.name);
+  const firstName = toTrimmedString(participant?.first_name);
+  const lastName = toTrimmedString(participant?.last_name);
+  const fallbackName = [firstName, lastName].filter(Boolean).join(' ');
+  const email = toTrimmedString(participant?.email);
+  const bibNumber = toTrimmedString(participant?.bib_number);
+  const qrCode = toTrimmedString(participant?.qr_code);
+  const checkedInAt = toTrimmedString(participant?.checked_in_at);
+  const participantId = toTrimmedString(participant?.id);
+  const normalizedId = participantId.startsWith('p-')
+    ? participantId
+    : `p-${participantId || 'unknown'}`;
 
   return {
-    id: `p-${participant.id}`,
+    id: normalizedId,
     event_id: eventId,
-    name: (participant.display_name ?? `${participant.first_name} ${participant.last_name}`.trim()).trim(),
-    email: participant.email,
-    bib_number: participant.bib_number ?? '',
-    qr_code: participant.qr_code ?? '',
-    status: normalizeParticipantStatus(participant.status),
-    email_status: participant.email_status ?? 'not_sent',
-    checked_in_at: participant.checked_in_at ?? undefined,
-    custom_fields: participant.custom_fields ?? {},
+    name: displayName || cachedName || fallbackName || email || 'Nieznany uczestnik',
+    email,
+    bib_number: bibNumber,
+    qr_code: qrCode,
+    status: normalizeParticipantStatus(toTrimmedString(participant?.status) || undefined),
+    email_status: participant?.email_status === 'sent' ? 'sent' : 'not_sent',
+    checked_in_at: checkedInAt || undefined,
+    custom_fields: normalizeCustomFields(participant?.custom_fields),
     sync_state: 'synced',
     sync_error: undefined,
   };

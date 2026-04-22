@@ -16,7 +16,8 @@ export function buildParticipantFieldValues(
   participant?: Participant
 ): Record<string, string> {
   const values = buildEmptyParticipantFieldValues(mappings);
-  const nameParts = participant?.name.trim().split(/\s+/).filter(Boolean) ?? [];
+  const participantName = typeof participant?.name === 'string' ? participant.name : '';
+  const nameParts = participantName.trim() ? participantName.trim().split(/\s+/).filter(Boolean) : [];
   let displayNameIndex = 0;
 
   for (const mapping of getActiveParticipantMappings(mappings)) {

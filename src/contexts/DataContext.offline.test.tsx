@@ -55,6 +55,7 @@ function OfflineConsumer() {
       <div data-testid="snapshot-source">{snapshotSource}</div>
       <div data-testid="connection-state">{connectionState}</div>
       <div data-testid="pending-count">{pendingMutationCount}</div>
+      <div data-testid="participant-name">{participant?.name ?? ''}</div>
       <div data-testid="participant-status">{participant?.status ?? ''}</div>
       <div data-testid="participant-sync">{participant?.sync_state ?? ''}</div>
       <button
@@ -164,6 +165,7 @@ describe('DataProvider offline cache and queue', () => {
 
     await waitFor(() => expect(screen.getByTestId('snapshot-source').textContent).toBe('cache'));
     expect(screen.getByTestId('connection-state').textContent).toMatch(/degraded|offline/);
+    expect(screen.getByTestId('participant-name').textContent).toBe('Anna Test');
     expect(screen.getByTestId('participant-status').textContent).toBe('not_checked_in');
   });
 
