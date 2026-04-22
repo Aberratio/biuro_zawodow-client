@@ -9,6 +9,39 @@ interface QrScannerViewProps {
   paused?: boolean;
 }
 
+const SCANNER_REGION_ID = 'qr-scanner-region';
+
+function computeQrBox(viewfinderWidth: number, viewfinderHeight: number) {
+  const shortestEdge = Math.min(viewfinderWidth, viewfinderHeight);
+  const boxSize = Math.max(180, Math.min(Math.floor(shortestEdge * 0.72), 280));
+
+  return { width: boxSize, height: boxSize };
+}
+
+async function ensureVideoPlayback(container: HTMLDivElement | null) {
+  const video = container?.querySelector('video');
+  if (!(video instanceof HTMLVideoElement)) {
+    return;
+  }
+
+  video.setAttribute('playsinline', 'true');
+  video.setAttribute('muted', 'true');
+  video.setAttribute('autoplay', 'true');
+  video.playsInline = true;
+  video.muted = true;
+  video.autoplay = true;
+  video.style.width = '100%';
+  video.style.height = '100%';
+  video.style.objectFit = 'cover';
+  video.style.backgroundColor = '#000';
+
+  try {
+    await video.play();
+  } catch {
+    // Some browsers reject a redundant play() call even when the stream is valid.
+  }
+}
+
 export default function QrScannerView({ onScan, paused }: QrScannerViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -19,30 +52,97 @@ export default function QrScannerView({ onScan, paused }: QrScannerViewProps) {
   useEffect(() => {
     if (paused) return;
 
-    const containerId = 'qr-scanner-region';
     let mounted = true;
 
+    setCameraState('requesting');
+
     const startScanner = async () => {
+      const onScanSuccess = (decodedText: string) => {
+        if (mounted) {
+          onScanRef.current(decodedText);
+        }
+      };
+
+      const startAttempts: Array<() => Promise<Html5Qrcode>> = [
+        async () => {
+          const scanner = new Html5Qrcode(SCANNER_REGION_ID);
+          await scanner.start(
+            { facingMode: 'environment' },
+            {
+              fps: 10,
+              disableFlip: false,
+              qrbox: computeQrBox,
+              videoConstraints: {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+            },
+            onScanSuccess,
+            () => {},
+          );
+          return scanner;
+        },
+        async () => {
+          const scanner = new Html5Qrcode(SCANNER_REGION_ID);
+          await scanner.start(
+            { facingMode: 'environment' },
+            {
+              fps: 10,
+              disableFlip: false,
+              qrbox: computeQrBox,
+            },
+            onScanSuccess,
+            () => {},
+          );
+          return scanner;
+        },
+        async () => {
+          const cameras = await Html5Qrcode.getCameras();
+          const preferredCamera = cameras.find(camera => /back|rear|environment/i.test(camera.label)) ?? cameras.at(-1);
+          if (!preferredCamera) {
+            throw new Error('No camera devices available.');
+          }
+
+          const scanner = new Html5Qrcode(SCANNER_REGION_ID);
+          await scanner.start(
+            preferredCamera.id,
+            {
+              fps: 10,
+              disableFlip: false,
+              qrbox: computeQrBox,
+            },
+            onScanSuccess,
+            () => {},
+          );
+          return scanner;
+        },
+      ];
+
       try {
-        const scanner = new Html5Qrcode(containerId);
-        scannerRef.current = scanner;
+        let lastError: unknown = null;
 
-        await scanner.start(
-          { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.333,
-          },
-          (decodedText) => {
+        for (const startAttempt of startAttempts) {
+          if (!mounted) {
+            return;
+          }
+
+          try {
+            const scanner = await startAttempt();
+            scannerRef.current = scanner;
+            await ensureVideoPlayback(containerRef.current);
+
             if (mounted) {
-              onScanRef.current(decodedText);
+              setCameraState('active');
             }
-          },
-          () => {} // ignore scan failures (continuous scanning)
-        );
+            return;
+          } catch (error) {
+            lastError = error;
+            scannerRef.current = null;
+          }
+        }
 
-        if (mounted) setCameraState('active');
+        throw lastError ?? new Error('Unable to start the QR scanner.');
       } catch (err: any) {
         if (!mounted) return;
         const msg = String(err?.message || err || '');
@@ -59,16 +159,26 @@ export default function QrScannerView({ onScan, paused }: QrScannerViewProps) {
     return () => {
       mounted = false;
       const scanner = scannerRef.current;
+      scannerRef.current = null;
       if (scanner) {
         try {
           const state = scanner.getState();
           if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
-            scanner.stop().catch(() => {});
+            scanner.stop()
+              .catch(() => {})
+              .finally(() => {
+                try {
+                  scanner.clear();
+                } catch {
+                  // ignore
+                }
+              });
+          } else {
+            scanner.clear();
           }
         } catch {
           // ignore
         }
-        scannerRef.current = null;
       }
     };
   }, [paused]);
@@ -82,9 +192,9 @@ export default function QrScannerView({ onScan, paused }: QrScannerViewProps) {
   }
 
   return (
-    <div className="relative rounded-lg overflow-hidden bg-black">
+    <div className="relative rounded-lg bg-black">
       {/* Camera feed renders here */}
-      <div id="qr-scanner-region" className="w-full" />
+      <div ref={containerRef} id={SCANNER_REGION_ID} className="qr-scanner-region w-full" />
 
       {/* Overlay states */}
       {cameraState === 'requesting' && (

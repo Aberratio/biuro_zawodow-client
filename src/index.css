@@ -1187,4 +1187,24 @@ All colors MUST be HSL.
   .themed-scrollbar::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--primary) / 0.46);
   }
+
+  .qr-scanner-region {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: #000;
+  }
+
+  .qr-scanner-region > div {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .qr-scanner-region video,
+  .qr-scanner-region canvas {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    background: #000 !important;
+  }
 }
