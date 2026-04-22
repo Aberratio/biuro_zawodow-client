@@ -45,6 +45,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import TableSkeleton from "@/components/skeletons/TableSkeleton";
+import { SuccessActionDialog } from "@/components/SuccessActionDialog";
 import { toast } from "@/hooks/use-toast";
 import {
   formatEventOfficeWindow,
@@ -62,7 +63,10 @@ import {
   validateRequired,
 } from "@/lib/form-validation";
 import { getRoleLabel, isScannerRole } from "@/lib/roles";
-import { buildOrganizationArchivedEventsPath } from "@/lib/routes";
+import {
+  buildEventPath,
+  buildOrganizationArchivedEventsPath,
+} from "@/lib/routes";
 import type { User } from "@/types";
 import {
   ArrowLeft,
@@ -169,6 +173,10 @@ export default function OrganizationDetails() {
   const [scannerAssignmentsDialogOpen, setScannerAssignmentsDialogOpen] =
     useState(false);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [createdEventSuccess, setCreatedEventSuccess] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [organizationEditOpen, setOrganizationEditOpen] = useState(false);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
   const [scannerEditDialogOpen, setScannerEditDialogOpen] = useState(false);
@@ -708,7 +716,12 @@ export default function OrganizationDetails() {
       office_open_at: "",
       office_close_at: "",
     });
-    toast({ title: "Wydarzenie utworzone" });
+    if (result.entityId) {
+      setCreatedEventSuccess({
+        id: result.entityId,
+        name: eventForm.name.trim(),
+      });
+    }
   };
 
   const handleSaveScannerAssignments = async () => {
@@ -2131,6 +2144,32 @@ export default function OrganizationDetails() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SuccessActionDialog
+        open={createdEventSuccess !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreatedEventSuccess(null);
+          }
+        }}
+        title="Wydarzenie utworzone pomyślnie"
+        description={
+          createdEventSuccess
+            ? `Wydarzenie "${createdEventSuccess.name || "Nowe wydarzenie"}" zostało utworzone.`
+            : ""
+        }
+        primaryLabel="Przejdź do wydarzenia"
+        secondaryLabel="Zostań na tej stronie"
+        onPrimaryAction={() => {
+          if (!createdEventSuccess) {
+            return;
+          }
+
+          navigate(buildEventPath(createdEventSuccess.id));
+          setCreatedEventSuccess(null);
+        }}
+        onSecondaryAction={() => setCreatedEventSuccess(null)}
+      />
     </div>
   );
 }

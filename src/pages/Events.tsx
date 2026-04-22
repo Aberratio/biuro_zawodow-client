@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import EventsSkeleton from "@/components/skeletons/EventsSkeleton";
+import { SuccessActionDialog } from "@/components/SuccessActionDialog";
 import { toast } from "@/hooks/use-toast";
 import {
   formatEventOfficeWindow,
@@ -53,6 +54,7 @@ import {
   parseEventDateTime,
 } from "@/lib/events";
 import { validateRequired } from "@/lib/form-validation";
+import { buildEventPath } from "@/lib/routes";
 import { isScannerRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
@@ -178,6 +180,10 @@ export default function Events() {
   } = useData();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [createdEventSuccess, setCreatedEventSuccess] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<EventStatusFilter>("all");
@@ -558,7 +564,12 @@ export default function Events() {
     });
     setFormErrors({});
     setOpen(false);
-    toast({ title: "Wydarzenie utworzone" });
+    if (result.entityId) {
+      setCreatedEventSuccess({
+        id: result.entityId,
+        name: form.name.trim(),
+      });
+    }
   };
 
   return (
@@ -1038,6 +1049,31 @@ export default function Events() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <SuccessActionDialog
+        open={createdEventSuccess !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setCreatedEventSuccess(null);
+          }
+        }}
+        title="Wydarzenie utworzone pomyślnie"
+        description={
+          createdEventSuccess
+            ? `Wydarzenie "${createdEventSuccess.name || "Nowe wydarzenie"}" zostało utworzone.`
+            : ""
+        }
+        primaryLabel="Przejdź do wydarzenia"
+        secondaryLabel="Zostań na tej stronie"
+        onPrimaryAction={() => {
+          if (!createdEventSuccess) {
+            return;
+          }
+
+          navigate(buildEventPath(createdEventSuccess.id));
+          setCreatedEventSuccess(null);
+        }}
+        onSecondaryAction={() => setCreatedEventSuccess(null)}
+      />
     </div>
   );
 }

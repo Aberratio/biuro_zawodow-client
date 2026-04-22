@@ -48,6 +48,7 @@ import {
   Pencil,
   Plus,
   ScanLine,
+  Trash2,
   Users,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -429,6 +430,15 @@ export default function EventDetails() {
   const canEditEvent = isArchivedEvent
     ? currentRole === "superadmin"
     : canManageScanners;
+  const canDeleteEvent = useMemo(() => {
+    if (!event || isArchivedEvent) return false;
+    if (currentRole === "superadmin") return true;
+    if (currentRole === "admin") return true;
+    if (currentRole === "editor") {
+      return currentUser.organization_id === event.organization_id;
+    }
+    return false;
+  }, [currentRole, currentUser.organization_id, event, isArchivedEvent]);
   const canUseActiveEventTools =
     !isArchivedEvent &&
     event !== undefined &&
@@ -487,10 +497,7 @@ export default function EventDetails() {
     officeOpenAt !== null &&
     now < officeOpenAt;
   const canArchiveEvent =
-    canEditEvent &&
-    !isArchivedEvent &&
-    officeCloseAt !== null &&
-    now > officeCloseAt;
+    canDeleteEvent && officeCloseAt !== null && now > officeCloseAt;
   const canAssignScannersToEvent =
     !isArchivedEvent && officeCloseAt !== null && now <= officeCloseAt;
 
@@ -999,7 +1006,10 @@ export default function EventDetails() {
           </div>
         </div>
 
-        {((!isArchivedEvent && event) || canUseActiveEventTools || canEditEvent || canArchiveEvent) && (
+        {((!isArchivedEvent && event) ||
+          canUseActiveEventTools ||
+          canEditEvent ||
+          canDeleteEvent) && (
           <aside className="event-detail-actions-panel">
             {canUseActiveEventTools && (
               <Button
@@ -1034,14 +1044,14 @@ export default function EventDetails() {
                 <Pencil className="h-4 w-4" /> Edytuj wydarzenie
               </Button>
             )}
-            {canArchiveEvent && (
+            {canDeleteEvent && (
               <Button
                 variant="destructive"
                 onClick={() => setDeleteConfirmOpen(true)}
                 className="event-detail-archive-action h-12 w-full"
-                disabled={!isOnline}
+                disabled={!isOnline || !canArchiveEvent}
               >
-                <Archive className="mr-1 h-4 w-4" /> Archiwizuj wydarzenie
+                <Trash2 className="mr-1 h-4 w-4" /> Usuń wydarzenie
               </Button>
             )}
           </aside>
@@ -1215,12 +1225,13 @@ export default function EventDetails() {
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Zarchiwizować wydarzenie?</AlertDialogTitle>
+            <AlertDialogTitle>Usunąć wydarzenie?</AlertDialogTitle>
             <AlertDialogDescription>
               Wydarzenie{" "}
               <span className="font-medium text-foreground">{event.name}</span>{" "}
               zniknie z aktywnych list i przypisań. Dane zostaną zachowane w
-              archiwum organizacji.
+              archiwum organizacji. Tę operację mogą wykonać tylko
+              administratorzy i organizatorzy po zakończeniu wydarzenia.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1233,7 +1244,7 @@ export default function EventDetails() {
               {isDeletingEvent && (
                 <Loader2 className="mr-1 h-4 w-4 animate-spin" />
               )}
-              Archiwizuj wydarzenie
+              Usuń wydarzenie
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
