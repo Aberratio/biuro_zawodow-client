@@ -1046,7 +1046,7 @@ export default function EventDetails() {
               <Button
                 variant="destructive"
                 onClick={() => setDeleteConfirmOpen(true)}
-                className="event-detail-archive-action h-12 w-full"
+                className="h-12 w-full"
                 disabled={!isOnline}
               >
                 <Trash2 className="mr-1 h-4 w-4" /> Usuń wydarzenie
