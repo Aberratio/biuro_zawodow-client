@@ -53,6 +53,7 @@ import {
   buildEventImportPath,
   buildEventParticipantsPath,
   buildEventPath,
+  buildOrganizationPath,
 } from "@/lib/routes";
 
 const allItems = [
