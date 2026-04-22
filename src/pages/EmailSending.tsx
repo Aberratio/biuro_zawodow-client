@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
+import { useRouteEventContext } from '@/hooks/use-route-event-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,7 +34,6 @@ export default function EmailSending() {
     participants,
     events,
     selectedEventId,
-    setSelectedEventId,
     sendEventQrEmails,
     sendParticipantQrEmail,
     isLoading,
@@ -46,15 +46,7 @@ export default function EmailSending() {
   const [pendingAction, setPendingAction] = useState<PendingEmailAction | null>(null);
   const activeEventId = routeEventId || selectedEventId;
 
-  useEffect(() => {
-    if (!routeEventId || routeEventId === selectedEventId) {
-      return;
-    }
-
-    if (events.some(event => event.id === routeEventId)) {
-      setSelectedEventId(routeEventId);
-    }
-  }, [events, routeEventId, selectedEventId, setSelectedEventId]);
+  useRouteEventContext(routeEventId);
 
   const eventParticipants = useMemo(
     () => participants.filter(participant => participant.event_id === activeEventId),

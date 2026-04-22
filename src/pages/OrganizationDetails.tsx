@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,7 @@ import {
   validateRequired,
 } from "@/lib/form-validation";
 import { getRoleLabel, isScannerRole } from "@/lib/roles";
+import { buildOrganizationArchivedEventsPath } from "@/lib/routes";
 import type { User } from "@/types";
 import {
   ArrowLeft,
@@ -1082,12 +1083,12 @@ export default function OrganizationDetails() {
             )}
             <p className="px-1 text-sm text-muted-foreground">
               {orgArchivedEvents.length} {archivedEventsSummaryLabel} w{" "}
-              <a
-                href={`/organizations/${organization.id}/archived-events`}
+              <Link
+                to={buildOrganizationArchivedEventsPath(organization.id)}
                 className="font-medium text-[hsl(var(--button-highlight))] underline underline-offset-4 hover:text-[hsl(var(--foreground))]"
               >
                 archiwum
-              </a>
+              </Link>
               .
             </p>
           </div>
@@ -1340,7 +1341,7 @@ export default function OrganizationDetails() {
               variant="outline"
               className="h-12 w-full rounded-[1rem] border-[hsl(var(--button-highlight)/0.38)] bg-transparent text-[hsl(var(--button-highlight))] hover:bg-[hsl(var(--button-highlight)/0.08)] hover:text-[hsl(var(--button-highlight))] sm:w-auto"
               onClick={() =>
-                navigate(`/organizations/${organization.id}/archived-events`)
+                navigate(buildOrganizationArchivedEventsPath(organization.id))
               }
             >
               Otwórz archiwum

@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
+import { useRouteEventContext } from "@/hooks/use-route-event-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -114,7 +115,6 @@ export default function ParticipantDetails() {
     events,
     activityLog,
     currentRole,
-    setSelectedEventId,
     updateParticipantStatus,
     updateParticipantBibNumber,
     updateParticipantDetails,
@@ -161,6 +161,8 @@ export default function ParticipantDetails() {
   const canUseAdminActions = canUseParticipantAdminActions(currentRole);
   const isOnline = connectionState === "online";
 
+  useRouteEventContext(routeEventId);
+
   useEffect(() => {
     if (!participant) return;
     setStatusValue(participant.status);
@@ -171,12 +173,6 @@ export default function ParticipantDetails() {
     setPendingBibNumberCandidate("");
     setTransferEmail(participant.email);
   }, [participant]);
-
-  useEffect(() => {
-    if (!participant?.event_id) return;
-
-    setSelectedEventId(participant.event_id);
-  }, [participant?.event_id, setSelectedEventId]);
 
   useEffect(() => {
     if (!participant?.event_id || !canManageParticipantData || !isOnline)

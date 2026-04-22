@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { formatDistanceToNowStrict } from "date-fns";
 import { pl } from "date-fns/locale";
 import { useData } from "@/contexts/DataContext";
+import { useRouteEventContext } from "@/hooks/use-route-event-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
@@ -434,11 +435,7 @@ export default function EventDetails() {
     isEventOfficeOpen(event, new Date(nowTimestamp));
   const isOnline = connectionState === "online";
 
-  useEffect(() => {
-    if (id && events.some((entry) => entry.id === id)) {
-      setSelectedEventId(id);
-    }
-  }, [events, id, setSelectedEventId]);
+  useRouteEventContext(id ?? "");
 
   useEffect(() => {
     const intervalId = window.setInterval(

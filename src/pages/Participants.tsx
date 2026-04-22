@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
+import { useRouteEventContext } from "@/hooks/use-route-event-context";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -73,9 +74,7 @@ function normalizeParticipantText(value: string | null | undefined) {
 export default function Participants() {
   const {
     participants,
-    events,
     selectedEventId,
-    setSelectedEventId,
     currentRole,
     isLoading,
     getParticipantFieldMappings,
@@ -102,15 +101,7 @@ export default function Participants() {
   const isOnline = connectionState === "online";
   const activeEventId = routeEventId || selectedEventId;
 
-  useEffect(() => {
-    if (!routeEventId || routeEventId === selectedEventId) {
-      return;
-    }
-
-    if (events.some((event) => event.id === routeEventId)) {
-      setSelectedEventId(routeEventId);
-    }
-  }, [events, routeEventId, selectedEventId, setSelectedEventId]);
+  useRouteEventContext(routeEventId);
 
   const eventParticipants = useMemo(
     () =>

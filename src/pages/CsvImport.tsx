@@ -1,6 +1,7 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
+import { useRouteEventContext } from '@/hooks/use-route-event-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -78,7 +79,6 @@ export default function CsvImport() {
   const {
     events,
     selectedEventId,
-    setSelectedEventId,
     analyzeParticipantImport,
     confirmParticipantImportMapping,
     runParticipantImport,
@@ -99,11 +99,7 @@ export default function CsvImport() {
   const [mappingErrors, setMappingErrors] = useState<{ emailColumn?: string; aliases: Record<string, string>; form?: string }>({ aliases: {} });
   const isOnline = connectionState === 'online';
 
-  useEffect(() => {
-    if (routeEventId) {
-      setSelectedEventId(routeEventId);
-    }
-  }, [routeEventId, setSelectedEventId]);
+  useRouteEventContext(routeEventId);
 
   useEffect(() => {
     if (!analysis || analysis.has_mapping) {
