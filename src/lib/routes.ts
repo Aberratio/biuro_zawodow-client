@@ -2,6 +2,16 @@ function encodeRouteParam(value: string): string {
   return encodeURIComponent(value);
 }
 
+export function buildOrganizationPath(organizationId: string): string {
+  return `/organizations/${encodeRouteParam(organizationId)}`;
+}
+
+export function buildOrganizationArchivedEventsPath(
+  organizationId: string,
+): string {
+  return `${buildOrganizationPath(organizationId)}/archived-events`;
+}
+
 export function buildEventPath(eventId: string): string {
   return `/events/${encodeRouteParam(eventId)}`;
 }
