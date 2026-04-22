@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -237,8 +237,12 @@ export default function Login() {
                 size="lg"
                 className="mt-2 h-16 w-full rounded-[1.35rem] border-[hsl(var(--button-highlight)/0.86)] bg-[linear-gradient(180deg,hsl(40_40%_44%)_0%,hsl(39_29%_31%)_48%,hsl(38_24%_22%)_100%)] text-[1.12rem] font-semibold shadow-[inset_0_1px_0_hsl(var(--foreground)/0.14),0_0_0_1px_hsl(var(--button-highlight)/0.12),0_12px_24px_hsl(var(--surface-shadow)/0.28)] hover:bg-[linear-gradient(180deg,hsl(40_42%_47%)_0%,hsl(39_30%_33%)_48%,hsl(38_25%_24%)_100%)] hover:translate-y-0"
                 disabled={isSubmitting}
+                aria-busy={isSubmitting}
               >
-                Zaloguj się
+                {isSubmitting && (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                )}
+                {isSubmitting ? "Logowanie..." : "Zaloguj się"}
               </Button>
 
               <div className="flex justify-end pt-1">
@@ -350,8 +354,12 @@ export default function Login() {
                     size="lg"
                     className="h-12 w-full rounded-2xl text-sm"
                     disabled={isSubmitting}
+                    aria-busy={isSubmitting}
                   >
-                    Zaloguj się
+                    {isSubmitting && (
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    )}
+                    {isSubmitting ? "Logowanie..." : "Zaloguj się"}
                   </Button>
 
                   <div className="flex justify-end">
