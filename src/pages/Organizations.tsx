@@ -42,7 +42,17 @@ function getClosestOrganizationEventLabel(organizationEvents: Event[], now: Date
 
 export default function Organizations() {
   const navigate = useNavigate();
-  const { organizations, events, archivedEvents, currentRole, currentUser, createOrganization, isLoading, connectionState } = useData();
+  const {
+    organizations,
+    events,
+    archivedEvents,
+    currentRole,
+    currentUser,
+    createOrganization,
+    isLoading,
+    connectionState,
+    setSelectedOrganizationId,
+  } = useData();
   const [open, setOpen] = useState(false);
   const [createdOrganizationSuccess, setCreatedOrganizationSuccess] = useState<{
     id: string;
@@ -91,6 +101,14 @@ export default function Organizations() {
         };
       });
   }, [archivedEvents, events, normalizedQuery, now, visibleOrganizations]);
+
+  const openOrganization = (organizationId: string) => {
+    if (currentRole === 'admin') {
+      setSelectedOrganizationId(organizationId);
+    }
+
+    navigate(buildOrganizationPath(organizationId));
+  };
 
   if (isLoading) return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
 
@@ -198,11 +216,11 @@ export default function Organizations() {
                     <TableRow
                       key={org.id}
                       className="cursor-pointer active:bg-accent/50"
-                      onClick={() => navigate(`/organizations/${org.id}`)}
+                      onClick={() => openOrganization(org.id)}
                       onKeyDown={event => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
-                          navigate(`/organizations/${org.id}`);
+                          openOrganization(org.id);
                         }
                       }}
                       tabIndex={0}
@@ -314,7 +332,7 @@ export default function Organizations() {
             return;
           }
 
-          navigate(buildOrganizationPath(createdOrganizationSuccess.id));
+          openOrganization(createdOrganizationSuccess.id);
           setCreatedOrganizationSuccess(null);
         }}
         onSecondaryAction={() => setCreatedOrganizationSuccess(null)}

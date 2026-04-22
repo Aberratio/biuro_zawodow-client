@@ -1,6 +1,7 @@
 ﻿import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
+import { useRouteOrganizationContext } from "@/hooks/use-route-organization-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -148,6 +149,7 @@ function formatEventCount(value: number) {
 
 export default function OrganizationDetails() {
   const { id } = useParams<{ id: string }>();
+  useRouteOrganizationContext(id ?? "");
   const navigate = useNavigate();
   const {
     organizations,

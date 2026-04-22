@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider, useData } from '@/contexts/DataContext';
+import { useRouteOrganizationContext } from '@/hooks/use-route-organization-context';
 import Participants from '@/pages/Participants';
 import type { Event, Organization, User } from '@/types';
 
@@ -55,6 +56,12 @@ function TestConsumer() {
       </button>
     </div>
   );
+}
+
+function OrganizationRouteSyncProbe() {
+  const { id } = useParams<{ id: string }>();
+  useRouteOrganizationContext(id ?? '');
+  return null;
 }
 
 function createEvent(id: string, organizationId = 'org-1'): Event {
@@ -420,6 +427,109 @@ describe('DataProvider bootstrap loading', () => {
 
     expect(window.sessionStorage.getItem('selected_organization_context:admin-1')).toBe('org-2');
     expect(window.sessionStorage.getItem('selected_event_context:admin-1')).toBe('event-2');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('syncs admin organization context from organization details route on refresh', async () => {
+    const adminUser: User = {
+      id: 'admin-1',
+      name: 'Admin',
+      email: 'admin@example.com',
+      password: '',
+      role: 'admin',
+      assigned_events: [],
+    };
+
+    authState.user = adminUser;
+    window.localStorage.setItem(
+      'selected_organization_context:admin-1',
+      'org-af3457c5f5f9490d',
+    );
+
+    const organizations = [
+      createOrganization('org-af3457c5f5f9490d'),
+      createOrganization('org-98a5894827bb86e2'),
+    ];
+    const fetchMock = vi.fn(async () =>
+      createBootstrapResponse(adminUser, [], organizations),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={['/organizations/org-98a5894827bb86e2']}>
+        <DataProvider>
+          <Routes>
+            <Route
+              path="/organizations/:id"
+              element={<OrganizationRouteSyncProbe />}
+            />
+          </Routes>
+          <TestConsumer />
+        </DataProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('selected-organization').textContent).toBe(
+        'org-98a5894827bb86e2',
+      ),
+    );
+
+    expect(window.sessionStorage.getItem('selected_organization_context:admin-1')).toBe(
+      'org-98a5894827bb86e2',
+    );
+    expect(window.localStorage.getItem('selected_organization_context:admin-1')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('syncs admin organization context from archived events route on refresh', async () => {
+    const adminUser: User = {
+      id: 'admin-1',
+      name: 'Admin',
+      email: 'admin@example.com',
+      password: '',
+      role: 'admin',
+      assigned_events: [],
+    };
+
+    authState.user = adminUser;
+    window.localStorage.setItem(
+      'selected_organization_context:admin-1',
+      'org-af3457c5f5f9490d',
+    );
+
+    const organizations = [
+      createOrganization('org-af3457c5f5f9490d'),
+      createOrganization('org-98a5894827bb86e2'),
+    ];
+    const fetchMock = vi.fn(async () =>
+      createBootstrapResponse(adminUser, [], organizations),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={['/organizations/org-98a5894827bb86e2/archived-events']}>
+        <DataProvider>
+          <Routes>
+            <Route
+              path="/organizations/:id/archived-events"
+              element={<OrganizationRouteSyncProbe />}
+            />
+          </Routes>
+          <TestConsumer />
+        </DataProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('selected-organization').textContent).toBe(
+        'org-98a5894827bb86e2',
+      ),
+    );
+
+    expect(window.sessionStorage.getItem('selected_organization_context:admin-1')).toBe(
+      'org-98a5894827bb86e2',
+    );
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

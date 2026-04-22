@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import Organizations from '@/pages/Organizations';
 import type { Event, Organization, User } from '@/types';
 
@@ -49,24 +49,46 @@ function createEvent(
   };
 }
 
-function renderPage(organizations: Organization[], events?: Event[], role: User['role'] = 'superadmin') {
+function LocationDisplay() {
+  const location = useLocation();
+  return <div data-testid="location-display">{location.pathname}</div>;
+}
+
+function renderPage(
+  organizations: Organization[],
+  events?: Event[],
+  role: User['role'] = 'superadmin',
+  options?: {
+    setSelectedOrganizationId?: ReturnType<typeof vi.fn>;
+    initialEntry?: string;
+  },
+) {
   const currentUser = createUser(role);
+  const setSelectedOrganizationId = options?.setSelectedOrganizationId ?? vi.fn();
 
   useDataMock.mockReturnValue({
     organizations,
+    archivedEvents: [],
     events: events ?? organizations.map((organization, index) => createEvent(`event-${index + 1}`, organization.id)),
     users: [currentUser],
     currentRole: role,
     currentUser,
     createOrganization: vi.fn(),
     isLoading: false,
+    connectionState: 'online',
+    setSelectedOrganizationId,
   });
 
   render(
-    <MemoryRouter>
-      <Organizations />
+    <MemoryRouter initialEntries={[options?.initialEntry ?? '/organizations']}>
+      <Routes>
+        <Route path="/organizations" element={<Organizations />} />
+        <Route path="/organizations/:id" element={<LocationDisplay />} />
+      </Routes>
     </MemoryRouter>
   );
+
+  return { setSelectedOrganizationId };
 }
 
 describe('Organizations page', () => {
@@ -139,5 +161,24 @@ describe('Organizations page', () => {
 
     expect(screen.getByText('Alpha')).toBeInTheDocument();
     expect(screen.getByText('Beta')).toBeInTheDocument();
+  });
+
+  it('syncs admin organization context before navigating to organization details', () => {
+    const setSelectedOrganizationId = vi.fn();
+
+    renderPage(
+      [
+        createOrganization('org-1', 'Alpha'),
+        createOrganization('org-2', 'Beta'),
+      ],
+      undefined,
+      'admin',
+      { setSelectedOrganizationId },
+    );
+
+    fireEvent.click(screen.getByText('Beta'));
+
+    expect(setSelectedOrganizationId).toHaveBeenCalledWith('org-2');
+    expect(screen.getByTestId('location-display').textContent).toBe('/organizations/org-2');
   });
 });

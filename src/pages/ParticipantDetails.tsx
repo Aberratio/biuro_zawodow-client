@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
 import { useRouteEventContext } from "@/hooks/use-route-event-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,6 +109,7 @@ export default function ParticipantDetails() {
     id: string;
     participantId: string;
   }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const {
     participants,
@@ -160,6 +161,9 @@ export default function ParticipantDetails() {
     canManageParticipantDataForRole(currentRole);
   const canUseAdminActions = canUseParticipantAdminActions(currentRole);
   const isOnline = connectionState === "online";
+  const shouldOpenEditOnMount = Boolean(
+    (location.state as { openEdit?: boolean } | null)?.openEdit,
+  );
 
   useRouteEventContext(routeEventId);
 
@@ -209,6 +213,22 @@ export default function ParticipantDetails() {
       })
       .finally(() => setIsQrLoading(false));
   }, [canUseAdminActions, getParticipantQrPreview, isOnline, participant?.id]);
+
+  useEffect(() => {
+    if (!shouldOpenEditOnMount || !canManageParticipantData) return;
+
+    setTransferOpen(true);
+    navigate(`${location.pathname}${location.search}`, {
+      replace: true,
+      state: null,
+    });
+  }, [
+    canManageParticipantData,
+    location.pathname,
+    location.search,
+    navigate,
+    shouldOpenEditOnMount,
+  ]);
 
   const activeMappings = useMemo(
     () => getActiveParticipantMappings(mappings),
