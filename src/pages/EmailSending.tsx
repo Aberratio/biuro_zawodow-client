@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
 import { useRouteEventContext } from '@/hooks/use-route-event-context';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -16,22 +16,69 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertTriangle, ArrowLeft, CheckCircle, Info, Loader2, Mail, RefreshCcw, Send } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Info, Loader2, Mail, RefreshCcw, Send } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 import { buildEventPath } from '@/lib/routes';
+import type { ActivityLog } from '@/types';
 
 type PendingEmailAction =
   | { kind: 'send-missing'; count: number }
   | { kind: 'resend-all'; count: number }
   | { kind: 'send-one'; participantId: string; participantName: string; participantEmail: string };
 
+const qrActionDateFormatter = new Intl.DateTimeFormat('pl-PL', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+const isQrSendingActivity = (action: string) => {
+  const normalizedAction = action.toLowerCase();
+  return normalizedAction.includes('kod qr') || normalizedAction.includes('kody qr') || normalizedAction.includes('kodu qr');
+};
+
+const formatQrActivityAction = (log: ActivityLog) => {
+  const normalizedAction = log.action.toLowerCase();
+
+  if (normalizedAction === 'ponownie wyslano kod qr') {
+    return `Wysłano ponownie kod QR do ${log.participant_name ?? 'uczestnika'}.`;
+  }
+
+  if (normalizedAction === 'wysłano ponownie kod qr') {
+    return `Wysłano ponownie kod QR do ${log.participant_name ?? 'uczestnika'}.`;
+  }
+
+  if (normalizedAction === 'wysłano kod qr') {
+    return `Wysłano kod QR do ${log.participant_name ?? 'uczestnika'}.`;
+  }
+
+  if (normalizedAction === 'nie udało się wysłać kodu qr' || normalizedAction.startsWith('nie udało się wysłać kodu qr:')) {
+    return log.participant_name
+      ? `Nie udało się wysłać kodu QR do ${log.participant_name}.`
+      : 'Nie udało się wysłać kodu QR.';
+  }
+
+  if (normalizedAction === 'nie udało się ponownie wysłać kodu qr' || normalizedAction.startsWith('nie udało się ponownie wysłać kodu qr:')) {
+    return log.participant_name
+      ? `Nie udało się ponownie wysłać kodu QR do ${log.participant_name}.`
+      : 'Nie udało się ponownie wysłać kodu QR.';
+  }
+
+  return log.participant_name && normalizedAction.includes('kod qr') && !normalizedAction.includes(log.participant_name.toLowerCase())
+    ? `${log.action} ${log.participant_name}.`
+    : log.action;
+};
+
 export default function EmailSending() {
   const navigate = useNavigate();
   const { id: routeEventId = '' } = useParams<{ id: string }>();
   const {
     participants,
+    activityLog,
     events,
     selectedEventId,
     sendEventQrEmails,
@@ -42,7 +89,6 @@ export default function EmailSending() {
   const [sendingAll, setSendingAll] = useState(false);
   const [resendingAll, setResendingAll] = useState(false);
   const [sendingParticipantId, setSendingParticipantId] = useState<string | null>(null);
-  const [lastErrors, setLastErrors] = useState<Array<{ participant_name: string; error: string }>>([]);
   const [pendingAction, setPendingAction] = useState<PendingEmailAction | null>(null);
   const activeEventId = routeEventId || selectedEventId;
 
@@ -60,6 +106,12 @@ export default function EmailSending() {
   const hasPendingEmails = pending > 0;
   const hasNoSentEmails = sent === 0;
   const hasPartialDelivery = hasSentEmails && hasPendingEmails;
+  const recentQrActions = useMemo(
+    () => activityLog
+      .filter(log => log.event_id === activeEventId && isQrSendingActivity(log.action))
+      .slice(0, 5),
+    [activeEventId, activityLog],
+  );
   const isConfirmingAction = sendingAll || resendingAll || sendingParticipantId !== null;
   const isOnline = connectionState === 'online';
 
@@ -82,7 +134,6 @@ export default function EmailSending() {
         return;
       }
 
-      setLastErrors(result.errors.map(error => ({ participant_name: error.participant_name, error: error.error })));
       if (result.error_count > 0) {
         toast({
           title: 'Wysyłka zakończona częściowo',
@@ -189,20 +240,25 @@ export default function EmailSending() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base">Ostatnie błędy</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Ostatnie akcje</CardTitle>
+            <CardDescription>
+              Historia ostatnich operacji wysyłki kodów QR (5 ostatnich, resztę możesz eksportować w zakładce ze szczególami tego wydarzenia).
+            </CardDescription>
+          </CardHeader>
           <CardContent className="space-y-3">
-            {lastErrors.length === 0 ? (
+            {recentQrActions.length === 0 ? (
               <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                Brak błędów z ostatniej operacji.
+                Brak zapisanych akcji wysyłki kodów QR dla tego wydarzenia.
               </div>
             ) : (
-              lastErrors.slice(0, 4).map(error => (
-                <div key={`${error.participant_name}-${error.error}`} className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                    <div>
-                      <p className="text-sm font-medium">{error.participant_name}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{error.error}</p>
+              recentQrActions.map(log => (
+                <div key={log.id} className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-medium leading-5">{formatQrActivityAction(log)}</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>{qrActionDateFormatter.format(new Date(log.timestamp))}</span>
+                      <span>{log.user_name ? `Wysłał(a): ${log.user_name}` : 'Operator nieznany'}</span>
                     </div>
                   </div>
                 </div>

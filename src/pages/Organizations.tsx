@@ -9,10 +9,12 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldError } from '@/components/ui/field-error';
+import { SuccessActionDialog } from '@/components/SuccessActionDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
 import { formatEventOfficeEnd, formatEventOfficeStart, getEventOfficeCloseAt, getEventOfficeOpenAt, isEventOfficeOpen } from '@/lib/events';
 import { validateNonNegativeInteger, validateRequired } from '@/lib/form-validation';
+import { buildOrganizationPath } from '@/lib/routes';
 import type { Event } from '@/types';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 
@@ -42,6 +44,10 @@ export default function Organizations() {
   const navigate = useNavigate();
   const { organizations, events, archivedEvents, currentRole, currentUser, createOrganization, isLoading, connectionState } = useData();
   const [open, setOpen] = useState(false);
+  const [createdOrganizationSuccess, setCreatedOrganizationSuccess] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,9 +129,11 @@ export default function Organizations() {
     setForm({ name: '', event_limit: '1' });
     setErrors({});
     setOpen(false);
-    toast({ title: 'Organizacja utworzona' });
     if (result.entityId) {
-      navigate(`/organizations/${result.entityId}`);
+      setCreatedOrganizationSuccess({
+        id: result.entityId,
+        name: form.name.trim(),
+      });
     }
   };
 
@@ -286,6 +294,31 @@ export default function Organizations() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <SuccessActionDialog
+        open={createdOrganizationSuccess !== null}
+        onOpenChange={nextOpen => {
+          if (!nextOpen) {
+            setCreatedOrganizationSuccess(null);
+          }
+        }}
+        title="Organizacja utworzona pomyślnie"
+        description={
+          createdOrganizationSuccess
+            ? `Organizacja "${createdOrganizationSuccess.name || 'Nowa organizacja'}" została utworzona.`
+            : ''
+        }
+        primaryLabel="Przejdź do organizacji"
+        secondaryLabel="Zostań na tej stronie"
+        onPrimaryAction={() => {
+          if (!createdOrganizationSuccess) {
+            return;
+          }
+
+          navigate(buildOrganizationPath(createdOrganizationSuccess.id));
+          setCreatedOrganizationSuccess(null);
+        }}
+        onSecondaryAction={() => setCreatedOrganizationSuccess(null)}
+      />
     </div>
   );
 }
