@@ -206,4 +206,6 @@ Preview the built app locally:
 npm run preview
 ```
 
-If the production build is hosted under Apache or XAMPP with `BrowserRouter`, keep the generated `.htaccess` from `public/.htaccess` next to `index.html`. Without that rewrite, refreshing deep routes such as `/events/:id`, `/events/:id/participants/:participantId`, `/organizations/:id`, or `/profile` will return the server `404` instead of booting the SPA.
+The production build uses hash-based routing, so refreshing screens such as `/#/events/:id`, `/#/events/:id/participants/:participantId`, `/#/organizations/:id`, or `/#/profile` does not require server-side SPA rewrites.
+
+The generated `.htaccess` is still included in `dist/` for environments that prefer clean URLs with server rewrites, but the default production behavior no longer depends on it.

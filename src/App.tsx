@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   BrowserRouter,
+  HashRouter,
   Navigate,
   Route,
   Routes,
@@ -35,9 +36,22 @@ import Unauthorized from "./pages/Unauthorized";
 import { isScannerRole } from "@/lib/roles";
 
 const queryClient = new QueryClient();
+const Router = import.meta.env.PROD ? HashRouter : BrowserRouter;
+
+function RouteLoadingState({ message }: { message: string }) {
+  return (
+    <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">
+      {message}
+    </div>
+  );
+}
 
 function HomeRoute() {
-  const { currentRole, visibleEvents } = useData();
+  const { currentRole, visibleEvents, isLoading } = useData();
+
+  if (isLoading) {
+    return <RouteLoadingState message="Ładujemy dostępne widoki..." />;
+  }
 
   if (isScannerRole(currentRole)) {
     return (
@@ -52,7 +66,11 @@ function HomeRoute() {
 }
 
 function ScannerRoute() {
-  const { currentRole, visibleEvents } = useData();
+  const { currentRole, visibleEvents, isLoading } = useData();
+
+  if (isLoading) {
+    return <RouteLoadingState message="Ładujemy wydarzenie operatora..." />;
+  }
 
   if (isScannerRole(currentRole) && visibleEvents.length === 0) {
     return <Navigate to="/scanner-info" replace />;
@@ -62,7 +80,11 @@ function ScannerRoute() {
 }
 
 function ScannerInfoRoute() {
-  const { currentRole, visibleEvents } = useData();
+  const { currentRole, visibleEvents, isLoading } = useData();
+
+  if (isLoading) {
+    return <RouteLoadingState message="Sprawdzamy dostęp operatora..." />;
+  }
 
   if (!isScannerRole(currentRole)) {
     return <Forbidden />;
@@ -87,11 +109,7 @@ function EventAccessRoute({
     useData();
 
   if (isLoading) {
-    return (
-      <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">
-        Sprawdzamy trasę do wydarzenia...
-      </div>
-    );
+    return <RouteLoadingState message="Sprawdzamy trasę do wydarzenia..." />;
   }
 
   if (
@@ -117,11 +135,7 @@ function ParticipantAccessRoute({ children }: { children: JSX.Element }) {
   const { participants, canAccessEvent, isLoading } = useData();
 
   if (isLoading) {
-    return (
-      <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">
-        Szukamy zawodnika na liście...
-      </div>
-    );
+    return <RouteLoadingState message="Szukamy zawodnika na liście..." />;
   }
 
   const participant = participants.find((entry) => entry.id === participantId);
@@ -145,11 +159,7 @@ function OrganizationAccessRoute({ children }: { children: JSX.Element }) {
   const { organizations, currentRole, currentUser, isLoading } = useData();
 
   if (isLoading) {
-    return (
-      <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">
-        Sprawdzamy organizację...
-      </div>
-    );
+    return <RouteLoadingState message="Sprawdzamy organizację..." />;
   }
 
   const organization = organizations.find((entry) => entry.id === id);
@@ -288,10 +298,10 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
-        <BrowserRouter>
+        <Router>
           <RouteSeo />
           <AppRoutes />
-        </BrowserRouter>
+        </Router>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
