@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Loader2, RefreshCw } from 'lucide-react';
 import { PasswordRequirements } from '@/components/PasswordRequirements';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -149,8 +149,9 @@ export default function ResetPassword() {
                 Minimum 10 znaków, wielka i mała litera, cyfra oraz znak specjalny.
               </p>
               <FieldError id="reset-password-form-error">{errors.form}</FieldError>
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                Zapisz nowe hasło
+              <Button type="submit" className="w-full" disabled={isSubmitting} aria-busy={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                {isSubmitting ? 'Zapisywanie...' : 'Zapisz nowe hasło'}
               </Button>
             </form>
           )}

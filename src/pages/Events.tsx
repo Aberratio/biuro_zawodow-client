@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ListFilter, Plus } from "lucide-react";
+import { ListFilter, Loader2, Plus } from "lucide-react";
 import { useData } from "@/contexts/DataContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1026,9 +1026,14 @@ export default function Events() {
               onClick={handleCreate}
               disabled={formOrganizationLimitReached || isSubmitting}
               className="h-11 w-full sm:h-10 sm:w-auto"
+              aria-busy={isSubmitting}
             >
-              <Plus className="mr-1 h-4 w-4" />
-              Utwórz
+              {isSubmitting ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-1 h-4 w-4" />
+              )}
+              {isSubmitting ? "Tworzenie..." : "Utwórz"}
             </Button>
           </DialogFooter>
         </DialogContent>

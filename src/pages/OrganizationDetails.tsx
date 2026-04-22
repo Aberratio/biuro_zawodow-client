@@ -1435,8 +1435,12 @@ export default function OrganizationDetails() {
               className="w-full sm:w-auto"
               onClick={handleSaveOrganization}
               disabled={isSavingOrganization}
+              aria-busy={isSavingOrganization}
             >
-              Zapisz zmiany
+              {isSavingOrganization && (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              )}
+              {isSavingOrganization ? "Zapisywanie..." : "Zapisz zmiany"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1524,7 +1528,10 @@ export default function OrganizationDetails() {
               disabled={isDeletingOrganization || !canDeleteOrganization}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Usuń organizację
+              {isDeletingOrganization && (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              )}
+              {isDeletingOrganization ? "Usuwanie..." : "Usuń organizację"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1559,7 +1566,10 @@ export default function OrganizationDetails() {
               disabled={isArchivingUser || !selectedActionUser}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Usuń konto
+              {isArchivingUser && (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              )}
+              {isArchivingUser ? "Usuwanie..." : "Usuń konto"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1596,7 +1606,12 @@ export default function OrganizationDetails() {
               onClick={() => void handleTriggerPasswordReset()}
               disabled={isSendingPasswordReset || !selectedActionUser}
             >
-              Wyślij reset hasła
+              {isSendingPasswordReset && (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              )}
+              {isSendingPasswordReset
+                ? "Wysyłanie resetu..."
+                : "Wyślij reset hasła"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1695,10 +1710,16 @@ export default function OrganizationDetails() {
                     )
                   }
                   disabled={isChangingScannerRole || isSavingScanner}
+                  aria-busy={isChangingScannerRole}
                 >
-                  {selectedScanner.role === "scanner"
-                    ? "Zmień na Operator Plus"
-                    : "Zmień na Operator"}
+                  {isChangingScannerRole && (
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  )}
+                  {isChangingScannerRole
+                    ? "Zmiana roli..."
+                    : selectedScanner.role === "scanner"
+                      ? "Zmień na Operator Plus"
+                      : "Zmień na Operator"}
                 </Button>
               </div>
             )}
@@ -1744,8 +1765,12 @@ export default function OrganizationDetails() {
               disabled={
                 isSavingScanner || isChangingScannerRole || !selectedScanner
               }
+              aria-busy={isSavingScanner}
             >
-              Zapisz zmiany
+              {isSavingScanner && (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              )}
+              {isSavingScanner ? "Zapisywanie..." : "Zapisz zmiany"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1922,8 +1947,14 @@ export default function OrganizationDetails() {
               className="w-full sm:w-auto"
               onClick={handleSaveScannerAssignments}
               disabled={isSavingScannerAssignments}
+              aria-busy={isSavingScannerAssignments}
             >
-              Zapisz przypisania
+              {isSavingScannerAssignments && (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              )}
+              {isSavingScannerAssignments
+                ? "Zapisywanie..."
+                : "Zapisz przypisania"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2087,9 +2118,14 @@ export default function OrganizationDetails() {
               className="w-full sm:w-auto"
               onClick={handleAddEvent}
               disabled={remainingSlots <= 0 || isSubmittingEvent}
+              aria-busy={isSubmittingEvent}
             >
-              <Plus className="mr-1 h-4 w-4" />
-              Zapisz
+              {isSubmittingEvent ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-1 h-4 w-4" />
+              )}
+              {isSubmittingEvent ? "Zapisywanie..." : "Zapisz"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent } from '@/components/ui/card';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
@@ -274,9 +274,14 @@ export default function Organizations() {
               className="w-full sm:w-auto"
               onClick={handleCreate}
               disabled={isSubmitting}
+              aria-busy={isSubmitting}
             >
-              <Plus className="mr-1 h-4 w-4" />
-              Utwórz organizację
+              {isSubmitting ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-1 h-4 w-4" />
+              )}
+              {isSubmitting ? "Tworzenie..." : "Utwórz organizację"}
             </Button>
           </DialogFooter>
         </DialogContent>

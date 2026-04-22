@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Card,
@@ -136,8 +136,14 @@ export default function ForgotPassword() {
                   size="lg"
                   className="h-12 w-full rounded-2xl text-sm"
                   disabled={isSubmitting}
+                  aria-busy={isSubmitting}
                 >
-                  Wyślij link resetujący
+                  {isSubmitting && (
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  )}
+                  {isSubmitting
+                    ? "Wysyłanie linku..."
+                    : "Wyślij link resetujący"}
                 </Button>
               </form>
             </CardContent>

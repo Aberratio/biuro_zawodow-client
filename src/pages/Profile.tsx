@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Loader2, RefreshCw } from 'lucide-react';
 import { PasswordRequirements } from '@/components/PasswordRequirements';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -222,8 +222,9 @@ export default function Profile() {
               <FieldError id="profile-new-password-confirmation-error">{errors.newPasswordConfirmation}</FieldError>
             </div>
             <FieldError id="profile-password-form-error">{errors.form}</FieldError>
-            <Button className="w-full sm:w-auto" type="submit" disabled={isSubmitting}>
-              Zapisz nowe hasło
+            <Button className="w-full sm:w-auto" type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              {isSubmitting ? 'Zapisywanie...' : 'Zapisz nowe hasło'}
             </Button>
           </form>
         </CardContent>
