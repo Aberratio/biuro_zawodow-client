@@ -20,6 +20,7 @@ import { ArrowLeft, CheckCircle, Info, Loader2, Mail, RefreshCcw, Send } from 'l
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
+import { formatEventOfficeWindow, isEventCurrentOrUpcoming, isEventOfficeOpen } from '@/lib/events';
 import { buildEventPath } from '@/lib/routes';
 import type { ActivityLog } from '@/types';
 
@@ -99,6 +100,8 @@ export default function EmailSending() {
     [activeEventId, participants],
   );
   const selectedEvent = events.find(event => event.id === activeEventId);
+  const isOfficeOpenNow = selectedEvent ? isEventOfficeOpen(selectedEvent) : false;
+  const canSendBulkQrEmails = selectedEvent ? isEventCurrentOrUpcoming(selectedEvent) : false;
   const sent = eventParticipants.filter(participant => participant.email_status === 'sent').length;
   const pending = eventParticipants.length - sent;
   const hasParticipants = eventParticipants.length > 0;
@@ -120,6 +123,16 @@ export default function EmailSending() {
   }
 
   const handleSendAll = async (resendAll: boolean) => {
+    if (resendAll && isOfficeOpenNow) {
+      setPendingAction(null);
+      toast({
+        title: 'Ponowna wysyłka zablokowana',
+        description: 'W godzinach działania biura można wysyłać tylko brakujące kody QR.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setPendingAction(null);
     if (resendAll) {
       setResendingAll(true);
@@ -191,13 +204,20 @@ export default function EmailSending() {
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <div className="space-y-1 text-xs text-muted-foreground">
-              {hasNoSentEmails ? (
-                <p>"Wyślij kody QR do wszystkich uczestników" wyśle pierwszą wiadomość do całej listy uczestników wydarzenia.</p>
+              {!canSendBulkQrEmails ? (
+                <p>Po zamknięciu biura zawodów masowa wysyłka kodów QR jest niedostępna.</p>
+              ) : hasNoSentEmails ? (
+                <p>"Wyślij kody QR do wszystkich uczestników" wyśle wiadomość email z kodami qr do wszystkich uczestników na aktualnej liście.</p>
               ) : (
                 <>
-                  <p>"Wyślij ponownie kody QR do wszystkich uczestników" wymusi ponowną wysyłkę dla całego wydarzenia.</p>
+                  {!isOfficeOpenNow && (
+                    <p>"Wyślij ponownie kody QR do wszystkich uczestników" wymusi ponowną wysyłkę dla całego wydarzenia.</p>
+                  )}
                   {hasPartialDelivery && (
                     <p>"Wyślij brakujące kody QR" wyśle wiadomości tylko do uczestników, którzy nie dostali jeszcze maila z kodem QR.</p>
+                  )}
+                  {isOfficeOpenNow && (
+                    <p>W godzinach działania biura ponowna wysyłka do wszystkich jest zablokowana, ale nadal możesz wysłać brakujące kody QR.</p>
                   )}
                 </>
               )}
@@ -212,28 +232,43 @@ export default function EmailSending() {
           <CardContent>
             <div className="text-3xl font-bold tabular-nums">{sent}/{eventParticipants.length}</div>
             <p className="mt-1 text-sm text-muted-foreground">uczestników ma już mail z QR</p>
+            {selectedEvent && (
+              <p className="mt-2 text-xs text-muted-foreground">Biuro: {formatEventOfficeWindow(selectedEvent)}</p>
+            )}
             <div className="mt-3 h-2 rounded-full bg-muted">
               <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${eventParticipants.length ? (sent / eventParticipants.length) * 100 : 0}%` }} />
             </div>
             <div className="mt-4 grid gap-2">
               {hasNoSentEmails ? (
-                <Button className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || !hasParticipants || !isOnline || !activeEventId}>
+                <Button className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || !hasParticipants || !isOnline || !activeEventId || !canSendBulkQrEmails}>
                   {sendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />}
                   Wyślij kody QR do wszystkich uczestników
                 </Button>
               ) : (
                 <>
-                  <Button variant="outline" className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'resend-all', count: eventParticipants.length })} disabled={resendingAll || !hasParticipants || !isOnline || !activeEventId}>
-                    {resendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
-                    Wyślij ponownie kody QR do wszystkich uczestników
-                  </Button>
+                  {!isOfficeOpenNow && (
+                    <Button variant="outline" className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'resend-all', count: eventParticipants.length })} disabled={resendingAll || !hasParticipants || !isOnline || !activeEventId || !canSendBulkQrEmails}>
+                      {resendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
+                      Wyślij ponownie kody QR do wszystkich uczestników
+                    </Button>
+                  )}
                   {hasPartialDelivery && (
-                    <Button className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || !hasPendingEmails || !isOnline || !activeEventId}>
+                    <Button className="h-11 w-full sm:h-10" onClick={() => setPendingAction({ kind: 'send-missing', count: pending })} disabled={sendingAll || !hasPendingEmails || !isOnline || !activeEventId || !canSendBulkQrEmails}>
                       {sendingAll ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />}
                       Wyślij brakujące kody QR
                     </Button>
                   )}
                 </>
+              )}
+              {!canSendBulkQrEmails && (
+                <p className="text-sm text-muted-foreground">
+                  To wydarzenie ma już zamknięte biuro zawodów, więc masowa wysyłka została wyłączona.
+                </p>
+              )}
+              {canSendBulkQrEmails && isOfficeOpenNow && !hasPartialDelivery && !hasNoSentEmails && (
+                <p className="text-sm text-muted-foreground">
+                  W godzinach działania biura nie można ponownie wysłać kodów QR do wszystkich uczestników.
+                </p>
               )}
             </div>
           </CardContent>

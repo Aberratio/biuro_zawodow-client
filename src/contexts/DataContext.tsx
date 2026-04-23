@@ -4,10 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { API_BASE_URL, fetchJson, getApiErrorCode, isApiResponseError, isNetworkRequestError } from '@/lib/api';
 import { type ApiEvent, type ApiOrganization, type ApiParticipant, type ApiUser, type BootstrapResponse, type ParticipantQrPreviewResponse, type ParticipantScanApiResponse, OFFLINE_ACTION_MESSAGE, applyPendingMutations, buildOfflineSnapshot, createBootstrapSnapshotVersion, createClientMutationId, extractConflictParticipant, getDefaultCurrentUser, getDeviceId, getInitialConnectionState, getSelectableOrganizationsForUser, getVisibleEventsForUser, mapApiOrganizationToUi, mapApiParticipantToUi, mapApiUserToUi, participantUiIdToApiId, persistStoredSelectedEventId, persistStoredSelectedOrganizationId, readStoredSelectedEventId, readStoredSelectedOrganizationId, resolveSelectedEventId, resolveSelectedOrganizationId } from '@/lib/data-context-helpers';
 import { deletePendingMutation, loadBootstrapSnapshot, loadPendingMutations, loadSyncMeta, saveBootstrapSnapshot, savePendingMutation, saveSyncMeta, updatePendingMutation, type PendingParticipantMutation } from '@/lib/offline-store';
-import { isEventOfficeOpen } from '@/lib/events';
+import { getEventOfficeCloseAt, isEventOfficeOpen } from '@/lib/events';
 
 type UserCreateInput = Omit<User, 'id' | 'password'>;
-type EventMutationInput = Omit<Event, 'id' | 'archived_at'>;
+type EventMutationInput = Omit<Event, 'id' | 'archived_at' | 'deleted_at'>;
 
 interface MutationResult { ok: boolean; error?: string; entityId?: string; queued?: boolean; }
 interface ParticipantBibNumberConflict { bibNumber: string; conflictingParticipants: Participant[]; }
@@ -46,6 +46,7 @@ interface DataContextType {
   addParticipantManually: (eventId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
   createEvent: (e: EventMutationInput) => Promise<MutationResult>;
   updateEvent: (eventId: string, data: EventMutationInput) => Promise<MutationResult>;
+  archiveEvent: (eventId: string) => Promise<MutationResult>;
   deleteEvent: (eventId: string) => Promise<MutationResult>;
   addUser: (u: UserCreateInput) => Promise<MutationResult>;
   updateUser: (userId: string, data: UserUpdateInput) => Promise<MutationResult>;
@@ -94,6 +95,14 @@ interface ParticipantUpdatePayload {
   device_id?: string;
   event_id?: string;
   base_status?: ParticipantStatus;
+}
+
+function normalizeScanParticipantErrorMessage(error: unknown): string {
+  if (isApiResponseError(error) && error.status === 403) {
+    return 'Ten kod QR należy do uczestnika z innego wydarzenia niż aktualnie wybrane.';
+  }
+
+  return error instanceof Error ? error.message : 'Nie udało się odczytać uczestnika.';
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -325,11 +334,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [authUser?.id, connectionState, loadBootstrap, token]);
   useEffect(() => { if (authUser?.id) void updateSyncMeta(authUser.id, lastSyncAt, offlineSinceAt); }, [authUser?.id, lastSyncAt, offlineSinceAt, updateSyncMeta]);
   useEffect(() => { if (currentRole !== 'admin') { if (selectedOrganizationId !== '') setSelectedOrganizationId(''); return; } const nextSelectedOrganizationId = resolveSelectedOrganizationId(selectableOrganizations, selectedOrganizationId); if (nextSelectedOrganizationId !== selectedOrganizationId) setSelectedOrganizationId(nextSelectedOrganizationId); }, [currentRole, selectableOrganizations, selectedOrganizationId, setSelectedOrganizationId]);
-  useEffect(() => { const nextVisibleEventId = eventSelectionScope[0]?.id ?? ''; if (eventSelectionScope.some(event => event.id === selectedEventId) || nextVisibleEventId === selectedEventId) return; setSelectedEventId(nextVisibleEventId); }, [eventSelectionScope, selectedEventId, setSelectedEventId]);
+  useEffect(() => {
+    if (isLoading) return;
+
+    const nextVisibleEventId = eventSelectionScope[0]?.id ?? '';
+    if (eventSelectionScope.some(event => event.id === selectedEventId) || nextVisibleEventId === selectedEventId) return;
+    setSelectedEventId(nextVisibleEventId);
+  }, [eventSelectionScope, isLoading, selectedEventId, setSelectedEventId]);
 
   const canAccessEvent = useCallback((eventId: string) => {
     const event = events.find(entry => entry.id === eventId) ?? archivedEvents.find(entry => entry.id === eventId);
     if (!event) return false;
+    if (event.deleted_at) return false;
     if (event.archived_at) return currentRole === 'superadmin';
     if (currentRole === 'superadmin' || currentRole === 'admin') return true;
     if (currentRole === 'editor') return event.organization_id === currentUser.organization_id;
@@ -599,9 +615,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setEvents(previous => previous.map(event => event.id === eventId ? payload.data! : event)); addLog(`Zaktualizowano wydarzenie: ${payload.data.name}`); return { ok: true };
   }), [addLog, ensureOnline, getAuthHeaders, runMutation]);
 
+  const archiveEvent = useCallback(async (eventId: string) => runMutation(async () => {
+    const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
+    const existingEvent = events.find(event => event.id === eventId); await fetchJson(`${API_BASE_URL}/events/${eventId}/archive`, { method: 'POST', headers: getAuthHeaders() }); setEvents(previous => previous.filter(event => event.id !== eventId)); if (existingEvent) setArchivedEvents(previous => [{ ...existingEvent, archived_at: new Date().toISOString() }, ...previous]); if (selectedEventId === eventId) setSelectedEventId(''); if (existingEvent) addLog(`Zarchiwizowano wydarzenie: ${existingEvent.name}`); await loadBootstrap(true); return { ok: true };
+  }), [addLog, ensureOnline, events, getAuthHeaders, loadBootstrap, runMutation, selectedEventId, setSelectedEventId]);
+
   const deleteEvent = useCallback(async (eventId: string) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
-    const existingEvent = events.find(event => event.id === eventId); await fetchJson(`${API_BASE_URL}/events/${eventId}`, { method: 'DELETE', headers: getAuthHeaders() }); setEvents(previous => previous.filter(event => event.id !== eventId)); if (existingEvent) setArchivedEvents(previous => [{ ...existingEvent, archived_at: new Date().toISOString() }, ...previous]); if (selectedEventId === eventId) setSelectedEventId(''); if (existingEvent) addLog(`Zarchiwizowano wydarzenie: ${existingEvent.name}`); await loadBootstrap(true); return { ok: true };
+    const existingEvent = events.find(event => event.id === eventId);
+    const eventOfficeCloseAt = existingEvent ? getEventOfficeCloseAt(existingEvent) : null;
+    if (eventOfficeCloseAt !== null && Date.now() > eventOfficeCloseAt.getTime()) return { ok: false, error: 'Zakończone wydarzenia trzeba przenieść do archiwum zamiast usuwać z UI' };
+    await fetchJson(`${API_BASE_URL}/events/${eventId}/delete-ui`, { method: 'POST', headers: getAuthHeaders() }); setEvents(previous => previous.filter(event => event.id !== eventId)); if (selectedEventId === eventId) setSelectedEventId(''); if (existingEvent) addLog(`Usunięto wydarzenie z UI: ${existingEvent.name}`); await loadBootstrap(true); return { ok: true };
   }), [addLog, ensureOnline, events, getAuthHeaders, loadBootstrap, runMutation, selectedEventId, setSelectedEventId]);
 
   const addUser = useCallback(async (userData: UserCreateInput) => runMutation(async () => {
@@ -716,7 +740,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return { ok: true, data: { participant: mapApiParticipantToUi(payload.data.participant, payload.data.event.id), event: payload.data.event, access: { allowed: Boolean(payload.data.access?.allowed) } }, status: response.response.status };
     } catch (error) {
       handleNetworkFailure(error);
-      return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się odczytać uczestnika.', status: isApiResponseError(error) ? error.status : 0 };
+      return { ok: false, error: normalizeScanParticipantErrorMessage(error), status: isApiResponseError(error) ? error.status : 0 };
     }
   }, [archivedEvents, connectionState, events, getAuthHeaders, handleNetworkFailure, participants, selectedEventId]);
 
@@ -750,7 +774,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [ensureOnline, getAuthHeaders, handleNetworkFailure]);
 
   return (
-    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
+    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
       {children}
     </DataContext.Provider>
   );

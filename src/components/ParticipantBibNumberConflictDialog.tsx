@@ -49,6 +49,23 @@ export function ParticipantBibNumberConflictDialog({
   const conflictKeepButtonLabel = hasSingleBibConflict
     ? "Zachowaj numer u obu uczestników"
     : "Zachowaj numer u wszystkich uczestników";
+  const conflictDescription = hasSingleBibConflict ? (
+    <>
+      Inny uczestnik ma już przypisany numer{" "}
+      <span className="font-semibold text-foreground">
+        {formatBibNumber(bibNumber, bibNumber || "bez numeru")}
+      </span>
+      .
+    </>
+  ) : (
+    <>
+      Inni uczestnicy mają już przypisany numer{" "}
+      <span className="font-semibold text-foreground">
+        {formatBibNumber(bibNumber, bibNumber || "bez numeru")}
+      </span>
+      .
+    </>
+  );
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -58,15 +75,7 @@ export function ParticipantBibNumberConflictDialog({
             Ten numer jest już używany
           </AlertDialogTitle>
           <AlertDialogDescription className="text-sm leading-6">
-            Numer{" "}
-            <span className="font-semibold text-foreground">
-              {formatBibNumber(bibNumber, bibNumber || "bez numeru")}
-            </span>{" "}
-            ma już{" "}
-            {conflictingParticipants.length === 1
-              ? "innego uczestnika"
-              : `${conflictingParticipants.length} uczestników`}
-            .
+            {conflictDescription}
           </AlertDialogDescription>
         </AlertDialogHeader>
 

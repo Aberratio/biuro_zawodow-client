@@ -224,6 +224,44 @@ describe('DataProvider bootstrap loading', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the scanner selected event after a page reload while bootstrap is loading', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2099-04-12T10:00:00.000Z'));
+
+    const scannerUser: User = {
+      id: 'scanner-1',
+      name: 'Scanner',
+      email: 'scanner@example.com',
+      password: '',
+      role: 'scanner',
+      assigned_events: ['event-1', 'event-2'],
+    };
+
+    authState.user = scannerUser;
+    window.localStorage.setItem('selected_event_context:scanner-1', 'event-2');
+
+    const fetchMock = vi.fn(async () => createBootstrapResponse(
+      scannerUser,
+      [createEvent('event-1'), createEvent('event-2')],
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <TestConsumer />
+      </DataProvider>
+    );
+
+    expect(screen.getByTestId('selected-event').textContent).toBe('event-2');
+    expect(window.localStorage.getItem('selected_event_context:scanner-1')).toBe('event-2');
+
+    await waitFor(() => expect(screen.getByTestId('visible-events-count').textContent).toBe('2'));
+    expect(screen.getByTestId('selected-event').textContent).toBe('event-2');
+    expect(window.sessionStorage.getItem('selected_event_context:scanner-1')).toBe('event-2');
+    expect(window.localStorage.getItem('selected_event_context:scanner-1')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('remembers selected organization for admin and scopes selected event to it', async () => {
     const adminUser: User = {
       id: 'admin-1',

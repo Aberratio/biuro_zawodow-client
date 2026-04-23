@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Role } from "@/types";
-import { isEventOfficeOpen } from "@/lib/events";
+import { isEventCurrentOrUpcoming, isEventOfficeOpen } from "@/lib/events";
 import { isScannerRole } from "@/lib/roles";
 import {
   buildEventEmailsPath,
@@ -278,7 +278,7 @@ export function AppSidebar() {
   const selectedEventOfficeOpen =
     selectedEvent !== null && isEventOfficeOpen(selectedEvent);
   const selectedEventCanSendQr =
-    selectedEvent !== null && !selectedEventOfficeOpen;
+    selectedEvent !== null && isEventCurrentOrUpcoming(selectedEvent);
   const eventScopedItems = items
     .filter((item) => eventScopedUrls.has(item.url))
     .filter((item) => item.url !== "/import")
