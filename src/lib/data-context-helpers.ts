@@ -213,7 +213,7 @@ export function getSelectableOrganizationsForUser(allOrganizations: Organization
 }
 
 export function getVisibleEventsForUser(allEvents: Event[], user: User, now = new Date()): Event[] {
-  const activeEvents = allEvents.filter(event => !event.archived_at);
+  const activeEvents = allEvents.filter(event => !event.archived_at && !event.deleted_at);
   if (user.role === 'superadmin') return activeEvents;
   if (user.role === 'admin') return activeEvents;
   if (user.role === 'editor') return activeEvents.filter(event => event.organization_id === user.organization_id);

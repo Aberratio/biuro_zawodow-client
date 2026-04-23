@@ -62,6 +62,7 @@ import {
   getEventOfficeRangeValidationResult,
   getEventOfficeCloseAt,
   getEventOfficeOpenAt,
+  isEventCurrentOrUpcoming,
   isEventOfficeStartAtOrAfterNow,
   isEventOfficeOpen,
   isValidEventOfficeRange,
@@ -293,6 +294,7 @@ export default function EventDetails() {
     addUser,
     assignScannerEvents,
     updateEvent,
+    archiveEvent,
     deleteEvent,
     exportEventCsv,
     exportEventLogsCsv,
@@ -338,6 +340,8 @@ export default function EventDetails() {
   }>({});
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingLogsCsv, setExportingLogsCsv] = useState(false);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [isArchivingEvent, setIsArchivingEvent] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeletingEvent, setIsDeletingEvent] = useState(false);
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
@@ -430,7 +434,7 @@ export default function EventDetails() {
   const canEditEvent = isArchivedEvent
     ? currentRole === "superadmin"
     : canManageScanners;
-  const canDeleteEvent = useMemo(() => {
+  const canManageEventLifecycle = useMemo(() => {
     if (!event || isArchivedEvent) return false;
     if (currentRole === "superadmin") return true;
     if (currentRole === "admin") return true;
@@ -490,12 +494,13 @@ export default function EventDetails() {
   const hasAnyTeamMembers =
     assignedScanners.length > 0 || assignedScannerPlus.length > 0;
   const officeCloseAt = getEventOfficeCloseAt(event);
-  const officeOpenAt = getEventOfficeOpenAt(event);
   const isFinishedEvent = officeCloseAt !== null && now > officeCloseAt;
+  const canArchiveEvent = canManageEventLifecycle;
+  const canDeleteEvent = canManageEventLifecycle;
+  const canDeleteEventNow = canDeleteEvent && !isFinishedEvent;
   const canSendQrForEvent =
     !isArchivedEvent &&
-    officeOpenAt !== null &&
-    now < officeOpenAt;
+    isEventCurrentOrUpcoming(event, now);
   const canAssignScannersToEvent =
     !isArchivedEvent && officeCloseAt !== null && now <= officeCloseAt;
 
@@ -881,6 +886,25 @@ export default function EventDetails() {
     toast({ title: "Eksport logów CSV rozpoczęty" });
   };
 
+  const handleArchiveEvent = async () => {
+    setIsArchivingEvent(true);
+    const result = await archiveEvent(event.id);
+    setIsArchivingEvent(false);
+
+    if (!result.ok) {
+      toast({
+        title: "Nie udało się przenieść wydarzenia do archiwum",
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setArchiveConfirmOpen(false);
+    toast({ title: "Wydarzenie przeniesione do archiwum" });
+    navigate(`/organizations/${event.organization_id}/archived-events`);
+  };
+
   const handleDeleteEvent = async () => {
     setIsDeletingEvent(true);
     const result = await deleteEvent(event.id);
@@ -888,7 +912,7 @@ export default function EventDetails() {
 
     if (!result.ok) {
       toast({
-        title: "Nie udało się zarchiwizować wydarzenia",
+        title: "Nie udało się usunąć wydarzenia z UI",
         description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
@@ -896,7 +920,7 @@ export default function EventDetails() {
     }
 
     setDeleteConfirmOpen(false);
-    toast({ title: "Wydarzenie zarchiwizowane" });
+    toast({ title: "Wydarzenie usunięte z UI" });
     navigate("/events");
   };
 
@@ -1007,6 +1031,7 @@ export default function EventDetails() {
         {((!isArchivedEvent && event) ||
           canUseActiveEventTools ||
           canEditEvent ||
+          canArchiveEvent ||
           canDeleteEvent) && (
           <aside className="event-detail-actions-panel">
             {canUseActiveEventTools && (
@@ -1042,15 +1067,36 @@ export default function EventDetails() {
                 <Pencil className="h-4 w-4" /> Edytuj wydarzenie
               </Button>
             )}
-            {canDeleteEvent && (
+            {canArchiveEvent && (
               <Button
-                variant="destructive"
-                onClick={() => setDeleteConfirmOpen(true)}
+                variant="outline"
+                onClick={() => setArchiveConfirmOpen(true)}
                 className="h-12 w-full"
                 disabled={!isOnline}
               >
-                <Trash2 className="mr-1 h-4 w-4" /> Usuń wydarzenie
+                <Archive className="mr-1 h-4 w-4" /> Przenieś do archiwum
               </Button>
+            )}
+            {canDeleteEvent && (
+              <>
+                <Button
+                  variant="destructive"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  className="h-12 w-full"
+                  disabled={!isOnline || !canDeleteEventNow}
+                >
+                  <Trash2 className="mr-1 h-4 w-4" /> Usuń z UI
+                </Button>
+                {!canDeleteEventNow && (
+                  <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>
+                      Wydarzenia, które już się odbyły, trzeba przenieść do
+                      archiwum zamiast usuwać z UI.
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </aside>
         )}
@@ -1220,16 +1266,44 @@ export default function EventDetails() {
         </div>
       </section>
 
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+      <AlertDialog
+        open={archiveConfirmOpen}
+        onOpenChange={setArchiveConfirmOpen}
+      >
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Usunąć wydarzenie?</AlertDialogTitle>
+            <AlertDialogTitle>Przenieść wydarzenie do archiwum?</AlertDialogTitle>
             <AlertDialogDescription>
               Wydarzenie{" "}
               <span className="font-medium text-foreground">{event.name}</span>{" "}
-              zniknie z aktywnych list i przypisań. Dane zostaną zachowane w
-              archiwum organizacji. Tę operację mogą wykonać tylko
-              administratorzy i organizatorzy.
+              będzie widoczne w archiwum organizacji i nadal będzie wliczane do
+              limitu wydarzeń.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleArchiveEvent()}
+              disabled={isArchivingEvent || !isOnline}
+            >
+              {isArchivingEvent && (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              )}
+              Przenieś do archiwum
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usunąć wydarzenie z UI?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Wydarzenie{" "}
+              <span className="font-medium text-foreground">{event.name}</span>{" "}
+              zniknie z UI i przestanie wliczać się do limitu wydarzeń. Rekord
+              pozostanie w bazie, ale nie będzie widoczny w aplikacji.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1242,7 +1316,7 @@ export default function EventDetails() {
               {isDeletingEvent && (
                 <Loader2 className="mr-1 h-4 w-4 animate-spin" />
               )}
-              Usuń wydarzenie
+              Usuń z UI
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

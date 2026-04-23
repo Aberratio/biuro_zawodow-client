@@ -91,6 +91,27 @@ function FieldMappingsConsumer() {
   return <div data-testid="field-mappings-status">{status}</div>;
 }
 
+function ScanConsumer() {
+  const { scanParticipantQr } = useData();
+  const [scanError, setScanError] = React.useState('');
+
+  return (
+    <div>
+      <div data-testid="scan-error">{scanError}</div>
+      <button
+        type="button"
+        onClick={() => {
+          void scanParticipantQr('QR-FOREIGN').then(result => {
+            setScanError(result.error ?? '');
+          });
+        }}
+      >
+        scan-foreign
+      </button>
+    </div>
+  );
+}
+
 describe('DataProvider offline cache and queue', () => {
   beforeEach(async () => {
     window.localStorage.clear();
@@ -444,5 +465,58 @@ describe('DataProvider offline cache and queue', () => {
 
     const fieldMappingsCalls = fetchMock.mock.calls.filter(([input]) => String(input).endsWith('/participant-field-mappings'));
     expect(fieldMappingsCalls).toHaveLength(1);
+  });
+
+  it('returns a fully Polish error when scanned QR belongs to another event', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.endsWith('/bootstrap')) {
+        return createJsonResponse(200, {
+          generated_at: '2099-04-12T08:00:00.000Z',
+          snapshot_version: 'snapshot-6',
+          data: {
+            organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5 }],
+            events: [{
+              id: 'event-1',
+              name: 'Event 1',
+              location: 'Warsaw',
+              organization_id: 'org-1',
+              office_open_at: '2099-04-12T07:00:00',
+              office_close_at: '2099-04-12T15:00:00',
+            }],
+            archivedEvents: [],
+            users: [authState.user!],
+            participants: [],
+            activityLog: [],
+          },
+        });
+      }
+
+      if (url.endsWith('/participants/scan')) {
+        return createJsonResponse(403, {
+          error: 'QR belongs to an event outside your permissions',
+        });
+      }
+
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <ScanConsumer />
+      </DataProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'scan-foreign' })).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'scan-foreign' }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('scan-error').textContent).toBe('Ten kod QR należy do uczestnika z innego wydarzenia niż aktualnie wybrane.');
+    });
   });
 });

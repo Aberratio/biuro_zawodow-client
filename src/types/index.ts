@@ -23,6 +23,7 @@ export interface Event {
   office_open_at: string;
   office_close_at: string;
   archived_at?: string | null;
+  deleted_at?: string | null;
 }
 
 export interface Participant {

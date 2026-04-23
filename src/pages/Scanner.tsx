@@ -717,7 +717,7 @@ export default function Scanner() {
                     Cofnij odprawę
                   </Button>
                 )}
-                <Button variant="ghost" className="w-full" onClick={resetToIdle}>
+                <Button variant="outline" className="w-full" onClick={resetToIdle}>
                   Wróć do skanera
                 </Button>
               </div>
