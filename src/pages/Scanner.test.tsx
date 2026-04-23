@@ -158,9 +158,9 @@ function createDataState(
   };
 }
 
-function renderPages() {
+function renderPages(initialEntries: string[] = ['/scanner']) {
   render(
-    <MemoryRouter initialEntries={['/scanner']}>
+    <MemoryRouter initialEntries={initialEntries}>
       <Routes>
         <Route path="/scanner" element={<Scanner />} />
         <Route path="/events/:id/participants/:participantId" element={<ParticipantDetails />} />
@@ -205,30 +205,31 @@ describe('Scanner page', () => {
     });
   });
 
-  it('shows important mapped fields in a dedicated scanner box instead of the remaining data box', async () => {
+  it('shows important mapped fields in the verification section and keeps them out of the remaining data box', async () => {
     useDataMock.mockReturnValue(createDataState('scanner_plus'));
 
     renderPages();
 
     fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
-    await screen.findByText('Ważne informacje uczestnika');
+    await screen.findByText('Dane do weryfikacji');
 
-    const importantSection = screen.getByText('Ważne informacje uczestnika').parentElement?.parentElement;
+    const verificationSection = screen.getByText('Dane do weryfikacji').parentElement?.parentElement;
     const remainingSection = screen.getByText('Pozostałe dane uczestnika').parentElement?.parentElement;
 
-    expect(importantSection).not.toBeNull();
+    expect(verificationSection).not.toBeNull();
     expect(remainingSection).not.toBeNull();
 
-    expect(within(importantSection as HTMLElement).getByText('Alergie')).toBeInTheDocument();
-    expect(within(importantSection as HTMLElement).getByText('Orzeszki')).toBeInTheDocument();
-    expect(within(importantSection as HTMLElement).queryByText('Miasto')).not.toBeInTheDocument();
+    expect(within(verificationSection as HTMLElement).getByText('Alergie')).toBeInTheDocument();
+    expect(within(verificationSection as HTMLElement).getByText('Orzeszki')).toBeInTheDocument();
+    expect(within(verificationSection as HTMLElement).queryByText('Miasto')).not.toBeInTheDocument();
 
     expect(within(remainingSection as HTMLElement).getByText('Miasto')).toBeInTheDocument();
     expect(within(remainingSection as HTMLElement).getByText('Warszawa')).toBeInTheDocument();
     expect(within(remainingSection as HTMLElement).queryByText('Alergie')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ważne informacje uczestnika')).not.toBeInTheDocument();
   });
 
-  it('keeps important fields separated in scanner fallback when mappings are unavailable', async () => {
+  it('keeps important fields in the verification section during scanner fallback when mappings are unavailable', async () => {
     const participant = createParticipant('', {
       importantFieldAliases: ['Alergie'],
       customFields: {
@@ -241,15 +242,16 @@ describe('Scanner page', () => {
     renderPages();
 
     fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
-    await screen.findByText('Ważne informacje uczestnika');
+    await screen.findByText('Dane do weryfikacji');
 
-    const importantSection = screen.getByText('Ważne informacje uczestnika').parentElement?.parentElement;
+    const verificationSection = screen.getByText('Dane do weryfikacji').parentElement?.parentElement;
     const remainingSection = screen.getByText('Pozostałe dane uczestnika').parentElement?.parentElement;
 
-    expect(within(importantSection as HTMLElement).getByText('Alergie')).toBeInTheDocument();
-    expect(within(importantSection as HTMLElement).getByText('Orzeszki')).toBeInTheDocument();
+    expect(within(verificationSection as HTMLElement).getByText('Alergie')).toBeInTheDocument();
+    expect(within(verificationSection as HTMLElement).getByText('Orzeszki')).toBeInTheDocument();
     expect(within(remainingSection as HTMLElement).getByText('Miasto')).toBeInTheDocument();
     expect(within(remainingSection as HTMLElement).getByText('Warszawa')).toBeInTheDocument();
+    expect(screen.queryByText('Ważne informacje uczestnika')).not.toBeInTheDocument();
   });
 
   it('does not expose inline participant editing for the plain scanner role', async () => {
@@ -278,5 +280,21 @@ describe('Scanner page', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('heading', { name: 'Edytuj dane uczestnika' })).toBeInTheDocument();
     expect(within(dialog).getByRole('textbox', { name: 'Email' })).toHaveValue('anna@example.com');
+  });
+
+  it('highlights important participant data in the participant details view', async () => {
+    useDataMock.mockReturnValue(createDataState('scanner_plus'));
+
+    renderPages(['/events/event-1/participants/p-1']);
+
+    const importantSection = await screen.findByText('Ważne dane do weryfikacji');
+    const participantDataCard = screen.getByText('Dane uczestnika').parentElement?.parentElement;
+
+    expect(importantSection).toBeInTheDocument();
+    expect(participantDataCard).not.toBeNull();
+    expect(within(participantDataCard as HTMLElement).getByText('Alergie')).toBeInTheDocument();
+    expect(within(participantDataCard as HTMLElement).getByText('Orzeszki')).toBeInTheDocument();
+    expect(within(participantDataCard as HTMLElement).getByText('Miasto')).toBeInTheDocument();
+    expect(within(participantDataCard as HTMLElement).getByText('Warszawa')).toBeInTheDocument();
   });
 });
