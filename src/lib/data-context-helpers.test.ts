@@ -20,6 +20,7 @@ describe('mapApiParticipantToUi', () => {
         lap: 3,
         broken: null,
       } as never,
+      important_field_aliases: [' team ', 'lap', '', 'team'] as never,
     }, 'event-1');
 
     expect(participant).toEqual({
@@ -37,6 +38,7 @@ describe('mapApiParticipantToUi', () => {
         lap: '3',
         broken: '',
       },
+      important_field_aliases: ['team', 'lap'],
       sync_state: 'synced',
       sync_error: undefined,
     });
@@ -56,11 +58,13 @@ describe('mapApiParticipantToUi', () => {
       custom_fields: {
         city: 'Warsaw',
       },
+      important_field_aliases: ['city'],
     }, '');
 
     expect(participant.name).toBe('Anna Test');
     expect(participant.id).toBe('p-1');
     expect(participant.custom_fields).toEqual({ city: 'Warsaw' });
+    expect(participant.important_field_aliases).toEqual(['city']);
     expect(participant.status).toBe('checked_in');
     expect(participant.email_status).toBe('sent');
   });

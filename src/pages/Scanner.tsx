@@ -350,8 +350,9 @@ export default function Scanner() {
       return {
         contact: [] as ParticipantFieldEntry[],
         identity: [] as ParticipantFieldEntry[],
+        important: [] as ParticipantFieldEntry[],
         additional: [] as ParticipantFieldEntry[],
-        fallback: [] as ParticipantFieldEntry[],
+        usesFallback: false,
       };
     }
 
@@ -378,21 +379,28 @@ export default function Scanner() {
       };
     });
 
+    const importantAliases = new Set(scannedParticipant.important_field_aliases ?? []);
     const fallbackEntries = entries.length === 0
       ? Object.entries(scannedParticipant.custom_fields ?? {})
           .sort(([firstKey], [secondKey]) => firstKey.localeCompare(secondKey, 'pl', { sensitivity: 'base' }))
           .map<ParticipantFieldEntry>(([label, value]) => ({
             label,
             value: String(value ?? '').trim(),
-            role: 'custom',
+            role: importantAliases.has(label) ? 'important_custom' : 'custom',
           }))
       : [];
+    const usesFallback = entries.length === 0;
 
     return {
       contact: entries.filter(entry => entry.role === 'email'),
       identity: entries.filter(entry => entry.role === 'display_name_part'),
-      additional: entries.filter(entry => entry.role === 'custom'),
-      fallback: fallbackEntries,
+      important: usesFallback
+        ? fallbackEntries.filter(entry => entry.role === 'important_custom')
+        : entries.filter(entry => entry.role === 'important_custom'),
+      additional: usesFallback
+        ? fallbackEntries.filter(entry => entry.role === 'custom')
+        : entries.filter(entry => entry.role === 'custom'),
+      usesFallback,
     };
   }, [participantMappings, scannedParticipant]);
 
@@ -413,21 +421,21 @@ export default function Scanner() {
     ];
   }, [mappedParticipantFields.contact, mappedParticipantFields.identity, scannedParticipant]);
 
+  const hasImportantParticipantData = Boolean(scannedParticipant)
+    && mappedParticipantFields.important.length > 0;
+
   const hasRemainingParticipantData = Boolean(scannedParticipant)
-    && (
-      mappedParticipantFields.additional.length > 0
-      || mappedParticipantFields.fallback.length > 0
-    );
+    && mappedParticipantFields.additional.length > 0;
 
   const normalizedCurrentBibNumber = normalizeScannerBibNumberInput(scannedParticipant?.bib_number);
 
-  const renderFieldGrid = (title: string, description: string, fields: ParticipantFieldEntry[]) => {
+  const renderFieldGrid = (title: string, description: string, fields: ParticipantFieldEntry[], tone: 'default' | 'important' = 'default') => {
     if (fields.length === 0) {
       return null;
     }
 
     return (
-      <div className="rounded-2xl border bg-muted/20 p-3 sm:p-4">
+      <div className={`rounded-2xl border p-3 sm:p-4 ${tone === 'important' ? 'border-amber-400/40 bg-amber-500/10' : 'bg-muted/20'}`}>
         <div className="mb-3">
           <p className="text-sm font-semibold text-foreground">{title}</p>
           <p className="mt-1 text-xs text-muted-foreground">{description}</p>
@@ -689,6 +697,14 @@ export default function Scanner() {
               </div>
 
               <div className="grid gap-2">
+                {renderFieldGrid(
+                  'Ważne informacje uczestnika',
+                  mappedParticipantFields.usesFallback
+                    ? 'Dane zapisane przy uczestniku jako ważne informacje, gdy mapowanie nie jest aktualnie dostępne.'
+                    : 'Pola oznaczone jako ważne w mapowaniu kolumn dla tego wydarzenia.',
+                  mappedParticipantFields.important,
+                  'important',
+                )}
                 {hasParticipantDataManagementAccess && selectedEvent && (
                   <Button
                     variant="outline"
@@ -724,12 +740,12 @@ export default function Scanner() {
 
               {renderFieldGrid(
                 'Pozostałe dane uczestnika',
-                participantMappings.length > 0
-                  ? 'Pozostałe aktywne pola z mapowania kolumn dla tego wydarzenia.'
-                  : 'Dane zapisane przy uczestniku, gdy mapowanie nie jest aktualnie dostępne.',
-                mappedParticipantFields.additional.length > 0 ? mappedParticipantFields.additional : mappedParticipantFields.fallback,
+                mappedParticipantFields.usesFallback
+                  ? 'Dane zapisane przy uczestniku, gdy mapowanie nie jest aktualnie dostępne.'
+                  : 'Pozostałe aktywne pola z mapowania kolumn dla tego wydarzenia.',
+                mappedParticipantFields.additional,
               )}
-              {!hasRemainingParticipantData && (
+              {!hasImportantParticipantData && !hasRemainingParticipantData && (
                 <div className="rounded-2xl border border-dashed bg-muted/10 px-4 py-5 text-sm text-muted-foreground">
                   Dla tego uczestnika nie ma dodatkowych pól do pokazania.
                 </div>

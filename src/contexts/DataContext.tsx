@@ -14,7 +14,7 @@ interface ParticipantBibNumberConflict { bibNumber: string; conflictingParticipa
 interface ParticipantBibNumberUpdateResult extends MutationResult { conflict?: ParticipantBibNumberConflict; }
 interface EventQrEmailResult { ok: boolean; sent_count: number; error_count: number; errors: Array<{ participant_id: number; participant_name: string; error: string }>; error?: string; }
 interface ParticipantImportAnalysis { headers: string[]; sample_rows: Record<string, string>[]; email_candidates: { column: string; matched_count: number }[]; has_mapping: boolean; mappings: ParticipantFieldMapping[]; missing_required_columns: string[]; row_count: number; }
-interface ParticipantImportMappingFieldInput { source_column_name: string; alias: string; field_role: 'display_name_part' | 'bib_number' | 'custom'; is_active: boolean; }
+interface ParticipantImportMappingFieldInput { source_column_name: string; alias: string; field_role: 'display_name_part' | 'bib_number' | 'custom' | 'important_custom'; is_active: boolean; }
 interface ParticipantImportMappingPayload { csv_columns: string[]; email_column: string; fields: ParticipantImportMappingFieldInput[]; }
 interface ParticipantImportRunResult { created_count: number; duplicate_count: number; invalid_count: number; invalid_rows: number[]; participants: Participant[]; }
 interface ParticipantUpdateOptions { allowOfflineQueue?: boolean; }

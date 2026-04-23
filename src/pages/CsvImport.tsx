@@ -20,7 +20,7 @@ import { validateRequired } from '@/lib/form-validation';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 import { buildEventPath } from '@/lib/routes';
 
-type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom';
+type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom' | 'important_custom';
 
 interface MappingDraft {
   source_column_name: string;
@@ -34,6 +34,8 @@ function getMappingFieldCardClassName(fieldRole: EditableFieldRole): string {
       return 'rounded-lg border border-amber-400/70 bg-amber-500/10 p-3 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.18)]';
     case 'display_name_part':
       return 'rounded-lg border border-sky-400/70 bg-sky-500/10 p-3 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.16)]';
+    case 'important_custom':
+      return 'rounded-lg border border-rose-400/70 bg-rose-500/10 p-3 shadow-[inset_0_0_0_1px_rgba(251,113,133,0.16)]';
     case 'ignore':
       return 'rounded-lg border border-border/50 bg-card/35 p-3 opacity-60';
     case 'custom':
@@ -387,7 +389,7 @@ export default function CsvImport() {
               <CardContent className="space-y-4">
                 <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
                   <p className="text-sm font-medium">Legenda ról</p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-md border border-sky-400/50 bg-sky-500/10 px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Część nazwy</p>
                       <p className="mt-1 text-xs text-muted-foreground">Buduje nazwę uczestnika (zazwyczaj kolumny imię i nazwisko). Wybierz co najmniej jedną taką kolumnę.</p>
@@ -396,9 +398,13 @@ export default function CsvImport() {
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Numer startowy</p>
                       <p className="mt-1 text-xs text-muted-foreground">Mapuje kolumnę z numerem startowym, jeśli występuje w pliku. Tę rolę można przypisać tylko jednej kolumnie.</p>
                     </div>
+                    <div className="rounded-md border border-rose-400/50 bg-rose-500/10 px-3 py-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Ważne dane</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Wyróżnia dodatkowe informacje, które będą szczególnie widoczne podczas odprawy uczestnika.</p>
+                    </div>
                     <div className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Pole własne / Ignoruj</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Pole własne zapisuje dodatkową wartość. Ignoruj całkowicie pomija kolumnę.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Pole własne zapisuje dodatkową wartość w sekcji pozostałych danych. Ignoruj całkowicie pomija kolumnę.</p>
                     </div>
                   </div>
                 </div>
@@ -447,6 +453,7 @@ export default function CsvImport() {
                               <SelectItem value="bib_number" disabled={Boolean(bibNumberColumn && bibNumberColumn !== field.source_column_name)}>
                                 Numer startowy
                               </SelectItem>
+                              <SelectItem value="important_custom">Ważne dane</SelectItem>
                               <SelectItem value="custom">Pole własne</SelectItem>
                             </SelectContent>
                           </Select>
