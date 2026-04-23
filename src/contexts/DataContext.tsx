@@ -624,8 +624,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const existingEvent = events.find(event => event.id === eventId);
     const eventOfficeCloseAt = existingEvent ? getEventOfficeCloseAt(existingEvent) : null;
-    if (eventOfficeCloseAt !== null && Date.now() > eventOfficeCloseAt.getTime()) return { ok: false, error: 'Zakończone wydarzenia trzeba przenieść do archiwum zamiast usuwać z UI' };
-    await fetchJson(`${API_BASE_URL}/events/${eventId}/delete-ui`, { method: 'POST', headers: getAuthHeaders() }); setEvents(previous => previous.filter(event => event.id !== eventId)); if (selectedEventId === eventId) setSelectedEventId(''); if (existingEvent) addLog(`Usunięto wydarzenie z UI: ${existingEvent.name}`); await loadBootstrap(true); return { ok: true };
+    if (eventOfficeCloseAt !== null && Date.now() > eventOfficeCloseAt.getTime()) return { ok: false, error: 'Zakończone wydarzenia trzeba przenieść do archiwum zamiast usuwać' };
+    await fetchJson(`${API_BASE_URL}/events/${eventId}/delete-ui`, { method: 'POST', headers: getAuthHeaders() }); setEvents(previous => previous.filter(event => event.id !== eventId)); if (selectedEventId === eventId) setSelectedEventId(''); if (existingEvent) addLog(`Usunięto wydarzenie: ${existingEvent.name}`); await loadBootstrap(true); return { ok: true };
   }), [addLog, ensureOnline, events, getAuthHeaders, loadBootstrap, runMutation, selectedEventId, setSelectedEventId]);
 
   const addUser = useCallback(async (userData: UserCreateInput) => runMutation(async () => {

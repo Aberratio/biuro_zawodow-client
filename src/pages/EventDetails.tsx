@@ -912,7 +912,7 @@ export default function EventDetails() {
 
     if (!result.ok) {
       toast({
-        title: "Nie udało się usunąć wydarzenia z UI",
+        title: "Nie udało się usunąć wydarzenia",
         description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
       });
@@ -920,7 +920,7 @@ export default function EventDetails() {
     }
 
     setDeleteConfirmOpen(false);
-    toast({ title: "Wydarzenie usunięte z UI" });
+    toast({ title: "Wydarzenie usunięte" });
     navigate("/events");
   };
 
@@ -1085,14 +1085,13 @@ export default function EventDetails() {
                   className="h-12 w-full"
                   disabled={!isOnline || !canDeleteEventNow}
                 >
-                  <Trash2 className="mr-1 h-4 w-4" /> Usuń z UI
+                  <Trash2 className="mr-1 h-4 w-4" /> Usuń wydarzenie
                 </Button>
                 {!canDeleteEventNow && (
                   <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
                     <Info className="mt-0.5 h-4 w-4 shrink-0" />
                     <p>
-                      Wydarzenia, które już się odbyły, trzeba przenieść do
-                      archiwum zamiast usuwać z UI.
+                      Wydarzenia, które już się odbyły, przenieś do archiwum.
                     </p>
                   </div>
                 )}
@@ -1298,12 +1297,11 @@ export default function EventDetails() {
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Usunąć wydarzenie z UI?</AlertDialogTitle>
+            <AlertDialogTitle>Usunąć wydarzenie?</AlertDialogTitle>
             <AlertDialogDescription>
               Wydarzenie{" "}
               <span className="font-medium text-foreground">{event.name}</span>{" "}
-              zniknie z UI i przestanie wliczać się do limitu wydarzeń. Rekord
-              pozostanie w bazie, ale nie będzie widoczny w aplikacji.
+              zniknie na zawszei przestanie wliczać się do limitu wydarzeń.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1316,7 +1314,7 @@ export default function EventDetails() {
               {isDeletingEvent && (
                 <Loader2 className="mr-1 h-4 w-4 animate-spin" />
               )}
-              Usuń z UI
+              Usuń wydarzenie
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
