@@ -411,6 +411,7 @@ export default function Scanner() {
 
     return [
       ...mappedParticipantFields.identity,
+      ...mappedParticipantFields.important,
       ...(mappedParticipantFields.contact.length > 0
         ? mappedParticipantFields.contact
         : [{
@@ -419,23 +420,20 @@ export default function Scanner() {
             role: 'system' as const,
           }]),
     ];
-  }, [mappedParticipantFields.contact, mappedParticipantFields.identity, scannedParticipant]);
-
-  const hasImportantParticipantData = Boolean(scannedParticipant)
-    && mappedParticipantFields.important.length > 0;
+  }, [mappedParticipantFields.contact, mappedParticipantFields.identity, mappedParticipantFields.important, scannedParticipant]);
 
   const hasRemainingParticipantData = Boolean(scannedParticipant)
     && mappedParticipantFields.additional.length > 0;
 
   const normalizedCurrentBibNumber = normalizeScannerBibNumberInput(scannedParticipant?.bib_number);
 
-  const renderFieldGrid = (title: string, description: string, fields: ParticipantFieldEntry[], tone: 'default' | 'important' = 'default') => {
+  const renderFieldGrid = (title: string, description: string, fields: ParticipantFieldEntry[]) => {
     if (fields.length === 0) {
       return null;
     }
 
     return (
-      <div className={`rounded-2xl border p-3 sm:p-4 ${tone === 'important' ? 'border-amber-400/40 bg-amber-500/10' : 'bg-muted/20'}`}>
+      <div className="rounded-2xl border bg-muted/20 p-3 sm:p-4">
         <div className="mb-3">
           <p className="text-sm font-semibold text-foreground">{title}</p>
           <p className="mt-1 text-xs text-muted-foreground">{description}</p>
@@ -604,7 +602,14 @@ export default function Scanner() {
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {primaryParticipantFields.map(field => (
-                      <div key={`primary-${field.role}-${field.label}`} className="rounded-xl border bg-background/90 px-3 py-2 shadow-sm">
+                      <div
+                        key={`primary-${field.role}-${field.label}`}
+                        className={`rounded-xl border px-3 py-2 shadow-sm ${
+                          field.role === 'important_custom'
+                            ? 'border-amber-400/60 bg-amber-500/10'
+                            : 'bg-background/90'
+                        }`}
+                      >
                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                           {formatParticipantFieldLabel(field.label)}
                         </p>
@@ -697,14 +702,6 @@ export default function Scanner() {
               </div>
 
               <div className="grid gap-2">
-                {renderFieldGrid(
-                  'Ważne informacje uczestnika',
-                  mappedParticipantFields.usesFallback
-                    ? 'Dane zapisane przy uczestniku jako ważne informacje, gdy mapowanie nie jest aktualnie dostępne.'
-                    : 'Pola oznaczone jako ważne w mapowaniu kolumn dla tego wydarzenia.',
-                  mappedParticipantFields.important,
-                  'important',
-                )}
                 {hasParticipantDataManagementAccess && selectedEvent && (
                   <Button
                     variant="outline"
@@ -745,9 +742,9 @@ export default function Scanner() {
                   : 'Pozostałe aktywne pola z mapowania kolumn dla tego wydarzenia.',
                 mappedParticipantFields.additional,
               )}
-              {!hasImportantParticipantData && !hasRemainingParticipantData && (
+              {!hasRemainingParticipantData && (
                 <div className="rounded-2xl border border-dashed bg-muted/10 px-4 py-5 text-sm text-muted-foreground">
-                  Dla tego uczestnika nie ma dodatkowych pól do pokazania.
+                  Poza danymi do weryfikacji nie ma dodatkowych pól do pokazania.
                 </div>
               )}
             </CardContent>

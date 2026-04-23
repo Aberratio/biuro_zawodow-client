@@ -104,6 +104,12 @@ function getTimelineIcon(action: string) {
   return Clock;
 }
 
+type ParticipantDataEntry = {
+  label: string;
+  value: string;
+  isImportant: boolean;
+};
+
 export default function ParticipantDetails() {
   const { id: routeEventId = "", participantId = "" } = useParams<{
     id: string;
@@ -240,11 +246,17 @@ export default function ParticipantDetails() {
     [activeMappings],
   );
   const participantDataEntries = useMemo(() => {
-    if (!participant) return [];
+    if (!participant) {
+      return {
+        important: [] as ParticipantDataEntry[],
+        regular: [] as ParticipantDataEntry[],
+      };
+    }
 
-    const entries = [
-      { label: "Imię i nazwisko", value: participant.name },
-      { label: "Email", value: participant.email },
+    const importantAliases = new Set(participant.important_field_aliases ?? []);
+    const entries: ParticipantDataEntry[] = [
+      { label: "Imię i nazwisko", value: participant.name, isImportant: false },
+      { label: "Email", value: participant.email, isImportant: false },
     ];
     const mappedValues = buildParticipantFieldValues(mappings, participant);
     const seenLabels = new Set(["Imię i nazwisko", "Email"]);
@@ -253,7 +265,13 @@ export default function ParticipantDetails() {
       if (mapping.field_role === "bib_number") continue;
       const value = (mappedValues[mapping.alias] ?? "").trim();
       if (!value) continue;
-      entries.push({ label: mapping.alias, value });
+      entries.push({
+        label: mapping.alias,
+        value,
+        isImportant:
+          mapping.field_role === "important_custom" ||
+          importantAliases.has(mapping.alias),
+      });
       seenLabels.add(mapping.alias);
     }
 
@@ -268,10 +286,17 @@ export default function ParticipantDetails() {
         seenLabels.has(normalizedLabel)
       )
         continue;
-      entries.push({ label: normalizedLabel, value: normalizedValue });
+      entries.push({
+        label: normalizedLabel,
+        value: normalizedValue,
+        isImportant: importantAliases.has(normalizedLabel),
+      });
     }
 
-    return entries;
+    return {
+      important: entries.filter((entry) => entry.isImportant),
+      regular: entries.filter((entry) => !entry.isImportant),
+    };
   }, [activeMappings, mappings, participant]);
 
   const timeline = useMemo(() => {
@@ -795,18 +820,40 @@ export default function ParticipantDetails() {
         <CardHeader>
           <CardTitle className="text-base">Dane uczestnika</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {participantDataEntries.map((entry) => (
-            <div
-              key={entry.label}
-              className="flex flex-col gap-1 text-sm sm:flex-row sm:items-start sm:justify-between"
-            >
-              <span className="text-muted-foreground">{entry.label}</span>
-              <span className="font-medium sm:max-w-[60%] sm:text-right break-words">
-                {entry.value}
-              </span>
+        <CardContent className="space-y-4">
+          {participantDataEntries.important.length > 0 && (
+            <div className="rounded-2xl border border-amber-400/50 bg-amber-500/10 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-950">
+                Ważne dane do weryfikacji
+              </p>
+              <div className="mt-3 space-y-3">
+                {participantDataEntries.important.map((entry) => (
+                  <div
+                    key={`important-${entry.label}`}
+                    className="flex flex-col gap-1 text-sm sm:flex-row sm:items-start sm:justify-between"
+                  >
+                    <span className="text-amber-950/80">{entry.label}</span>
+                    <span className="font-semibold text-amber-950 sm:max-w-[60%] sm:text-right break-words">
+                      {entry.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
+          )}
+          <div className="space-y-3">
+            {participantDataEntries.regular.map((entry) => (
+              <div
+                key={entry.label}
+                className="flex flex-col gap-1 text-sm sm:flex-row sm:items-start sm:justify-between"
+              >
+                <span className="text-muted-foreground">{entry.label}</span>
+                <span className="font-medium sm:max-w-[60%] sm:text-right break-words">
+                  {entry.value}
+                </span>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
