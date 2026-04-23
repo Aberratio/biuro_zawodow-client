@@ -55,7 +55,10 @@ function createEvent(): Event {
   };
 }
 
-function createParticipant(bibNumber = ''): Participant {
+function createParticipant(
+  bibNumber = '',
+  options?: { importantFieldAliases?: string[]; customFields?: Record<string, string> },
+): Participant {
   return {
     id: 'p-1',
     event_id: 'event-1',
@@ -65,9 +68,11 @@ function createParticipant(bibNumber = ''): Participant {
     qr_code: 'QR-1',
     status: 'not_checked_in',
     email_status: 'not_sent',
-    custom_fields: {
+    custom_fields: options?.customFields ?? {
       miasto: 'Warszawa',
+      alergie: 'Orzeszki',
     },
+    important_field_aliases: options?.importantFieldAliases ?? ['Alergie'],
   };
 }
 
@@ -97,12 +102,24 @@ function createMappings(): ParticipantFieldMapping[] {
       is_required: false,
       is_active: true,
     },
+    {
+      source_column_name: 'allergies',
+      alias: 'Alergie',
+      field_role: 'important_custom',
+      display_order: 3,
+      is_required: false,
+      is_active: true,
+    },
   ];
 }
 
-function createDataState(role: User['role'], bibNumber = '') {
+function createDataState(
+  role: User['role'],
+  bibNumber = '',
+  options?: { mappings?: ParticipantFieldMapping[]; participant?: Participant; mappingError?: boolean },
+) {
   const event = createEvent();
-  const participant = createParticipant(bibNumber);
+  const participant = options?.participant ?? createParticipant(bibNumber);
 
   return {
     participants: [participant],
@@ -127,7 +144,9 @@ function createDataState(role: User['role'], bibNumber = '') {
     connectionState: 'online',
     pendingMutationCount: 0,
     scannerMode: 'online',
-    getParticipantFieldMappings: vi.fn(async () => createMappings()),
+    getParticipantFieldMappings: options?.mappingError
+      ? vi.fn(async () => { throw new Error('mapping unavailable'); })
+      : vi.fn(async () => options?.mappings ?? createMappings()),
     sendParticipantQrEmail: vi.fn(async () => ({ ok: true })),
     deleteParticipant: vi.fn(async () => ({ ok: true })),
     getParticipantQrPreview: vi.fn(async () => ({
@@ -184,6 +203,53 @@ describe('Scanner page', () => {
     await waitFor(() => {
       expect(dataState.updateParticipantBibNumber).toHaveBeenCalledWith('p-1', '123');
     });
+  });
+
+  it('shows important mapped fields in a dedicated scanner box instead of the remaining data box', async () => {
+    useDataMock.mockReturnValue(createDataState('scanner_plus'));
+
+    renderPages();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
+    await screen.findByText('Ważne informacje uczestnika');
+
+    const importantSection = screen.getByText('Ważne informacje uczestnika').parentElement?.parentElement;
+    const remainingSection = screen.getByText('Pozostałe dane uczestnika').parentElement?.parentElement;
+
+    expect(importantSection).not.toBeNull();
+    expect(remainingSection).not.toBeNull();
+
+    expect(within(importantSection as HTMLElement).getByText('Alergie')).toBeInTheDocument();
+    expect(within(importantSection as HTMLElement).getByText('Orzeszki')).toBeInTheDocument();
+    expect(within(importantSection as HTMLElement).queryByText('Miasto')).not.toBeInTheDocument();
+
+    expect(within(remainingSection as HTMLElement).getByText('Miasto')).toBeInTheDocument();
+    expect(within(remainingSection as HTMLElement).getByText('Warszawa')).toBeInTheDocument();
+    expect(within(remainingSection as HTMLElement).queryByText('Alergie')).not.toBeInTheDocument();
+  });
+
+  it('keeps important fields separated in scanner fallback when mappings are unavailable', async () => {
+    const participant = createParticipant('', {
+      importantFieldAliases: ['Alergie'],
+      customFields: {
+        Alergie: 'Orzeszki',
+        Miasto: 'Warszawa',
+      },
+    });
+    useDataMock.mockReturnValue(createDataState('scanner_plus', '', { participant, mappingError: true }));
+
+    renderPages();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
+    await screen.findByText('Ważne informacje uczestnika');
+
+    const importantSection = screen.getByText('Ważne informacje uczestnika').parentElement?.parentElement;
+    const remainingSection = screen.getByText('Pozostałe dane uczestnika').parentElement?.parentElement;
+
+    expect(within(importantSection as HTMLElement).getByText('Alergie')).toBeInTheDocument();
+    expect(within(importantSection as HTMLElement).getByText('Orzeszki')).toBeInTheDocument();
+    expect(within(remainingSection as HTMLElement).getByText('Miasto')).toBeInTheDocument();
+    expect(within(remainingSection as HTMLElement).getByText('Warszawa')).toBeInTheDocument();
   });
 
   it('does not expose inline participant editing for the plain scanner role', async () => {

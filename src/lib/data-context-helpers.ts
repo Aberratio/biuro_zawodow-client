@@ -19,6 +19,7 @@ export interface ApiParticipant {
   bib_number: string | null;
   qr_code: string | null;
   custom_fields?: Record<string, string> | null;
+  important_field_aliases?: string[] | null;
   status: ParticipantStatus | 'pending' | null;
   email_status: 'not_sent' | 'sent' | null;
   checked_in_at: string | null;
@@ -158,6 +159,20 @@ function normalizeCustomFields(value: unknown): Record<string, string> {
   );
 }
 
+function normalizeImportantFieldAliases(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .map(alias => toTrimmedString(alias))
+        .filter(Boolean),
+    ),
+  );
+}
+
 export function mapApiParticipantToUi(participant: ParticipantLike | null | undefined, fallbackEventId: string): Participant {
   const eventId = toTrimmedString(participant?.event_id) || fallbackEventId;
   const displayName = toTrimmedString(participant?.display_name);
@@ -185,6 +200,7 @@ export function mapApiParticipantToUi(participant: ParticipantLike | null | unde
     email_status: participant?.email_status === 'sent' ? 'sent' : 'not_sent',
     checked_in_at: checkedInAt || undefined,
     custom_fields: normalizeCustomFields(participant?.custom_fields),
+    important_field_aliases: normalizeImportantFieldAliases(participant?.important_field_aliases),
     sync_state: 'synced',
     sync_error: undefined,
   };

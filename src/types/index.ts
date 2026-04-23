@@ -37,6 +37,7 @@ export interface Participant {
   email_status: EmailStatus;
   checked_in_at?: string;
   custom_fields?: Record<string, string>;
+  important_field_aliases?: string[];
   sync_state?: ParticipantSyncState;
   sync_error?: string;
 }
@@ -56,7 +57,7 @@ export interface ParticipantScanResult {
   };
 }
 
-export type ParticipantFieldRole = 'email' | 'display_name_part' | 'bib_number' | 'custom';
+export type ParticipantFieldRole = 'email' | 'display_name_part' | 'bib_number' | 'custom' | 'important_custom';
 
 export interface ParticipantFieldMapping {
   source_column_name: string;
