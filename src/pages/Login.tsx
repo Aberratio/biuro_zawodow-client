@@ -140,7 +140,7 @@ export default function Login() {
             </div>
 
             <div className="mt-14">
-              <h1 className="text-[2.3rem] leading-none tracking-[-0.045em] text-foreground">
+              <h1 className="text-[2rem] font-semibold leading-none tracking-[-0.05em] text-foreground md:text-[2.25rem] lg:text-[2.55rem]">
                 Logowanie
               </h1>
             </div>

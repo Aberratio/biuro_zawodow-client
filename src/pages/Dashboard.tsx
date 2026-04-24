@@ -17,6 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import DashboardSkeleton from '@/components/skeletons/DashboardSkeleton';
+import { PageHeader } from '@/components/PageHeader';
 import {
   formatEventOfficeStart,
   formatEventOfficeWindow,
@@ -90,11 +91,7 @@ export default function Dashboard() {
 
     return (
       <div className="space-y-6 lg:space-y-8">
-        <div className="space-y-1.5">
-          <h1 className="text-[2rem] font-semibold tracking-[-0.05em] text-foreground sm:text-[2.55rem]">
-            Panel
-          </h1>
-        </div>
+        <PageHeader title="Panel" />
 
         <section className="space-y-4">
           <div className="space-y-1.5">
@@ -171,11 +168,7 @@ export default function Dashboard() {
 
   return (
       <div className="space-y-6 lg:space-y-8">
-        <div className="space-y-1.5">
-          <h1 className="text-[2rem] font-semibold tracking-[-0.05em] text-foreground sm:text-[2.55rem]">
-            Panel
-          </h1>
-        </div>
+        <PageHeader title="Panel" />
 
       {currentEvent && (
         <Card className="overflow-hidden rounded-[1.8rem] border-[hsl(var(--primary)/0.22)] bg-[radial-gradient(circle_at_top_right,hsl(var(--button-highlight)/0.08),transparent_28%),linear-gradient(180deg,hsl(220_10%_11%/0.95),hsl(220_14%_7%/0.98))] sm:rounded-[2rem]">

@@ -17,6 +17,7 @@ interface ParticipantImportAnalysis { headers: string[]; sample_rows: Record<str
 interface ParticipantImportMappingFieldInput { source_column_name: string; alias: string; field_role: 'display_name_part' | 'bib_number' | 'custom' | 'important_custom'; is_active: boolean; }
 interface ParticipantImportMappingPayload { csv_columns: string[]; email_column: string; fields: ParticipantImportMappingFieldInput[]; }
 interface ParticipantImportRunResult { created_count: number; duplicate_count: number; invalid_count: number; invalid_rows: number[]; participants: Participant[]; }
+interface ParticipantFieldMappingsState { has_mapping: boolean; has_baseline_import: boolean; mappings: ParticipantFieldMapping[]; }
 interface ParticipantUpdateOptions { allowOfflineQueue?: boolean; }
 interface ParticipantBibNumberUpdateOptions { conflictResolution?: 'keep_duplicates' | 'delete_conflicts'; }
 interface OrganizationUpdateInput { name?: string; event_limit?: number; }
@@ -42,6 +43,7 @@ interface DataContextType {
   analyzeParticipantImport: (eventId: string, csvContent: string) => Promise<ParticipantImportAnalysis>;
   confirmParticipantImportMapping: (eventId: string, payload: ParticipantImportMappingPayload) => Promise<ParticipantFieldMapping[]>;
   runParticipantImport: (eventId: string, csvContent: string) => Promise<ParticipantImportRunResult>;
+  getParticipantFieldMappingsState: (eventId: string) => Promise<ParticipantFieldMappingsState>;
   getParticipantFieldMappings: (eventId: string) => Promise<ParticipantFieldMapping[]>;
   addParticipantManually: (eventId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
   createEvent: (e: EventMutationInput) => Promise<MutationResult>;
@@ -65,6 +67,7 @@ interface DataContextType {
   deleteParticipant: (participantId: string) => Promise<MutationResult>;
   exportEventCsv: (eventId: string) => Promise<MutationResult>;
   exportEventLogsCsv: (eventId: string) => Promise<MutationResult>;
+  exportEventParticipantChangesCsv: (eventId: string) => Promise<MutationResult>;
   visibleEvents: Event[];
   canAccessEvent: (eventId: string) => boolean;
   canViewEvent: (eventId: string) => boolean;
@@ -126,6 +129,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const networkFailureCountRef = useRef(0);
   const participantFieldMappingsCacheRef = useRef(new Map<string, { fetchedAt: number; mappings: ParticipantFieldMapping[] }>());
   const participantFieldMappingsInFlightRef = useRef(new Map<string, Promise<ParticipantFieldMapping[]>>());
+  const participantFieldMappingsStateCacheRef = useRef(new Map<string, { fetchedAt: number; state: ParticipantFieldMappingsState }>());
+  const participantFieldMappingsStateInFlightRef = useRef(new Map<string, Promise<ParticipantFieldMappingsState>>());
   const participantFieldMappingsFailureUntilRef = useRef(new Map<string, number>());
 
   const participants = useMemo(() => applyPendingMutations(participantRecords, pendingMutations), [participantRecords, pendingMutations]);
@@ -182,7 +187,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const nextValue = JSON.stringify(updater(JSON.parse(raw) as User));
       sessionStorage.setItem('auth_user', nextValue);
       localStorage.setItem('auth_user', nextValue);
-    } catch {}
+    } catch {
+      // Ignore storage sync failures and keep the in-memory session usable.
+    }
   }, []);
 
   const resetState = useCallback(() => {
@@ -545,7 +552,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [applyOnlineOnly, getAuthHeaders]);
   const confirmParticipantImportMapping = useCallback(async (eventId: string, payload: ParticipantImportMappingPayload) => {
     const mappings = ((await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/events/${eventId}/participant-imports/confirm`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(payload) }))).payload as { data?: ParticipantFieldMapping[] }).data ?? [];
+    const cachedState = participantFieldMappingsStateCacheRef.current.get(eventId)?.state;
     participantFieldMappingsCacheRef.current.set(eventId, { fetchedAt: Date.now(), mappings });
+    participantFieldMappingsStateCacheRef.current.set(eventId, { fetchedAt: Date.now(), state: { has_mapping: mappings.length > 0, has_baseline_import: cachedState?.has_baseline_import ?? false, mappings } });
     participantFieldMappingsFailureUntilRef.current.delete(eventId);
     return mappings;
   }, [applyOnlineOnly, getAuthHeaders]);
@@ -589,6 +598,48 @@ export function DataProvider({ children }: { children: ReactNode }) {
     })();
 
     participantFieldMappingsInFlightRef.current.set(eventId, request);
+    return request;
+  }, [applyOnlineOnly, getAuthHeaders]);
+  const getParticipantFieldMappingsState = useCallback(async (eventId: string): Promise<ParticipantFieldMappingsState> => {
+    const cachedEntry = participantFieldMappingsStateCacheRef.current.get(eventId);
+    if (cachedEntry && Date.now() - cachedEntry.fetchedAt < PARTICIPANT_FIELD_MAPPINGS_CACHE_TTL_MS) {
+      return cachedEntry.state;
+    }
+
+    const cooldownUntil = participantFieldMappingsFailureUntilRef.current.get(eventId) ?? 0;
+    if (cooldownUntil > Date.now()) {
+      if (cachedEntry) return cachedEntry.state;
+      throw new Error('Trwa ponowne nawiazywanie polaczenia z serwerem. Sprobuj ponownie za chwile.');
+    }
+
+    const pendingRequest = participantFieldMappingsStateInFlightRef.current.get(eventId);
+    if (pendingRequest) {
+      return pendingRequest;
+    }
+
+    const request = (async () => {
+      try {
+        const payload = (await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/events/${eventId}/participant-field-mappings`, { headers: getAuthHeaders() }), 'Mapowanie pol uczestnikow jest dostepne tylko po polaczeniu z serwerem.')).payload as { data?: { has_mapping?: boolean; has_baseline_import?: boolean; mappings?: ParticipantFieldMapping[] } };
+        const state = {
+          has_mapping: Boolean(payload.data?.has_mapping),
+          has_baseline_import: Boolean(payload.data?.has_baseline_import),
+          mappings: payload.data?.mappings ?? [],
+        };
+        participantFieldMappingsStateCacheRef.current.set(eventId, { fetchedAt: Date.now(), state });
+        participantFieldMappingsCacheRef.current.set(eventId, { fetchedAt: Date.now(), mappings: state.mappings });
+        participantFieldMappingsFailureUntilRef.current.delete(eventId);
+        return state;
+      } catch (error) {
+        if (isNetworkRequestError(error)) {
+          participantFieldMappingsFailureUntilRef.current.set(eventId, Date.now() + PARTICIPANT_FIELD_MAPPINGS_FAILURE_COOLDOWN_MS);
+        }
+        throw error;
+      } finally {
+        participantFieldMappingsStateInFlightRef.current.delete(eventId);
+      }
+    })();
+
+    participantFieldMappingsStateInFlightRef.current.set(eventId, request);
     return request;
   }, [applyOnlineOnly, getAuthHeaders]);
 
@@ -754,7 +805,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`${API_BASE_URL}/events/${eventId}/export.csv`, { headers: getAuthHeaders() });
       if (!response.ok) { const payload = await response.json().catch(() => ({})) as { error?: string }; return { ok: false, error: payload.error ?? `API event export failed: ${response.status}` }; }
-      const blob = await response.blob(); const fallbackName = `event-${eventId}-participants.csv`; const contentDisposition = response.headers.get('content-disposition') ?? ''; const fileNameMatch = contentDisposition.match(/filename=\"?([^\"]+)\"?/i); const fileName = fileNameMatch?.[1] ?? fallbackName; const objectUrl = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = objectUrl; link.download = fileName; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(objectUrl); return { ok: true };
+      const blob = await response.blob(); const fallbackName = `event-${eventId}-participants.csv`; const contentDisposition = response.headers.get('content-disposition') ?? ''; const fileNameMatch = contentDisposition.match(/filename="?([^"]+)"?/i); const fileName = fileNameMatch?.[1] ?? fallbackName; const objectUrl = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = objectUrl; link.download = fileName; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(objectUrl); return { ok: true };
     } catch (error) {
       handleNetworkFailure(error);
       return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się wyeksportować CSV' };
@@ -766,15 +817,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`${API_BASE_URL}/events/${eventId}/logs/export.csv`, { headers: getAuthHeaders() });
       if (!response.ok) { const payload = await response.json().catch(() => ({})) as { error?: string }; return { ok: false, error: payload.error ?? `API event logs export failed: ${response.status}` }; }
-      const blob = await response.blob(); const fallbackName = `event-${eventId}-logs.csv`; const contentDisposition = response.headers.get('content-disposition') ?? ''; const fileNameMatch = contentDisposition.match(/filename=\"?([^\"]+)\"?/i); const fileName = fileNameMatch?.[1] ?? fallbackName; const objectUrl = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = objectUrl; link.download = fileName; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(objectUrl); return { ok: true };
+      const blob = await response.blob(); const fallbackName = `event-${eventId}-logs.csv`; const contentDisposition = response.headers.get('content-disposition') ?? ''; const fileNameMatch = contentDisposition.match(/filename="?([^"]+)"?/i); const fileName = fileNameMatch?.[1] ?? fallbackName; const objectUrl = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = objectUrl; link.download = fileName; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(objectUrl); return { ok: true };
     } catch (error) {
       handleNetworkFailure(error);
       return { ok: false, error: error instanceof Error ? error.message : 'Nie udało się wyeksportować logów CSV' };
     }
   }, [ensureOnline, getAuthHeaders, handleNetworkFailure]);
 
+  const exportEventParticipantChangesCsv = useCallback(async (eventId: string): Promise<MutationResult> => {
+    const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
+    try {
+      const response = await fetch(`${API_BASE_URL}/events/${eventId}/participant-changes/export.csv`, { headers: getAuthHeaders() });
+      if (!response.ok) { const payload = await response.json().catch(() => ({})) as { error?: string }; return { ok: false, error: payload.error ?? `API event participant changes export failed: ${response.status}` }; }
+      const blob = await response.blob(); const fallbackName = `event-${eventId}-participant-changes.csv`; const contentDisposition = response.headers.get('content-disposition') ?? ''; const fileNameMatch = contentDisposition.match(/filename="?([^"]+)"?/i); const fileName = fileNameMatch?.[1] ?? fallbackName; const objectUrl = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = objectUrl; link.download = fileName; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(objectUrl); return { ok: true };
+    } catch (error) {
+      handleNetworkFailure(error);
+      return { ok: false, error: error instanceof Error ? error.message : 'Nie udaĹ‚o siÄ™ wyeksportowaÄ‡ CSV zmian uczestnikĂłw' };
+    }
+  }, [ensureOnline, getAuthHeaders, handleNetworkFailure]);
+
   return (
-    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
+    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, getParticipantFieldMappingsState, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, exportEventParticipantChangesCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
       {children}
     </DataContext.Provider>
   );

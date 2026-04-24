@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useData } from '@/contexts/DataContext';
 import { formatEventOfficeStart, getEventOfficeOpenAt } from '@/lib/events';
 import { isScannerRole } from '@/lib/roles';
+import { PageHeader } from '@/components/PageHeader';
 
 function formatCountdown(milliseconds: number): string {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
@@ -49,7 +50,12 @@ export default function ScannerInfo() {
             <div className="mb-5 rounded-full bg-primary/10 p-4 text-primary">
               {showCountdown ? <TimerReset className="h-10 w-10" /> : <CalendarDays className="h-10 w-10" />}
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">Brak aktywnych zawodów</h1>
+            <PageHeader
+              title="Brak aktywnych zawodów"
+              className="w-full"
+              contentClassName="space-y-3"
+              headingClassName="text-center"
+            />
             <p className="mt-3 text-sm text-muted-foreground">
               Obecnie nie masz przypisanego żadnego wydarzenia z otwartym biurem zawodów, dlatego zakładki skanera i uczestników są chwilowo ukryte.
             </p>

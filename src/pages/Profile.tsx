@@ -11,6 +11,7 @@ import { useData } from '@/contexts/DataContext';
 import { generateStrongPassword } from '@/lib/password';
 import { validatePasswordConfirmation, validateRequired, validateStrongPassword } from '@/lib/form-validation';
 import { toast } from '@/hooks/use-toast';
+import { PageHeader } from '@/components/PageHeader';
 
 const roleLabels: Record<string, string> = {
   superadmin: 'Superadmin',
@@ -96,6 +97,8 @@ export default function Profile() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <PageHeader title="Mój profil" />
+
       <Card>
         <CardHeader>
           <CardTitle>Mój profil</CardTitle>

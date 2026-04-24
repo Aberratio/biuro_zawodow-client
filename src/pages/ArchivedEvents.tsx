@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import TableSkeleton from "@/components/skeletons/TableSkeleton";
+import { PageHeader } from "@/components/PageHeader";
 import { formatEventOfficeWindow, getEventOfficeOpenAt } from "@/lib/events";
 import { participantCountsAsCheckedIn } from "@/lib/participant-status";
 
@@ -86,24 +87,21 @@ export default function ArchivedEvents() {
         Wróć do organizacji
       </Button>
 
-      <div className="space-y-2">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <Archive className="h-5 w-5 text-primary" />
-              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-                Archiwum wydarzeń
-              </h1>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {organization.name}
-            </p>
-          </div>
+      <PageHeader
+        title={
+          <span className="flex items-center gap-2">
+            <Archive className="h-6 w-6 shrink-0 text-primary" />
+            <span>Archiwum wydarzeń</span>
+          </span>
+        }
+        description={organization.name}
+        actions={
           <Badge variant="outline" className="w-fit">
             {eventRows.length} archiwalnych
           </Badge>
-        </div>
-      </div>
+        }
+        headingClassName="flex items-center gap-2"
+      />
 
       <Card className="archive-notice shadow-sm">
         <CardContent className="p-5">
