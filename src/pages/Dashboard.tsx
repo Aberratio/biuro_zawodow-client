@@ -133,36 +133,38 @@ export default function Dashboard() {
           )}
         </section>
 
-        <Card className="overflow-hidden rounded-[1.8rem] border-[hsl(var(--primary)/0.2)] bg-[radial-gradient(circle_at_top_right,hsl(var(--button-highlight)/0.08),transparent_26%),linear-gradient(180deg,hsl(220_10%_11%/0.95),hsl(220_14%_7%/0.98))] shadow-[0_30px_70px_hsl(var(--surface-shadow)/0.42)] sm:rounded-[2rem]">
-          <CardHeader className="border-b border-white/6 px-5 py-4.5 sm:px-6 sm:py-5">
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-1">
-                <CardTitle className="text-[1.18rem] font-semibold tracking-[-0.03em] text-foreground sm:text-[1.3rem]">
-                  Nadchodzące wydarzenia
-                </CardTitle>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {upcomingEvents.length === 0 ? (
-              <div className="p-5 sm:p-6">
-                <EmptyState
-                  title="Brak nadchodzących wydarzeń"
-                  description={upcomingEmptyDescription}
-                  compact
+        <section className="space-y-4">
+          <div className="space-y-1.5">
+            <h2 className="text-[1.25rem] font-semibold tracking-[-0.03em] text-[hsl(var(--button-highlight))] sm:text-[1.55rem]">
+              Nadchodzące wydarzenia
+            </h2>
+            <p className="max-w-2xl text-[0.92rem] leading-6 text-muted-foreground sm:text-[0.98rem] sm:leading-7">
+              Wydarzenia, dla których biuro zawodów otworzy się w najbliższym czasie.
+            </p>
+          </div>
+
+          <Card className="overflow-hidden rounded-[1.8rem] border-[hsl(var(--primary)/0.2)] bg-[radial-gradient(circle_at_top_right,hsl(var(--button-highlight)/0.08),transparent_26%),linear-gradient(180deg,hsl(220_10%_11%/0.95),hsl(220_14%_7%/0.98))] shadow-[0_30px_70px_hsl(var(--surface-shadow)/0.42)] sm:rounded-[2rem]">
+            <CardContent className="p-0">
+              {upcomingEvents.length === 0 ? (
+                <div className="p-5 sm:p-6">
+                  <EmptyState
+                    title="Brak nadchodzących wydarzeń"
+                    description={upcomingEmptyDescription}
+                    compact
+                  />
+                </div>
+              ) : (
+                <EventOverviewTable
+                  events={upcomingEvents}
+                  organizationNames={organizationNames}
+                  metaColumnLabel="Start biura"
+                  getMetaValue={(event) => formatEventOfficeStart(event)}
+                  onOpen={(eventId) => navigate(`/events/${eventId}`)}
                 />
-              </div>
-            ) : (
-              <EventOverviewTable
-                events={upcomingEvents}
-                organizationNames={organizationNames}
-                metaColumnLabel="Start biura"
-                getMetaValue={(event) => formatEventOfficeStart(event)}
-                onOpen={(eventId) => navigate(`/events/${eventId}`)}
-              />
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </section>
       </div>
     );
   }
@@ -338,14 +340,14 @@ function EventOverviewTable({
         containerClassName="rounded-none border-0 bg-transparent shadow-none backdrop-blur-0"
       >
         <TableHeader>
-          <TableRow className="border-white/6 bg-transparent hover:bg-transparent">
-            <TableHead className="h-13 px-5 text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground/78 sm:px-6 sm:text-[0.72rem] sm:tracking-[0.2em]">
+          <TableRow>
+            <TableHead>
               Wydarzenie
             </TableHead>
-            <TableHead className="hidden h-13 px-6 text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground/78 md:table-cell">
+            <TableHead className="hidden md:table-cell">
               Organizacja
             </TableHead>
-            <TableHead className="h-13 px-5 text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground/78 sm:px-6 sm:text-[0.72rem] sm:tracking-[0.2em]">
+            <TableHead>
               {metaColumnLabel}
             </TableHead>
           </TableRow>
