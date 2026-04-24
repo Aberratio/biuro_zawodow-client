@@ -83,6 +83,7 @@ import {
   Icon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/PageHeader";
 
 type MemberRole = "editor" | "scanner" | "scanner_plus";
 
@@ -894,67 +895,64 @@ export default function OrganizationDetails() {
   };
 
   return (
-    <div className="flex flex-col gap-7 pb-6">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => navigate("/organizations")}
-        className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
-      >
-        <ArrowLeft className="mr-1 h-4 w-4" />
-        Wróć do listy wszystkich organizacji
-      </Button>
+    <div className="flex flex-col gap-6 pb-6">
+      <div className="space-y-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate("/organizations")}
+          className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Wróć do listy wszystkich organizacji
+        </Button>
 
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h1 className="truncate text-[2rem] font-bold leading-none tracking-[-0.03em] text-foreground sm:text-[2.35rem]">
-                    {organization.name}
-                  </h1>
-                  {canEditOrganization && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className={subtleIconButtonClassName}
-                      onClick={() => {
-                        setOrganizationNameDraft(organization.name);
-                        setLimitDraft(String(organization.event_limit));
-                        setOrganizationEditOpen(true);
-                      }}
-                      aria-label="Edytuj organizację"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-          {canEditOrganization && (
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                variant="outline"
-                className="w-full rounded-[1rem] px-5 sm:w-auto"
-                onClick={openLimitDialog}
-              >
-                <Calculator className="mr-1 h-4 w-4" />
-                Zmień limit wydarzeń
-              </Button>
-              <Button
-                variant="destructive"
-                className="w-full rounded-[1rem] px-5 sm:w-auto"
-                onClick={() => setDeleteOrganizationConfirmOpen(true)}
-              >
-                <Trash2 className="mr-1 h-4 w-4" />
-                Usuń organizację
-              </Button>
-            </div>
-          )}
-        </div>
+        <PageHeader
+          title={organization.name}
+          className="sm:flex-col lg:flex-row"
+          headingClassName="break-words lg:truncate"
+          actionsClassName="w-full sm:flex-col lg:w-auto lg:flex-row"
+          actions={
+            <>
+              {canEditOrganization && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={`${subtleIconButtonClassName} sm:w-full lg:w-10`}
+                  onClick={() => {
+                    setOrganizationNameDraft(organization.name);
+                    setLimitDraft(String(organization.event_limit));
+                    setOrganizationEditOpen(true);
+                  }}
+                  aria-label="Edytuj organizację"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+              {canEditOrganization && (
+                <Button
+                  variant="outline"
+                  className="w-full rounded-[1rem] px-5 lg:w-auto"
+                  onClick={openLimitDialog}
+                >
+                  <Calculator className="mr-1 h-4 w-4" />
+                  Zmień limit wydarzeń
+                </Button>
+              )}
+              {canEditOrganization && (
+                <Button
+                  variant="destructive"
+                  className="w-full rounded-[1rem] px-5 lg:w-auto"
+                  onClick={() => setDeleteOrganizationConfirmOpen(true)}
+                >
+                  <Trash2 className="mr-1 h-4 w-4" />
+                  Usuń organizację
+                </Button>
+              )}
+            </>
+          }
+        />
       </div>
 
       <section className={sectionClassName}>

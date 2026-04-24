@@ -58,6 +58,7 @@ import { buildEventPath } from "@/lib/routes";
 import { isScannerRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
+import { PageHeader } from "@/components/PageHeader";
 
 const EVENTS_PAGE_SIZE = 20;
 
@@ -574,12 +575,8 @@ export default function Events() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-            Wydarzenia
-          </h1>
-        </div>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <PageHeader className="contents" title="Wydarzenia" />
         {canCreateEvent && (
           <Button
             onClick={() => setOpen(true)}

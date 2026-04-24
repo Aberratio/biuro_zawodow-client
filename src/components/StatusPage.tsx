@@ -55,7 +55,7 @@ export function StatusPage({
           <div className="space-y-5">
             <div className="space-y-3">
               <p className="font-heading text-xs font-bold uppercase tracking-[0.28em] text-primary/80">{eyebrow}</p>
-              <h1 className="font-heading text-3xl font-black tracking-tight text-foreground sm:text-4xl">{title}</h1>
+              <h1 className="text-[2rem] font-semibold tracking-[-0.05em] text-foreground md:text-[2.25rem] lg:text-[2.55rem]">{title}</h1>
               <p className="max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">{description}</p>
             </div>
 

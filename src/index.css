@@ -754,11 +754,23 @@ All colors MUST be HSL.
   }
 
   .event-detail-title {
-    font-size: clamp(2rem, 4vw, 3.25rem);
+    font-size: 2rem;
     line-height: 1;
-    font-weight: 800;
-    letter-spacing: -0.03em;
+    font-weight: 600;
+    letter-spacing: -0.05em;
     color: hsl(var(--foreground));
+  }
+
+  @media (min-width: 768px) {
+    .event-detail-title {
+      font-size: 2.25rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .event-detail-title {
+      font-size: 2.55rem;
+    }
   }
 
   .event-detail-headline {

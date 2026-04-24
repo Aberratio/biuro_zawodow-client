@@ -57,6 +57,7 @@ import {
 import { validateEmail, validateRequired } from "@/lib/form-validation";
 import { isScannerRole } from "@/lib/roles";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
+import { PageHeader } from "@/components/PageHeader";
 import {
   buildEventImportPath,
   buildEventParticipantPath,
@@ -280,8 +281,8 @@ export default function Participants() {
     return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="space-y-6">
+      <div className="space-y-6">
         <div>
           <Button
             variant="ghost"
@@ -291,11 +292,11 @@ export default function Participants() {
           >
             <ArrowLeft className="h-4 w-4 mr-1" /> Wróć do wydarzenia
           </Button>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight mt-8">
-            Uczestnicy
-          </h1>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+        <PageHeader
+          title="Uczestnicy"
+          actions={
+            <>
           <Button
             variant="outline"
             onClick={() => void refreshData()}
@@ -331,7 +332,9 @@ export default function Participants() {
               <UserPlus className="h-4 w-4 mr-1" /> Dodaj ręcznie
             </Button>
           )}
-        </div>
+            </>
+          }
+        />
       </div>
 
       {!isOnline && (

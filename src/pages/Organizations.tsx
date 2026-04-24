@@ -17,6 +17,7 @@ import { validateNonNegativeInteger, validateRequired } from '@/lib/form-validat
 import { buildOrganizationPath } from '@/lib/routes';
 import type { Event } from '@/types';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
+import { PageHeader } from '@/components/PageHeader';
 
 function getClosestOrganizationEventLabel(organizationEvents: Event[], now: Date): string {
   const activeEvent = organizationEvents
@@ -156,11 +157,9 @@ export default function Organizations() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Organizacje</h1>
-        </div>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <PageHeader className="contents" title="Organizacje" />
         {(currentRole === 'admin' || currentRole === 'superadmin') && (
           <Button onClick={() => setOpen(true)} size="sm" className="w-full sm:w-auto sm:self-auto" disabled={!isOnline}>
             <Plus className="mr-1 h-4 w-4" />

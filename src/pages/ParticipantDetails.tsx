@@ -63,6 +63,7 @@ import {
 } from "@/lib/participant-status";
 import { validateEmail, validateRequired } from "@/lib/form-validation";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
+import { PageHeader } from "@/components/PageHeader";
 import {
   canManageParticipantData as canManageParticipantDataForRole,
   canUseParticipantAdminActions,
@@ -577,51 +578,49 @@ export default function ParticipantDetails() {
         <ArrowLeft className="h-4 w-4 mr-1" /> {backLabel}
       </Button>
 
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-            {participant.name}
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            {participant.email}
-          </p>
-          {event && (
-            <p className="text-xs text-muted-foreground mt-1">{event.name}</p>
-          )}
-        </div>
-        {canManageParticipantData && (
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full sm:w-auto"
-              onClick={() => setTransferOpen(true)}
-              disabled={!isOnline}
-            >
-              <UserRoundCog className="h-4 w-4 mr-1" />
-              Edytuj dane uczestnika
-            </Button>
-            {canUseAdminActions && (
+      <PageHeader
+        title={participant.name}
+        description={
+          <>
+            <p>{participant.email}</p>
+            {event ? <p className="mt-1 text-xs">{event.name}</p> : null}
+          </>
+        }
+        actions={
+          canManageParticipantData ? (
+            <>
               <Button
                 variant="outline"
                 size="sm"
                 className="w-full sm:w-auto"
-                onClick={() => setSendQrConfirmOpen(true)}
-                disabled={isSendingQr || !isOnline}
+                onClick={() => setTransferOpen(true)}
+                disabled={!isOnline}
               >
-                {isSendingQr ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : (
-                  <Repeat className="h-4 w-4 mr-1" />
-                )}
-                {participant.email_status === "sent"
-                  ? "Wyślij ponownie QR"
-                  : "Wyślij QR"}
+                <UserRoundCog className="h-4 w-4 mr-1" />
+                Edytuj dane uczestnika
               </Button>
-            )}
-          </div>
-        )}
-      </div>
+              {canUseAdminActions && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  onClick={() => setSendQrConfirmOpen(true)}
+                  disabled={isSendingQr || !isOnline}
+                >
+                  {isSendingQr ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Repeat className="h-4 w-4 mr-1" />
+                  )}
+                  {participant.email_status === "sent"
+                    ? "Wyślij ponownie QR"
+                    : "Wyślij QR"}
+                </Button>
+              )}
+            </>
+          ) : null
+        }
+      />
 
       {canUseAdminActions && (
         <div className="flex justify-end">
@@ -823,7 +822,7 @@ export default function ParticipantDetails() {
         <CardContent className="space-y-4">
           {participantDataEntries.important.length > 0 && (
             <div className="rounded-2xl border border-amber-400/50 bg-amber-500/10 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-950">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/80">
                 Ważne dane do weryfikacji
               </p>
               <div className="mt-3 space-y-3">
@@ -832,8 +831,8 @@ export default function ParticipantDetails() {
                     key={`important-${entry.label}`}
                     className="flex flex-col gap-1 text-sm sm:flex-row sm:items-start sm:justify-between"
                   >
-                    <span className="text-amber-950/80">{entry.label}</span>
-                    <span className="font-semibold text-amber-950 sm:max-w-[60%] sm:text-right break-words">
+                    <span className="text-white/80">{entry.label}</span>
+                    <span className="font-semibold text-white sm:max-w-[60%] sm:text-right break-words">
                       {entry.value}
                     </span>
                   </div>

@@ -289,7 +289,7 @@ export default function EventDetails() {
     currentUser,
     setSelectedEventId,
     isLoading,
-    getParticipantFieldMappings,
+    getParticipantFieldMappingsState,
     addParticipantManually,
     addUser,
     assignScannerEvents,
@@ -298,9 +298,12 @@ export default function EventDetails() {
     deleteEvent,
     exportEventCsv,
     exportEventLogsCsv,
+    exportEventParticipantChangesCsv,
     connectionState,
   } = useData();
   const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
+  const [hasBaselineParticipantImport, setHasBaselineParticipantImport] =
+    useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [scannerDialogOpen, setScannerDialogOpen] = useState(false);
@@ -340,6 +343,8 @@ export default function EventDetails() {
   }>({});
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingLogsCsv, setExportingLogsCsv] = useState(false);
+  const [exportingParticipantChangesCsv, setExportingParticipantChangesCsv] =
+    useState(false);
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [isArchivingEvent, setIsArchivingEvent] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -460,18 +465,23 @@ export default function EventDetails() {
   }, []);
 
   useEffect(() => {
-    if (!id || !isOnline) return;
+    if (!id || !isOnline) {
+      setHasBaselineParticipantImport(false);
+      return;
+    }
 
-    getParticipantFieldMappings(id)
-      .then((data) => {
-        setMappings(data);
-        setManualFields(buildEmptyParticipantFieldValues(data));
+    getParticipantFieldMappingsState(id)
+      .then((state) => {
+        setMappings(state.mappings);
+        setHasBaselineParticipantImport(state.has_baseline_import);
+        setManualFields(buildEmptyParticipantFieldValues(state.mappings));
       })
       .catch(() => {
         setMappings([]);
+        setHasBaselineParticipantImport(false);
         setManualFields({});
       });
-  }, [getParticipantFieldMappings, id, isOnline]);
+  }, [getParticipantFieldMappingsState, id, isOnline]);
 
   useEffect(() => {
     if (!event) return;
@@ -886,6 +896,23 @@ export default function EventDetails() {
     toast({ title: "Eksport logów CSV rozpoczęty" });
   };
 
+  const handleExportParticipantChangesCsv = async () => {
+    setExportingParticipantChangesCsv(true);
+    const result = await exportEventParticipantChangesCsv(event.id);
+    setExportingParticipantChangesCsv(false);
+
+    if (!result.ok) {
+      toast({
+        title: "Nie udało się wyeksportować zmian uczestników CSV",
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({ title: "Eksport zmian uczestników CSV rozpoczęty" });
+  };
+
   const handleArchiveEvent = async () => {
     setIsArchivingEvent(true);
     const result = await archiveEvent(event.id);
@@ -1260,6 +1287,32 @@ export default function EventDetails() {
                 )}
                 Eksport logów CSV
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => void handleExportParticipantChangesCsv()}
+                className="event-detail-operation-button h-11 justify-start"
+                disabled={
+                  exportingParticipantChangesCsv ||
+                  !isOnline ||
+                  !hasBaselineParticipantImport
+                }
+              >
+                {exportingParticipantChangesCsv ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-1 h-4 w-4" />
+                )}
+                Eksport zmian uczestników CSV
+              </Button>
+              {!hasBaselineParticipantImport && (
+                <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>
+                    Ten eksport będzie dostępny po pierwszym udanym imporcie
+                    CSV dla tego wydarzenia.
+                  </p>
+                </div>
+              )}
             </div>
           </CollapsibleSection>
         </div>

@@ -19,6 +19,7 @@ import { formatEventOfficeWindow } from '@/lib/events';
 import { validateRequired } from '@/lib/form-validation';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 import { buildEventPath } from '@/lib/routes';
+import { PageHeader } from '@/components/PageHeader';
 
 type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom' | 'important_custom';
 
@@ -274,7 +275,7 @@ export default function CsvImport() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="space-y-6">
         <div>
           <Button
             variant="ghost"
@@ -284,14 +285,20 @@ export default function CsvImport() {
           >
             <ArrowLeft className="mr-1 h-4 w-4" /> Wróć do wydarzenia
           </Button>
-          <h1 className="mt-8 text-xl font-bold tracking-tight sm:text-2xl">Import CSV</h1>
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            Wydarzenie: <span className="font-medium text-foreground">{event.name}</span>
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Biuro zawodów: {formatEventOfficeWindow(event)}
-          </p>
         </div>
+        <PageHeader
+          title="Import CSV"
+          description={
+            <>
+              <p>
+                Wydarzenie: <span className="font-medium text-foreground">{event.name}</span>
+              </p>
+              <p className="mt-1 text-xs">
+                Biuro zawodów: {formatEventOfficeWindow(event)}
+              </p>
+            </>
+          }
+        />
       </div>
 
       {!isOnline && (

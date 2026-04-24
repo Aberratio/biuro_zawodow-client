@@ -20,6 +20,7 @@ import { ArrowLeft, CheckCircle, Info, Loader2, Mail, RefreshCcw, Send } from 'l
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
+import { PageHeader } from '@/components/PageHeader';
 import { formatEventOfficeWindow, isEventCurrentOrUpcoming, isEventOfficeOpen } from '@/lib/events';
 import { buildEventPath } from '@/lib/routes';
 import type { ActivityLog } from '@/types';
@@ -184,15 +185,19 @@ export default function EmailSending() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="space-y-6">
         <Button variant="ghost" size="sm" onClick={() => navigate(buildEventPath(activeEventId))} className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
           >
         <ArrowLeft className="h-4 w-4 mr-1" /> Wróć do wydarzenia
       </Button>
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl mt-8">Wysyłka kodów QR</h1>
-        <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-          {selectedEvent ? `Wydarzenie: ${selectedEvent.name}` : 'Wyślij kody QR dla wybranego wydarzenia.'}
-        </p>
+        <PageHeader
+          title="Wysyłka kodów QR"
+          description={
+            selectedEvent
+              ? `Wydarzenie: ${selectedEvent.name}`
+              : "Wyślij kody QR dla wybranego wydarzenia."
+          }
+        />
       </div>
 
       {!isOnline && (

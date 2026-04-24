@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Loader2, Undo2, Use
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
 import { ParticipantBibNumberConflictDialog } from '@/components/ParticipantBibNumberConflictDialog';
+import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -531,7 +532,7 @@ export default function Scanner() {
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <div className="px-4 md:px-0">
-        <h1 className="font-heading text-lg font-bold tracking-tight md:text-2xl">Skaner</h1>
+        <PageHeader title="Skaner" />
         {(connectionState !== 'online' || pendingMutationCount > 0) && (
           <div className={`mt-3 rounded-xl border px-4 py-3 text-sm ${isReadOnly ? 'border-amber-500/40 bg-amber-500/10 text-amber-950' : 'border-sky-500/30 bg-sky-500/10 text-sky-950'}`}>
             <p className="font-semibold">
