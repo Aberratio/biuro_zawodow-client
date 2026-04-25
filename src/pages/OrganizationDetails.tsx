@@ -1625,9 +1625,8 @@ export default function OrganizationDetails() {
               <span className="font-medium text-foreground">
                 {selectedActionUser?.name}
               </span>{" "}
-              zostanie usunięte z widoku organizacji. W backendzie konto
-              zostanie zarchiwizowane. Ta osoba nie zaloguje się już na stare
-              konto, a ten adres e-mail będzie można wykorzystać ponownie.
+              zostanie usunięte z widoku organizacji. Ta osoba nie zaloguje się już na stare
+              konto, ale ten adres e-mail będzie można wykorzystać ponownie.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
