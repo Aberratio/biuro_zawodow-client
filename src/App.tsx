@@ -25,6 +25,7 @@ import EmailSending from "./pages/EmailSending";
 import Organizations from "./pages/Organizations";
 import OrganizationDetails from "./pages/OrganizationDetails";
 import ArchivedEvents from "./pages/ArchivedEvents";
+import SuperAdmin from "./pages/SuperAdmin";
 import ForgotPassword from "./pages/ForgotPassword";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
@@ -179,6 +180,20 @@ function OrganizationAccessRoute({ children }: { children: JSX.Element }) {
   return children;
 }
 
+function SuperAdminRoute() {
+  const { currentRole, isLoading } = useData();
+
+  if (isLoading) {
+    return <RouteLoadingState message="Sprawdzamy dostÄ™p superadmina..." />;
+  }
+
+  if (currentRole !== "superadmin") {
+    return <Forbidden />;
+  }
+
+  return <SuperAdmin />;
+}
+
 function ProtectedAppRoutes() {
   return (
     <DataProvider>
@@ -245,6 +260,7 @@ function ProtectedAppRoutes() {
               </OrganizationAccessRoute>
             }
           />
+          <Route path="/superadmin" element={<SuperAdminRoute />} />
           <Route path="/users" element={<Organizations />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/403" element={<Forbidden />} />
