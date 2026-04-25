@@ -9,6 +9,7 @@ import {
   LogOut,
   Mail,
   ScanLine,
+  Shield,
   UserRound,
   Users,
   X,
@@ -64,6 +65,12 @@ const allItems = [
     url: "/",
     icon: LayoutDashboard,
     roles: ["editor", "admin", "superadmin"] as Role[],
+  },
+  {
+    title: "Superadmin",
+    url: "/superadmin",
+    icon: Shield,
+    roles: ["superadmin"] as Role[],
   },
   {
     title: "Organizacje",
