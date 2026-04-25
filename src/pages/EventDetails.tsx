@@ -505,7 +505,7 @@ export default function EventDetails() {
     assignedScanners.length > 0 || assignedScannerPlus.length > 0;
   const officeCloseAt = getEventOfficeCloseAt(event);
   const isFinishedEvent = officeCloseAt !== null && now > officeCloseAt;
-  const canArchiveEvent = canManageEventLifecycle;
+  const canArchiveEvent = canManageEventLifecycle && isFinishedEvent;
   const canDeleteEvent = canManageEventLifecycle;
   const canDeleteEventNow = canDeleteEvent && !isFinishedEvent;
   const canSendQrForEvent =
@@ -1058,8 +1058,7 @@ export default function EventDetails() {
         {((!isArchivedEvent && event) ||
           canUseActiveEventTools ||
           canEditEvent ||
-          canArchiveEvent ||
-          canDeleteEvent) && (
+          canArchiveEvent) && (
           <aside className="event-detail-actions-panel">
             {canUseActiveEventTools && (
               <Button
@@ -1103,26 +1102,6 @@ export default function EventDetails() {
               >
                 <Archive className="mr-1 h-4 w-4" /> Przenieś do archiwum
               </Button>
-            )}
-            {canDeleteEvent && (
-              <>
-                <Button
-                  variant="destructive"
-                  onClick={() => setDeleteConfirmOpen(true)}
-                  className="h-12 w-full"
-                  disabled={!isOnline || !canDeleteEventNow}
-                >
-                  <Trash2 className="mr-1 h-4 w-4" /> Usuń wydarzenie
-                </Button>
-                {!canDeleteEventNow && (
-                  <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-                    <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                    <p>
-                      Wydarzenia, które już się odbyły, przenieś do archiwum.
-                    </p>
-                  </div>
-                )}
-              </>
             )}
           </aside>
         )}
@@ -1315,6 +1294,29 @@ export default function EventDetails() {
               )}
             </div>
           </CollapsibleSection>
+
+          {canDeleteEvent && (
+            <CollapsibleSection title="Administracja" defaultOpen={false}>
+              <div className="flex flex-col gap-2">
+                <Button
+                  variant="destructive"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  className="event-detail-operation-button h-11 justify-start"
+                  disabled={!isOnline || !canDeleteEventNow}
+                >
+                  <Trash2 className="mr-1 h-4 w-4" /> Usuń wydarzenie
+                </Button>
+                {!canDeleteEventNow && (
+                  <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>
+                      Wydarzenia, które już się odbyły, przenieś do archiwum.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CollapsibleSection>
+          )}
         </div>
       </section>
 
