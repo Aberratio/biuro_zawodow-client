@@ -10,11 +10,15 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
   ({ className, containerClassName, ...props }, ref) => (
     <div
       className={cn(
-        "surface-table themed-scrollbar relative w-full overflow-auto rounded-[1.35rem] border",
+        "surface-table themed-scrollbar relative w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden rounded-[1.35rem] border",
         containerClassName,
       )}
     >
-      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+      <table
+        ref={ref}
+        className={cn("w-full min-w-max caption-bottom text-sm", className)}
+        {...props}
+      />
     </div>
   ),
 );
