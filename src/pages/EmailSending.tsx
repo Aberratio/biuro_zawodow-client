@@ -21,6 +21,7 @@ import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 import { PageHeader } from '@/components/PageHeader';
+import { PageBlockerOverlay } from '@/components/PageBlockerOverlay';
 import { formatEventOfficeWindow, isEventCurrentOrUpcoming, isEventOfficeOpen } from '@/lib/events';
 import { buildEventPath } from '@/lib/routes';
 import type { ActivityLog } from '@/types';
@@ -117,6 +118,7 @@ export default function EmailSending() {
     [activeEventId, activityLog],
   );
   const isConfirmingAction = sendingAll || resendingAll || sendingParticipantId !== null;
+  const isSendingQrEmails = sendingAll || resendingAll || sendingParticipantId !== null;
   const isOnline = connectionState === 'online';
 
   if (isLoading) {
@@ -401,6 +403,13 @@ export default function EmailSending() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {isSendingQrEmails && (
+        <PageBlockerOverlay
+          title="Wysyłamy kody QR"
+          description="To może chwilę potrwać. Strona jest na ten czas zablokowana, więc spokojnie możesz zrobić sobie kawę."
+        />
+      )}
     </div>
   );
 }
