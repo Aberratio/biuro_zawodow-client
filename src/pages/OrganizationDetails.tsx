@@ -33,6 +33,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -343,9 +348,32 @@ export default function OrganizationDetails() {
   const canDeleteOrganization =
     canEditOrganization &&
     orgEvents.length === 0 &&
-    orgArchivedEvents.length === 0 &&
     organizers.length === 0 &&
     scanners.length === 0;
+  const deleteOrganizationDisabledReason = useMemo(() => {
+    if (canDeleteOrganization) return "";
+
+    const reasons: string[] = [];
+    if (!canEditOrganization) {
+      reasons.push("Organizację może usunąć tylko admin lub superadmin.");
+    }
+    if (orgEvents.length > 0) {
+      reasons.push(
+        "Najpierw zarchiwizuj lub usuń aktywne i nadchodzące wydarzenia tej organizacji.",
+      );
+    }
+    if (organizers.length > 0 || scanners.length > 0) {
+      reasons.push("Najpierw usuń użytkowników przypisanych do organizacji.");
+    }
+
+    return reasons.join(" ");
+  }, [
+    canDeleteOrganization,
+    canEditOrganization,
+    orgEvents.length,
+    organizers.length,
+    scanners.length,
+  ]);
   const adminLabel = "Wszystkie organizacje";
   const sectionClassName =
     "overflow-hidden rounded-[1.35rem] border border-[hsl(var(--button-highlight)/0.14)] bg-[linear-gradient(180deg,hsl(220_13%_8%/_0.95),hsl(220_14%_6%/_0.98))] shadow-[0_18px_44px_hsl(var(--surface-shadow)/0.28),inset_0_1px_0_hsl(var(--foreground)/0.04)]";
@@ -825,7 +853,7 @@ export default function OrganizationDetails() {
         title: "Nie udało się usunąć organizacji",
         description:
           result.error ??
-          "Usuń najpierw wydarzenia i użytkowników przypisanych do organizacji.",
+          "Usuń lub zarchiwizuj najpierw aktywne i nadchodzące wydarzenia oraz usuń użytkowników przypisanych do organizacji.",
         variant: "destructive",
       });
       return;
@@ -940,7 +968,7 @@ export default function OrganizationDetails() {
                   Zmień limit wydarzeń
                 </Button>
               )}
-              {canEditOrganization && (
+              {canEditOrganization && canDeleteOrganization && (
                 <Button
                   variant="destructive"
                   className="w-full rounded-[1rem] px-5 lg:w-auto"
@@ -949,6 +977,33 @@ export default function OrganizationDetails() {
                   <Trash2 className="mr-1 h-4 w-4" />
                   Usuń organizację
                 </Button>
+              )}
+              {canEditOrganization && !canDeleteOrganization && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <span
+                      className="inline-flex w-full lg:w-auto"
+                      tabIndex={0}
+                    >
+                      <Button
+                        variant="destructive"
+                        className="pointer-events-none w-full rounded-[1rem] px-5 lg:w-auto"
+                        disabled
+                      >
+                        <Trash2 className="mr-1 h-4 w-4" />
+                        Usuń organizację
+                      </Button>
+                    </span>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="bottom"
+                    align="end"
+                    collisionPadding={16}
+                    className="max-w-[min(20rem,calc(100vw-2rem))] text-sm"
+                  >
+                    {deleteOrganizationDisabledReason}
+                  </PopoverContent>
+                </Popover>
               )}
             </>
           }
@@ -1531,8 +1586,10 @@ export default function OrganizationDetails() {
               <span className="font-medium text-foreground">
                 {organization.name}
               </span>{" "}
-              zostanie usunięta tylko wtedy, gdy nie ma już przypisanych
-              wydarzeń ani użytkowników. Tej operacji nie da się cofnąć.
+              zostanie usunięta tylko wtedy, gdy nie ma już aktywnych lub
+              nadchodzących wydarzeń ani przypisanych użytkowników. Wydarzenia
+              zarchiwizowane i usunięte nie blokują tej operacji. Tej operacji
+              nie da się cofnąć.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
