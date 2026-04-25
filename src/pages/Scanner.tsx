@@ -612,7 +612,7 @@ export default function Scanner() {
                     </p>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    {primaryParticipantFields.map(field => (
+                    {primaryParticipantFields.filter(field => field.role !== 'email').map(field => (
                       <div
                         key={`primary-${field.role}-${field.label}`}
                         className={`rounded-xl border px-3 py-2 shadow-sm ${
