@@ -668,7 +668,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const archiveEvent = useCallback(async (eventId: string) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
-    const existingEvent = events.find(event => event.id === eventId); await fetchJson(`${API_BASE_URL}/events/${eventId}/archive`, { method: 'POST', headers: getAuthHeaders() }); setEvents(previous => previous.filter(event => event.id !== eventId)); if (existingEvent) setArchivedEvents(previous => [{ ...existingEvent, archived_at: new Date().toISOString() }, ...previous]); if (selectedEventId === eventId) setSelectedEventId(''); if (existingEvent) addLog(`Zarchiwizowano wydarzenie: ${existingEvent.name}`); await loadBootstrap(true); return { ok: true };
+    const existingEvent = events.find(event => event.id === eventId);
+    const eventOfficeCloseAt = existingEvent ? getEventOfficeCloseAt(existingEvent) : null;
+    if (eventOfficeCloseAt === null || Date.now() <= eventOfficeCloseAt.getTime()) return { ok: false, error: 'Do archiwum można przenieść tylko zakończone wydarzenia' };
+    await fetchJson(`${API_BASE_URL}/events/${eventId}/archive`, { method: 'POST', headers: getAuthHeaders() }); setEvents(previous => previous.filter(event => event.id !== eventId)); if (existingEvent) setArchivedEvents(previous => [{ ...existingEvent, archived_at: new Date().toISOString() }, ...previous]); if (selectedEventId === eventId) setSelectedEventId(''); if (existingEvent) addLog(`Zarchiwizowano wydarzenie: ${existingEvent.name}`); await loadBootstrap(true); return { ok: true };
   }), [addLog, ensureOnline, events, getAuthHeaders, loadBootstrap, runMutation, selectedEventId, setSelectedEventId]);
 
   const deleteEvent = useCallback(async (eventId: string) => runMutation(async () => {
