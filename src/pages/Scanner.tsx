@@ -346,6 +346,16 @@ export default function Scanner() {
     }
   }, [pendingBibNumberCandidate, scannedParticipant, syncParticipantInView, updateParticipantBibNumber]);
 
+  const handleBibNumberConflictOpenChange = useCallback((nextOpen: boolean) => {
+    setBibNumberConflictOpen(nextOpen);
+    if (!nextOpen) {
+      setBibNumberValue(normalizeScannerBibNumberInput(scannedParticipant?.bib_number));
+      setBibNumberError(undefined);
+      setPendingBibNumberCandidate('');
+      setBibNumberConflictParticipants([]);
+    }
+  }, [scannedParticipant?.bib_number]);
+
   const mappedParticipantFields = useMemo(() => {
     if (!scannedParticipant) {
       return {
@@ -804,13 +814,7 @@ export default function Scanner() {
 
       <ParticipantBibNumberConflictDialog
         open={bibNumberConflictOpen}
-        onOpenChange={nextOpen => {
-          setBibNumberConflictOpen(nextOpen);
-          if (!nextOpen) {
-            setPendingBibNumberCandidate('');
-            setBibNumberConflictParticipants([]);
-          }
-        }}
+        onOpenChange={handleBibNumberConflictOpenChange}
         bibNumber={pendingBibNumberCandidate}
         conflictingParticipants={bibNumberConflictParticipants}
         allowDeleteConflicts={canUseParticipantAdminConflictActions}

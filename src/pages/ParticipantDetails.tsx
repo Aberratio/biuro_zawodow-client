@@ -64,6 +64,7 @@ import {
 import { validateEmail, validateRequired } from "@/lib/form-validation";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 import { PageHeader } from "@/components/PageHeader";
+import { PageBlockerOverlay } from "@/components/PageBlockerOverlay";
 import {
   canManageParticipantData as canManageParticipantDataForRole,
   canUseParticipantAdminActions,
@@ -479,6 +480,16 @@ export default function ParticipantDetails() {
       });
     } finally {
       setIsSavingBibNumber(false);
+    }
+  };
+
+  const handleBibNumberConflictOpenChange = (nextOpen: boolean) => {
+    setBibNumberConflictOpen(nextOpen);
+    if (!nextOpen) {
+      setBibNumberValue(participant.bib_number);
+      setBibNumberError(undefined);
+      setPendingBibNumberCandidate("");
+      setBibNumberConflictParticipants([]);
     }
   };
 
@@ -973,13 +984,7 @@ export default function ParticipantDetails() {
 
       <ParticipantBibNumberConflictDialog
         open={bibNumberConflictOpen}
-        onOpenChange={(nextOpen) => {
-          setBibNumberConflictOpen(nextOpen);
-          if (!nextOpen) {
-            setPendingBibNumberCandidate("");
-            setBibNumberConflictParticipants([]);
-          }
-        }}
+        onOpenChange={handleBibNumberConflictOpenChange}
         bibNumber={pendingBibNumberCandidate}
         conflictingParticipants={bibNumberConflictParticipants}
         allowDeleteConflicts={canUseAdminActions}
@@ -1046,6 +1051,13 @@ export default function ParticipantDetails() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {isSendingQr && (
+        <PageBlockerOverlay
+          title="Wysyłamy kod QR"
+          description="To może chwilę potrwać. Strona jest na ten czas zablokowana, więc spokojnie możesz zrobić sobie kawę."
+        />
+      )}
     </div>
   );
 }
