@@ -1,6 +1,9 @@
 {
   "name": "Biuro Zawodow",
   "short_name": "Biuro Zawodow",
+  "description": "Panel obslugi biura zawodow.",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",

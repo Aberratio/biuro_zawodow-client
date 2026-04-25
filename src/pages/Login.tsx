@@ -1,6 +1,15 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
+import {
+  Download,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  Share2,
+  Smartphone,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +28,151 @@ type LoginFooterProps = {
   primaryLinkClassName?: string;
   secondaryLinkClassName?: string;
 };
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{
+    outcome: "accepted" | "dismissed";
+    platform: string;
+  }>;
+};
+
+function isRunningAsInstalledPwa() {
+  const navigatorWithStandalone = window.navigator as Navigator & {
+    standalone?: boolean;
+  };
+
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.matchMedia("(display-mode: fullscreen)").matches ||
+    window.matchMedia("(display-mode: minimal-ui)").matches ||
+    Boolean(navigatorWithStandalone.standalone) ||
+    document.referrer.startsWith("android-app://")
+  );
+}
+
+function isIosDevice() {
+  const navigatorWithTouch = window.navigator as Navigator & {
+    maxTouchPoints?: number;
+  };
+
+  return (
+    /iphone|ipad|ipod/i.test(window.navigator.userAgent) ||
+    (window.navigator.platform === "MacIntel" &&
+      (navigatorWithTouch.maxTouchPoints ?? 0) > 1)
+  );
+}
+
+function LoginPwaInstallCard() {
+  const [installPrompt, setInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [isInstallStarting, setIsInstallStarting] = useState(false);
+  const [showIosInstructions, setShowIosInstructions] = useState(false);
+
+  useEffect(() => {
+    if (isRunningAsInstalledPwa()) {
+      setIsInstalled(true);
+      return;
+    }
+
+    setShowIosInstructions(isIosDevice());
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+      setShowIosInstructions(false);
+    };
+
+    const handleAppInstalled = () => {
+      setInstallPrompt(null);
+      setShowIosInstructions(false);
+      setIsInstalled(true);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handleBeforeInstallPrompt,
+      );
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!installPrompt) {
+      return;
+    }
+
+    setIsInstallStarting(true);
+
+    try {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+
+      if (choice.outcome === "accepted") {
+        setIsInstalled(true);
+      }
+
+      setInstallPrompt(null);
+    } finally {
+      setIsInstallStarting(false);
+    }
+  };
+
+  if (isInstalled || (!installPrompt && !showIosInstructions)) {
+    return null;
+  }
+
+  return (
+    <section
+      className="overflow-hidden rounded-[1.35rem] border border-[hsl(var(--button-highlight)/0.18)] bg-[linear-gradient(135deg,hsl(220_12%_11%/0.92),hsl(220_14%_7%/0.92))] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.05),0_18px_42px_hsl(var(--surface-shadow)/0.22)] backdrop-blur-xl md:rounded-2xl"
+      aria-label="Instalacja aplikacji PWA"
+    >
+      <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between md:p-5">
+        <div className="flex min-w-0 gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[hsl(var(--button-highlight)/0.22)] bg-[hsl(var(--button-highlight)/0.12)] text-[hsl(var(--button-highlight))]">
+            <Smartphone className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold leading-6 tracking-normal text-foreground">
+              Zainstaluj Biuro Zawodów
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Szybszy dostęp z ekranu głównego i wygodna praca jak w aplikacji.
+            </p>
+          </div>
+        </div>
+
+        {installPrompt ? (
+          <Button
+            type="button"
+            onClick={handleInstallClick}
+            className="h-11 w-full shrink-0 rounded-2xl px-4 text-sm sm:w-auto"
+            disabled={isInstallStarting}
+          >
+            {isInstallStarting ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Download className="h-4 w-4" aria-hidden="true" />
+            )}
+            Pobierz Aplikację
+          </Button>
+        ) : (
+          <div className="flex shrink-0 items-start gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm font-medium leading-5 text-foreground/82">
+            <Share2 className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--button-highlight))]" />
+            <span className="min-w-0">
+              Udostępnij, potem Dodaj do ekranu początkowego
+            </span>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
 
 function LoginFooter({
   copyrightYears,
@@ -254,6 +408,10 @@ export default function Login() {
                 </Link>
               </div>
             </form>
+
+            <div className="mt-6">
+              <LoginPwaInstallCard />
+            </div>
           </div>
 
           <LoginFooter
@@ -373,6 +531,10 @@ export default function Login() {
                 </form>
               </CardContent>
             </Card>
+
+            <div className="mt-5">
+              <LoginPwaInstallCard />
+            </div>
           </div>
         </div>
 
