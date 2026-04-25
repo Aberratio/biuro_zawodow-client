@@ -350,7 +350,7 @@ export default function OrganizationDetails() {
     orgEvents.length === 0 &&
     organizers.length === 0 &&
     scanners.length === 0;
-  const deleteOrganizationDisabledReason = useMemo(() => {
+  const deleteOrganizationDisabledReason = (() => {
     if (canDeleteOrganization) return "";
 
     const reasons: string[] = [];
@@ -367,13 +367,7 @@ export default function OrganizationDetails() {
     }
 
     return reasons.join(" ");
-  }, [
-    canDeleteOrganization,
-    canEditOrganization,
-    orgEvents.length,
-    organizers.length,
-    scanners.length,
-  ]);
+  })();
   const adminLabel = "Wszystkie organizacje";
   const sectionClassName =
     "overflow-hidden rounded-[1.35rem] border border-[hsl(var(--button-highlight)/0.14)] bg-[linear-gradient(180deg,hsl(220_13%_8%/_0.95),hsl(220_14%_6%/_0.98))] shadow-[0_18px_44px_hsl(var(--surface-shadow)/0.28),inset_0_1px_0_hsl(var(--foreground)/0.04)]";
@@ -1052,7 +1046,7 @@ export default function OrganizationDetails() {
                 description="Po dodaniu wydarzeń pojawi się tutaj ich lista."
               />
             ) : (
-              <div className="w-full space-y-3">
+              <div className="w-full min-w-0 space-y-3">
                 <Table containerClassName={tableContainerClassName}>
                   <TableHeader>
                     <TableRow>
@@ -1187,7 +1181,7 @@ export default function OrganizationDetails() {
                 description="Po dodaniu organizatorów pojawi się tutaj ich lista."
               />
             ) : (
-              <div className="w-full">
+              <div className="w-full min-w-0">
                 <Table containerClassName={tableContainerClassName}>
                   <TableHeader>
                     <TableRow>
@@ -1295,7 +1289,7 @@ export default function OrganizationDetails() {
                 description="Po dodaniu operatorów pojawi się tutaj ich lista."
               />
             ) : (
-              <div className="w-full">
+              <div className="w-full min-w-0">
                 <Table containerClassName={tableContainerClassName}>
                   <TableHeader>
                     <TableRow>

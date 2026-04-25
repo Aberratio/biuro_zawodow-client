@@ -899,8 +899,13 @@ All colors MUST be HSL.
   .event-detail-list-content {
     display: grid;
     gap: 0.75rem;
+    min-width: 0;
     padding: 0 1.125rem 1rem;
     background: hsl(220 10% 7% / 0.5);
+  }
+
+  .event-detail-list-content > * {
+    min-width: 0;
   }
 
   .event-detail-member-row {
@@ -1181,6 +1186,7 @@ All colors MUST be HSL.
   }
 
   .themed-scrollbar::-webkit-scrollbar {
+    height: 6px;
     width: 6px;
   }
 
