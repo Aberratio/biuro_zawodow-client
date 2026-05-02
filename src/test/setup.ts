@@ -1,4 +1,6 @@
 import "@testing-library/jest-dom";
+import { cleanup } from "@testing-library/react";
+import { afterEach, vi } from "vitest";
 
 Object.defineProperty(window, "matchMedia", {
   writable: true,
@@ -12,4 +14,18 @@ Object.defineProperty(window, "matchMedia", {
     removeEventListener: () => {},
     dispatchEvent: () => {},
   }),
+});
+
+Object.defineProperty(window.URL, "createObjectURL", {
+  writable: true,
+  value: vi.fn(() => "blob:biuro-zawodow-test"),
+});
+
+Object.defineProperty(window.URL, "revokeObjectURL", {
+  writable: true,
+  value: vi.fn(),
+});
+
+afterEach(() => {
+  cleanup();
 });
