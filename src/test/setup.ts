@@ -26,6 +26,11 @@ Object.defineProperty(window.URL, "revokeObjectURL", {
   value: vi.fn(),
 });
 
+Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+  writable: true,
+  value: vi.fn(),
+});
+
 afterEach(() => {
   cleanup();
 });

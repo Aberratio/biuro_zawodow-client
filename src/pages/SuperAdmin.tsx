@@ -101,6 +101,7 @@ type AuditMeta = {
 };
 
 const AUDIT_PAGE_SIZE = 50;
+const AUDIT_ENTITY_OPTION_LIMIT = 12;
 
 const roleLabels: Record<Role, string> = {
   superadmin: "Superadmin",
@@ -233,14 +234,17 @@ export default function SuperAdmin() {
     return [];
   }, [allEvents, auditScope, organizations, participants, users]);
 
-  const filteredEntityOptions = useMemo(() => {
+  const matchingEntityOptions = useMemo(() => {
     const query = normalizeSearch(entitySearch);
-    if (!query) return entityOptions.slice(0, 12);
+    if (!query) return entityOptions;
 
     return entityOptions
-      .filter((entity) => `${entity.label} ${entity.meta}`.toLocaleLowerCase("pl-PL").includes(query))
-      .slice(0, 12);
+      .filter((entity) => `${entity.label} ${entity.meta}`.toLocaleLowerCase("pl-PL").includes(query));
   }, [entityOptions, entitySearch]);
+  const filteredEntityOptions = useMemo(
+    () => matchingEntityOptions.slice(0, AUDIT_ENTITY_OPTION_LIMIT),
+    [matchingEntityOptions],
+  );
 
   const localAuditEntries = useMemo<AuditEntry[]>(() => {
     return activityLog.map((log) => ({
@@ -585,18 +589,23 @@ export default function SuperAdmin() {
               </div>
 
               {auditScope !== "all" && !selectedEntity && filteredEntityOptions.length > 0 && (
-                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                  {filteredEntityOptions.map((entity) => (
-                    <button
-                      key={entity.id}
-                      type="button"
-                      onClick={() => selectEntity(entity)}
-                      className="rounded-lg border bg-background px-3 py-2 text-left transition-colors hover:bg-accent"
-                    >
-                      <span className="block truncate text-sm font-medium">{entity.label}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{entity.meta}</span>
-                    </button>
-                  ))}
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Pokazano maksymalnie {AUDIT_ENTITY_OPTION_LIMIT} z {matchingEntityOptions.length} pasujących encji. Zawęź wyszukiwanie, aby znaleźć konkretną pozycję.
+                  </p>
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    {filteredEntityOptions.map((entity) => (
+                      <button
+                        key={entity.id}
+                        type="button"
+                        onClick={() => selectEntity(entity)}
+                        className="rounded-lg border bg-background px-3 py-2 text-left transition-colors hover:bg-accent"
+                      >
+                        <span className="block truncate text-sm font-medium">{entity.label}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{entity.meta}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 

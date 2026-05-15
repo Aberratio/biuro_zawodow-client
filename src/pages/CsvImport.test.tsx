@@ -29,6 +29,14 @@ function createEvent(): Event {
   };
 }
 
+function createCsvFile(content: string, name: string): File {
+  const file = new File([content], name, { type: 'text/csv' });
+  Object.defineProperty(file, 'arrayBuffer', {
+    value: async () => new TextEncoder().encode(content).buffer,
+  });
+  return file;
+}
+
 describe('CsvImport page', () => {
   it('allows mapping a column as important data and sends the new role in the payload', async () => {
     const confirmParticipantImportMapping = vi.fn(async () => []);
@@ -44,12 +52,21 @@ describe('CsvImport page', () => {
       events: [createEvent()],
       selectedEventId: 'event-1',
       analyzeParticipantImport: vi.fn(async () => ({
-        headers: ['Email', 'Uwagi'],
-        sample_rows: [{ Email: 'anna@example.com', Uwagi: 'VIP' }],
+        headers: ['Email', 'Imie', 'Uwagi'],
+        sample_rows: [{ Email: 'anna@example.com', Imie: 'Anna', Uwagi: 'VIP' }],
         email_candidates: [{ column: 'Email', matched_count: 1 }],
         has_mapping: false,
         has_baseline_import: false,
-        mappings: [],
+        mappings: [
+          {
+            source_column_name: 'Imie',
+            alias: 'Imię',
+            field_role: 'display_name_part',
+            display_order: 1,
+            is_required: true,
+            is_active: true,
+          },
+        ],
         missing_required_columns: [],
         row_count: 1,
         existing_participant_count: 0,
@@ -80,31 +97,36 @@ describe('CsvImport page', () => {
     const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
     expect(fileInput).not.toBeNull();
 
-    const file = new File(['Email,Uwagi\nanna@example.com,VIP'], 'uczestnicy.csv', { type: 'text/csv' });
+    const file = createCsvFile('Email,Imie,Uwagi\nanna@example.com,Anna,VIP', 'uczestnicy.csv');
     fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
 
     await screen.findByText('Mapowanie kolumn');
-    expect(screen.getByText('Ważne dane')).toBeInTheDocument();
+    expect(screen.getByText('Podgląd po imporcie')).toBeInTheDocument();
+    expect(screen.queryByText('Co się stanie z kolumną')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Co się stanie z kolumną' }));
+    expect(screen.getByText('Co się stanie z kolumną')).toBeInTheDocument();
+    expect(screen.getAllByText('Wyróżnij przy odprawie').length).toBeGreaterThan(0);
 
     const roleTriggers = screen.getAllByRole('combobox', { name: 'Rola' });
-    fireEvent.click(roleTriggers[0]);
-    fireEvent.click(await screen.findByText('Ważne dane'));
+    fireEvent.click(roleTriggers[1]);
+    const importantRoleChoices = await screen.findAllByText('Wyróżnij przy odprawie');
+    fireEvent.click(importantRoleChoices[importantRoleChoices.length - 1]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Zapisz mapowanie i importuj' }));
 
     await waitFor(() => {
       expect(confirmParticipantImportMapping).toHaveBeenCalledWith('event-1', expect.objectContaining({
         email_column: 'Email',
-        fields: [
+        fields: expect.arrayContaining([
           expect.objectContaining({
             source_column_name: 'Uwagi',
             field_role: 'important_custom',
           }),
-        ],
+        ]),
       }));
     });
 
-    expect(runParticipantImport).toHaveBeenCalledWith('event-1', 'Email,Uwagi\nanna@example.com,VIP');
+    expect(runParticipantImport).toHaveBeenCalledWith('event-1', 'Email,Imie,Uwagi\nanna@example.com,Anna,VIP');
   });
 
   it('offers replacing the saved list when analysis detects a different CSV', async () => {
@@ -173,7 +195,7 @@ describe('CsvImport page', () => {
     const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
     expect(fileInput).not.toBeNull();
 
-    const file = new File(['Email,Imie\nnowa@example.com,Nowa'], 'nowa-lista.csv', { type: 'text/csv' });
+    const file = createCsvFile('Email,Imie\nnowa@example.com,Nowa', 'nowa-lista.csv');
     fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
 
     await screen.findByText('Ten CSV wygląda jak inna lista');
