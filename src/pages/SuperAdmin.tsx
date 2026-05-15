@@ -713,8 +713,8 @@ export default function SuperAdmin() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="control" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
+        <TabsContent value="control" className="space-y-3 sm:space-y-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-2">
             <ControlCard title="Role" icon={Shield}>
               {Object.entries(roleCounts).map(([role, count]) => (
                 <ControlRow key={role} label={roleLabels[role as Role]} value={count} />
@@ -735,8 +735,8 @@ export default function SuperAdmin() {
 
             <ControlCard title="Ostatnie aktywności" icon={Activity}>
               {activityLog.slice(0, 5).map((log) => (
-                <div key={log.id} className="border-b py-2 last:border-0">
-                  <p className="truncate text-sm font-medium">{log.action}</p>
+                <div key={log.id} className="border-b py-1.5 last:border-0 sm:py-2">
+                  <p className="truncate text-xs font-medium sm:text-sm">{log.action}</p>
                   <p className="text-xs text-muted-foreground">{formatDateTime(log.timestamp)}</p>
                 </div>
               ))}
@@ -880,23 +880,23 @@ function ControlCard({
   children: ReactNode;
 }) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Icon className="h-4 w-4" />
+    <Card className="rounded-xl sm:rounded-[1.5rem]">
+      <CardHeader className="flex flex-row items-center gap-2 p-3 pb-2 sm:gap-3 sm:p-6">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary sm:h-9 sm:w-9 sm:rounded-lg">
+          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </div>
-        <CardTitle className="text-lg">{title}</CardTitle>
+        <CardTitle className="truncate text-sm sm:text-lg">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-1">{children}</CardContent>
+      <CardContent className="space-y-0.5 px-3 pb-3 pt-0 sm:space-y-1 sm:px-6 sm:pb-6">{children}</CardContent>
     </Card>
   );
 }
 
 function ControlRow({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b py-2 text-sm last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-semibold tabular-nums">{value}</span>
+    <div className="flex items-center justify-between gap-2 border-b py-1.5 text-xs last:border-0 sm:gap-4 sm:py-2 sm:text-sm">
+      <span className="min-w-0 truncate text-muted-foreground">{label}</span>
+      <span className="shrink-0 font-semibold tabular-nums">{value}</span>
     </div>
   );
 }
