@@ -495,7 +495,7 @@ export default function Participants() {
                           backTo: buildEventParticipantsPath(
                             participant.event_id,
                           ),
-                          backLabel: "Wróć do wydarzenia",
+                          backLabel: "Wróć do listy uczestników wydarzenia",
                         },
                       })
                     }
