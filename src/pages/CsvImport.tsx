@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { FieldError } from '@/components/ui/field-error';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { AlertTriangle, ArrowLeft, FileUp, Info, Loader2, Mail, RefreshCcw, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
@@ -37,6 +38,18 @@ interface MappingDraft {
   source_column_name: string;
   alias: string;
   field_role: EditableFieldRole;
+}
+
+interface MappingPreviewField {
+  label: string;
+  value: string;
+  role: EditableFieldRole | 'email';
+}
+
+const IMPORTANT_FIELDS_WARNING_LIMIT = 5;
+
+function getSampleCellValue(sampleRow: Record<string, string> | undefined, columnName: string): string {
+  return sampleRow?.[columnName]?.trim() || 'Brak danych w podglądzie';
 }
 
 function getMappingFieldCardClassName(fieldRole: EditableFieldRole): string {
@@ -153,6 +166,42 @@ export default function CsvImport() {
   const bibNumberColumn = mappingDrafts.find(field => field.field_role === 'bib_number')?.source_column_name ?? null;
 
   const activeDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role !== 'ignore'), [mappingDrafts]);
+  const highlightedDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role === 'important_custom'), [mappingDrafts]);
+  const samplePreviewRow = analysis?.sample_rows[0];
+  const verificationPreviewFields = useMemo<MappingPreviewField[]>(() => {
+    if (!analysis) return [];
+
+    const fields: MappingPreviewField[] = [];
+    if (selectedEmailColumn) {
+      fields.push({
+        label: 'Email',
+        value: getSampleCellValue(samplePreviewRow, selectedEmailColumn),
+        role: 'email',
+      });
+    }
+
+    for (const field of mappingDrafts) {
+      if (!['display_name_part', 'bib_number', 'important_custom'].includes(field.field_role)) continue;
+      fields.push({
+        label: field.alias.trim() || field.source_column_name,
+        value: getSampleCellValue(samplePreviewRow, field.source_column_name),
+        role: field.field_role,
+      });
+    }
+
+    return fields;
+  }, [analysis, mappingDrafts, samplePreviewRow, selectedEmailColumn]);
+  const additionalPreviewFields = useMemo<MappingPreviewField[]>(() => {
+    if (!analysis) return [];
+
+    return mappingDrafts
+      .filter(field => field.field_role === 'custom')
+      .map(field => ({
+        label: field.alias.trim() || field.source_column_name,
+        value: getSampleCellValue(samplePreviewRow, field.source_column_name),
+        role: field.field_role,
+      }));
+  }, [analysis, mappingDrafts, samplePreviewRow]);
   const previewHeaderLabels = useMemo(() => {
     if (!analysis || (analysis.has_mapping && !replacementMode)) {
       return new Map<string, string>();
@@ -452,7 +501,52 @@ export default function CsvImport() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
-                  <p className="text-sm font-medium">Legenda ról</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">Legenda ról</p>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground"
+                          aria-label="Co się stanie z kolumną"
+                        >
+                          <Info className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-[min(28rem,calc(100vw-2rem))] p-0">
+                        <div className="border-b px-4 py-3">
+                          <p className="text-sm font-semibold">Co się stanie z kolumną</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Każdą kolumnę możesz zapisać w innym miejscu albo pominąć.
+                          </p>
+                        </div>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[180px]">Wybór</TableHead>
+                              <TableHead>Efekt</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            <TableRow>
+                              <TableCell className="font-medium">Wyróżnij przy odprawie</TableCell>
+                              <TableCell className="text-muted-foreground">Dane zostaną zaimportowane i pokazane wysoko w sekcji danych do weryfikacji.</TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell className="font-medium">Pole własne</TableCell>
+                              <TableCell className="text-muted-foreground">Dane zostaną zaimportowane, ale trafią niżej do pozostałych danych uczestnika.</TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell className="font-medium">Ignoruj</TableCell>
+                              <TableCell className="text-muted-foreground">Kolumna nie zostanie zapisana przy uczestniku.</TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-md border border-sky-400/50 bg-sky-500/10 px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Część nazwy</p>
@@ -463,8 +557,8 @@ export default function CsvImport() {
                       <p className="mt-1 text-xs text-muted-foreground">Mapuje kolumnę z numerem startowym, jeśli występuje w pliku. Tę rolę można przypisać tylko jednej kolumnie.</p>
                     </div>
                     <div className="rounded-md border border-rose-400/50 bg-rose-500/10 px-3 py-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Ważne dane</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Wyróżnia dodatkowe informacje, które będą szczególnie widoczne podczas odprawy uczestnika.</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Wyróżnij przy odprawie</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Wybierz tylko informacje, które operator musi szybko zobaczyć przy skanowaniu.</p>
                     </div>
                     <div className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Pole własne / Ignoruj</p>
@@ -472,6 +566,16 @@ export default function CsvImport() {
                     </div>
                   </div>
                 </div>
+
+                {highlightedDrafts.length > IMPORTANT_FIELDS_WARNING_LIMIT && (
+                  <Alert variant="default" className="border-amber-400/50 bg-amber-500/10">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Wybrano dużo danych do wyróżnienia</AlertTitle>
+                    <AlertDescription>
+                      Przy odprawie najlepiej działa kilka najważniejszych informacji. Pozostałe kolumny nadal możesz zapisać jako pole własne.
+                    </AlertDescription>
+                  </Alert>
+                )}
 
                 <div className="space-y-2.5">
                   {mappingDrafts.map((field, index) => (
@@ -517,7 +621,7 @@ export default function CsvImport() {
                               <SelectItem value="bib_number" disabled={Boolean(bibNumberColumn && bibNumberColumn !== field.source_column_name)}>
                                 Numer startowy
                               </SelectItem>
-                              <SelectItem value="important_custom">Ważne dane</SelectItem>
+                              <SelectItem value="important_custom">Wyróżnij przy odprawie</SelectItem>
                               <SelectItem value="custom">Pole własne</SelectItem>
                             </SelectContent>
                           </Select>
@@ -527,6 +631,60 @@ export default function CsvImport() {
                   ))}
                 </div>
                 <FieldError id="csv-mapping-form-error">{mappingErrors.form}</FieldError>
+              </CardContent>
+            </Card>
+          )}
+
+          {!shouldWaitForEmailSelection && isEditingMapping && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Podgląd uczestnika po imporcie</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-lg border border-rose-400/40 bg-rose-500/10 p-4">
+                  <p className="text-sm font-semibold text-foreground">Dane do weryfikacji przy odprawie</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Tu trafią dane wyróżnione oraz podstawowe informacje potrzebne przy obsłudze uczestnika.
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {verificationPreviewFields.length > 0 ? verificationPreviewFields.map(field => (
+                      <div
+                        key={`verification-${field.role}-${field.label}`}
+                        className={`rounded-md border px-3 py-2 ${
+                          field.role === 'important_custom'
+                            ? 'border-rose-400/60 bg-background/80'
+                            : 'border-border/60 bg-background/70'
+                        }`}
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{field.label}</p>
+                        <p className="mt-1 break-words text-sm font-medium text-foreground">{field.value}</p>
+                      </div>
+                    )) : (
+                      <p className="rounded-md border border-dashed bg-background/60 px-3 py-4 text-sm text-muted-foreground sm:col-span-2">
+                        Wybierz kolumny, żeby zobaczyć podgląd danych do weryfikacji.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                  <p className="text-sm font-semibold text-foreground">Pozostałe dane uczestnika</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Tu trafią pola własne: również są widoczne podczas odprawy, jednak nie są tak wyróżnione jak dane z poprzedniej sekcji. Ignorowane kolumny nie będą tu widoczne wcale.
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {additionalPreviewFields.length > 0 ? additionalPreviewFields.map(field => (
+                      <div key={`additional-${field.label}`} className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{field.label}</p>
+                        <p className="mt-1 break-words text-sm font-medium text-foreground">{field.value}</p>
+                      </div>
+                    )) : (
+                      <p className="rounded-md border border-dashed bg-background/60 px-3 py-4 text-sm text-muted-foreground sm:col-span-2">
+                        Nie wybrano jeszcze pól własnych do pokazania w tej sekcji.
+                      </p>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}

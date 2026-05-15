@@ -95,12 +95,16 @@ type MemberRole = "editor" | "scanner" | "scanner_plus";
 function CollapsibleOrganizationSection({
   title,
   defaultOpen = false,
+  open,
+  onOpenChange,
   children,
   className,
   action,
 }: {
   title: string;
   defaultOpen?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   children: ReactNode;
   className?: string;
   action?: ReactNode;
@@ -119,7 +123,11 @@ function CollapsibleOrganizationSection({
   }
 
   return (
-    <Collapsible defaultOpen={defaultOpen}>
+    <Collapsible
+      defaultOpen={defaultOpen}
+      open={open}
+      onOpenChange={onOpenChange}
+    >
       <div className={cn("event-detail-list-section", className)}>
         <div className="flex items-center gap-3 pr-3">
           <CollapsibleTrigger className="event-detail-collapsible-trigger w-full flex-1">
@@ -178,6 +186,8 @@ export default function OrganizationDetails() {
   } = useData();
 
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
+  const [organizersSectionOpen, setOrganizersSectionOpen] = useState(false);
+  const [scannersSectionOpen, setScannersSectionOpen] = useState(false);
   const [scannerAssignmentsDialogOpen, setScannerAssignmentsDialogOpen] =
     useState(false);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
@@ -485,6 +495,11 @@ export default function OrganizationDetails() {
 
     setMemberDialogOpen(false);
     setMemberErrors({});
+    if (memberForm.role === "editor") {
+      setOrganizersSectionOpen(true);
+    } else {
+      setScannersSectionOpen(true);
+    }
     toast({
       title:
         memberForm.role === "editor"
@@ -1160,6 +1175,8 @@ export default function OrganizationDetails() {
       <section className={sectionClassName}>
         <CollapsibleOrganizationSection
           title="Organizatorzy"
+          open={organizersSectionOpen}
+          onOpenChange={setOrganizersSectionOpen}
           action={
             canManageMembers ? (
               <Button
@@ -1257,6 +1274,8 @@ export default function OrganizationDetails() {
       <section className={sectionClassName}>
         <CollapsibleOrganizationSection
           title="Operatorzy"
+          open={scannersSectionOpen}
+          onOpenChange={setScannersSectionOpen}
           action={
             canManageScanners ? (
               <div>
