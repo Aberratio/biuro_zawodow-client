@@ -184,7 +184,7 @@ function SuperAdminRoute() {
   const { currentRole, isLoading } = useData();
 
   if (isLoading) {
-    return <RouteLoadingState message="Sprawdzamy dostÄ™p superadmina..." />;
+    return <RouteLoadingState message="Sprawdzamy dostęp superadmina..." />;
   }
 
   if (currentRole !== "superadmin") {
