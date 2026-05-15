@@ -576,7 +576,7 @@ export default function Scanner() {
       {view === 'idle' && (
         <>
           <div className="px-4 md:px-0">
-            <ParticipantSearch participants={eventParticipants} onSelect={handleSearchSelect} autoFocus />
+            <ParticipantSearch participants={eventParticipants} onSelect={handleSearchSelect} autoFocus={false} />
           </div>
 
           <div className="px-4 md:px-0">

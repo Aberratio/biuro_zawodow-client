@@ -14,6 +14,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const { isMobile, setOpenMobile } = useSidebar();
   const mainRef = useRef<HTMLElement | null>(null);
+  const contentMaxWidth = pathname.startsWith("/superadmin") ? "max-w-none" : "max-w-[1080px]";
 
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
@@ -59,7 +60,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
           className="relative flex-1 overflow-auto px-4 pb-7 pt-4 md:px-5 md:pb-8 md:pt-5 lg:px-8 lg:pb-10 lg:pt-7"
         >
           <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-primary/25 to-transparent" />
-          <div className="relative z-10 mx-auto w-full max-w-[1080px]">
+          <div className={`relative z-10 mx-auto w-full ${contentMaxWidth}`}>
             {children}
           </div>
         </main>

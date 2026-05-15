@@ -697,12 +697,6 @@ export default function ParticipantDetails() {
                 {participant.email_status === "sent" ? "Wysłany" : "Oczekuje"}
               </Badge>
             </div>
-            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-start sm:justify-between">
-              <span className="text-muted-foreground">Token QR</span>
-              <span className="font-mono text-xs break-all sm:max-w-[18rem] sm:text-right">
-                {participant.qr_code}
-              </span>
-            </div>
             {canManageParticipantData && (
               <div className="space-y-2 pt-2">
                 <Label htmlFor="participant-bib-number">Numer startowy</Label>
