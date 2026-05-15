@@ -101,14 +101,13 @@ describe('CsvImport page', () => {
     fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
 
     await screen.findByText('Mapowanie kolumn');
-    expect(screen.getByText('Podgląd po imporcie')).toBeInTheDocument();
+    expect(screen.getByText('Podgląd uczestnika po imporcie')).toBeInTheDocument();
     expect(screen.queryByText('Co się stanie z kolumną')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Co się stanie z kolumną' }));
     expect(screen.getByText('Co się stanie z kolumną')).toBeInTheDocument();
     expect(screen.getAllByText('Wyróżnij przy odprawie').length).toBeGreaterThan(0);
 
-    const roleTriggers = screen.getAllByRole('combobox', { name: 'Rola' });
-    fireEvent.click(roleTriggers[1]);
+    fireEvent.click(screen.getByRole('button', { name: 'Zmień typ kolumny Uwagi' }));
     const importantRoleChoices = await screen.findAllByText('Wyróżnij przy odprawie');
     fireEvent.click(importantRoleChoices[importantRoleChoices.length - 1]);
 

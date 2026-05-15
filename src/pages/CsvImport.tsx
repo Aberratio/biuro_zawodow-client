@@ -23,7 +23,8 @@ import { FieldError } from '@/components/ui/field-error';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { AlertTriangle, ArrowLeft, FileUp, Info, Loader2, Mail, RefreshCcw, Sparkles } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { AlertTriangle, ArrowLeft, Check, ChevronDown, FileUp, Info, Loader2, Mail, RefreshCcw, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { formatEventOfficeWindow } from '@/lib/events';
@@ -41,6 +42,7 @@ interface MappingDraft {
 }
 
 interface MappingPreviewField {
+  source_column_name?: string;
   label: string;
   value: string;
   role: EditableFieldRole | 'email';
@@ -52,6 +54,41 @@ function getSampleCellValue(sampleRow: Record<string, string> | undefined, colum
   return sampleRow?.[columnName]?.trim() || 'Brak danych w podglądzie';
 }
 
+function getPreviewFieldRoleLabel(role: MappingPreviewField['role']): string {
+  switch (role) {
+    case 'email':
+      return 'Email';
+    case 'display_name_part':
+      return 'Część nazwy';
+    case 'bib_number':
+      return 'Numer startowy';
+    case 'important_custom':
+      return 'Wyróżnij przy odprawie';
+    case 'ignore':
+      return 'Ignoruj';
+    case 'custom':
+    default:
+      return 'Pole własne';
+  }
+}
+
+function getPreviewRoleBadgeClassName(role: MappingPreviewField['role']): string {
+  switch (role) {
+    case 'important_custom':
+      return 'border-destructive/35 bg-destructive/10 text-muted-foreground';
+    case 'bib_number':
+      return 'border-amber-400/60 bg-amber-500/10 text-amber-700';
+    case 'display_name_part':
+      return 'border-sky-400/60 bg-sky-500/10 text-sky-700';
+    case 'ignore':
+      return 'border-border/60 bg-muted/60 text-muted-foreground';
+    case 'email':
+    case 'custom':
+    default:
+      return 'border-border/60 bg-background/70 text-muted-foreground';
+  }
+}
+
 function getMappingFieldCardClassName(fieldRole: EditableFieldRole): string {
   switch (fieldRole) {
     case 'bib_number':
@@ -59,7 +96,7 @@ function getMappingFieldCardClassName(fieldRole: EditableFieldRole): string {
     case 'display_name_part':
       return 'rounded-lg border border-sky-400/70 bg-sky-500/10 p-3 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.16)]';
     case 'important_custom':
-      return 'rounded-lg border border-rose-400/70 bg-rose-500/10 p-3 shadow-[inset_0_0_0_1px_rgba(251,113,133,0.16)]';
+      return 'rounded-lg border border-destructive/45 bg-destructive/10 p-3 shadow-[inset_0_0_0_1px_hsl(var(--destructive)/0.14)]';
     case 'ignore':
       return 'rounded-lg border border-border/50 bg-card/35 p-3 opacity-60';
     case 'custom':
@@ -174,6 +211,7 @@ export default function CsvImport() {
     const fields: MappingPreviewField[] = [];
     if (selectedEmailColumn) {
       fields.push({
+        source_column_name: selectedEmailColumn,
         label: 'Email',
         value: getSampleCellValue(samplePreviewRow, selectedEmailColumn),
         role: 'email',
@@ -183,6 +221,7 @@ export default function CsvImport() {
     for (const field of mappingDrafts) {
       if (!['display_name_part', 'bib_number', 'important_custom'].includes(field.field_role)) continue;
       fields.push({
+        source_column_name: field.source_column_name,
         label: field.alias.trim() || field.source_column_name,
         value: getSampleCellValue(samplePreviewRow, field.source_column_name),
         role: field.field_role,
@@ -197,6 +236,19 @@ export default function CsvImport() {
     return mappingDrafts
       .filter(field => field.field_role === 'custom')
       .map(field => ({
+        source_column_name: field.source_column_name,
+        label: field.alias.trim() || field.source_column_name,
+        value: getSampleCellValue(samplePreviewRow, field.source_column_name),
+        role: field.field_role,
+      }));
+  }, [analysis, mappingDrafts, samplePreviewRow]);
+  const ignoredPreviewFields = useMemo<MappingPreviewField[]>(() => {
+    if (!analysis) return [];
+
+    return mappingDrafts
+      .filter(field => field.field_role === 'ignore')
+      .map(field => ({
+        source_column_name: field.source_column_name,
         label: field.alias.trim() || field.source_column_name,
         value: getSampleCellValue(samplePreviewRow, field.source_column_name),
         role: field.field_role,
@@ -263,6 +315,98 @@ export default function CsvImport() {
       aliases: { ...prev.aliases, [sourceColumnName]: '' },
       form: undefined,
     }));
+  };
+
+  const handlePreviewFieldRoleChange = (field: MappingPreviewField, role: EditableFieldRole) => {
+    if (!field.source_column_name || field.role === 'email') return;
+    if (role === 'bib_number' && bibNumberColumn && bibNumberColumn !== field.source_column_name) return;
+
+    handleFieldChange(field.source_column_name, { field_role: role });
+  };
+
+  const renderPreviewFieldTile = (field: MappingPreviewField, previewArea: 'verification' | 'additional' | 'ignored') => {
+    const isEmail = field.role === 'email';
+    const isHighlighted = field.role === 'important_custom';
+    const isIgnored = field.role === 'ignore';
+    const tileClassName = `w-full rounded-md border px-3 py-2 text-left transition ${
+      isHighlighted
+        ? 'border-destructive/45 bg-destructive/10 hover:bg-destructive/15'
+        : isIgnored
+          ? 'border-border/50 bg-background/50 opacity-75 hover:opacity-100'
+          : 'border-border/60 bg-background/70 hover:bg-background/90'
+    }`;
+    const roleOptions: Array<{ value: EditableFieldRole; label: string }> = [
+      { value: 'important_custom', label: 'Wyróżnij przy odprawie' },
+      { value: 'custom', label: 'Pole własne' },
+      { value: 'display_name_part', label: 'Część nazwy' },
+      { value: 'bib_number', label: 'Numer startowy' },
+      { value: 'ignore', label: 'Ignoruj' },
+    ];
+
+    return (
+      <Popover key={`${previewArea}-${field.role}-${field.source_column_name ?? field.label}`}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={tileClassName}
+            aria-label={isEmail ? `Kolumna ${field.label}` : `Zmień typ kolumny ${field.label}`}
+          >
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{field.label}</span>
+            <span className="mt-1 block break-words text-sm font-medium text-foreground">{field.value}</span>
+            <span className={`mt-2 inline-flex max-w-full rounded-lg border px-2.5 py-1 text-[11px] font-medium leading-tight ${getPreviewRoleBadgeClassName(field.role)}`}>
+              {getPreviewFieldRoleLabel(field.role)}
+            </span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="center"
+          side="bottom"
+          sideOffset={8}
+          collisionPadding={12}
+          className="max-h-[min(22rem,calc(100vh-2rem))] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto p-2"
+        >
+          <div className="space-y-2">
+            <div className="px-2 pb-1 pt-1">
+              <p className="text-sm font-semibold">{field.label}</p>
+              <p className="mt-0.5 line-clamp-2 break-words text-xs text-muted-foreground">
+                {isEmail
+                  ? 'Kolumna email służy do rozpoznania uczestnika. Zmień ją w sekcji wyboru kolumny email.'
+                  : field.value}
+              </p>
+            </div>
+            {!isEmail && (
+              <div className="space-y-1">
+                {roleOptions.map(option => {
+                  const isCurrentRole = field.role === option.value;
+                  const isBibNumberBlocked = option.value === 'bib_number' && Boolean(bibNumberColumn && bibNumberColumn !== field.source_column_name);
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-left text-sm transition ${
+                        isCurrentRole
+                          ? 'border-primary/50 bg-primary/10'
+                          : 'border-border/60 bg-background/70 hover:bg-muted/50'
+                      } ${isBibNumberBlocked ? 'cursor-not-allowed opacity-50' : ''}`}
+                      disabled={isBibNumberBlocked}
+                      onClick={() => handlePreviewFieldRoleChange(field, option.value)}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium text-foreground">{option.label}</span>
+                        {isBibNumberBlocked && (
+                          <span className="block truncate text-xs text-muted-foreground">Już przypisany</span>
+                        )}
+                      </span>
+                      {isCurrentRole && <Check className="h-4 w-4 shrink-0 text-primary" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
   };
 
   const buildMappingPayload = () => {
@@ -556,7 +700,7 @@ export default function CsvImport() {
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Numer startowy</p>
                       <p className="mt-1 text-xs text-muted-foreground">Mapuje kolumnę z numerem startowym, jeśli występuje w pliku. Tę rolę można przypisać tylko jednej kolumnie.</p>
                     </div>
-                    <div className="rounded-md border border-rose-400/50 bg-rose-500/10 px-3 py-2">
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Wyróżnij przy odprawie</p>
                       <p className="mt-1 text-xs text-muted-foreground">Wybierz tylko informacje, które operator musi szybko zobaczyć przy skanowaniu.</p>
                     </div>
@@ -641,25 +785,13 @@ export default function CsvImport() {
                 <CardTitle className="text-base">Podgląd uczestnika po imporcie</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-lg border border-rose-400/40 bg-rose-500/10 p-4">
+                <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-4">
                   <p className="text-sm font-semibold text-foreground">Dane do weryfikacji przy odprawie</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Tu trafią dane wyróżnione oraz podstawowe informacje potrzebne przy obsłudze uczestnika.
                   </p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {verificationPreviewFields.length > 0 ? verificationPreviewFields.map(field => (
-                      <div
-                        key={`verification-${field.role}-${field.label}`}
-                        className={`rounded-md border px-3 py-2 ${
-                          field.role === 'important_custom'
-                            ? 'border-rose-400/60 bg-background/80'
-                            : 'border-border/60 bg-background/70'
-                        }`}
-                      >
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{field.label}</p>
-                        <p className="mt-1 break-words text-sm font-medium text-foreground">{field.value}</p>
-                      </div>
-                    )) : (
+                    {verificationPreviewFields.length > 0 ? verificationPreviewFields.map(field => renderPreviewFieldTile(field, 'verification')) : (
                       <p className="rounded-md border border-dashed bg-background/60 px-3 py-4 text-sm text-muted-foreground sm:col-span-2">
                         Wybierz kolumny, żeby zobaczyć podgląd danych do weryfikacji.
                       </p>
@@ -673,18 +805,40 @@ export default function CsvImport() {
                     Tu trafią pola własne: również są widoczne podczas odprawy, jednak nie są tak wyróżnione jak dane z poprzedniej sekcji. Ignorowane kolumny nie będą tu widoczne wcale.
                   </p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {additionalPreviewFields.length > 0 ? additionalPreviewFields.map(field => (
-                      <div key={`additional-${field.label}`} className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{field.label}</p>
-                        <p className="mt-1 break-words text-sm font-medium text-foreground">{field.value}</p>
-                      </div>
-                    )) : (
+                    {additionalPreviewFields.length > 0 ? additionalPreviewFields.map(field => renderPreviewFieldTile(field, 'additional')) : (
                       <p className="rounded-md border border-dashed bg-background/60 px-3 py-4 text-sm text-muted-foreground sm:col-span-2">
                         Nie wybrano jeszcze pól własnych do pokazania w tej sekcji.
                       </p>
                     )}
                   </div>
                 </div>
+
+                <Collapsible className="lg:col-span-2">
+                  <div className="rounded-lg border border-border/60 bg-muted/10">
+                    <CollapsibleTrigger asChild>
+                      <Button type="button" variant="ghost" className="flex w-full justify-between rounded-lg px-4 py-3 text-left whitespace-normal">
+                        <span>
+                          <span className="block text-sm font-semibold text-foreground">Ignorowane pola</span>
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            {ignoredPreviewFields.length > 0
+                              ? `${ignoredPreviewFields.length} kolumn nie zostanie zapisanych przy uczestniku.`
+                              : 'Żadna kolumna nie jest teraz ignorowana.'}
+                          </span>
+                        </span>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid gap-2 border-t border-border/60 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {ignoredPreviewFields.length > 0 ? ignoredPreviewFields.map(field => renderPreviewFieldTile(field, 'ignored')) : (
+                          <p className="rounded-md border border-dashed bg-background/60 px-3 py-4 text-sm text-muted-foreground sm:col-span-2 lg:col-span-3">
+                            Jeśli ustawisz kolumnę jako ignorowaną, pojawi się tutaj i nadal będzie można zmienić jej typ przed importem.
+                          </p>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
               </CardContent>
             </Card>
           )}

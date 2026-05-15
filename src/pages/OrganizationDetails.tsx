@@ -129,14 +129,18 @@ function CollapsibleOrganizationSection({
       onOpenChange={onOpenChange}
     >
       <div className={cn("event-detail-list-section", className)}>
-        <div className="flex items-center gap-3 pr-3">
+        <div className="flex flex-col gap-2 px-3 pt-3 sm:flex-row sm:items-center sm:gap-3 sm:px-0 sm:pt-0 sm:pr-3">
           <CollapsibleTrigger className="event-detail-collapsible-trigger w-full flex-1">
             <h2 className="text-base font-semibold text-foreground">
               {displayTitle}
             </h2>
             <ChevronDown className="event-detail-collapsible-chevron h-4 w-4 shrink-0" />
           </CollapsibleTrigger>
-          {action ? <div className="shrink-0">{action}</div> : null}
+          {action ? (
+            <div className="w-full shrink-0 pb-2 sm:w-auto sm:pb-0">
+              {action}
+            </div>
+          ) : null}
         </div>
         <CollapsibleContent className="event-detail-collapsible-content">
           <div className="event-detail-list-content space-y-4">{children}</div>
@@ -1183,7 +1187,7 @@ export default function OrganizationDetails() {
                 size="sm"
                 variant="outline"
                 onClick={() => openMemberDialog("editor")}
-                className="h-9 rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)]"
+                className="h-11 w-full rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)] sm:h-9 sm:w-auto"
               >
                 <Plus className="mr-1 h-3.5 w-3.5" />
                 Dodaj organizatora
@@ -1278,12 +1282,12 @@ export default function OrganizationDetails() {
           onOpenChange={setScannersSectionOpen}
           action={
             canManageScanners ? (
-              <div>
+              <div className="grid gap-2 sm:block">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => openMemberDialog("scanner")}
-                  className="h-9 rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)]"
+                  className="h-11 w-full rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)] sm:h-9 sm:w-auto"
                 >
                   <Plus className="mr-1 h-3.5 w-3.5" />
                   Dodaj operatora
@@ -1292,7 +1296,7 @@ export default function OrganizationDetails() {
                   size="sm"
                   variant="outline"
                   onClick={() => openMemberDialog("scanner_plus")}
-                  className="h-9 rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)]"
+                  className="h-11 w-full rounded-[0.9rem] border-[hsl(var(--button-highlight)/0.28)] bg-transparent px-3 text-xs font-medium hover:bg-[hsl(var(--button-highlight)/0.08)] sm:h-9 sm:w-auto"
                 >
                   <Plus className="mr-1 h-3.5 w-3.5" />
                   Dodaj operatora plus
