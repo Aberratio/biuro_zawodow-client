@@ -1,15 +1,38 @@
 import { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
+import {
+  Html5Qrcode,
+  Html5QrcodeScannerState,
+  Html5QrcodeSupportedFormats,
+  type Html5QrcodeCameraScanConfig,
+} from 'html5-qrcode';
 import { Camera, CameraOff, Loader2 } from 'lucide-react';
 
 type CameraState = 'requesting' | 'active' | 'denied' | 'error';
 
 interface QrScannerViewProps {
-  onScan: (decodedText: string) => void;
+  onScan: (decodedText: string) => void | Promise<void>;
   paused?: boolean;
 }
 
 const SCANNER_REGION_ID = 'qr-scanner-region';
+const START_RECOVERY_DELAY_MS = 700;
+const START_TIMEOUT_MS = 6500;
+const SCAN_LOCK_RELEASE_DELAY_MS = 250;
+
+const scannerConfig = {
+  formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+  verbose: false,
+};
+
+const baseScanConfig: Html5QrcodeCameraScanConfig = {
+  fps: 10,
+  disableFlip: true,
+  qrbox: computeQrBox,
+};
+
+function isRearCameraLabel(label: string) {
+  return /back|rear|environment/i.test(label);
+}
 
 function computeQrBox(viewfinderWidth: number, viewfinderHeight: number) {
   const shortestEdge = Math.min(viewfinderWidth, viewfinderHeight);
@@ -18,13 +41,9 @@ function computeQrBox(viewfinderWidth: number, viewfinderHeight: number) {
   return { width: boxSize, height: boxSize };
 }
 
-async function ensureVideoPlayback(container: HTMLDivElement | null) {
-  const video = container?.querySelector('video');
-  if (!(video instanceof HTMLVideoElement)) {
-    return;
-  }
-
+function prepareVideoElement(video: HTMLVideoElement) {
   video.setAttribute('playsinline', 'true');
+  video.setAttribute('webkit-playsinline', 'true');
   video.setAttribute('muted', 'true');
   video.setAttribute('autoplay', 'true');
   video.playsInline = true;
@@ -34,6 +53,15 @@ async function ensureVideoPlayback(container: HTMLDivElement | null) {
   video.style.height = '100%';
   video.style.objectFit = 'cover';
   video.style.backgroundColor = '#000';
+}
+
+async function ensureVideoPlayback(container: HTMLDivElement | null) {
+  const video = container?.querySelector('video');
+  if (!(video instanceof HTMLVideoElement)) {
+    return;
+  }
+
+  prepareVideoElement(video);
 
   try {
     await video.play();
@@ -42,80 +70,150 @@ async function ensureVideoPlayback(container: HTMLDivElement | null) {
   }
 }
 
+function stopContainerVideoTracks(container: HTMLDivElement | null) {
+  const videos = container?.querySelectorAll('video') ?? [];
+  videos.forEach(video => {
+    const stream = video.srcObject;
+    if (typeof MediaStream !== 'undefined' && stream instanceof MediaStream) {
+      stream.getTracks().forEach(track => track.stop());
+      video.srcObject = null;
+    }
+  });
+}
+
+async function cleanupScanner(scanner: Html5Qrcode, container: HTMLDivElement | null) {
+  try {
+    const state = scanner.getState();
+    if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+      await scanner.stop();
+    } else {
+      stopContainerVideoTracks(container);
+    }
+  } catch {
+    stopContainerVideoTracks(container);
+  }
+
+  try {
+    scanner.clear();
+  } catch {
+    // ignore
+  }
+}
+
+async function startWithVideoRecovery(
+  scanner: Html5Qrcode,
+  cameraIdOrConfig: string | MediaTrackConstraints,
+  configuration: Html5QrcodeCameraScanConfig,
+  onScanSuccess: (decodedText: string) => void,
+  container: HTMLDivElement | null,
+) {
+  const recoveryTimer = window.setTimeout(() => {
+    void ensureVideoPlayback(container);
+  }, START_RECOVERY_DELAY_MS);
+
+  let startTimeout: number | undefined;
+
+  try {
+    await Promise.race([
+      scanner.start(cameraIdOrConfig, configuration, onScanSuccess, () => {}),
+      new Promise<never>((_, reject) => {
+        startTimeout = window.setTimeout(() => {
+          stopContainerVideoTracks(container);
+          reject(new Error('QR scanner camera start timed out.'));
+        }, START_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    window.clearTimeout(recoveryTimer);
+    if (startTimeout !== undefined) {
+      window.clearTimeout(startTimeout);
+    }
+  }
+}
+
 export default function QrScannerView({ onScan, paused }: QrScannerViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [cameraState, setCameraState] = useState<CameraState>('requesting');
   const onScanRef = useRef(onScan);
+  const scanInProgressRef = useRef(false);
   onScanRef.current = onScan;
 
   useEffect(() => {
     if (paused) return;
 
     let mounted = true;
+    const scannerContainer = containerRef.current;
 
     setCameraState('requesting');
 
     const startScanner = async () => {
       const onScanSuccess = (decodedText: string) => {
-        if (mounted) {
-          onScanRef.current(decodedText);
+        if (!mounted || scanInProgressRef.current) {
+          return;
         }
+
+        scanInProgressRef.current = true;
+        Promise.resolve(onScanRef.current(decodedText))
+          .catch(() => {})
+          .finally(() => {
+            window.setTimeout(() => {
+              scanInProgressRef.current = false;
+            }, SCAN_LOCK_RELEASE_DELAY_MS);
+          });
       };
 
-      const startAttempts: Array<() => Promise<Html5Qrcode>> = [
+      const startAttempts: Array<() => Promise<void>> = [
         async () => {
-          const scanner = new Html5Qrcode(SCANNER_REGION_ID);
-          await scanner.start(
+          const scanner = new Html5Qrcode(SCANNER_REGION_ID, scannerConfig);
+          scannerRef.current = scanner;
+          await startWithVideoRecovery(
+            scanner,
             { facingMode: 'environment' },
             {
-              fps: 10,
-              disableFlip: false,
-              qrbox: computeQrBox,
+              ...baseScanConfig,
               videoConstraints: {
-                facingMode: { ideal: 'environment' },
+                facingMode: 'environment',
                 width: { ideal: 1280 },
                 height: { ideal: 720 },
+                frameRate: { ideal: 15, max: 30 },
               },
             },
             onScanSuccess,
-            () => {},
+            scannerContainer,
           );
-          return scanner;
         },
         async () => {
-          const scanner = new Html5Qrcode(SCANNER_REGION_ID);
-          await scanner.start(
+          const scanner = new Html5Qrcode(SCANNER_REGION_ID, scannerConfig);
+          scannerRef.current = scanner;
+          await startWithVideoRecovery(
+            scanner,
             { facingMode: 'environment' },
-            {
-              fps: 10,
-              disableFlip: false,
-              qrbox: computeQrBox,
-            },
+            baseScanConfig,
             onScanSuccess,
-            () => {},
+            scannerContainer,
           );
-          return scanner;
         },
         async () => {
           const cameras = await Html5Qrcode.getCameras();
-          const preferredCamera = cameras.find(camera => /back|rear|environment/i.test(camera.label)) ?? cameras.at(-1);
+          const preferredCamera = cameras.find(camera => isRearCameraLabel(camera.label)) ?? cameras[cameras.length - 1];
           if (!preferredCamera) {
             throw new Error('No camera devices available.');
           }
 
-          const scanner = new Html5Qrcode(SCANNER_REGION_ID);
-          await scanner.start(
+          const scanConfig = isRearCameraLabel(preferredCamera.label)
+            ? baseScanConfig
+            : { ...baseScanConfig, disableFlip: false };
+
+          const scanner = new Html5Qrcode(SCANNER_REGION_ID, scannerConfig);
+          scannerRef.current = scanner;
+          await startWithVideoRecovery(
+            scanner,
             preferredCamera.id,
-            {
-              fps: 10,
-              disableFlip: false,
-              qrbox: computeQrBox,
-            },
+            scanConfig,
             onScanSuccess,
-            () => {},
+            scannerContainer,
           );
-          return scanner;
         },
       ];
 
@@ -128,9 +226,8 @@ export default function QrScannerView({ onScan, paused }: QrScannerViewProps) {
           }
 
           try {
-            const scanner = await startAttempt();
-            scannerRef.current = scanner;
-            await ensureVideoPlayback(containerRef.current);
+            await startAttempt();
+            await ensureVideoPlayback(scannerContainer);
 
             if (mounted) {
               setCameraState('active');
@@ -138,14 +235,20 @@ export default function QrScannerView({ onScan, paused }: QrScannerViewProps) {
             return;
           } catch (error) {
             lastError = error;
+            const scanner = scannerRef.current;
             scannerRef.current = null;
+            if (scanner) {
+              await cleanupScanner(scanner, scannerContainer);
+            } else {
+              stopContainerVideoTracks(scannerContainer);
+            }
           }
         }
 
         throw lastError ?? new Error('Unable to start the QR scanner.');
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!mounted) return;
-        const msg = String(err?.message || err || '');
+        const msg = err instanceof Error ? err.message : String(err || '');
         if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
           setCameraState('denied');
         } else {
@@ -161,24 +264,9 @@ export default function QrScannerView({ onScan, paused }: QrScannerViewProps) {
       const scanner = scannerRef.current;
       scannerRef.current = null;
       if (scanner) {
-        try {
-          const state = scanner.getState();
-          if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
-            scanner.stop()
-              .catch(() => {})
-              .finally(() => {
-                try {
-                  scanner.clear();
-                } catch {
-                  // ignore
-                }
-              });
-          } else {
-            scanner.clear();
-          }
-        } catch {
-          // ignore
-        }
+        void cleanupScanner(scanner, scannerContainer);
+      } else {
+        stopContainerVideoTracks(scannerContainer);
       }
     };
   }, [paused]);

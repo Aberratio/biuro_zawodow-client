@@ -310,6 +310,56 @@ All colors MUST be HSL.
       inset 0 1px 0 hsl(var(--foreground) / 0.12);
   }
 
+  .scanner-action-dock {
+    border-color: hsl(var(--button-highlight) / 0.24);
+    background:
+      linear-gradient(180deg, hsl(var(--foreground) / 0.035), transparent 42%),
+      linear-gradient(180deg, hsl(220 12% 10% / 0.94), hsl(220 18% 5% / 0.96));
+    box-shadow:
+      0 -22px 52px hsl(var(--surface-shadow) / 0.58),
+      inset 0 1px 0 hsl(var(--foreground) / 0.06);
+    backdrop-filter: blur(24px);
+  }
+
+  .scanner-check-in-action {
+    border-color: hsl(147 58% 44% / 0.72) !important;
+    background:
+      linear-gradient(180deg, hsl(var(--foreground) / 0.14), transparent 24%),
+      radial-gradient(
+        circle at top left,
+        hsl(var(--button-highlight) / 0.18),
+        transparent 50%
+      ),
+      linear-gradient(
+        135deg,
+        hsl(149 60% 40%) 0%,
+        hsl(148 56% 31%) 52%,
+        hsl(151 48% 24%) 100%
+      ) !important;
+    color: hsl(40 33% 96%) !important;
+    box-shadow:
+      0 20px 44px hsl(150 60% 5% / 0.42),
+      0 0 0 1px hsl(147 74% 62% / 0.14),
+      inset 0 1px 0 hsl(var(--foreground) / 0.22) !important;
+  }
+
+  .scanner-check-in-action:hover {
+    background:
+      linear-gradient(180deg, hsl(var(--foreground) / 0.16), transparent 24%),
+      radial-gradient(
+        circle at top left,
+        hsl(var(--button-highlight) / 0.2),
+        transparent 50%
+      ),
+      linear-gradient(
+        135deg,
+        hsl(149 64% 44%) 0%,
+        hsl(148 58% 34%) 52%,
+        hsl(151 50% 27%) 100%
+      ) !important;
+    color: hsl(40 33% 98%) !important;
+  }
+
   .archive-notice {
     color: hsl(40 30% 96%);
     background-color: hsl(26 24% 14% / 0.94);

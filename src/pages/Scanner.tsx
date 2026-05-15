@@ -98,6 +98,7 @@ export default function Scanner() {
   const [pendingBibNumberCandidate, setPendingBibNumberCandidate] = useState('');
   const [isSavingBibNumber, setIsSavingBibNumber] = useState(false);
   const successTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const scanRequestInFlightRef = useRef(false);
   const selectedEvent = visibleEvents.find(event => event.id === selectedEventId) ?? null;
   const scannerAvailable = selectedEvent !== null && isEventOfficeOpen(selectedEvent);
   const activeEventId = selectedEvent?.id ?? selectedEventId;
@@ -180,18 +181,27 @@ export default function Scanner() {
   }, [addToRecent]);
 
   const handleQrScan = useCallback(async (decodedText: string) => {
-    const result = await scanParticipantQr(decodedText);
-    if (!result.ok || !result.data) {
-      setErrorMessage(result.error ?? 'Nie znaleziono uczestnika dla tego kodu QR.');
-      setView('error');
-      successTimerRef.current = setTimeout(() => setView('idle'), 2500);
+    if (scanRequestInFlightRef.current) {
       return;
     }
 
-    const participant = result.data.participant;
-    setScannedParticipant(participant);
-    addToRecent(participant);
-    setView('detail');
+    scanRequestInFlightRef.current = true;
+    try {
+      const result = await scanParticipantQr(decodedText);
+      if (!result.ok || !result.data) {
+        setErrorMessage(result.error ?? 'Nie znaleziono uczestnika dla tego kodu QR.');
+        setView('error');
+        successTimerRef.current = setTimeout(() => setView('idle'), 2500);
+        return;
+      }
+
+      const participant = result.data.participant;
+      setScannedParticipant(participant);
+      addToRecent(participant);
+      setView('detail');
+    } finally {
+      scanRequestInFlightRef.current = false;
+    }
   }, [addToRecent, scanParticipantQr]);
 
   const handleSearchSelect = useCallback((participant: Participant) => {
@@ -570,13 +580,13 @@ export default function Scanner() {
           </div>
 
           <div className="px-4 md:px-0">
-            <QrScannerView onScan={decodedText => { void handleQrScan(decodedText); }} paused={false} />
+            <QrScannerView onScan={handleQrScan} paused={false} />
           </div>
         </>
       )}
 
       {view === 'detail' && scannedParticipant && (
-        <div className="px-4 md:px-0">
+        <div className={`px-4 md:px-0 ${scannedParticipant.status !== 'checked_in' ? 'pb-44 sm:pb-40' : ''}`}>
           <Card>
             <CardHeader className="space-y-3 pb-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -723,12 +733,6 @@ export default function Scanner() {
                     Edytuj dane uczestnika
                   </Button>
                 )}
-                {scannedParticipant.status !== 'checked_in' && (
-                  <Button className="w-full" onClick={() => void mutateStatus('checked_in', 'Uczestnik odprawiony')} disabled={isMutating || isReadOnly}>
-                    {isMutating ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-1 h-4 w-4" />}
-                    Odpraw uczestnika
-                  </Button>
-                )}
                 {scannedParticipant.status !== 'checked_in_not_starting' && (
                   <Button variant="outline" className="w-full" onClick={() => void mutateStatus('checked_in_not_starting', 'Uczestnik oznaczony jako bez startu')} disabled={isMutating || isReadOnly}>
                     {isMutating ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <UserX2 className="mr-1 h-4 w-4" />}
@@ -760,6 +764,20 @@ export default function Scanner() {
               )}
             </CardContent>
           </Card>
+          {scannedParticipant.status !== 'checked_in' && (
+            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] pt-5 md:left-[20rem] md:px-5 lg:px-8">
+              <div className="scanner-action-dock pointer-events-auto mx-auto w-full max-w-xl rounded-t-2xl border p-3 sm:rounded-2xl">
+                <Button
+                  className="scanner-check-in-action min-h-[5.75rem] w-full flex-col whitespace-normal rounded-lg px-4 py-4 font-heading text-base font-black uppercase tracking-normal sm:min-h-24 sm:text-lg [&_svg]:!size-8"
+                  onClick={() => void mutateStatus('checked_in', 'Uczestnik odprawiony')}
+                  disabled={isMutating || isReadOnly}
+                >
+                  {isMutating ? <Loader2 className="animate-spin" /> : <CheckCircle />}
+                  ODPRAW ZAWODNIKA
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
