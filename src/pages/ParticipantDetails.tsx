@@ -172,6 +172,10 @@ export default function ParticipantDetails() {
   const shouldOpenEditOnMount = Boolean(
     (location.state as { openEdit?: boolean } | null)?.openEdit,
   );
+  const navigationState = location.state as {
+    backTo?: string;
+    backLabel?: string;
+  } | null;
 
   useRouteEventContext(routeEventId);
 
@@ -355,12 +359,12 @@ export default function ParticipantDetails() {
     );
 
   const participantEventId = routeEventId || participant.event_id || event?.id || "";
-  const backTo = participantEventId
-    ? buildEventParticipantsPath(participantEventId)
-    : "/events";
-  const backLabel = participantEventId
-    ? "Wróć do uczestników"
-    : "Wróć do wydarzeń";
+  const backTo =
+    navigationState?.backTo ??
+    (participantEventId ? buildEventParticipantsPath(participantEventId) : "/events");
+  const backLabel =
+    navigationState?.backLabel ??
+    (participantEventId ? "Wróć do uczestników" : "Wróć do wydarzeń");
 
   const statusDefinition = getParticipantStatusDefinition(participant.status);
   const normalizedBibNumberValue = bibNumberValue.trim();
@@ -579,59 +583,63 @@ export default function ParticipantDetails() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => navigate(backTo)}
-        className="touch-manipulation"
-      >
-        <ArrowLeft className="h-4 w-4 mr-1" /> {backLabel}
-      </Button>
+    <div className="space-y-6">
+      <div className="space-y-6">
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(backTo)}
+            className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" /> {backLabel}
+          </Button>
+        </div>
 
-      <PageHeader
-        title={participant.name}
-        description={
-          <>
-            <p>{participant.email}</p>
-            {event ? <p className="mt-1 text-xs">{event.name}</p> : null}
-          </>
-        }
-        actions={
-          canManageParticipantData ? (
+        <PageHeader
+          title={participant.name}
+          description={
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-                onClick={() => setTransferOpen(true)}
-                disabled={!isOnline}
-              >
-                <UserRoundCog className="h-4 w-4 mr-1" />
-                Edytuj dane uczestnika
-              </Button>
-              {canUseAdminActions && (
+              <p>{participant.email}</p>
+              {event ? <p className="mt-1 text-xs">{event.name}</p> : null}
+            </>
+          }
+          actions={
+            canManageParticipantData ? (
+              <>
                 <Button
                   variant="outline"
                   size="sm"
                   className="w-full sm:w-auto"
-                  onClick={() => setSendQrConfirmOpen(true)}
-                  disabled={isSendingQr || !isOnline}
+                  onClick={() => setTransferOpen(true)}
+                  disabled={!isOnline}
                 >
-                  {isSendingQr ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <Repeat className="h-4 w-4 mr-1" />
-                  )}
-                  {participant.email_status === "sent"
-                    ? "Wyślij ponownie QR"
-                    : "Wyślij QR"}
+                  <UserRoundCog className="h-4 w-4 mr-1" />
+                  Edytuj dane uczestnika
                 </Button>
-              )}
-            </>
-          ) : null
-        }
-      />
+                {canUseAdminActions && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    onClick={() => setSendQrConfirmOpen(true)}
+                    disabled={isSendingQr || !isOnline}
+                  >
+                    {isSendingQr ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Repeat className="h-4 w-4 mr-1" />
+                    )}
+                    {participant.email_status === "sent"
+                      ? "Wyślij ponownie QR"
+                      : "Wyślij QR"}
+                  </Button>
+                )}
+              </>
+            ) : null
+          }
+        />
+      </div>
 
       {canUseAdminActions && (
         <div className="flex justify-end">

@@ -18,6 +18,7 @@ import TableSkeleton from "@/components/skeletons/TableSkeleton";
 import { PageHeader } from "@/components/PageHeader";
 import { formatEventOfficeWindow, getEventOfficeOpenAt } from "@/lib/events";
 import { participantCountsAsCheckedIn } from "@/lib/participant-status";
+import { buildOrganizationPath } from "@/lib/routes";
 
 export default function ArchivedEvents() {
   const { id } = useParams<{ id: string }>();
@@ -77,31 +78,35 @@ export default function ArchivedEvents() {
 
   return (
     <div className="space-y-6">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => navigate(`/organizations/${organization.id}`)}
-        className="w-fit touch-manipulation"
-      >
-        <ArrowLeft className="mr-1 h-4 w-4" />
-        Wróć do organizacji
-      </Button>
+      <div className="space-y-6">
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(buildOrganizationPath(organization.id))}
+            className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Wróć do organizacji
+          </Button>
+        </div>
 
-      <PageHeader
-        title={
-          <span className="flex items-center gap-2">
-            <Archive className="h-6 w-6 shrink-0 text-primary" />
-            <span>Archiwum wydarzeń</span>
-          </span>
-        }
-        description={organization.name}
-        actions={
-          <Badge variant="outline" className="w-fit">
-            {eventRows.length} archiwalnych
-          </Badge>
-        }
-        headingClassName="flex items-center gap-2"
-      />
+        <PageHeader
+          title={
+            <span className="flex items-center gap-2">
+              <Archive className="h-6 w-6 shrink-0 text-primary" />
+              <span>Archiwum wydarzeń</span>
+            </span>
+          }
+          description={organization.name}
+          actions={
+            <Badge variant="outline" className="w-fit">
+              {eventRows.length} archiwalnych
+            </Badge>
+          }
+          headingClassName="flex items-center gap-2"
+        />
+      </div>
 
       <Card className="archive-notice shadow-sm">
         <CardContent className="p-5">
