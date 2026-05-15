@@ -3,6 +3,16 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
 import { useRouteEventContext } from '@/hooks/use-route-event-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +22,7 @@ import { Label } from '@/components/ui/label';
 import { FieldError } from '@/components/ui/field-error';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, FileUp, Info, Loader2, Mail, RefreshCcw, Sparkles } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, FileUp, Info, Loader2, Mail, RefreshCcw, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { formatEventOfficeWindow } from '@/lib/events';
@@ -86,6 +96,7 @@ export default function CsvImport() {
     analyzeParticipantImport,
     confirmParticipantImportMapping,
     runParticipantImport,
+    replaceParticipantImport,
     isLoading,
     connectionState,
   } = useData();
@@ -98,42 +109,52 @@ export default function CsvImport() {
   const [analysis, setAnalysis] = useState<Awaited<ReturnType<typeof analyzeParticipantImport>> | null>(null);
   const [selectedEmailColumn, setSelectedEmailColumn] = useState('');
   const [mappingDrafts, setMappingDrafts] = useState<MappingDraft[]>([]);
-  const [runningAction, setRunningAction] = useState<'analyze' | 'confirm' | 'run' | ''>('');
+  const [runningAction, setRunningAction] = useState<'analyze' | 'confirm' | 'run' | 'replace' | ''>('');
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof runParticipantImport>> | null>(null);
   const [importSuccessOpen, setImportSuccessOpen] = useState(false);
+  const [replacementPromptOpen, setReplacementPromptOpen] = useState(false);
+  const [replacementMode, setReplacementMode] = useState(false);
   const [mappingErrors, setMappingErrors] = useState<{ emailColumn?: string; aliases: Record<string, string>; form?: string }>({ aliases: {} });
   const isOnline = connectionState === 'online';
 
   useRouteEventContext(routeEventId);
 
   useEffect(() => {
-    if (!analysis || analysis.has_mapping) {
+    if (!analysis || (analysis.has_mapping && !replacementMode)) {
       setMappingDrafts([]);
       return;
     }
 
-    const autoEmailColumn = analysis.email_candidates.length === 1 ? analysis.email_candidates[0].column : selectedEmailColumn;
+    const savedEmailMapping = analysis.mappings.find(mapping => mapping.field_role === 'email');
+    const savedEmailColumn = savedEmailMapping && analysis.headers.includes(savedEmailMapping.source_column_name)
+      ? savedEmailMapping.source_column_name
+      : '';
+    const autoEmailColumn = savedEmailColumn || (analysis.email_candidates.length === 1 ? analysis.email_candidates[0].column : selectedEmailColumn);
     setSelectedEmailColumn(autoEmailColumn);
     setMappingDrafts(
       analysis.headers
         .filter(header => header !== autoEmailColumn)
-        .map(header => ({
-          source_column_name: header,
-          alias: header,
-          field_role: 'custom',
-        })),
+        .map(header => {
+          const savedMapping = analysis.mappings.find(mapping => mapping.source_column_name === header && mapping.field_role !== 'email');
+          return {
+            source_column_name: header,
+            alias: savedMapping?.alias ?? header,
+            field_role: (savedMapping?.field_role as EditableFieldRole | undefined) ?? 'custom',
+          };
+        }),
     );
-  }, [analysis, selectedEmailColumn]);
+  }, [analysis, replacementMode, selectedEmailColumn]);
 
   const multipleEmailCandidates = (analysis?.email_candidates.length ?? 0) > 1;
   const canRunWithSavedMapping = !!analysis?.has_mapping && (analysis.missing_required_columns?.length ?? 0) === 0;
   const displayNamePartsCount = mappingDrafts.filter(field => field.field_role === 'display_name_part').length;
-  const shouldWaitForEmailSelection = !analysis?.has_mapping && multipleEmailCandidates && !selectedEmailColumn;
+  const isEditingMapping = Boolean(analysis && (!analysis.has_mapping || replacementMode));
+  const shouldWaitForEmailSelection = isEditingMapping && multipleEmailCandidates && !selectedEmailColumn;
   const bibNumberColumn = mappingDrafts.find(field => field.field_role === 'bib_number')?.source_column_name ?? null;
 
   const activeDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role !== 'ignore'), [mappingDrafts]);
   const previewHeaderLabels = useMemo(() => {
-    if (!analysis || analysis.has_mapping) {
+    if (!analysis || (analysis.has_mapping && !replacementMode)) {
       return new Map<string, string>();
     }
 
@@ -143,17 +164,17 @@ export default function CsvImport() {
         field.alias.trim() || field.source_column_name,
       ]),
     );
-  }, [analysis, mappingDrafts]);
+  }, [analysis, mappingDrafts, replacementMode]);
   const previewHeaders = useMemo(() => {
     if (!analysis) return [];
-    if (analysis.has_mapping) return analysis.headers;
+    if (analysis.has_mapping && !replacementMode) return analysis.headers;
 
     return analysis.headers.filter(header => {
       if (header === selectedEmailColumn) return true;
       const matchingDraft = mappingDrafts.find(field => field.source_column_name === header);
       return matchingDraft ? matchingDraft.field_role !== 'ignore' : true;
     });
-  }, [analysis, mappingDrafts, selectedEmailColumn]);
+  }, [analysis, mappingDrafts, replacementMode, selectedEmailColumn]);
 
   const handleFilePicked = async (eventValue: ChangeEvent<HTMLInputElement>) => {
     const file = eventValue.target.files?.[0];
@@ -164,11 +185,15 @@ export default function CsvImport() {
     setCsvContent(text);
     setSummary(null);
     setMappingErrors({ aliases: {} });
+    setSelectedEmailColumn('');
+    setReplacementMode(false);
+    setReplacementPromptOpen(false);
 
     try {
       setRunningAction('analyze');
       const result = await analyzeParticipantImport(eventId, text);
       setAnalysis(result);
+      setReplacementPromptOpen(Boolean(result.list_difference?.should_offer_replacement));
       toast({ title: 'CSV przeanalizowany', description: `Wykryto ${result.headers.length} kolumn i ${result.row_count} wierszy.` });
     } catch (error) {
       setAnalysis(null);
@@ -189,6 +214,21 @@ export default function CsvImport() {
       aliases: { ...prev.aliases, [sourceColumnName]: '' },
       form: undefined,
     }));
+  };
+
+  const buildMappingPayload = () => {
+    if (!analysis) return null;
+
+    return {
+      csv_columns: analysis.headers,
+      email_column: selectedEmailColumn,
+      fields: activeDrafts.map(field => ({
+        source_column_name: field.source_column_name,
+        alias: field.alias.trim(),
+        field_role: field.field_role as Exclude<EditableFieldRole, 'ignore'>,
+        is_active: true,
+      })),
+    };
   };
 
   const handleSaveMappingAndImport = async () => {
@@ -216,17 +256,20 @@ export default function CsvImport() {
 
     try {
       setMappingErrors({ aliases: {} });
+      const mappingPayload = buildMappingPayload();
+      if (!mappingPayload) return;
+
+      if (replacementMode) {
+        setRunningAction('replace');
+        const result = await replaceParticipantImport(eventId, csvContent, mappingPayload, (analysis.sent_qr_email_count ?? 0) > 0);
+        setSummary(result);
+        setImportSuccessOpen(true);
+        toast({ title: `Podmieniono listę i dodano ${result.created_count} uczestników` });
+        return;
+      }
+
       setRunningAction('confirm');
-      await confirmParticipantImportMapping(eventId, {
-        csv_columns: analysis.headers,
-        email_column: selectedEmailColumn,
-        fields: activeDrafts.map(field => ({
-          source_column_name: field.source_column_name,
-          alias: field.alias.trim(),
-          field_role: field.field_role as Exclude<EditableFieldRole, 'ignore'>,
-          is_active: true,
-        })),
-      });
+      await confirmParticipantImportMapping(eventId, mappingPayload);
 
       setRunningAction('run');
       const result = await runParticipantImport(eventId, csvContent);
@@ -273,6 +316,9 @@ export default function CsvImport() {
     ? `Import uczestników zakończył się pomyślnie. Dodano ${summary.created_count} uczestników, pominięto ${summary.duplicate_count} duplikatów, a ${summary.invalid_count} wierszy oznaczono jako nieprawidłowe.`
     : '';
 
+  const participantDifferencePercent = Math.round(((analysis?.list_difference?.participant_difference_ratio ?? 0) * 100));
+  const hasSentQrEmails = (analysis?.sent_qr_email_count ?? 0) > 0;
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="space-y-6">
@@ -303,6 +349,17 @@ export default function CsvImport() {
 
       {!isOnline && (
         <OnlineOnlyNotice description="Analiza CSV, zapis mapowania i sam import wymagają aktywnego połączenia z serwerem. W trybie offline pozostaje tylko podgląd ostatnich danych." />
+      )}
+
+      {replacementMode && analysis && (
+        <Alert className="border-destructive/40 bg-destructive/10 px-4 py-3 [&>svg]:left-3 [&>svg]:top-3 [&>svg~*]:pl-8">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          <AlertTitle className="text-sm">Podmieniasz całą listę uczestników</AlertTitle>
+          <AlertDescription className="text-xs text-muted-foreground">
+            Import usunie obecną listę uczestników razem z mapowaniem i zapisze ten plik jako nową listę bazową wydarzenia.
+            {hasSentQrEmails ? ' Dla tego wydarzenia wysłano już kody QR, więc to ryzykowna operacja.' : ''}
+          </AlertDescription>
+        </Alert>
       )}
 
       <Card className="border-dashed">
@@ -352,7 +409,7 @@ export default function CsvImport() {
                 ))}
               </div>
 
-              {!analysis.has_mapping && multipleEmailCandidates && (
+              {isEditingMapping && multipleEmailCandidates && (
                 <div className="max-w-md space-y-2">
                   <Label htmlFor="csv-email-column">Wybierz kolumnę z emailem uczestnika</Label>
                   <Select
@@ -380,7 +437,7 @@ export default function CsvImport() {
                 </div>
               )}
 
-              {!analysis.has_mapping && !multipleEmailCandidates && selectedEmailColumn && (
+              {isEditingMapping && !multipleEmailCandidates && selectedEmailColumn && (
                 <p className="text-sm text-muted-foreground">
                   Kolumna email została wybrana automatycznie: <span className="font-medium text-foreground">{selectedEmailColumn}</span>
                 </p>
@@ -388,7 +445,7 @@ export default function CsvImport() {
             </CardContent>
           </Card>
 
-          {!shouldWaitForEmailSelection && !analysis.has_mapping && (
+          {!shouldWaitForEmailSelection && isEditingMapping && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Mapowanie kolumn</CardTitle>
@@ -474,7 +531,7 @@ export default function CsvImport() {
             </Card>
           )}
 
-          {!shouldWaitForEmailSelection && analysis.has_mapping && (
+          {!shouldWaitForEmailSelection && analysis.has_mapping && !replacementMode && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Dopasowanie mapowania do pliku</CardTitle>
@@ -523,13 +580,13 @@ export default function CsvImport() {
 
           {!shouldWaitForEmailSelection && (
             <div className="flex flex-wrap gap-3">
-              {!analysis.has_mapping && (
-                <Button onClick={handleSaveMappingAndImport} disabled={runningAction === 'confirm' || runningAction === 'run' || !isOnline}>
-                  {(runningAction === 'confirm' || runningAction === 'run') ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}
-                  Zapisz mapowanie i importuj
+              {isEditingMapping && (
+                <Button onClick={handleSaveMappingAndImport} disabled={runningAction === 'confirm' || runningAction === 'run' || runningAction === 'replace' || !isOnline}>
+                  {(runningAction === 'confirm' || runningAction === 'run' || runningAction === 'replace') ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}
+                  {replacementMode ? 'Usuń starą listę i importuj nową' : 'Zapisz mapowanie i importuj'}
                 </Button>
               )}
-              {analysis.has_mapping && (
+              {analysis.has_mapping && !replacementMode && (
                 <Button onClick={handleRunExistingImport} disabled={!canRunWithSavedMapping || runningAction === 'run' || !isOnline}>
                   {runningAction === 'run' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
                   Importuj z zapisanym mapowaniem
@@ -555,6 +612,41 @@ export default function CsvImport() {
           )}
         </>
       )}
+
+      <AlertDialog open={replacementPromptOpen} onOpenChange={setReplacementPromptOpen}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ten CSV wygląda jak inna lista</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                Wykryto różnice między zapisaną listą a nowym plikiem. Różnica w składzie uczestników wynosi około {participantDifferencePercent}%.
+              </span>
+              {analysis?.list_difference?.columns_differ && (
+                <span className="block">
+                  Różnią się też kolumny CSV względem zapisanego mapowania.
+                </span>
+              )}
+              {hasSentQrEmails && (
+                <span className="block font-medium text-destructive">
+                  Dla tego wydarzenia wysłano już maile z kodami QR. Usunięcie listy i wgranie nowej może unieważnić wysłane kody dla obecnych uczestników.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Zostaw starą listę</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setReplacementMode(true);
+                setReplacementPromptOpen(false);
+              }}
+            >
+              Usuń starą i wgraj nową
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <SuccessActionDialog
         open={importSuccessOpen}

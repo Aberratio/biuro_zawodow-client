@@ -22,6 +22,16 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -35,11 +45,13 @@ import {
   ArrowLeft,
   ArrowUp,
   ArrowUpDown,
+  AlertTriangle,
   FileUp,
   Loader2,
   Plus,
   RefreshCcw,
   Search,
+  Trash2,
   UserPlus,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -80,6 +92,7 @@ export default function Participants() {
     isLoading,
     getParticipantFieldMappings,
     addParticipantManually,
+    resetEventParticipantList,
     connectionState,
     refreshData,
   } = useData();
@@ -94,6 +107,9 @@ export default function Participants() {
   const [manualEmail, setManualEmail] = useState("");
   const [manualFields, setManualFields] = useState<Record<string, string>>({});
   const [manualSaving, setManualSaving] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetRequiresQrConfirm, setResetRequiresQrConfirm] = useState(false);
+  const [resetSaving, setResetSaving] = useState(false);
   const [manualErrors, setManualErrors] = useState<{
     email?: string;
     fields: Record<string, string>;
@@ -110,6 +126,10 @@ export default function Participants() {
         (participant) => participant.event_id === activeEventId,
       ),
     [activeEventId, participants],
+  );
+  const sentQrEmailCount = useMemo(
+    () => eventParticipants.filter((participant) => participant.email_status === "sent").length,
+    [eventParticipants],
   );
 
   const filtered = useMemo(() => {
@@ -181,6 +201,10 @@ export default function Participants() {
   );
   const canImportParticipants =
     Boolean(activeEventId) && !isScannerRole(currentRole);
+  const canResetParticipantList =
+    Boolean(activeEventId) &&
+    eventParticipants.length > 0 &&
+    ["editor", "admin", "superadmin"].includes(currentRole);
   const canAddManually =
     eventParticipants.length > 0 &&
     mappings.length > 0 &&
@@ -277,6 +301,42 @@ export default function Participants() {
     toast({ title: "Dodano uczestnika ręcznie" });
   };
 
+  const handleResetParticipantList = async () => {
+    if (!activeEventId) return;
+
+    setResetSaving(true);
+    const result = await resetEventParticipantList(activeEventId, resetRequiresQrConfirm || sentQrEmailCount > 0);
+    setResetSaving(false);
+
+    if (!result.ok) {
+      if (result.qrEmailsSent) {
+        setResetRequiresQrConfirm(true);
+        toast({
+          title: "Potwierdź usunięcie po wysyłce QR",
+          description: "Dla tego wydarzenia wysłano już maile z kodami QR. Potwierdź operację ponownie w oknie.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Nie udało się usunąć listy",
+        description: result.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setResetDialogOpen(false);
+    setResetRequiresQrConfirm(false);
+    setMappings([]);
+    setManualFields({});
+    toast({
+      title: "Usunięto listę uczestników",
+      description: `Usunięto ${result.deleted_participant_count} uczestników i ${result.deleted_mapping_count} mapowań.`,
+    });
+  };
+
   if (isLoading)
     return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
 
@@ -321,6 +381,19 @@ export default function Participants() {
               className="h-11 w-full sm:h-10 sm:w-auto"
             >
               <FileUp className="h-4 w-4 mr-1" /> Import z pliku
+            </Button>
+          )}
+          {canResetParticipantList && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setResetRequiresQrConfirm(false);
+                setResetDialogOpen(true);
+              }}
+              disabled={!isOnline || resetSaving}
+              className="h-11 w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive sm:h-10 sm:w-auto"
+            >
+              <Trash2 className="h-4 w-4 mr-1" /> Usuń listę
             </Button>
           )}
           {canAddManually && (
@@ -458,6 +531,46 @@ export default function Participants() {
           </Table>
         </div>
       )}
+
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usunąć listę uczestników?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                Ta operacja usunie {eventParticipants.length} uczestników tego wydarzenia razem z mapowaniem CSV, bazą importu i logami zmian uczestników.
+              </span>
+              {sentQrEmailCount > 0 && (
+                <span className="flex gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 font-medium text-destructive">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    Dla {sentQrEmailCount} uczestników wysłano już maile z kodami QR. Usuwanie listy po wysyłce kodów QR to zły pomysł, bo wysłane kody przestaną pasować do aktualnej listy.
+                  </span>
+                </span>
+              )}
+              {resetRequiresQrConfirm && (
+                <span className="block font-medium text-destructive">
+                  Serwer wymaga dodatkowego potwierdzenia. Kliknij przycisk usunięcia jeszcze raz, jeśli na pewno chcesz kontynuować.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetSaving}>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={resetSaving}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleResetParticipantList();
+              }}
+            >
+              {resetSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1 h-4 w-4" />}
+              Usuń listę i mapowanie
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={manualOpen}

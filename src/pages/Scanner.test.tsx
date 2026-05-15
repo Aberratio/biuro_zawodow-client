@@ -193,6 +193,7 @@ describe('Scanner page', () => {
 
     expect(screen.queryByRole('textbox', { name: 'Szukaj uczestnika' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zasymuluj skan' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ODPRAW ZAWODNIKA' })).toHaveClass('scanner-check-in-action');
 
     const bibNumberInput = screen.getByRole('textbox', { name: 'Numer startowy' });
     expect(bibNumberInput).toHaveValue('');
