@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import {
   Activity,
   Archive,
   Building2,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Edit3,
   KeyRound,
   Loader2,
@@ -31,6 +34,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+} from "@/components/ui/pagination";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -52,6 +60,11 @@ import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { API_BASE_URL, fetchJson } from "@/lib/api";
 import { participantCountsAsCheckedIn } from "@/lib/participant-status";
+import {
+  buildEventParticipantPath,
+  buildEventPath,
+  buildOrganizationPath,
+} from "@/lib/routes";
 import type { ParticipantStatus, Role, User } from "@/types";
 
 type AuditScope = "all" | "user" | "organization" | "event" | "participant";
@@ -79,6 +92,15 @@ type EntityOption = {
   label: string;
   meta: string;
 };
+
+type AuditMeta = {
+  page: number;
+  per_page: number;
+  total: number;
+  total_pages: number;
+};
+
+const AUDIT_PAGE_SIZE = 50;
 
 const roleLabels: Record<Role, string> = {
   superadmin: "Superadmin",
@@ -137,6 +159,13 @@ export default function SuperAdmin() {
   const [selectedEntity, setSelectedEntity] = useState<EntityOption | null>(null);
   const [auditQuery, setAuditQuery] = useState("");
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
+  const [auditMeta, setAuditMeta] = useState<AuditMeta>({
+    page: 1,
+    per_page: AUDIT_PAGE_SIZE,
+    total: 0,
+    total_pages: 1,
+  });
+  const [auditPage, setAuditPage] = useState(1);
   const [hasLoadedRemoteAudit, setHasLoadedRemoteAudit] = useState(false);
   const [isAuditLoading, setIsAuditLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("admins");
@@ -214,7 +243,7 @@ export default function SuperAdmin() {
   }, [entityOptions, entitySearch]);
 
   const localAuditEntries = useMemo<AuditEntry[]>(() => {
-    return activityLog.slice(0, 100).map((log) => ({
+    return activityLog.map((log) => ({
       source: "activity",
       id: log.id,
       action: log.action,
@@ -227,14 +256,25 @@ export default function SuperAdmin() {
     }));
   }, [activityLog]);
 
-  const displayedAuditEntries = hasLoadedRemoteAudit ? auditEntries : localAuditEntries;
+  const localAuditMeta = useMemo<AuditMeta>(() => ({
+    page: auditPage,
+    per_page: AUDIT_PAGE_SIZE,
+    total: localAuditEntries.length,
+    total_pages: Math.max(1, Math.ceil(localAuditEntries.length / AUDIT_PAGE_SIZE)),
+  }), [auditPage, localAuditEntries.length]);
 
-  const loadAudit = async (nextScope = auditScope, nextEntity = selectedEntity) => {
+  const displayedAuditEntries = hasLoadedRemoteAudit
+    ? auditEntries
+    : localAuditEntries.slice((auditPage - 1) * AUDIT_PAGE_SIZE, auditPage * AUDIT_PAGE_SIZE);
+  const displayedAuditMeta = hasLoadedRemoteAudit ? auditMeta : localAuditMeta;
+
+  const loadAudit = async (nextScope = auditScope, nextEntity = selectedEntity, nextPage = auditPage) => {
     setIsAuditLoading(true);
     try {
       const params = new URLSearchParams({
         scope: nextScope,
-        limit: "200",
+        limit: String(AUDIT_PAGE_SIZE),
+        page: String(nextPage),
       });
       if (nextEntity?.id) params.set("id", nextEntity.id);
       if (auditQuery.trim()) params.set("q", auditQuery.trim());
@@ -242,8 +282,16 @@ export default function SuperAdmin() {
       const { payload } = await fetchJson(`${API_BASE_URL}/superadmin/audit?${params.toString()}`, {
         headers: getAuthHeaders(),
       });
-      const data = (payload as { data?: AuditEntry[] }).data;
+      const responseData = payload as { data?: AuditEntry[]; meta?: Partial<AuditMeta> };
+      const data = responseData.data;
       setAuditEntries(Array.isArray(data) ? data : []);
+      setAuditMeta({
+        page: Number(responseData.meta?.page ?? nextPage),
+        per_page: Number(responseData.meta?.per_page ?? AUDIT_PAGE_SIZE),
+        total: Number(responseData.meta?.total ?? (Array.isArray(data) ? data.length : 0)),
+        total_pages: Math.max(1, Number(responseData.meta?.total_pages ?? 1)),
+      });
+      setAuditPage(Number(responseData.meta?.page ?? nextPage));
       setHasLoadedRemoteAudit(true);
     } catch (error) {
       toast({
@@ -367,16 +415,33 @@ export default function SuperAdmin() {
     setAuditScope(scope);
     setSelectedEntity(null);
     setEntitySearch("");
+    setAuditPage(1);
     if (activeTab === "audit") {
-      void loadAudit(scope, null);
+      void loadAudit(scope, null, 1);
     }
   };
 
   const selectEntity = (entity: EntityOption) => {
     setSelectedEntity(entity);
     setEntitySearch(entity.label);
-    void loadAudit(auditScope, entity);
+    setAuditPage(1);
+    void loadAudit(auditScope, entity, 1);
   };
+
+  const goToAuditPage = (page: number) => {
+    const nextPage = Math.min(Math.max(1, page), displayedAuditMeta.total_pages);
+    if (nextPage === auditPage || isAuditLoading) return;
+
+    setAuditPage(nextPage);
+    if (hasLoadedRemoteAudit) {
+      void loadAudit(auditScope, selectedEntity, nextPage);
+    }
+  };
+
+  const auditRangeStart = displayedAuditMeta.total === 0
+    ? 0
+    : (displayedAuditMeta.page - 1) * displayedAuditMeta.per_page + 1;
+  const auditRangeEnd = Math.min(displayedAuditMeta.total, displayedAuditMeta.page * displayedAuditMeta.per_page);
 
   if (isLoading) {
     return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
@@ -410,7 +475,7 @@ export default function SuperAdmin() {
         onValueChange={(value) => {
           setActiveTab(value);
           if (value === "audit" && !hasLoadedRemoteAudit && !isAuditLoading) {
-            void loadAudit("all", null);
+            void loadAudit("all", null, 1);
           }
         }}
         className="space-y-5"
@@ -512,7 +577,7 @@ export default function SuperAdmin() {
                 </div>
 
                 <div className="flex items-end">
-                  <Button onClick={() => void loadAudit()} disabled={isAuditLoading} className="w-full lg:w-auto">
+                  <Button onClick={() => void loadAudit(auditScope, selectedEntity, 1)} disabled={isAuditLoading} className="w-full lg:w-auto">
                     {isAuditLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
                     Szukaj
                   </Button>
@@ -538,7 +603,15 @@ export default function SuperAdmin() {
               {selectedEntity && (
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">{selectedEntity.label}</Badge>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedEntity(null)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedEntity(null);
+                      setAuditPage(1);
+                      void loadAudit(auditScope, null, 1);
+                    }}
+                  >
                     Wyczyść
                   </Button>
                 </div>
@@ -547,15 +620,21 @@ export default function SuperAdmin() {
           </Card>
 
           <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <CardTitle className="text-lg">Logi audytu</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {auditRangeStart}-{auditRangeEnd} z {displayedAuditMeta.total}
+              </p>
+            </CardHeader>
             <CardContent className="p-0">
-              <Table>
+              <Table className="min-w-[1120px] table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Czas</TableHead>
+                    <TableHead className="w-[10rem]">Czas</TableHead>
                     <TableHead>Akcja</TableHead>
-                    <TableHead className="hidden lg:table-cell">Powiązania</TableHead>
-                    <TableHead className="hidden md:table-cell">Operator</TableHead>
-                    <TableHead>Źródło</TableHead>
+                    <TableHead className="w-[22rem]">Powiązania</TableHead>
+                    <TableHead className="w-[13rem]">Operator</TableHead>
+                    <TableHead className="w-[9rem]">Źródło</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -570,10 +649,10 @@ export default function SuperAdmin() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="hidden max-w-[22rem] lg:table-cell">
+                      <TableCell>
                         <RelatedAuditData entry={entry} />
                       </TableCell>
-                      <TableCell className="hidden text-sm md:table-cell">{entry.user_name || "-"}</TableCell>
+                      <TableCell className="text-sm">{entry.user_name || "-"}</TableCell>
                       <TableCell>
                         <Badge variant={entry.source === "participant_change" ? "secondary" : "outline"}>
                           {entry.source === "participant_change" ? "zmiana" : "aktywność"}
@@ -590,6 +669,46 @@ export default function SuperAdmin() {
                   )}
                 </TableBody>
               </Table>
+              {displayedAuditMeta.total_pages > 1 && (
+                <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                  <p className="text-sm text-muted-foreground">
+                    Strona {displayedAuditMeta.page} z {displayedAuditMeta.total_pages}
+                  </p>
+                  <Pagination className="mx-0 w-auto justify-start sm:justify-end">
+                    <PaginationContent>
+                      <PaginationItem>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => goToAuditPage(displayedAuditMeta.page - 1)}
+                          disabled={displayedAuditMeta.page <= 1 || isAuditLoading}
+                          aria-label="Poprzednia strona"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <span className="flex h-9 min-w-20 items-center justify-center rounded-md border px-3 text-sm tabular-nums">
+                          {displayedAuditMeta.page} / {displayedAuditMeta.total_pages}
+                        </span>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => goToAuditPage(displayedAuditMeta.page + 1)}
+                          disabled={displayedAuditMeta.page >= displayedAuditMeta.total_pages || isAuditLoading}
+                          aria-label="Nastepna strona"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -700,11 +819,34 @@ function MetricCard({
 }
 
 function RelatedAuditData({ entry }: { entry: AuditEntry }) {
+  const participantId = entry.participant_id ? String(entry.participant_id) : "";
+  const participantUiId = participantId.startsWith("p-") ? participantId : `p-${participantId}`;
   const values = [
-    entry.organization_name,
-    entry.event_name,
-    entry.participant_name,
-  ].filter(Boolean);
+    entry.organization_id && entry.organization_name
+      ? {
+          key: `organization-${entry.organization_id}`,
+          label: entry.organization_name,
+          meta: "Organizacja",
+          to: buildOrganizationPath(entry.organization_id),
+        }
+      : null,
+    entry.event_id && entry.event_name
+      ? {
+          key: `event-${entry.event_id}`,
+          label: entry.event_name,
+          meta: "Wydarzenie",
+          to: buildEventPath(entry.event_id),
+        }
+      : null,
+    entry.event_id && participantId && entry.participant_name
+      ? {
+          key: `participant-${participantId}`,
+          label: entry.participant_name,
+          meta: "Uczestnik",
+          to: buildEventParticipantPath(entry.event_id, participantUiId),
+        }
+      : null,
+  ].filter((value): value is { key: string; label: string; meta: string; to: string } => value !== null);
 
   if (values.length === 0) {
     return <span className="text-sm text-muted-foreground">-</span>;
@@ -713,9 +855,16 @@ function RelatedAuditData({ entry }: { entry: AuditEntry }) {
   return (
     <div className="space-y-1 text-sm">
       {values.map((value) => (
-        <p key={value} className="truncate">
-          {value}
-        </p>
+        <Link
+          key={value.key}
+          to={value.to}
+          className="block min-w-0 rounded-md px-1 py-0.5 text-primary transition-colors hover:bg-primary/10 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="block truncate text-[0.68rem] uppercase tracking-[0.14em] text-muted-foreground">
+            {value.meta}
+          </span>
+          <span className="block truncate font-medium">{value.label}</span>
+        </Link>
       ))}
     </div>
   );

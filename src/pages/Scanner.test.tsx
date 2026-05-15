@@ -69,8 +69,8 @@ function createParticipant(
     status: 'not_checked_in',
     email_status: 'not_sent',
     custom_fields: options?.customFields ?? {
-      miasto: 'Warszawa',
-      alergie: 'Orzeszki',
+      Miasto: 'Warszawa',
+      Alergie: 'Orzeszki',
     },
     important_field_aliases: options?.importantFieldAliases ?? ['Alergie'],
   };
@@ -171,7 +171,7 @@ function renderPages(initialEntries: string[] = ['/scanner']) {
 
 describe('Scanner page', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2099-04-12T10:00:00'));
     useDataMock.mockReset();
   });
@@ -186,7 +186,9 @@ describe('Scanner page', () => {
 
     renderPages();
 
-    expect(screen.getByRole('textbox', { name: 'Szukaj uczestnika' })).toBeInTheDocument();
+    const searchInput = screen.getByRole('textbox', { name: 'Szukaj uczestnika' });
+    expect(searchInput).toBeInTheDocument();
+    expect(searchInput).not.toHaveFocus();
     fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
 
     await screen.findByText('Dane do weryfikacji');
