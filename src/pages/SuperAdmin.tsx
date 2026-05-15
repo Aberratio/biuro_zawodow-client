@@ -714,7 +714,7 @@ export default function SuperAdmin() {
         </TabsContent>
 
         <TabsContent value="control" className="space-y-3 sm:space-y-4">
-          <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-2">
+          <div className="grid gap-2 sm:gap-4 lg:grid-cols-2">
             <ControlCard title="Role" icon={Shield}>
               {Object.entries(roleCounts).map(([role, count]) => (
                 <ControlRow key={role} label={roleLabels[role as Role]} value={count} />
@@ -736,7 +736,7 @@ export default function SuperAdmin() {
             <ControlCard title="Ostatnie aktywności" icon={Activity}>
               {activityLog.slice(0, 5).map((log) => (
                 <div key={log.id} className="border-b py-1.5 last:border-0 sm:py-2">
-                  <p className="truncate text-xs font-medium sm:text-sm">{log.action}</p>
+                  <p className="break-words text-xs font-medium sm:text-sm">{log.action}</p>
                   <p className="text-xs text-muted-foreground">{formatDateTime(log.timestamp)}</p>
                 </div>
               ))}
