@@ -70,6 +70,7 @@ import { validateEmail, validateRequired } from "@/lib/form-validation";
 import { isScannerRole } from "@/lib/roles";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 import { PageHeader } from "@/components/PageHeader";
+import { ParticipantFieldRoleHint } from "@/components/ParticipantFieldRoleHint";
 import {
   buildEventImportPath,
   buildEventParticipantPath,
@@ -250,24 +251,25 @@ export default function Participants() {
   };
 
   const handleManualSubmit = async () => {
-    const fieldErrors = activeMappings.reduce<Record<string, string>>(
-      (accumulator, mapping) => {
-        const error = validateRequired(
-          manualFields[mapping.alias] ?? "",
-          `Uzupełnij pole: ${mapping.alias}.`,
-        );
-        if (error) accumulator[mapping.alias] = error;
-        return accumulator;
-      },
-      {},
-    );
-    void fieldErrors;
+    const fieldErrors = activeMappings
+      .filter((mapping) => mapping.is_required)
+      .reduce<Record<string, string>>(
+        (accumulator, mapping) => {
+          const error = validateRequired(
+            manualFields[mapping.alias] ?? "",
+            `Uzupełnij pole: ${mapping.alias}.`,
+          );
+          if (error) accumulator[mapping.alias] = error;
+          return accumulator;
+        },
+        {},
+      );
     const nextErrors = {
       email: validateEmail(manualEmail),
-      fields: {},
+      fields: fieldErrors,
     };
 
-    if (nextErrors.email) {
+    if (nextErrors.email || Object.keys(fieldErrors).length > 0) {
       setManualErrors(nextErrors);
       return;
     }
@@ -603,9 +605,14 @@ export default function Participants() {
                 aria-invalid={Boolean(manualErrors.email)}
                 aria-describedby={
                   manualErrors.email
-                    ? "manual-participant-email-error"
-                    : undefined
+                    ? "manual-participant-email-description manual-participant-email-error"
+                    : "manual-participant-email-description"
                 }
+              />
+              <ParticipantFieldRoleHint
+                id="manual-participant-email-description"
+                role="email"
+                isRequired
               />
               <FieldError id="manual-participant-email-error" className="mt-2">
                 {manualErrors.email}
@@ -614,6 +621,7 @@ export default function Participants() {
             {activeMappings.map((mapping, index) => {
               const fieldId = `manual-participant-field-${index}`;
               const errorId = `${fieldId}-error`;
+              const descriptionId = `${fieldId}-description`;
               const fieldError = manualErrors.fields[mapping.alias];
 
               return (
@@ -626,8 +634,16 @@ export default function Participants() {
                       handleManualFieldChange(mapping.alias, event.target.value)
                     }
                     className="mt-2"
+                    required={mapping.is_required}
                     aria-invalid={Boolean(fieldError)}
-                    aria-describedby={fieldError ? errorId : undefined}
+                    aria-describedby={
+                      fieldError ? `${descriptionId} ${errorId}` : descriptionId
+                    }
+                  />
+                  <ParticipantFieldRoleHint
+                    id={descriptionId}
+                    role={mapping.field_role}
+                    isRequired={mapping.is_required}
                   />
                   <FieldError id={errorId} className="mt-2">
                     {fieldError}
