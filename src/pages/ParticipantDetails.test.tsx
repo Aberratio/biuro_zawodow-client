@@ -108,4 +108,26 @@ describe("ParticipantDetails page", () => {
     });
     expect(await screen.findByTestId("participants-route")).toBeInTheDocument();
   });
+
+  it("asks before leaving with unsaved participant status or number changes", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Numer startowy"), {
+      target: { value: "202" },
+    });
+
+    fireEvent.click(screen.getAllByRole("button")[0]);
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      expect.stringContaining("niezapisane zmiany"),
+    );
+    expect(screen.queryByTestId("participants-route")).not.toBeInTheDocument();
+
+    confirmSpy.mockReturnValue(true);
+    fireEvent.click(screen.getAllByRole("button")[0]);
+
+    expect(await screen.findByTestId("participants-route")).toBeInTheDocument();
+    confirmSpy.mockRestore();
+  });
 });
