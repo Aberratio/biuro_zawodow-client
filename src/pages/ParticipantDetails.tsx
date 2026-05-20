@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
 import { useRouteEventContext } from "@/hooks/use-route-event-context";
@@ -65,6 +65,7 @@ import { validateEmail, validateRequired } from "@/lib/form-validation";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 import { PageHeader } from "@/components/PageHeader";
 import { PageBlockerOverlay } from "@/components/PageBlockerOverlay";
+import { ParticipantFieldRoleHint } from "@/components/ParticipantFieldRoleHint";
 import {
   canManageParticipantData as canManageParticipantDataForRole,
   canUseParticipantAdminActions,
@@ -111,6 +112,109 @@ type ParticipantDataEntry = {
   value: string;
   isImportant: boolean;
 };
+
+const UNSAVED_PARTICIPANT_CHANGES_MESSAGE =
+  "Masz niezapisane zmiany statusu lub numeru startowego. Czy na pewno chcesz opuścić stronę?";
+
+function getCurrentBrowserUrl() {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
+function useUnsavedParticipantChangesGuard(hasUnsavedChanges: boolean) {
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  const allowNextPopRef = useRef(false);
+
+  useEffect(() => {
+    hasUnsavedChangesRef.current = hasUnsavedChanges;
+  }, [hasUnsavedChanges]);
+
+  const confirmDiscardChanges = useCallback(() => {
+    if (!hasUnsavedChangesRef.current) return true;
+    return window.confirm(UNSAVED_PARTICIPANT_CHANGES_MESSAGE);
+  }, []);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = UNSAVED_PARTICIPANT_CHANGES_MESSAGE;
+      return UNSAVED_PARTICIPANT_CHANGES_MESSAGE;
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const currentUrl = getCurrentBrowserUrl();
+    window.history.pushState(
+      { ...window.history.state, participantUnsavedChangesGuard: true },
+      "",
+      currentUrl,
+    );
+
+    const handlePopState = () => {
+      if (allowNextPopRef.current) {
+        allowNextPopRef.current = false;
+        return;
+      }
+
+      if (!hasUnsavedChangesRef.current) return;
+
+      if (window.confirm(UNSAVED_PARTICIPANT_CHANGES_MESSAGE)) {
+        allowNextPopRef.current = true;
+        window.history.back();
+        return;
+      }
+
+      window.history.pushState(
+        { ...window.history.state, participantUnsavedChangesGuard: true },
+        "",
+        currentUrl,
+      );
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey
+      ) {
+        return;
+      }
+
+      const target = event.target instanceof Element ? event.target : null;
+      const anchor = target?.closest<HTMLAnchorElement>("a[href]");
+      if (!anchor || anchor.target || anchor.hasAttribute("download")) return;
+
+      const href = anchor.getAttribute("href");
+      if (!href || href.startsWith("#")) return;
+
+      if (!window.confirm(UNSAVED_PARTICIPANT_CHANGES_MESSAGE)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    document.addEventListener("click", handleDocumentClick, true);
+    return () => document.removeEventListener("click", handleDocumentClick, true);
+  }, [hasUnsavedChanges]);
+
+  return confirmDiscardChanges;
+}
 
 export default function ParticipantDetails() {
   const { id: routeEventId = "", participantId = "" } = useParams<{
@@ -246,6 +350,10 @@ export default function ParticipantDetails() {
     () => getActiveParticipantMappings(mappings),
     [mappings],
   );
+  const bibNumberMapping = useMemo(
+    () => activeMappings.find((mapping) => mapping.field_role === "bib_number"),
+    [activeMappings],
+  );
   const editableMappings = useMemo(
     () =>
       activeMappings.filter((mapping) => mapping.field_role !== "bib_number"),
@@ -350,6 +458,16 @@ export default function ParticipantDetails() {
     ];
   }, [activityLog, participant]);
 
+  const hasUnsavedParticipantChanges = Boolean(
+    participant &&
+      canManageParticipantData &&
+      (statusValue !== participant.status ||
+        bibNumberValue.trim() !== participant.bib_number.trim()),
+  );
+  const confirmDiscardParticipantChanges = useUnsavedParticipantChangesGuard(
+    hasUnsavedParticipantChanges,
+  );
+
   if (isLoading) return <DetailSkeleton />;
   if (!participant)
     return (
@@ -369,6 +487,11 @@ export default function ParticipantDetails() {
   const statusDefinition = getParticipantStatusDefinition(participant.status);
   const normalizedBibNumberValue = bibNumberValue.trim();
   const normalizedCurrentBibNumber = participant.bib_number.trim();
+
+  const handleBackNavigation = () => {
+    if (!confirmDiscardParticipantChanges()) return;
+    navigate(backTo);
+  };
 
   const handleSendQr = async () => {
     setSendQrConfirmOpen(false);
@@ -413,6 +536,11 @@ export default function ParticipantDetails() {
 
   const handleSaveBibNumber = async () => {
     const normalizedBibNumber = bibNumberValue.trim();
+    if (bibNumberMapping?.is_required && !normalizedBibNumber) {
+      setBibNumberError("Uzupełnij pole: Numer startowy.");
+      return;
+    }
+
     if (normalizedBibNumber.length > 32) {
       setBibNumberError("Numer startowy może mieć maksymalnie 32 znaki.");
       return;
@@ -507,25 +635,28 @@ export default function ParticipantDetails() {
   };
 
   const handleTransferSubmit = async () => {
-    const fieldErrors = activeMappings.reduce<Record<string, string>>(
-      (accumulator, mapping) => {
-        if (mapping.field_role === "bib_number") return accumulator;
-        const error = validateRequired(
-          transferFields[mapping.alias] ?? "",
-          `Uzupełnij pole: ${mapping.alias}.`,
-        );
-        if (error) accumulator[mapping.alias] = error;
-        return accumulator;
-      },
-      {},
-    );
-    void fieldErrors;
+    const fieldErrors = activeMappings
+      .filter(
+        (mapping) =>
+          mapping.is_required && mapping.field_role !== "bib_number",
+      )
+      .reduce<Record<string, string>>(
+        (accumulator, mapping) => {
+          const error = validateRequired(
+            transferFields[mapping.alias] ?? "",
+            `Uzupełnij pole: ${mapping.alias}.`,
+          );
+          if (error) accumulator[mapping.alias] = error;
+          return accumulator;
+        },
+        {},
+      );
     const nextErrors = {
       email: validateEmail(transferEmail),
-      fields: {},
+      fields: fieldErrors,
     };
 
-    if (nextErrors.email) {
+    if (nextErrors.email || Object.keys(fieldErrors).length > 0) {
       setTransferErrors(nextErrors);
       return;
     }
@@ -589,7 +720,7 @@ export default function ParticipantDetails() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate(backTo)}
+            onClick={handleBackNavigation}
             className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
           >
             <ArrowLeft className="h-4 w-4 mr-1" /> {backLabel}
@@ -721,8 +852,8 @@ export default function ParticipantDetails() {
                     aria-invalid={Boolean(bibNumberError)}
                     aria-describedby={
                       bibNumberError
-                        ? "participant-bib-number-error"
-                        : undefined
+                        ? "participant-bib-number-description participant-bib-number-error"
+                        : "participant-bib-number-description"
                     }
                   />
                   <Button
@@ -740,13 +871,14 @@ export default function ParticipantDetails() {
                     Zapisz numer
                   </Button>
                 </div>
+                <ParticipantFieldRoleHint
+                  id="participant-bib-number-description"
+                  role="bib_number"
+                  isRequired={Boolean(bibNumberMapping?.is_required)}
+                />
                 <FieldError id="participant-bib-number-error">
                   {bibNumberError}
                 </FieldError>
-                <p className="text-xs text-muted-foreground">
-                  Pole może pozostać puste. Numer powinien być unikalny w ramach
-                  wydarzenia.
-                </p>
               </div>
             )}
             {canManageParticipantData && (
@@ -924,9 +1056,14 @@ export default function ParticipantDetails() {
                 aria-invalid={Boolean(transferErrors.email)}
                 aria-describedby={
                   transferErrors.email
-                    ? "transfer-participant-email-error"
-                    : undefined
+                    ? "transfer-participant-email-description transfer-participant-email-error"
+                    : "transfer-participant-email-description"
                 }
+              />
+              <ParticipantFieldRoleHint
+                id="transfer-participant-email-description"
+                role="email"
+                isRequired
               />
               <FieldError
                 id="transfer-participant-email-error"
@@ -938,6 +1075,7 @@ export default function ParticipantDetails() {
             {editableMappings.map((mapping, index) => {
               const fieldId = `transfer-participant-field-${index}`;
               const errorId = `${fieldId}-error`;
+              const descriptionId = `${fieldId}-description`;
               const fieldError = transferErrors.fields[mapping.alias];
 
               return (
@@ -953,8 +1091,16 @@ export default function ParticipantDetails() {
                       )
                     }
                     className="mt-2"
+                    required={mapping.is_required}
                     aria-invalid={Boolean(fieldError)}
-                    aria-describedby={fieldError ? errorId : undefined}
+                    aria-describedby={
+                      fieldError ? `${descriptionId} ${errorId}` : descriptionId
+                    }
+                  />
+                  <ParticipantFieldRoleHint
+                    id={descriptionId}
+                    role={mapping.field_role}
+                    isRequired={mapping.is_required}
                   />
                   <FieldError id={errorId} className="mt-2">
                     {fieldError}
