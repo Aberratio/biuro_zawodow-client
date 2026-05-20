@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm run unlock:dist",
     "build": "vite build",
+    "build:safe": "npm run unlock:dist && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "unlock:dist": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/unlock-dist.ps1"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
