@@ -254,12 +254,13 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      const ok = await login(email, password);
-      if (!ok) {
-        setErrors({ form: "Nieprawidłowy e-mail lub hasło." });
+      const result = await login(email, password);
+      if (!result.ok) {
+        const message = result.error ?? "Nieprawidłowy e-mail lub hasło.";
+        setErrors({ form: message });
         toast({
           title: "Błąd logowania",
-          description: "Nieprawidłowy e-mail lub hasło.",
+          description: message,
           variant: "destructive",
         });
       }
@@ -317,7 +318,12 @@ export default function Login() {
                     value={email}
                     onChange={(event) => handleEmailChange(event.target.value)}
                     placeholder="email@gmail.com"
+                    name="email"
                     autoComplete="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    inputMode="email"
                     required
                     aria-invalid={Boolean(errors.email || errors.form)}
                     aria-describedby={
@@ -351,7 +357,11 @@ export default function Login() {
                     value={password}
                     onChange={(event) => handlePasswordChange(event.target.value)}
                     placeholder="********"
+                    name="password"
                     autoComplete="current-password"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     required
                     aria-invalid={Boolean(errors.password || errors.form)}
                     aria-describedby={
@@ -457,7 +467,12 @@ export default function Login() {
                       value={email}
                       onChange={(event) => handleEmailChange(event.target.value)}
                       placeholder="email@gmail.com"
+                      name="email"
                       autoComplete="email"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      inputMode="email"
                       required
                       aria-invalid={Boolean(errors.email || errors.form)}
                       aria-describedby={
@@ -485,7 +500,11 @@ export default function Login() {
                         handlePasswordChange(event.target.value)
                       }
                       placeholder="********"
+                      name="password"
                       autoComplete="current-password"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       required
                       aria-invalid={Boolean(errors.password || errors.form)}
                       aria-describedby={

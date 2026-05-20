@@ -10,7 +10,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAuthLoading: boolean;
   sessionState: SessionState;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<LoginResult>;
   forgotPassword: (email: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
   resetPassword: (token: string, password: string, passwordConfirmation: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
   changePassword: (currentPassword: string, newPassword: string, newPasswordConfirmation: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
@@ -22,6 +22,11 @@ interface AuthContextType {
 interface AuthMeResponse {
   data?: Omit<User, 'password'> & { password?: string };
 }
+
+type LoginResult = {
+  ok: boolean;
+  error?: string;
+};
 
 const AuthContext = createContext<AuthContextType | null>(null);
 const AUTH_USER_KEY = 'auth_user';
@@ -229,7 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [revalidateStoredSession, sessionState, token, user]);
 
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     try {
       const { payload } = await fetchJson(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
@@ -245,14 +250,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!responsePayload.access_token || !nextUser) {
         clearSession();
-        return false;
+        return { ok: false, error: 'Nie udało się odczytać sesji użytkownika.' };
       }
 
       persistSession(nextUser, responsePayload.access_token, 'online');
-      return true;
-    } catch {
-      clearSession();
-      return false;
+      return { ok: true };
+    } catch (error) {
+      if (isApiResponseError(error)) {
+        if (error.status === 401) {
+          clearSession();
+        }
+
+        return {
+          ok: false,
+          error: error.message || 'Nieprawidłowy e-mail lub hasło.',
+        };
+      }
+
+      if (isNetworkRequestError(error)) {
+        return {
+          ok: false,
+          error: error.message || 'Nie udało się połączyć z serwerem.',
+        };
+      }
+
+      return { ok: false, error: 'Nie udało się zalogować.' };
     }
   }, [clearSession, persistSession]);
 

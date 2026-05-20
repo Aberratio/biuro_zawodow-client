@@ -1,4 +1,34 @@
-export const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080').replace(/\/+$/, '');
+const DEFAULT_API_BASE_URL = 'http://localhost:8080';
+
+function normalizeHostname(hostname: string): string {
+  return hostname.trim().toLowerCase().replace(/^\[|\]$/g, '');
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  const normalized = normalizeHostname(hostname);
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
+}
+
+export function resolveApiBaseUrl(
+  configuredApiUrl = import.meta.env.VITE_API_URL ?? DEFAULT_API_BASE_URL,
+  browserLocation: Pick<Location, 'hostname'> = window.location,
+): string {
+  const configuredValue = (configuredApiUrl || DEFAULT_API_BASE_URL).trim();
+
+  try {
+    const apiUrl = new URL(configuredValue);
+
+    if (isLoopbackHostname(apiUrl.hostname) && !isLoopbackHostname(browserLocation.hostname)) {
+      apiUrl.hostname = browserLocation.hostname;
+    }
+
+    return apiUrl.toString().replace(/\/+$/, '');
+  } catch {
+    return configuredValue.replace(/\/+$/, '');
+  }
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export class ApiResponseError extends Error {
   status: number;

@@ -47,7 +47,7 @@ describe("Login page", () => {
   });
 
   it("shows a form error and destructive toast when credentials are rejected", async () => {
-    loginMock.mockResolvedValue(false);
+    loginMock.mockResolvedValue({ ok: false, error: "Nieprawidłowy e-mail lub hasło." });
     const { container } = renderLogin();
     const emailInput = container.querySelector("#login-desktop-email") as HTMLInputElement;
     const passwordInput = container.querySelector("#login-desktop-password") as HTMLInputElement;
