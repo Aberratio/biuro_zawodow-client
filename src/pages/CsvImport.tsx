@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldError } from '@/components/ui/field-error';
@@ -23,7 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { AlertTriangle, ArrowLeft, Check, ChevronDown, FileUp, Info, Loader2, Mail, RefreshCcw, Sparkles } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ChevronDown, FileUp, Info, Loader2, RefreshCcw, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { formatEventOfficeWindow } from '@/lib/events';
@@ -48,6 +47,41 @@ interface MappingPreviewField {
 }
 
 const IMPORTANT_FIELDS_WARNING_LIMIT = 5;
+
+function normalizeColumnNameForMatching(columnName: string): string {
+  return columnName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function isLikelyBibNumberColumn(columnName: string): boolean {
+  const normalized = normalizeColumnNameForMatching(columnName);
+  if (!normalized) return false;
+
+  const blockedTerms = ['email', 'mail', 'telefon', 'phone', 'tel', 'prefix', 'platnosc', 'kwota', 'rabat', 'id user'];
+  if (blockedTerms.some(term => normalized.includes(term))) return false;
+
+  return [
+    'numer',
+    'nr',
+    'numer startowy',
+    'nr startowy',
+    'startowy',
+    'numer zawodnika',
+    'nr zawodnika',
+    'bib',
+    'bib number',
+    'race number',
+    'start number',
+  ].includes(normalized);
+}
+
+function findLikelyBibNumberColumn(headers: string[], emailColumn: string): string | null {
+  return headers.find(header => header !== emailColumn && isLikelyBibNumberColumn(header)) ?? null;
+}
 
 function getSampleCellValue(sampleRow: Record<string, string> | undefined, columnName: string): string {
   return sampleRow?.[columnName]?.trim() || 'Brak danych w podglądzie';
@@ -162,6 +196,8 @@ export default function CsvImport() {
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof runParticipantImport>> | null>(null);
   const [replacementPromptOpen, setReplacementPromptOpen] = useState(false);
   const [replacementMode, setReplacementMode] = useState(false);
+  const [skippedBibNumberPromptOpen, setSkippedBibNumberPromptOpen] = useState(false);
+  const [skippedBibNumberPromptMode, setSkippedBibNumberPromptMode] = useState<'save' | 'run'>('save');
   const [mappingErrors, setMappingErrors] = useState<{ emailColumn?: string; aliases: Record<string, string>; form?: string }>({ aliases: {} });
   const isOnline = connectionState === 'online';
 
@@ -178,6 +214,7 @@ export default function CsvImport() {
       ? savedEmailMapping.source_column_name
       : '';
     const autoEmailColumn = savedEmailColumn || (analysis.email_candidates.length === 1 ? analysis.email_candidates[0].column : selectedEmailColumn);
+    const likelyBibNumberColumn = findLikelyBibNumberColumn(analysis.headers, autoEmailColumn);
     setSelectedEmailColumn(autoEmailColumn);
     setMappingDrafts(
       analysis.headers
@@ -187,18 +224,29 @@ export default function CsvImport() {
           return {
             source_column_name: header,
             alias: savedMapping?.alias ?? header,
-            field_role: (savedMapping?.field_role as EditableFieldRole | undefined) ?? 'custom',
+            field_role: (savedMapping?.field_role as EditableFieldRole | undefined) ?? (header === likelyBibNumberColumn ? 'bib_number' : 'custom'),
           };
         }),
     );
   }, [analysis, replacementMode, selectedEmailColumn]);
 
-  const multipleEmailCandidates = (analysis?.email_candidates.length ?? 0) > 1;
+  const emailCandidatesCount = analysis?.email_candidates.length ?? 0;
+  const multipleEmailCandidates = emailCandidatesCount > 1;
+  const hasAutoResolvableEmailColumn = emailCandidatesCount === 1;
   const canRunWithSavedMapping = !!analysis?.has_mapping && (analysis.missing_required_columns?.length ?? 0) === 0;
   const displayNamePartsCount = mappingDrafts.filter(field => field.field_role === 'display_name_part').length;
   const isEditingMapping = Boolean(analysis && (!analysis.has_mapping || replacementMode));
-  const shouldWaitForEmailSelection = isEditingMapping && multipleEmailCandidates && !selectedEmailColumn;
+  const shouldWaitForEmailSelection = isEditingMapping && !selectedEmailColumn && !hasAutoResolvableEmailColumn;
+  const shouldShowEmailColumnStep = isEditingMapping && (multipleEmailCandidates || (!selectedEmailColumn && !hasAutoResolvableEmailColumn));
   const bibNumberColumn = mappingDrafts.find(field => field.field_role === 'bib_number')?.source_column_name ?? null;
+  const mappedBibNumberColumn = isEditingMapping
+    ? bibNumberColumn
+    : (analysis?.mappings.find(mapping => mapping.field_role === 'bib_number')?.source_column_name ?? null);
+  const likelyBibNumberColumn = useMemo(
+    () => analysis ? findLikelyBibNumberColumn(analysis.headers, selectedEmailColumn) : null,
+    [analysis, selectedEmailColumn],
+  );
+  const skippedLikelyBibNumberColumn = likelyBibNumberColumn && !mappedBibNumberColumn ? likelyBibNumberColumn : null;
 
   const activeDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role !== 'ignore'), [mappingDrafts]);
   const highlightedDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role === 'important_custom'), [mappingDrafts]);
@@ -426,10 +474,13 @@ export default function CsvImport() {
     result: Awaited<ReturnType<typeof runParticipantImport>>,
     mode: 'append' | 'replace',
   ) => {
+    const emailColumn = selectedEmailColumn || analysis?.mappings.find(mapping => mapping.field_role === 'email')?.source_column_name || '';
+
     navigate(buildEventImportSummaryPath(eventId), {
       state: {
         summary: result,
         headers: analysis?.headers ?? [],
+        emailColumn,
         fileName,
         importedAt: new Date().toISOString(),
         mode,
@@ -437,7 +488,7 @@ export default function CsvImport() {
     });
   };
 
-  const handleSaveMappingAndImport = async () => {
+  const handleSaveMappingAndImport = async (options?: { confirmedSkippedBibNumber?: boolean }) => {
     if (!analysis) return;
     if (!selectedEmailColumn) {
       setMappingErrors(prev => ({ ...prev, emailColumn: 'Wybierz kolumnę email.' }));
@@ -457,6 +508,11 @@ export default function CsvImport() {
     if (Object.values(aliasErrors).some(Boolean)) {
       setMappingErrors({ aliases: aliasErrors });
       toast({ title: 'Uzupełnij aliasy aktywnych kolumn', variant: 'destructive' });
+      return;
+    }
+    if (!options?.confirmedSkippedBibNumber && skippedLikelyBibNumberColumn) {
+      setSkippedBibNumberPromptMode('save');
+      setSkippedBibNumberPromptOpen(true);
       return;
     }
 
@@ -497,7 +553,13 @@ export default function CsvImport() {
     }
   };
 
-  const handleRunExistingImport = async () => {
+  const handleRunExistingImport = async (options?: { confirmedSkippedBibNumber?: boolean }) => {
+    if (!options?.confirmedSkippedBibNumber && skippedLikelyBibNumberColumn) {
+      setSkippedBibNumberPromptMode('run');
+      setSkippedBibNumberPromptOpen(true);
+      return;
+    }
+
     try {
       setRunningAction('run');
       const result = await runParticipantImport(eventId, csvContent);
@@ -585,72 +647,81 @@ export default function CsvImport() {
 
       {analysis && (
         <>
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <CardTitle className="text-base">Kolumny email</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  Wykryto {analysis.headers.length} kolumn i {analysis.row_count} wierszy.
-                </p>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Alert className="border-border/60 bg-muted/30 px-4 py-3 [&>svg]:left-3 [&>svg]:top-3 [&>svg~*]:pl-8">
-                <Info className="h-4 w-4" />
-                <AlertTitle className="text-sm">Jak wybrać kolumnę email</AlertTitle>
-                <AlertDescription className="text-xs text-muted-foreground">
-                  Wskaż kolumnę z adresem email uczestnika. Ta wartość służy do rozpoznania osoby i ograniczania duplikatów podczas importu.
-                </AlertDescription>
-              </Alert>
-
-              <div className="flex flex-wrap gap-2">
-                {analysis.email_candidates.map(candidate => (
-                  <Badge key={candidate.column} variant="secondary" className="gap-1 rounded-full px-3 py-1">
-                    <Mail className="h-3 w-3" /> {candidate.column} ({candidate.matched_count})
-                  </Badge>
-                ))}
-              </div>
-
-              {isEditingMapping && multipleEmailCandidates && (
-                <div className="max-w-md space-y-2">
-                  <Label htmlFor="csv-email-column">Wybierz kolumnę z emailem uczestnika</Label>
-                  <Select
-                    value={selectedEmailColumn}
-                    onValueChange={value => {
-                      setSelectedEmailColumn(value);
-                      setMappingErrors(prev => ({ ...prev, emailColumn: undefined, form: undefined }));
-                    }}
-                  >
-                    <SelectTrigger
-                      id="csv-email-column"
-                      className="h-10"
-                      aria-invalid={Boolean(mappingErrors.emailColumn)}
-                      aria-describedby={mappingErrors.emailColumn ? 'csv-email-column-error' : undefined}
-                    >
-                      <SelectValue placeholder="Wybierz kolumnę email" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {analysis.email_candidates.map(candidate => (
-                        <SelectItem key={candidate.column} value={candidate.column}>{candidate.column}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldError id="csv-email-column-error">{mappingErrors.emailColumn}</FieldError>
+          {shouldShowEmailColumnStep && (
+            <Card className={emailCandidatesCount === 0 ? 'border-destructive/40' : undefined}>
+              <CardHeader className="pb-2">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-base">Wybierz kolumnę email</CardTitle>
+                  {emailCandidatesCount > 0 && (
+                    <p className="text-xs text-muted-foreground">{emailCandidatesCount} kandydatów</p>
+                  )}
                 </div>
-              )}
-
-              {isEditingMapping && !multipleEmailCandidates && selectedEmailColumn && (
-                <p className="text-sm text-muted-foreground">
-                  Kolumna email została wybrana automatycznie: <span className="font-medium text-foreground">{selectedEmailColumn}</span>
-                </p>
-              )}
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {emailCandidatesCount === 0 ? (
+                  <Alert variant="destructive" className="px-4 py-3">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle className="text-sm">Nie wykryto kolumny email</AlertTitle>
+                    <AlertDescription className="text-xs">
+                      Import wymaga kolumny z adresem email uczestnika.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <>
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] md:items-end">
+                      <p className="text-sm text-muted-foreground">
+                        W pliku znaleziono kilka możliwych kolumn. Wybierz email uczestnika, bo ta wartość rozpoznaje osobę przy imporcie.
+                      </p>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="csv-email-column">Kolumna email</Label>
+                        <Select
+                          value={selectedEmailColumn}
+                          onValueChange={value => {
+                            setSelectedEmailColumn(value);
+                            setMappingErrors(prev => ({ ...prev, emailColumn: undefined, form: undefined }));
+                          }}
+                        >
+                          <SelectTrigger
+                            id="csv-email-column"
+                            className="h-9"
+                            aria-invalid={Boolean(mappingErrors.emailColumn)}
+                            aria-describedby={mappingErrors.emailColumn ? 'csv-email-column-error' : undefined}
+                          >
+                            <SelectValue placeholder="Wybierz kolumnę" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {analysis.email_candidates.map(candidate => (
+                              <SelectItem key={candidate.column} value={candidate.column}>
+                                {candidate.column} ({candidate.matched_count})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FieldError id="csv-email-column-error">{mappingErrors.emailColumn}</FieldError>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {!shouldWaitForEmailSelection && isEditingMapping && (
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Mapowanie kolumn</CardTitle>
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="text-base">Mapowanie kolumn</CardTitle>
+                    {selectedEmailColumn && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Email: <span className="font-medium text-foreground">{selectedEmailColumn}</span>
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {analysis.headers.length} kolumn, {analysis.row_count} wierszy
+                  </p>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
@@ -902,13 +973,13 @@ export default function CsvImport() {
           {!shouldWaitForEmailSelection && (
             <div className="flex flex-wrap gap-3">
               {isEditingMapping && (
-                <Button onClick={handleSaveMappingAndImport} disabled={runningAction === 'confirm' || runningAction === 'run' || runningAction === 'replace' || !isOnline}>
+                <Button onClick={() => handleSaveMappingAndImport()} disabled={runningAction === 'confirm' || runningAction === 'run' || runningAction === 'replace' || !isOnline}>
                   {(runningAction === 'confirm' || runningAction === 'run' || runningAction === 'replace') ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}
                   {replacementMode ? 'Usuń starą listę i importuj nową' : 'Zapisz mapowanie i importuj'}
                 </Button>
               )}
               {analysis.has_mapping && !replacementMode && (
-                <Button onClick={handleRunExistingImport} disabled={!canRunWithSavedMapping || runningAction === 'run' || !isOnline}>
+                <Button onClick={() => handleRunExistingImport()} disabled={!canRunWithSavedMapping || runningAction === 'run' || !isOnline}>
                   {runningAction === 'run' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
                   Importuj z zapisanym mapowaniem
                 </Button>
@@ -964,6 +1035,37 @@ export default function CsvImport() {
               }}
             >
               Usuń starą i wgraj nową
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={skippedBibNumberPromptOpen} onOpenChange={setSkippedBibNumberPromptOpen}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pominąć numer startowy?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                Kolumna „{skippedLikelyBibNumberColumn ?? 'Numer startowy'}” wygląda jak numer startowy, ale nie jest zmapowana jako systemowe pole numeru startowego.
+              </span>
+              <span className="block">
+                Jeśli ją pominiesz, zaimportowani uczestnicy będą mieli pusty numer startowy i trzeba będzie uzupełnić go później.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Wróć do mapowania</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setSkippedBibNumberPromptOpen(false);
+                if (skippedBibNumberPromptMode === 'run') {
+                  void handleRunExistingImport({ confirmedSkippedBibNumber: true });
+                  return;
+                }
+                void handleSaveMappingAndImport({ confirmedSkippedBibNumber: true });
+              }}
+            >
+              Pomiń numer i importuj
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

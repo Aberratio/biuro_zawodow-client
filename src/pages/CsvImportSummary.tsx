@@ -1,16 +1,18 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Download, FileWarning, RotateCcw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Download, FileWarning, Loader2, RotateCcw, UploadCloud } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { useRouteEventContext } from '@/hooks/use-route-event-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PageHeader } from '@/components/PageHeader';
 import { buildEventImportPath, buildEventPath } from '@/lib/routes';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
+import { toast } from '@/hooks/use-toast';
 
 interface ImportRowIssue {
   row_number: number;
@@ -30,6 +32,7 @@ interface ImportSummaryState {
     reset?: Record<string, unknown>;
   };
   headers?: string[];
+  emailColumn?: string;
   fileName?: string;
   importedAt?: string;
   mode?: 'append' | 'replace';
@@ -57,12 +60,16 @@ function escapeCsvCell(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
-function downloadCsv(filename: string, headers: string[], rows: ImportRowIssue[]) {
+function buildCsvContent(headers: string[], rows: ImportRowIssue[]): string {
   const csvRows = [
     headers,
     ...rows.map(issue => headers.map(header => issue.row?.[header] ?? '')),
   ];
-  const csv = csvRows.map(row => row.map(cell => escapeCsvCell(String(cell ?? ''))).join(';')).join('\r\n');
+  return csvRows.map(row => row.map(cell => escapeCsvCell(String(cell ?? ''))).join(';')).join('\r\n');
+}
+
+function downloadCsv(filename: string, headers: string[], rows: ImportRowIssue[]) {
+  const csv = buildCsvContent(headers, rows);
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -72,6 +79,23 @@ function downloadCsv(filename: string, headers: string[], rows: ImportRowIssue[]
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function isLikelyEmailColumn(header: string): boolean {
+  const normalized = header.toLowerCase().replace(/[\s_-]+/g, '');
+  return normalized === 'email' || normalized === 'e-mail' || normalized.includes('email') || normalized.includes('mail');
+}
+
+function resolveEmailColumn(explicitColumn: string | undefined, headers: string[], issues: ImportRowIssue[]): string {
+  if (explicitColumn && headers.includes(explicitColumn)) return explicitColumn;
+  const matchingHeader = headers.find(isLikelyEmailColumn);
+  if (matchingHeader) return matchingHeader;
+
+  return headers.find(header => issues.some(issue => (issue.row?.[header] ?? '').includes('@'))) ?? '';
+}
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 function StatCard({ label, value, tone = 'default' }: { label: string; value: number; tone?: 'default' | 'success' | 'warning' | 'danger' }) {
@@ -90,8 +114,37 @@ function StatCard({ label, value, tone = 'default' }: { label: string; value: nu
   );
 }
 
-function IssueTable({ title, description, issues, headers, badgeLabel }: { title: string; description: string; issues: ImportRowIssue[]; headers: string[]; badgeLabel: string }) {
+function IssueTable({
+  title,
+  description,
+  issues,
+  headers,
+  badgeLabel,
+  editableEmailColumn,
+  emailErrors = {},
+  onEmailChange,
+  onSaveIssue,
+  savingRowNumbers = {},
+  saveDisabled = false,
+}: {
+  title: string;
+  description: string;
+  issues: ImportRowIssue[];
+  headers: string[];
+  badgeLabel: string;
+  editableEmailColumn?: string;
+  emailErrors?: Record<number, string>;
+  onEmailChange?: (rowNumber: number, value: string) => void;
+  onSaveIssue?: (issue: ImportRowIssue) => void;
+  savingRowNumbers?: Record<number, boolean>;
+  saveDisabled?: boolean;
+}) {
   if (issues.length === 0) return null;
+
+  const visibleHeaders = editableEmailColumn
+    ? headers.filter(header => header !== editableEmailColumn)
+    : headers;
+  const isEditable = Boolean(editableEmailColumn && onEmailChange);
 
   return (
     <Card>
@@ -110,8 +163,10 @@ function IssueTable({ title, description, issues, headers, badgeLabel }: { title
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead className="w-24">Wiersz</TableHead>
+                {isEditable && <TableHead className="min-w-[18rem]">E-mail do poprawy</TableHead>}
+                {isEditable && <TableHead className="w-[10rem]">Zapis</TableHead>}
                 <TableHead className="min-w-[16rem]">Powód</TableHead>
-                {headers.map(header => (
+                {visibleHeaders.map(header => (
                   <TableHead key={header} className="min-w-[10rem]">{header}</TableHead>
                 ))}
               </TableRow>
@@ -120,6 +175,37 @@ function IssueTable({ title, description, issues, headers, badgeLabel }: { title
               {issues.map(issue => (
                 <TableRow key={`${title}-${issue.row_number}`}>
                   <TableCell className="font-medium">{issue.row_number}</TableCell>
+                  {isEditable && editableEmailColumn && onEmailChange && (
+                    <TableCell className="align-top">
+                      <div className="min-w-[16rem] space-y-1">
+                        <Input
+                          type="email"
+                          value={issue.row?.[editableEmailColumn] ?? ''}
+                          onChange={event => onEmailChange(issue.row_number, event.target.value)}
+                          aria-invalid={Boolean(emailErrors[issue.row_number])}
+                          className="h-9"
+                          placeholder="email@example.com"
+                        />
+                        {emailErrors[issue.row_number] && (
+                          <p className="text-xs text-destructive">{emailErrors[issue.row_number]}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                  {isEditable && (
+                    <TableCell className="align-top">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => onSaveIssue?.(issue)}
+                        disabled={saveDisabled || savingRowNumbers[issue.row_number]}
+                        className="whitespace-nowrap"
+                      >
+                        {savingRowNumbers[issue.row_number] ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-1 h-4 w-4" />}
+                        Dopisz
+                      </Button>
+                    </TableCell>
+                  )}
                   <TableCell className="max-w-[22rem]">
                     <div className="space-y-1">
                       {issue.reasons.map((reason, index) => (
@@ -127,9 +213,9 @@ function IssueTable({ title, description, issues, headers, badgeLabel }: { title
                       ))}
                     </div>
                   </TableCell>
-                  {headers.map(header => (
-                    <TableCell key={`${issue.row_number}-${header}`} className="max-w-[18rem] truncate">
-                      {issue.row?.[header] || <span className="text-muted-foreground">-</span>}
+                  {visibleHeaders.map(header => (
+                    <TableCell key={`${issue.row_number}-${header}`} className="max-w-[18rem]">
+                      <span className="block truncate">{issue.row?.[header] || <span className="text-muted-foreground">-</span>}</span>
                     </TableCell>
                   ))}
                 </TableRow>
@@ -146,11 +232,16 @@ export default function CsvImportSummary() {
   const { id: routeEventId = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { events, selectedEventId, isLoading } = useData();
+  const { events, selectedEventId, isLoading, runParticipantImport, connectionState } = useData();
   const eventId = routeEventId || selectedEventId;
   const event = events.find(item => item.id === eventId);
   const state = (location.state ?? {}) as ImportSummaryState;
   const summary = state.summary;
+  const [editableInvalidIssues, setEditableInvalidIssues] = useState<ImportRowIssue[]>([]);
+  const [emailErrors, setEmailErrors] = useState<Record<number, string>>({});
+  const [retryingImport, setRetryingImport] = useState(false);
+  const [savingRowNumbers, setSavingRowNumbers] = useState<Record<number, boolean>>({});
+  const [importedFixedCount, setImportedFixedCount] = useState(0);
 
   useRouteEventContext(routeEventId);
 
@@ -167,10 +258,169 @@ export default function CsvImportSummary() {
     [duplicateIssues, invalidIssues, state.headers],
   );
   const invalidHeaders = useMemo(
-    () => collectHeaders(state.headers, invalidIssues),
-    [invalidIssues, state.headers],
+    () => collectHeaders(state.headers, editableInvalidIssues),
+    [editableInvalidIssues, state.headers],
   );
-  const unimportedCount = (summary?.invalid_count ?? 0) + (summary?.duplicate_count ?? 0);
+  const emailColumn = useMemo(
+    () => resolveEmailColumn(state.emailColumn, invalidHeaders, editableInvalidIssues),
+    [editableInvalidIssues, invalidHeaders, state.emailColumn],
+  );
+  const canRetryEditedRows = editableInvalidIssues.length > 0 && Boolean(emailColumn) && connectionState === 'online';
+  const changedEmailCount = useMemo(
+    () => editableInvalidIssues.filter(issue => {
+      const originalIssue = invalidIssues.find(item => item.row_number === issue.row_number);
+      return (issue.row?.[emailColumn] ?? '') !== (originalIssue?.row?.[emailColumn] ?? '');
+    }).length,
+    [editableInvalidIssues, emailColumn, invalidIssues],
+  );
+  const currentInvalidCount = summary ? editableInvalidIssues.length : 0;
+  const currentCreatedCount = (summary?.created_count ?? 0) + importedFixedCount;
+  const unimportedCount = currentInvalidCount + (summary?.duplicate_count ?? 0);
+
+  useEffect(() => {
+    setEditableInvalidIssues(
+      invalidIssues.map(issue => ({
+        ...issue,
+        reasons: [...issue.reasons],
+        row: { ...issue.row },
+      })),
+    );
+    setEmailErrors({});
+    setImportedFixedCount(0);
+  }, [invalidIssues]);
+
+  const handleEmailChange = (rowNumber: number, value: string) => {
+    setEditableInvalidIssues(prev => prev.map(issue => (
+      issue.row_number === rowNumber
+        ? { ...issue, row: { ...issue.row, [emailColumn]: value } }
+        : issue
+    )));
+    setEmailErrors(prev => ({ ...prev, [rowNumber]: '' }));
+  };
+
+  const validateIssueEmail = (issue: ImportRowIssue): string => {
+    const email = (issue.row?.[emailColumn] ?? '').trim();
+    if (!email) return 'Podaj adres e-mail.';
+    if (!isValidEmail(email)) return 'Podaj poprawny adres e-mail.';
+    return '';
+  };
+
+  const applyRetryResultToRows = (
+    attemptedIssues: ImportRowIssue[],
+    result: Awaited<ReturnType<typeof runParticipantImport>>,
+  ) => {
+    const failedDetails = [
+      ...(result.invalid_row_details ?? []),
+      ...(result.duplicate_row_details ?? []),
+    ];
+    const failedByAttemptIndex = new Map(
+      failedDetails.map(detail => [detail.row_number - 2, detail]),
+    );
+    const remainingIssues = attemptedIssues
+      .map((issue, index) => {
+        const failedDetail = failedByAttemptIndex.get(index);
+        if (!failedDetail) return null;
+        return {
+          ...issue,
+          reasons: failedDetail.reasons.length > 0 ? failedDetail.reasons : issue.reasons,
+          row: { ...issue.row, ...failedDetail.row },
+        };
+      })
+      .filter((issue): issue is ImportRowIssue => issue !== null);
+    const successfulOriginalRows = new Set(
+      attemptedIssues
+        .filter((_, index) => !failedByAttemptIndex.has(index))
+        .map(issue => issue.row_number),
+    );
+
+    setEditableInvalidIssues(previous => [
+      ...previous.filter(issue => !attemptedIssues.some(attempted => attempted.row_number === issue.row_number)),
+      ...remainingIssues,
+    ].sort((left, right) => left.row_number - right.row_number));
+    setEmailErrors({});
+
+    if (successfulOriginalRows.size > 0) {
+      setImportedFixedCount(previous => previous + successfulOriginalRows.size);
+    }
+  };
+
+  const handleSaveIssue = async (issue: ImportRowIssue) => {
+    if (!emailColumn) {
+      toast({ title: 'Nie znaleziono kolumny e-mail', variant: 'destructive' });
+      return;
+    }
+
+    const validationError = validateIssueEmail(issue);
+    if (validationError) {
+      setEmailErrors(previous => ({ ...previous, [issue.row_number]: validationError }));
+      return;
+    }
+
+    try {
+      setSavingRowNumbers(previous => ({ ...previous, [issue.row_number]: true }));
+      const result = await runParticipantImport(eventId, buildCsvContent(invalidHeaders, [issue]));
+      applyRetryResultToRows([issue], result);
+
+      if (result.created_count > 0) {
+        toast({ title: 'Zawodnik dopisany do bazy' });
+      } else {
+        toast({
+          title: 'Nie udało się dopisać zawodnika',
+          description: result.duplicate_count > 0 ? 'Ten rekord nadal wygląda jak duplikat.' : 'Sprawdź dane w wierszu i spróbuj ponownie.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Nie udało się dopisać zawodnika',
+        description: error instanceof Error ? error.message : 'Spróbuj ponownie albo pobierz CSV do poprawy.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingRowNumbers(previous => ({ ...previous, [issue.row_number]: false }));
+    }
+  };
+
+  const handleRetryEditedRows = async () => {
+    if (!emailColumn) {
+      toast({ title: 'Nie znaleziono kolumny e-mail', variant: 'destructive' });
+      return;
+    }
+
+    const nextErrors = editableInvalidIssues.reduce<Record<number, string>>((accumulator, issue) => {
+      const error = validateIssueEmail(issue);
+      if (error) accumulator[issue.row_number] = error;
+      return accumulator;
+    }, {});
+
+    if (Object.values(nextErrors).some(Boolean)) {
+      setEmailErrors(nextErrors);
+      toast({ title: 'Popraw adresy e-mail przed importem', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      setRetryingImport(true);
+      const attemptedIssues = [...editableInvalidIssues];
+      const csvContent = buildCsvContent(invalidHeaders, editableInvalidIssues);
+      const result = await runParticipantImport(eventId, csvContent);
+      applyRetryResultToRows(attemptedIssues, result);
+      toast({
+        title: `Dopisano ${result.created_count} zawodników do bazy`,
+        description: result.invalid_count + result.duplicate_count > 0
+          ? `${result.invalid_count + result.duplicate_count} wierszy nadal wymaga poprawy.`
+          : undefined,
+      });
+    } catch (error) {
+      toast({
+        title: 'Nie udało się zaimportować poprawionych wierszy',
+        description: error instanceof Error ? error.message : 'Spróbuj ponownie albo pobierz CSV do poprawy.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRetryingImport(false);
+    }
+  };
 
   if (isLoading) return <TableSkeleton rows={5} cols={4} subtitle="" />;
   if (!event) return <div className="py-12 text-center text-muted-foreground">Nie znaleziono wydarzenia</div>;
@@ -206,20 +456,26 @@ export default function CsvImportSummary() {
             </>
           }
           actions={
-            invalidIssues.length > 0 ? (
-              <Button onClick={() => downloadCsv(`do-poprawy-${eventId}.csv`, invalidHeaders, invalidIssues)}>
-                <Download className="mr-1 h-4 w-4" /> Pobierz CSV do poprawy
-              </Button>
+            editableInvalidIssues.length > 0 ? (
+              <>
+                <Button onClick={handleRetryEditedRows} disabled={!canRetryEditedRows || retryingImport}>
+                  {retryingImport ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-1 h-4 w-4" />}
+                  Dopisz poprawione do bazy
+                </Button>
+                <Button variant="outline" onClick={() => downloadCsv(`do-poprawy-${eventId}.csv`, invalidHeaders, editableInvalidIssues)}>
+                  <Download className="mr-1 h-4 w-4" /> Pobierz CSV do poprawy
+                </Button>
+              </>
             ) : null
           }
         />
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <StatCard label="Zaimportowano" value={summary.created_count} tone="success" />
+        <StatCard label="Zaimportowano" value={currentCreatedCount} tone="success" />
         <StatCard label="Nie zaimportowano" value={unimportedCount} tone={unimportedCount > 0 ? 'warning' : 'default'} />
         <StatCard label="Duplikaty" value={summary.duplicate_count} tone={summary.duplicate_count > 0 ? 'warning' : 'default'} />
-        <StatCard label="Błędne wiersze" value={summary.invalid_count} tone={summary.invalid_count > 0 ? 'danger' : 'default'} />
+        <StatCard label="Błędne wiersze" value={currentInvalidCount} tone={currentInvalidCount > 0 ? 'danger' : 'default'} />
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
@@ -227,7 +483,7 @@ export default function CsvImportSummary() {
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>Import zakończony</AlertTitle>
           <AlertDescription>
-            Dodano {summary.created_count} uczestników. {state.mode === 'replace' ? 'Poprzednia lista została podmieniona.' : 'Nowi uczestnicy zostali dopisani do wydarzenia.'}
+            Dodano {currentCreatedCount} uczestników. {state.mode === 'replace' ? 'Poprzednia lista została podmieniona.' : 'Nowi uczestnicy zostali dopisani do wydarzenia.'}
           </AlertDescription>
         </Alert>
         {unimportedCount > 0 ? (
@@ -235,7 +491,7 @@ export default function CsvImportSummary() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Wymagane sprawdzenie danych</AlertTitle>
             <AlertDescription>
-              {summary.invalid_count > 0 ? 'Błędne wiersze można pobrać jako CSV, poprawić i wgrać ponownie. ' : ''}
+              {currentInvalidCount > 0 ? 'Błędne adresy e-mail można poprawić w tabeli poniżej i od razu dopisać zawodnika do bazy. ' : ''}
               {summary.duplicate_count > 0 ? 'Duplikaty pominięto, bo pasują do uczestników już zapisanych w wydarzeniu.' : ''}
             </AlertDescription>
           </Alert>
@@ -248,12 +504,46 @@ export default function CsvImportSummary() {
         )}
       </div>
 
+      {editableInvalidIssues.length > 0 && !emailColumn && (
+        <Alert className="border-amber-400/50 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Nie rozpoznano kolumny e-mail</AlertTitle>
+          <AlertDescription>
+            Możesz nadal pobrać CSV do poprawy. Edycja w tabeli wymaga rozpoznanej kolumny z adresem e-mail.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {editableInvalidIssues.length > 0 && emailColumn && (
+        <Card>
+          <CardContent className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-medium">Poprawianie adresów e-mail w UI</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Edytowana kolumna: <span className="font-medium text-foreground">{emailColumn}</span>.
+                {changedEmailCount > 0 ? ` Zmieniono ${changedEmailCount} adresów.` : ' Wprowadź poprawki w tabeli poniżej.'}
+              </p>
+            </div>
+            <Button onClick={handleRetryEditedRows} disabled={!canRetryEditedRows || retryingImport}>
+              {retryingImport ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-1 h-4 w-4" />}
+              Dopisz wszystkie poprawione
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <IssueTable
         title="Wiersze do poprawy"
         description="Te rekordy nie zostały zaimportowane z powodu brakujących lub nieprawidłowych danych."
-        issues={invalidIssues}
+        issues={editableInvalidIssues}
         headers={issueHeaders}
-        badgeLabel={`${invalidIssues.length} wierszy`}
+        badgeLabel={`${editableInvalidIssues.length} wierszy`}
+        editableEmailColumn={emailColumn}
+        emailErrors={emailErrors}
+        onEmailChange={handleEmailChange}
+        onSaveIssue={handleSaveIssue}
+        savingRowNumbers={savingRowNumbers}
+        saveDisabled={connectionState !== 'online'}
       />
 
       <IssueTable
