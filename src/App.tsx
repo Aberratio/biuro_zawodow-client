@@ -21,6 +21,7 @@ import Participants from "./pages/Participants";
 import ParticipantDetails from "./pages/ParticipantDetails";
 import Scanner from "./pages/Scanner";
 import CsvImport from "./pages/CsvImport";
+import CsvImportSummary from "./pages/CsvImportSummary";
 import EmailSending from "./pages/EmailSending";
 import Organizations from "./pages/Organizations";
 import OrganizationDetails from "./pages/OrganizationDetails";
@@ -214,6 +215,14 @@ function ProtectedAppRoutes() {
             element={
               <EventAccessRoute>
                 <CsvImport />
+              </EventAccessRoute>
+            }
+          />
+          <Route
+            path="/events/:id/import/summary"
+            element={
+              <EventAccessRoute>
+                <CsvImportSummary />
               </EventAccessRoute>
             }
           />

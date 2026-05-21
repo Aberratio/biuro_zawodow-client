@@ -4,6 +4,7 @@ import {
   Html5QrcodeScannerState,
   Html5QrcodeSupportedFormats,
   type Html5QrcodeCameraScanConfig,
+  type Html5QrcodeFullConfig,
 } from 'html5-qrcode';
 import { Camera, CameraOff, Loader2 } from 'lucide-react';
 
@@ -18,20 +19,64 @@ const SCANNER_REGION_ID = 'qr-scanner-region';
 const START_RECOVERY_DELAY_MS = 700;
 const START_TIMEOUT_MS = 6500;
 const SCAN_LOCK_RELEASE_DELAY_MS = 250;
-
-const scannerConfig = {
-  formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-  verbose: false,
-};
-
-const baseScanConfig: Html5QrcodeCameraScanConfig = {
-  fps: 10,
-  disableFlip: true,
-  qrbox: computeQrBox,
-};
+const TARGET_CAMERA_ASPECT_RATIO = 4 / 3;
 
 function isRearCameraLabel(label: string) {
   return /back|rear|environment/i.test(label);
+}
+
+function isAppleMobileBrowser() {
+  if (typeof navigator === 'undefined') {
+    return false;
+  }
+
+  return /iPad|iPhone|iPod/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function canUseNativeBarcodeDetector() {
+  return typeof window !== 'undefined'
+    && !isAppleMobileBrowser()
+    && 'BarcodeDetector' in window;
+}
+
+function createScannerConfig(): Html5QrcodeFullConfig {
+  return {
+    formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+    useBarCodeDetectorIfSupported: canUseNativeBarcodeDetector(),
+    verbose: false,
+  };
+}
+
+function createBaseScanConfig(): Html5QrcodeCameraScanConfig {
+  const isAppleMobile = isAppleMobileBrowser();
+  const useNativeDetector = canUseNativeBarcodeDetector();
+
+  return {
+    fps: isAppleMobile ? 8 : useNativeDetector ? 18 : 10,
+    aspectRatio: TARGET_CAMERA_ASPECT_RATIO,
+    disableFlip: !isAppleMobile,
+    ...(isAppleMobile ? {} : { qrbox: computeQrBox }),
+  };
+}
+
+function createPreferredVideoConstraints(): MediaTrackConstraints {
+  const isAppleMobile = isAppleMobileBrowser();
+  const useNativeDetector = canUseNativeBarcodeDetector();
+
+  return {
+    facingMode: 'environment',
+    width: { ideal: useNativeDetector ? 960 : 1280 },
+    height: { ideal: useNativeDetector ? 720 : 960 },
+    aspectRatio: { ideal: TARGET_CAMERA_ASPECT_RATIO },
+    frameRate: isAppleMobile ? { ideal: 10, max: 24 } : { ideal: useNativeDetector ? 30 : 15, max: 30 },
+    advanced: [
+      {
+        focusMode: 'continuous',
+        exposureMode: 'continuous',
+      } as MediaTrackConstraintSet,
+    ],
+  };
 }
 
 function computeQrBox(viewfinderWidth: number, viewfinderHeight: number) {
@@ -148,6 +193,9 @@ export default function QrScannerView({ onScan, paused }: QrScannerViewProps) {
     setCameraState('requesting');
 
     const startScanner = async () => {
+      const baseScanConfig = createBaseScanConfig();
+      const currentScannerConfig = createScannerConfig();
+
       const onScanSuccess = (decodedText: string) => {
         if (!mounted || scanInProgressRef.current) {
           return;
@@ -165,26 +213,21 @@ export default function QrScannerView({ onScan, paused }: QrScannerViewProps) {
 
       const startAttempts: Array<() => Promise<void>> = [
         async () => {
-          const scanner = new Html5Qrcode(SCANNER_REGION_ID, scannerConfig);
+          const scanner = new Html5Qrcode(SCANNER_REGION_ID, currentScannerConfig);
           scannerRef.current = scanner;
           await startWithVideoRecovery(
             scanner,
             { facingMode: 'environment' },
             {
               ...baseScanConfig,
-              videoConstraints: {
-                facingMode: 'environment',
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                frameRate: { ideal: 15, max: 30 },
-              },
+              videoConstraints: createPreferredVideoConstraints(),
             },
             onScanSuccess,
             scannerContainer,
           );
         },
         async () => {
-          const scanner = new Html5Qrcode(SCANNER_REGION_ID, scannerConfig);
+          const scanner = new Html5Qrcode(SCANNER_REGION_ID, currentScannerConfig);
           scannerRef.current = scanner;
           await startWithVideoRecovery(
             scanner,
@@ -205,7 +248,7 @@ export default function QrScannerView({ onScan, paused }: QrScannerViewProps) {
             ? baseScanConfig
             : { ...baseScanConfig, disableFlip: false };
 
-          const scanner = new Html5Qrcode(SCANNER_REGION_ID, scannerConfig);
+          const scanner = new Html5Qrcode(SCANNER_REGION_ID, currentScannerConfig);
           scannerRef.current = scanner;
           await startWithVideoRecovery(
             scanner,

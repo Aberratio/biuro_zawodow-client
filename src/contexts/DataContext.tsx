@@ -17,7 +17,8 @@ interface ParticipantImportListDifference { columns_differ: boolean; missing_col
 interface ParticipantImportAnalysis { headers: string[]; sample_rows: Record<string, string>[]; email_candidates: { column: string; matched_count: number }[]; has_mapping: boolean; has_baseline_import: boolean; mappings: ParticipantFieldMapping[]; missing_required_columns: string[]; row_count: number; existing_participant_count: number; sent_qr_email_count: number; list_difference: ParticipantImportListDifference; }
 interface ParticipantImportMappingFieldInput { source_column_name: string; alias: string; field_role: 'display_name_part' | 'bib_number' | 'custom' | 'important_custom'; is_active: boolean; }
 interface ParticipantImportMappingPayload { csv_columns: string[]; email_column: string; fields: ParticipantImportMappingFieldInput[]; }
-interface ParticipantImportRunResult { created_count: number; duplicate_count: number; invalid_count: number; invalid_rows: number[]; participants: Participant[]; }
+interface ParticipantImportRowIssue { row_number: number; reasons: string[]; row: Record<string, string>; matched_by?: string; }
+interface ParticipantImportRunResult { created_count: number; duplicate_count: number; invalid_count: number; invalid_rows: number[]; invalid_row_details: ParticipantImportRowIssue[]; duplicate_row_details: ParticipantImportRowIssue[]; participants: Participant[]; reset?: Record<string, unknown>; }
 interface ParticipantListResetResult extends MutationResult { deleted_participant_count: number; deleted_mapping_count: number; deleted_baseline_record_count: number; deleted_change_log_count: number; qrEmailsSent?: boolean; sent_qr_email_count?: number; }
 interface ParticipantFieldMappingsState { has_mapping: boolean; has_baseline_import: boolean; mappings: ParticipantFieldMapping[]; }
 interface ParticipantUpdateOptions { allowOfflineQueue?: boolean; }
@@ -110,6 +111,22 @@ function normalizeScanParticipantErrorMessage(error: unknown): string {
   }
 
   return error instanceof Error ? error.message : 'Nie udało się odczytać uczestnika.';
+}
+
+function mapParticipantImportRowIssues(value: unknown): ParticipantImportRowIssue[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+    .map(entry => ({
+      row_number: Number(entry.row_number ?? 0),
+      reasons: Array.isArray(entry.reasons) ? entry.reasons.map(reason => String(reason)) : [],
+      row: entry.row && typeof entry.row === 'object'
+        ? Object.fromEntries(Object.entries(entry.row as Record<string, unknown>).map(([key, cell]) => [key, String(cell ?? '')]))
+        : {},
+      matched_by: typeof entry.matched_by === 'string' ? entry.matched_by : undefined,
+    }))
+    .filter(entry => entry.row_number > 0);
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -565,7 +582,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const runParticipantImport = useCallback(async (eventId: string, csvContent: string) => {
     const payload = (await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/events/${eventId}/participant-imports/run`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ csv_content: csvContent }) }))).payload as { data?: Record<string, unknown> };
     const data = payload.data ?? {}; const createdParticipants = Array.isArray(data.participants) ? data.participants.map((participant: ApiParticipant) => mapApiParticipantToUi(participant, eventId)) : []; setParticipantRecords(previous => [...previous, ...createdParticipants]); if (createdParticipants.length > 0) addLog(`Import CSV (${createdParticipants.length} uczestników)`);
-    return { created_count: Number(data.created_count ?? 0), duplicate_count: Number(data.duplicate_count ?? 0), invalid_count: Number(data.invalid_count ?? 0), invalid_rows: Array.isArray(data.invalid_rows) ? data.invalid_rows.map((row: number) => Number(row)) : [], participants: createdParticipants };
+    return {
+      created_count: Number(data.created_count ?? 0),
+      duplicate_count: Number(data.duplicate_count ?? 0),
+      invalid_count: Number(data.invalid_count ?? 0),
+      invalid_rows: Array.isArray(data.invalid_rows) ? data.invalid_rows.map((row: number) => Number(row)) : [],
+      invalid_row_details: mapParticipantImportRowIssues(data.invalid_row_details),
+      duplicate_row_details: mapParticipantImportRowIssues(data.duplicate_row_details),
+      participants: createdParticipants,
+    };
   }, [addLog, applyOnlineOnly, getAuthHeaders]);
   const replaceParticipantImport = useCallback(async (eventId: string, csvContent: string, mapping: ParticipantImportMappingPayload, confirmQrSent = false) => {
     const payload = (await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/events/${eventId}/participant-imports/replace`, {
@@ -582,7 +607,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     participantFieldMappingsFailureUntilRef.current.delete(eventId);
     addLog(`Podmieniono listę uczestników z CSV (${importedParticipants.length} uczestników)`);
     await loadBootstrap(true);
-    return { created_count: Number(data.created_count ?? 0), duplicate_count: Number(data.duplicate_count ?? 0), invalid_count: Number(data.invalid_count ?? 0), invalid_rows: Array.isArray(data.invalid_rows) ? data.invalid_rows.map((row: number) => Number(row)) : [], participants: importedParticipants };
+    return {
+      created_count: Number(data.created_count ?? 0),
+      duplicate_count: Number(data.duplicate_count ?? 0),
+      invalid_count: Number(data.invalid_count ?? 0),
+      invalid_rows: Array.isArray(data.invalid_rows) ? data.invalid_rows.map((row: number) => Number(row)) : [],
+      invalid_row_details: mapParticipantImportRowIssues(data.invalid_row_details),
+      duplicate_row_details: mapParticipantImportRowIssues(data.duplicate_row_details),
+      participants: importedParticipants,
+      reset: data.reset && typeof data.reset === 'object' ? data.reset as Record<string, unknown> : undefined,
+    };
   }, [addLog, applyOnlineOnly, getAuthHeaders, loadBootstrap]);
   const resetEventParticipantList = useCallback(async (eventId: string, confirmQrSent = false): Promise<ParticipantListResetResult> => {
     try {
