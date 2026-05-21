@@ -108,6 +108,20 @@ function buildEditFormFromEvent(event: {
   };
 }
 
+function formatDateTimePickerValue(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+}
+
+function getDefaultReopenCloseAt(now: Date): string {
+  const closeAt = new Date(now);
+  closeAt.setHours(closeAt.getHours() + 1);
+  closeAt.setSeconds(0, 0);
+
+  return formatDateTimePickerValue(closeAt);
+}
+
 function getOfficeStatusSummary(
   eventOffice: { office_open_at: string; office_close_at: string },
   now: Date,
@@ -508,6 +522,7 @@ export default function EventDetails() {
   const canArchiveEvent = canManageEventLifecycle && isFinishedEvent;
   const canDeleteEvent = canManageEventLifecycle;
   const canDeleteEventNow = canDeleteEvent && !isFinishedEvent;
+  const canReopenEvent = canEditEvent && !isArchivedEvent && isFinishedEvent;
   const canSendQrForEvent =
     !isArchivedEvent &&
     isEventCurrentOrUpcoming(event, now);
@@ -530,6 +545,25 @@ export default function EventDetails() {
     setEditForm(buildEditFormFromEvent(event));
   };
 
+  const openReopenOfficeDialog = () => {
+    setEditForm({
+      ...buildEditFormFromEvent(event),
+      office_close_at: getDefaultReopenCloseAt(new Date(nowTimestamp)),
+    });
+    setEditErrors({});
+    setEditOpen(true);
+  };
+
+  const canKeepPastOfficeOpenAt = (officeOpenAt: string) => {
+    const submittedOfficeOpenAt = toLocalDateTimeValue(officeOpenAt);
+    const currentOfficeOpenAt = toLocalDateTimeValue(event.office_open_at);
+
+    return (
+      isEventOfficeOpen(event, new Date(nowTimestamp)) ||
+      submittedOfficeOpenAt === currentOfficeOpenAt
+    );
+  };
+
   const applyEditOfficeValidationErrors = (
     officeOpenAt: string,
     officeCloseAt: string,
@@ -538,7 +572,7 @@ export default function EventDetails() {
       officeOpenAt,
       officeCloseAt,
       {
-        allowPastOpenAt: isEventOfficeOpen(event),
+        allowPastOpenAt: canKeepPastOfficeOpenAt(officeOpenAt),
       },
     );
 
@@ -748,12 +782,8 @@ export default function EventDetails() {
   };
 
   const handleEditSubmit = async () => {
-    const submittedOfficeOpenAt = isFinishedEvent
-      ? toLocalDateTimeValue(event.office_open_at)
-      : toLocalDateTimeValue(editForm.office_open_at);
-    const submittedOfficeCloseAt = isFinishedEvent
-      ? toLocalDateTimeValue(event.office_close_at)
-      : toLocalDateTimeValue(editForm.office_close_at);
+    const submittedOfficeOpenAt = toLocalDateTimeValue(editForm.office_open_at);
+    const submittedOfficeCloseAt = toLocalDateTimeValue(editForm.office_close_at);
     const nextErrors = {
       name: validateRequired(editForm.name, "Podaj nazwę wydarzenia."),
       location: validateRequired(
@@ -780,11 +810,9 @@ export default function EventDetails() {
       return;
     }
 
-    const canKeepPastOfficeOpenAt = isEventOfficeOpen(event);
-
     if (
       !submittedOfficeOpenAt ||
-      (!canKeepPastOfficeOpenAt &&
+      (!canKeepPastOfficeOpenAt(submittedOfficeOpenAt) &&
         !isEventOfficeStartAtOrAfterNow(submittedOfficeOpenAt))
     ) {
       setEditErrors({
@@ -1093,6 +1121,15 @@ export default function EventDetails() {
                 <Pencil className="h-4 w-4" /> Edytuj wydarzenie
               </Button>
             )}
+            {canReopenEvent && (
+              <Button
+                onClick={openReopenOfficeDialog}
+                className="event-detail-primary-action h-12 w-full"
+                disabled={!isOnline}
+              >
+                <Calendar className="h-4 w-4" /> Otwórz biuro ponownie
+              </Button>
+            )}
             {canArchiveEvent && (
               <Button
                 variant="outline"
@@ -1384,7 +1421,9 @@ export default function EventDetails() {
       >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edytuj wydarzenie</DialogTitle>
+            <DialogTitle>
+              {isFinishedEvent ? "Otwórz biuro ponownie" : "Edytuj wydarzenie"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -1471,7 +1510,8 @@ export default function EventDetails() {
               />
               {isFinishedEvent && (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Dat zakończonego wydarzenia nie można już edytować.
+                  Data otwarcia zostaje bez zmian. Aby wznowić pracę biura,
+                  ustaw nowe zamknięcie w przyszłości.
                 </p>
               )}
               <FieldError id="event-edit-office-open-error" className="mt-2">
@@ -1485,7 +1525,6 @@ export default function EventDetails() {
               <DateTimePicker
                 id="event-edit-office-close"
                 value={editForm.office_close_at}
-                disabled={isFinishedEvent}
                 onChange={(value) => {
                   setEditForm((current) => ({
                     ...current,

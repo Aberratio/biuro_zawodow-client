@@ -35,6 +35,19 @@ export function buildEventParticipantPath(
   return `${buildEventParticipantsPath(eventId)}/${encodeRouteParam(participantId)}`;
 }
 
+export function buildEventParticipantDocumentHref(
+  eventId: string,
+  participantId: string,
+): string {
+  const path = buildEventParticipantPath(eventId, participantId);
+
+  if (typeof window !== "undefined" && window.location.hash.startsWith("#/")) {
+    return `${window.location.pathname}${window.location.search}#${path}`;
+  }
+
+  return path;
+}
+
 export function buildEventEmailsPath(eventId: string): string {
   return `${buildEventPath(eventId)}/emails`;
 }

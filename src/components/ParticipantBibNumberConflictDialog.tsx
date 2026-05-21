@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatBibNumber } from "@/lib/participants";
-import { buildEventParticipantPath } from "@/lib/routes";
+import { buildEventParticipantDocumentHref } from "@/lib/routes";
 import type { Participant } from "@/types";
 import { Loader2, Repeat, Trash2 } from "lucide-react";
 
@@ -103,7 +103,7 @@ export function ParticipantBibNumberConflictDialog({
                 </div>
                 <Button variant="outline" asChild className="w-full sm:w-auto">
                   <a
-                    href={buildEventParticipantPath(
+                    href={buildEventParticipantDocumentHref(
                       conflictParticipant.event_id,
                       conflictParticipant.id,
                     )}

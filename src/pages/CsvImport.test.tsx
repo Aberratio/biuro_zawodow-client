@@ -38,6 +38,295 @@ function createCsvFile(content: string, name: string): File {
 }
 
 describe('CsvImport page', () => {
+  it('skips the email selection step when there is only one email candidate', async () => {
+    useDataMock.mockReturnValue({
+      events: [createEvent()],
+      selectedEventId: 'event-1',
+      analyzeParticipantImport: vi.fn(async () => ({
+        headers: ['Email', 'Imie'],
+        sample_rows: [{ Email: 'anna@example.com', Imie: 'Anna' }],
+        email_candidates: [{ column: 'Email', matched_count: 1 }],
+        has_mapping: false,
+        has_baseline_import: false,
+        mappings: [
+          {
+            source_column_name: 'Imie',
+            alias: 'Imię',
+            field_role: 'display_name_part',
+            display_order: 1,
+            is_required: true,
+            is_active: true,
+          },
+        ],
+        missing_required_columns: [],
+        row_count: 1,
+        existing_participant_count: 0,
+        sent_qr_email_count: 0,
+        list_difference: {
+          columns_differ: false,
+          missing_columns: [],
+          extra_columns: [],
+          participant_difference_ratio: 0,
+          should_offer_replacement: false,
+        },
+      })),
+      confirmParticipantImportMapping: vi.fn(),
+      runParticipantImport: vi.fn(),
+      replaceParticipantImport: vi.fn(),
+      isLoading: false,
+      connectionState: 'online',
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={['/events/event-1/import']}>
+        <Routes>
+          <Route path="/events/:id/import" element={<CsvImport />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
+    expect(fileInput).not.toBeNull();
+
+    const file = createCsvFile('Email,Imie\nanna@example.com,Anna', 'uczestnicy.csv');
+    fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
+
+    await screen.findByText('Mapowanie kolumn');
+
+    expect(screen.queryByRole('heading', { name: 'Wybierz kolumnę email' })).not.toBeInTheDocument();
+    expect(await screen.findByText(/Email:/)).toBeInTheDocument();
+  });
+
+  it('shows a compact email selection step when there are multiple email candidates', async () => {
+    useDataMock.mockReturnValue({
+      events: [createEvent()],
+      selectedEventId: 'event-1',
+      analyzeParticipantImport: vi.fn(async () => ({
+        headers: ['Email', 'Email opiekuna', 'Imie'],
+        sample_rows: [{ Email: 'anna@example.com', 'Email opiekuna': 'opiekun@example.com', Imie: 'Anna' }],
+        email_candidates: [
+          { column: 'Email', matched_count: 1 },
+          { column: 'Email opiekuna', matched_count: 1 },
+        ],
+        has_mapping: false,
+        has_baseline_import: false,
+        mappings: [
+          {
+            source_column_name: 'Imie',
+            alias: 'Imię',
+            field_role: 'display_name_part',
+            display_order: 1,
+            is_required: true,
+            is_active: true,
+          },
+        ],
+        missing_required_columns: [],
+        row_count: 1,
+        existing_participant_count: 0,
+        sent_qr_email_count: 0,
+        list_difference: {
+          columns_differ: false,
+          missing_columns: [],
+          extra_columns: [],
+          participant_difference_ratio: 0,
+          should_offer_replacement: false,
+        },
+      })),
+      confirmParticipantImportMapping: vi.fn(),
+      runParticipantImport: vi.fn(),
+      replaceParticipantImport: vi.fn(),
+      isLoading: false,
+      connectionState: 'online',
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={['/events/event-1/import']}>
+        <Routes>
+          <Route path="/events/:id/import" element={<CsvImport />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
+    expect(fileInput).not.toBeNull();
+
+    const file = createCsvFile('Email,Email opiekuna,Imie\nanna@example.com,opiekun@example.com,Anna', 'uczestnicy.csv');
+    fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
+
+    await screen.findByRole('heading', { name: 'Wybierz kolumnę email' });
+
+    expect(screen.getByText('2 kandydatów')).toBeInTheDocument();
+    expect(screen.getByLabelText('Kolumna email')).toBeInTheDocument();
+    expect(screen.queryByText('Jak wybrać kolumnę email')).not.toBeInTheDocument();
+  });
+
+  it('automatically maps a likely bib number column as bib_number', async () => {
+    const confirmParticipantImportMapping = vi.fn(async () => []);
+    const runParticipantImport = vi.fn(async () => ({
+      created_count: 1,
+      duplicate_count: 0,
+      invalid_count: 0,
+      invalid_rows: [],
+      participants: [],
+    }));
+
+    useDataMock.mockReturnValue({
+      events: [createEvent()],
+      selectedEventId: 'event-1',
+      analyzeParticipantImport: vi.fn(async () => ({
+        headers: ['Email', 'Imie', 'Numer startowy'],
+        sample_rows: [{ Email: 'anna@example.com', Imie: 'Anna', 'Numer startowy': '101' }],
+        email_candidates: [{ column: 'Email', matched_count: 1 }],
+        has_mapping: false,
+        has_baseline_import: false,
+        mappings: [
+          {
+            source_column_name: 'Imie',
+            alias: 'Imię',
+            field_role: 'display_name_part',
+            display_order: 1,
+            is_required: true,
+            is_active: true,
+          },
+        ],
+        missing_required_columns: [],
+        row_count: 1,
+        existing_participant_count: 0,
+        sent_qr_email_count: 0,
+        list_difference: {
+          columns_differ: false,
+          missing_columns: [],
+          extra_columns: [],
+          participant_difference_ratio: 0,
+          should_offer_replacement: false,
+        },
+      })),
+      confirmParticipantImportMapping,
+      runParticipantImport,
+      replaceParticipantImport: vi.fn(),
+      isLoading: false,
+      connectionState: 'online',
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={['/events/event-1/import']}>
+        <Routes>
+          <Route path="/events/:id/import" element={<CsvImport />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
+    expect(fileInput).not.toBeNull();
+
+    const file = createCsvFile('Email,Imie,Numer startowy\nanna@example.com,Anna,101', 'uczestnicy.csv');
+    fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
+
+    await screen.findByText('Mapowanie kolumn');
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz mapowanie i importuj' }));
+
+    await waitFor(() => {
+      expect(confirmParticipantImportMapping).toHaveBeenCalledWith('event-1', expect.objectContaining({
+        fields: expect.arrayContaining([
+          expect.objectContaining({
+            source_column_name: 'Numer startowy',
+            field_role: 'bib_number',
+          }),
+        ]),
+      }));
+    });
+  });
+
+  it('asks for confirmation before importing when a likely bib number column is not mapped', async () => {
+    const confirmParticipantImportMapping = vi.fn(async () => []);
+    const runParticipantImport = vi.fn(async () => ({
+      created_count: 1,
+      duplicate_count: 0,
+      invalid_count: 0,
+      invalid_rows: [],
+      participants: [],
+    }));
+
+    useDataMock.mockReturnValue({
+      events: [createEvent()],
+      selectedEventId: 'event-1',
+      analyzeParticipantImport: vi.fn(async () => ({
+        headers: ['Email', 'Imie', 'Numer startowy'],
+        sample_rows: [{ Email: 'anna@example.com', Imie: 'Anna', 'Numer startowy': '101' }],
+        email_candidates: [{ column: 'Email', matched_count: 1 }],
+        has_mapping: false,
+        has_baseline_import: false,
+        mappings: [
+          {
+            source_column_name: 'Imie',
+            alias: 'Imię',
+            field_role: 'display_name_part',
+            display_order: 1,
+            is_required: true,
+            is_active: true,
+          },
+          {
+            source_column_name: 'Numer startowy',
+            alias: 'Numer startowy',
+            field_role: 'custom',
+            display_order: 2,
+            is_required: false,
+            is_active: true,
+          },
+        ],
+        missing_required_columns: [],
+        row_count: 1,
+        existing_participant_count: 0,
+        sent_qr_email_count: 0,
+        list_difference: {
+          columns_differ: false,
+          missing_columns: [],
+          extra_columns: [],
+          participant_difference_ratio: 0,
+          should_offer_replacement: false,
+        },
+      })),
+      confirmParticipantImportMapping,
+      runParticipantImport,
+      replaceParticipantImport: vi.fn(),
+      isLoading: false,
+      connectionState: 'online',
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={['/events/event-1/import']}>
+        <Routes>
+          <Route path="/events/:id/import" element={<CsvImport />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
+    expect(fileInput).not.toBeNull();
+
+    const file = createCsvFile('Email,Imie,Numer startowy\nanna@example.com,Anna,101', 'uczestnicy.csv');
+    fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
+
+    await screen.findByText('Mapowanie kolumn');
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz mapowanie i importuj' }));
+
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('Pominąć numer startowy?');
+    expect(confirmParticipantImportMapping).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pomiń numer i importuj' }));
+
+    await waitFor(() => {
+      expect(confirmParticipantImportMapping).toHaveBeenCalledWith('event-1', expect.objectContaining({
+        fields: expect.arrayContaining([
+          expect.objectContaining({
+            source_column_name: 'Numer startowy',
+            field_role: 'custom',
+          }),
+        ]),
+      }));
+    });
+  });
+
   it('allows mapping a column as important data and sends the new role in the payload', async () => {
     const confirmParticipantImportMapping = vi.fn(async () => []);
     const runParticipantImport = vi.fn(async () => ({
