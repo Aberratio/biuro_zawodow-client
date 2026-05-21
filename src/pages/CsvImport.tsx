@@ -16,7 +16,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { SuccessActionDialog } from '@/components/SuccessActionDialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldError } from '@/components/ui/field-error';
@@ -30,7 +29,7 @@ import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { formatEventOfficeWindow } from '@/lib/events';
 import { validateRequired } from '@/lib/form-validation';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
-import { buildEventPath } from '@/lib/routes';
+import { buildEventImportSummaryPath, buildEventPath } from '@/lib/routes';
 import { PageHeader } from '@/components/PageHeader';
 
 type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom' | 'important_custom';
@@ -161,7 +160,6 @@ export default function CsvImport() {
   const [mappingDrafts, setMappingDrafts] = useState<MappingDraft[]>([]);
   const [runningAction, setRunningAction] = useState<'analyze' | 'confirm' | 'run' | 'replace' | ''>('');
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof runParticipantImport>> | null>(null);
-  const [importSuccessOpen, setImportSuccessOpen] = useState(false);
   const [replacementPromptOpen, setReplacementPromptOpen] = useState(false);
   const [replacementMode, setReplacementMode] = useState(false);
   const [mappingErrors, setMappingErrors] = useState<{ emailColumn?: string; aliases: Record<string, string>; form?: string }>({ aliases: {} });
@@ -424,6 +422,21 @@ export default function CsvImport() {
     };
   };
 
+  const navigateToImportSummary = (
+    result: Awaited<ReturnType<typeof runParticipantImport>>,
+    mode: 'append' | 'replace',
+  ) => {
+    navigate(buildEventImportSummaryPath(eventId), {
+      state: {
+        summary: result,
+        headers: analysis?.headers ?? [],
+        fileName,
+        importedAt: new Date().toISOString(),
+        mode,
+      },
+    });
+  };
+
   const handleSaveMappingAndImport = async () => {
     if (!analysis) return;
     if (!selectedEmailColumn) {
@@ -456,7 +469,7 @@ export default function CsvImport() {
         setRunningAction('replace');
         const result = await replaceParticipantImport(eventId, csvContent, mappingPayload, (analysis.sent_qr_email_count ?? 0) > 0);
         setSummary(result);
-        setImportSuccessOpen(true);
+        navigateToImportSummary(result, 'replace');
         toast({ title: `Podmieniono listę i dodano ${result.created_count} uczestników` });
         return;
       }
@@ -467,7 +480,7 @@ export default function CsvImport() {
       setRunningAction('run');
       const result = await runParticipantImport(eventId, csvContent);
       setSummary(result);
-      setImportSuccessOpen(true);
+      navigateToImportSummary(result, 'append');
       toast({ title: `Dodano ${result.created_count} uczestników` });
     } catch (error) {
       setMappingErrors({
@@ -489,7 +502,7 @@ export default function CsvImport() {
       setRunningAction('run');
       const result = await runParticipantImport(eventId, csvContent);
       setSummary(result);
-      setImportSuccessOpen(true);
+      navigateToImportSummary(result, 'append');
       toast({ title: `Dodano ${result.created_count} uczestników` });
     } catch (error) {
       toast({
@@ -504,10 +517,6 @@ export default function CsvImport() {
 
   if (isLoading) return <TableSkeleton rows={5} cols={4} subtitle="" />;
   if (!event) return <div className="py-12 text-center text-muted-foreground">Nie znaleziono wydarzenia</div>;
-
-  const importSuccessDescription = summary
-    ? `Import uczestników zakończył się pomyślnie. Dodano ${summary.created_count} uczestników, pominięto ${summary.duplicate_count} duplikatów, a ${summary.invalid_count} wierszy oznaczono jako nieprawidłowe.`
-    : '';
 
   const participantDifferencePercent = Math.round(((analysis?.list_difference?.participant_difference_ratio ?? 0) * 100));
   const hasSentQrEmails = (analysis?.sent_qr_email_count ?? 0) > 0;
@@ -959,20 +968,6 @@ export default function CsvImport() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <SuccessActionDialog
-        open={importSuccessOpen}
-        onOpenChange={setImportSuccessOpen}
-        title="Import CSV zakończony pomyślnie"
-        description={importSuccessDescription}
-        primaryLabel="Przejdź do wydarzenia"
-        secondaryLabel="Zostań na tej stronie"
-        onPrimaryAction={() => {
-          setImportSuccessOpen(false);
-          navigate(buildEventPath(eventId));
-        }}
-        onSecondaryAction={() => setImportSuccessOpen(false)}
-      />
     </div>
   );
 }

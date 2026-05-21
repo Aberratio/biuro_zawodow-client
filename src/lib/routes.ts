@@ -20,6 +20,10 @@ export function buildEventImportPath(eventId: string): string {
   return `${buildEventPath(eventId)}/import`;
 }
 
+export function buildEventImportSummaryPath(eventId: string): string {
+  return `${buildEventImportPath(eventId)}/summary`;
+}
+
 export function buildEventParticipantsPath(eventId: string): string {
   return `${buildEventPath(eventId)}/participants`;
 }
