@@ -30,6 +30,7 @@ import { validateRequired } from '@/lib/form-validation';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 import { buildEventImportSummaryPath, buildEventPath } from '@/lib/routes';
 import { PageHeader } from '@/components/PageHeader';
+import { formatParticipantCount } from '@/lib/participants';
 
 type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom' | 'important_custom';
 
@@ -47,41 +48,6 @@ interface MappingPreviewField {
 }
 
 const IMPORTANT_FIELDS_WARNING_LIMIT = 5;
-
-function normalizeColumnNameForMatching(columnName: string): string {
-  return columnName
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-function isLikelyBibNumberColumn(columnName: string): boolean {
-  const normalized = normalizeColumnNameForMatching(columnName);
-  if (!normalized) return false;
-
-  const blockedTerms = ['email', 'mail', 'telefon', 'phone', 'tel', 'prefix', 'platnosc', 'kwota', 'rabat', 'id user'];
-  if (blockedTerms.some(term => normalized.includes(term))) return false;
-
-  return [
-    'numer',
-    'nr',
-    'numer startowy',
-    'nr startowy',
-    'startowy',
-    'numer zawodnika',
-    'nr zawodnika',
-    'bib',
-    'bib number',
-    'race number',
-    'start number',
-  ].includes(normalized);
-}
-
-function findLikelyBibNumberColumn(headers: string[], emailColumn: string): string | null {
-  return headers.find(header => header !== emailColumn && isLikelyBibNumberColumn(header)) ?? null;
-}
 
 function getSampleCellValue(sampleRow: Record<string, string> | undefined, columnName: string): string {
   return sampleRow?.[columnName]?.trim() || 'Brak danych w podglądzie';
@@ -120,6 +86,10 @@ function getPreviewRoleBadgeClassName(role: MappingPreviewField['role']): string
     default:
       return 'border-border/60 bg-background/70 text-muted-foreground';
   }
+}
+
+function formatAddedParticipantsToast(count: number): string {
+  return count === 0 ? 'nie dodano żadnych uczestników' : `dodano ${formatParticipantCount(count)}`;
 }
 
 function getMappingFieldCardClassName(fieldRole: EditableFieldRole): string {
@@ -196,8 +166,6 @@ export default function CsvImport() {
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof runParticipantImport>> | null>(null);
   const [replacementPromptOpen, setReplacementPromptOpen] = useState(false);
   const [replacementMode, setReplacementMode] = useState(false);
-  const [skippedBibNumberPromptOpen, setSkippedBibNumberPromptOpen] = useState(false);
-  const [skippedBibNumberPromptMode, setSkippedBibNumberPromptMode] = useState<'save' | 'run'>('save');
   const [mappingErrors, setMappingErrors] = useState<{ emailColumn?: string; aliases: Record<string, string>; form?: string }>({ aliases: {} });
   const isOnline = connectionState === 'online';
 
@@ -214,7 +182,6 @@ export default function CsvImport() {
       ? savedEmailMapping.source_column_name
       : '';
     const autoEmailColumn = savedEmailColumn || (analysis.email_candidates.length === 1 ? analysis.email_candidates[0].column : selectedEmailColumn);
-    const likelyBibNumberColumn = findLikelyBibNumberColumn(analysis.headers, autoEmailColumn);
     setSelectedEmailColumn(autoEmailColumn);
     setMappingDrafts(
       analysis.headers
@@ -224,7 +191,7 @@ export default function CsvImport() {
           return {
             source_column_name: header,
             alias: savedMapping?.alias ?? header,
-            field_role: (savedMapping?.field_role as EditableFieldRole | undefined) ?? (header === likelyBibNumberColumn ? 'bib_number' : 'custom'),
+            field_role: (savedMapping?.field_role as EditableFieldRole | undefined) ?? 'custom',
           };
         }),
     );
@@ -242,11 +209,7 @@ export default function CsvImport() {
   const mappedBibNumberColumn = isEditingMapping
     ? bibNumberColumn
     : (analysis?.mappings.find(mapping => mapping.field_role === 'bib_number')?.source_column_name ?? null);
-  const likelyBibNumberColumn = useMemo(
-    () => analysis ? findLikelyBibNumberColumn(analysis.headers, selectedEmailColumn) : null,
-    [analysis, selectedEmailColumn],
-  );
-  const skippedLikelyBibNumberColumn = likelyBibNumberColumn && !mappedBibNumberColumn ? likelyBibNumberColumn : null;
+  const shouldShowMissingBibNumberNotice = Boolean(analysis && !shouldWaitForEmailSelection && !mappedBibNumberColumn);
 
   const activeDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role !== 'ignore'), [mappingDrafts]);
   const highlightedDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role === 'important_custom'), [mappingDrafts]);
@@ -488,7 +451,7 @@ export default function CsvImport() {
     });
   };
 
-  const handleSaveMappingAndImport = async (options?: { confirmedSkippedBibNumber?: boolean }) => {
+  const handleSaveMappingAndImport = async () => {
     if (!analysis) return;
     if (!selectedEmailColumn) {
       setMappingErrors(prev => ({ ...prev, emailColumn: 'Wybierz kolumnę email.' }));
@@ -510,12 +473,6 @@ export default function CsvImport() {
       toast({ title: 'Uzupełnij aliasy aktywnych kolumn', variant: 'destructive' });
       return;
     }
-    if (!options?.confirmedSkippedBibNumber && skippedLikelyBibNumberColumn) {
-      setSkippedBibNumberPromptMode('save');
-      setSkippedBibNumberPromptOpen(true);
-      return;
-    }
-
     try {
       setMappingErrors({ aliases: {} });
       const mappingPayload = buildMappingPayload();
@@ -526,7 +483,7 @@ export default function CsvImport() {
         const result = await replaceParticipantImport(eventId, csvContent, mappingPayload, (analysis.sent_qr_email_count ?? 0) > 0);
         setSummary(result);
         navigateToImportSummary(result, 'replace');
-        toast({ title: `Podmieniono listę i dodano ${result.created_count} uczestników` });
+        toast({ title: `Podmieniono listę i ${formatAddedParticipantsToast(result.created_count)}` });
         return;
       }
 
@@ -537,7 +494,7 @@ export default function CsvImport() {
       const result = await runParticipantImport(eventId, csvContent);
       setSummary(result);
       navigateToImportSummary(result, 'append');
-      toast({ title: `Dodano ${result.created_count} uczestników` });
+      toast({ title: result.created_count === 0 ? 'Nie dodano żadnych uczestników' : `Dodano ${formatParticipantCount(result.created_count)}` });
     } catch (error) {
       setMappingErrors({
         aliases: {},
@@ -553,19 +510,13 @@ export default function CsvImport() {
     }
   };
 
-  const handleRunExistingImport = async (options?: { confirmedSkippedBibNumber?: boolean }) => {
-    if (!options?.confirmedSkippedBibNumber && skippedLikelyBibNumberColumn) {
-      setSkippedBibNumberPromptMode('run');
-      setSkippedBibNumberPromptOpen(true);
-      return;
-    }
-
+  const handleRunExistingImport = async () => {
     try {
       setRunningAction('run');
       const result = await runParticipantImport(eventId, csvContent);
       setSummary(result);
       navigateToImportSummary(result, 'append');
-      toast({ title: `Dodano ${result.created_count} uczestników` });
+      toast({ title: result.created_count === 0 ? 'Nie dodano żadnych uczestników' : `Dodano ${formatParticipantCount(result.created_count)}` });
     } catch (error) {
       toast({
         title: 'Import nie powiódł się',
@@ -971,19 +922,31 @@ export default function CsvImport() {
           )}
 
           {!shouldWaitForEmailSelection && (
-            <div className="flex flex-wrap gap-3">
-              {isEditingMapping && (
-                <Button onClick={() => handleSaveMappingAndImport()} disabled={runningAction === 'confirm' || runningAction === 'run' || runningAction === 'replace' || !isOnline}>
-                  {(runningAction === 'confirm' || runningAction === 'run' || runningAction === 'replace') ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}
-                  {replacementMode ? 'Usuń starą listę i importuj nową' : 'Zapisz mapowanie i importuj'}
-                </Button>
+            <div className="space-y-3">
+              {shouldShowMissingBibNumberNotice && (
+                <Alert className="border-amber-400/50 bg-amber-500/10">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Nie wybrano pola „Numer startowy”</AlertTitle>
+                  <AlertDescription>
+                    Jeśli w pliku jest kolumna z numerem startowym, uczestnicy zostaną zaimportowani z pustym numerem startowym.
+                    Numer będzie można nadać później, ale ręcznie dla każdego uczestnika osobno.
+                  </AlertDescription>
+                </Alert>
               )}
-              {analysis.has_mapping && !replacementMode && (
-                <Button onClick={() => handleRunExistingImport()} disabled={!canRunWithSavedMapping || runningAction === 'run' || !isOnline}>
-                  {runningAction === 'run' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
-                  Importuj z zapisanym mapowaniem
-                </Button>
-              )}
+              <div className="flex flex-wrap gap-3">
+                {isEditingMapping && (
+                  <Button onClick={() => handleSaveMappingAndImport()} disabled={runningAction === 'confirm' || runningAction === 'run' || runningAction === 'replace' || !isOnline}>
+                    {(runningAction === 'confirm' || runningAction === 'run' || runningAction === 'replace') ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}
+                    {replacementMode ? 'Usuń starą listę i importuj nową' : 'Zapisz mapowanie i importuj'}
+                  </Button>
+                )}
+                {analysis.has_mapping && !replacementMode && (
+                  <Button onClick={() => handleRunExistingImport()} disabled={!canRunWithSavedMapping || runningAction === 'run' || !isOnline}>
+                    {runningAction === 'run' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-1 h-4 w-4" />}
+                    Importuj z zapisanym mapowaniem
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 
@@ -1040,36 +1003,6 @@ export default function CsvImport() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={skippedBibNumberPromptOpen} onOpenChange={setSkippedBibNumberPromptOpen}>
-        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Pominąć numer startowy?</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <span className="block">
-                Kolumna „{skippedLikelyBibNumberColumn ?? 'Numer startowy'}” wygląda jak numer startowy, ale nie jest zmapowana jako systemowe pole numeru startowego.
-              </span>
-              <span className="block">
-                Jeśli ją pominiesz, zaimportowani uczestnicy będą mieli pusty numer startowy i trzeba będzie uzupełnić go później.
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Wróć do mapowania</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setSkippedBibNumberPromptOpen(false);
-                if (skippedBibNumberPromptMode === 'run') {
-                  void handleRunExistingImport({ confirmedSkippedBibNumber: true });
-                  return;
-                }
-                void handleSaveMappingAndImport({ confirmedSkippedBibNumber: true });
-              }}
-            >
-              Pomiń numer i importuj
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
