@@ -32,6 +32,7 @@ function TestConsumer() {
     setSelectedEventId,
     canAccessEvent,
     canViewEvent,
+    createEvent,
   } = useData();
 
   return (
@@ -53,6 +54,20 @@ function TestConsumer() {
       </button>
       <button type="button" onClick={() => selectEventContext('event-2')}>
         sync-event-2
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void createEvent({
+            name: 'Event event-2',
+            location: 'Warsaw',
+            organization_id: 'org-1',
+            office_open_at: '2099-04-12T07:00:00',
+            office_close_at: '2099-04-12T15:00:00',
+          });
+        }}
+      >
+        create-event-2
       </button>
     </div>
   );
@@ -109,6 +124,18 @@ function createBootstrapResponse(user: User, events: Event[], organizations: Org
         activityLog: [],
       },
     }),
+  };
+}
+
+function createJsonResponse(payload: unknown, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: {
+      get: (name: string) => name.toLowerCase() === 'content-type' ? 'application/json' : null,
+    },
+    json: async () => payload,
+    text: async () => JSON.stringify(payload),
   };
 }
 
@@ -222,6 +249,68 @@ describe('DataProvider bootstrap loading', () => {
     expect(window.sessionStorage.getItem('selected_event_context:admin-1')).toBe('event-2');
     expect(window.localStorage.getItem('selected_event_context:admin-1')).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps locally created events when an older background bootstrap finishes later', async () => {
+    const adminUser: User = {
+      id: 'admin-1',
+      name: 'Admin',
+      email: 'admin@example.com',
+      password: '',
+      role: 'superadmin',
+      assigned_events: [],
+    };
+
+    authState.user = adminUser;
+
+    let resolveStaleBootstrap: (response: ReturnType<typeof createBootstrapResponse>) => void = () => undefined;
+    const staleBootstrapResponse = new Promise<ReturnType<typeof createBootstrapResponse>>(resolve => {
+      resolveStaleBootstrap = resolve;
+    });
+    let bootstrapCalls = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/bootstrap')) {
+        bootstrapCalls += 1;
+        if (bootstrapCalls === 1) {
+          return createBootstrapResponse(adminUser, [createEvent('event-1')]);
+        }
+
+        return staleBootstrapResponse;
+      }
+
+      if (url.endsWith('/events') && options?.method === 'POST') {
+        return createJsonResponse({ data: createEvent('event-2') }, 201);
+      }
+
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <TestConsumer />
+      </DataProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('visible-events-count').textContent).toBe('1'));
+
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    fireEvent.click(screen.getByRole('button', { name: 'create-event-2' }));
+    await waitFor(() => expect(screen.getByTestId('visible-events-count').textContent).toBe('2'));
+
+    await act(async () => {
+      resolveStaleBootstrap(createBootstrapResponse(adminUser, [createEvent('event-1')]));
+      await staleBootstrapResponse;
+    });
+    await flushEffects();
+
+    expect(screen.getByTestId('visible-events-count').textContent).toBe('2');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('keeps the scanner selected event after a page reload while bootstrap is loading', async () => {

@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { buildEventImportPath, buildEventPath } from '@/lib/routes';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { toast } from '@/hooks/use-toast';
+import { formatParticipantCount } from '@/lib/participants';
 
 interface ImportRowIssue {
   row_number: number;
@@ -96,6 +97,22 @@ function resolveEmailColumn(explicitColumn: string | undefined, headers: string[
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function buildImportSuccessDescription(createdCount: number, mode: ImportSummaryState['mode']): string {
+  const createdSentence = createdCount === 0
+    ? 'Nie dodano żadnych uczestników.'
+    : `Dodano ${formatParticipantCount(createdCount)}.`;
+
+  if (mode === 'replace') {
+    return `${createdSentence} Poprzednia lista została podmieniona.`;
+  }
+
+  if (createdCount === 0) {
+    return `${createdSentence} Lista wydarzenia nie została uzupełniona nowymi rekordami.`;
+  }
+
+  return `${createdSentence} ${createdCount === 1 ? 'Nowy uczestnik został dopisany do wydarzenia.' : 'Nowi uczestnicy zostali dopisani do wydarzenia.'}`;
 }
 
 function StatCard({ label, value, tone = 'default' }: { label: string; value: number; tone?: 'default' | 'success' | 'warning' | 'danger' }) {
@@ -483,7 +500,7 @@ export default function CsvImportSummary() {
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>Import zakończony</AlertTitle>
           <AlertDescription>
-            Dodano {currentCreatedCount} uczestników. {state.mode === 'replace' ? 'Poprzednia lista została podmieniona.' : 'Nowi uczestnicy zostali dopisani do wydarzenia.'}
+            {buildImportSuccessDescription(currentCreatedCount, state.mode)}
           </AlertDescription>
         </Alert>
         {unimportedCount > 0 ? (

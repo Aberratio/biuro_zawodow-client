@@ -465,7 +465,7 @@ export default function Scanner() {
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {formatParticipantFieldLabel(field.label)}
               </p>
-              <p className={`mt-2 break-words text-base font-semibold leading-snug ${field.value ? 'text-foreground' : 'text-muted-foreground'}`}>
+              <p className={`mt-2 break-words text-base font-semibold leading-snug [overflow-wrap:anywhere] ${field.value ? 'text-foreground' : 'text-muted-foreground'}`}>
                 {field.value || 'Brak danych'}
               </p>
             </div>
@@ -524,11 +524,13 @@ export default function Scanner() {
 
     return (
       <div className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-emerald-600 animate-in fade-in duration-200" onClick={resetToIdle}>
-        <div className="max-w-md space-y-4 px-6 text-center text-white">
+        <div className="w-full max-w-[min(28rem,100vw)] space-y-4 px-4 text-center text-white sm:px-6">
           <CheckCircle className="mx-auto h-16 w-16 sm:h-20 sm:w-20" strokeWidth={2.5} />
-          <p className="font-heading text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">{status.shortLabel.toUpperCase()}</p>
-          <p className="break-words text-xl font-bold sm:text-2xl md:text-3xl">{scannedParticipant.name}</p>
-          <p className="font-mono text-4xl font-black tabular-nums sm:text-5xl md:text-7xl">{formatBibNumber(scannedParticipant.bib_number)}</p>
+          <p className="mx-auto max-w-full break-words font-heading text-[clamp(1.5rem,9vw,3.75rem)] font-black leading-tight tracking-tight [overflow-wrap:anywhere]">{status.shortLabel.toUpperCase()}</p>
+          <p className="break-words text-xl font-bold leading-tight [overflow-wrap:anywhere] sm:text-2xl md:text-3xl">{scannedParticipant.name}</p>
+          <p className={`break-words font-black leading-tight [overflow-wrap:anywhere] ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'font-heading text-2xl sm:text-3xl md:text-4xl' : 'font-mono text-4xl tabular-nums sm:text-5xl md:text-7xl'}`}>
+            {formatBibNumber(scannedParticipant.bib_number)}
+          </p>
           {scannedParticipant.status === 'checked_in_not_starting' && (
             <p className="mt-4 text-base opacity-80">Pakiet odebrany, uczestnik nie wystartuje</p>
           )}
@@ -591,10 +593,10 @@ export default function Scanner() {
             <CardHeader className="space-y-4 border-b border-border/70 bg-background/25 p-4 sm:p-6">
               <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.34fr)] lg:items-center">
                 <div className="min-w-0">
-                  <CardTitle className="break-words text-2xl leading-tight sm:text-3xl lg:text-4xl">{scannedParticipant.name}</CardTitle>
-                  <p className="mt-2 break-all text-base font-medium text-muted-foreground sm:text-lg">{scannedParticipant.email}</p>
+                  <CardTitle className="break-words text-2xl leading-tight [overflow-wrap:anywhere] sm:text-3xl lg:text-4xl">{scannedParticipant.name}</CardTitle>
+                  <p className="mt-2 break-all text-base font-medium leading-snug text-muted-foreground [overflow-wrap:anywhere] sm:text-lg">{scannedParticipant.email}</p>
                 </div>
-                <span className={`rounded-2xl border border-primary/30 bg-primary/10 px-5 py-4 text-left font-mono text-4xl font-black leading-none tabular-nums sm:text-5xl lg:text-right ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'text-muted-foreground' : 'text-primary'}`}>
+                <span className={`min-w-0 max-w-full whitespace-normal break-words rounded-2xl border border-primary/30 bg-primary/10 px-5 py-4 text-left font-black leading-tight [overflow-wrap:anywhere] lg:text-right ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'font-heading text-2xl text-muted-foreground sm:text-3xl' : 'font-mono text-4xl tabular-nums text-primary sm:text-5xl'}`}>
                   {isScannerBibNumberMissing(scannedParticipant.bib_number)
                     ? 'Do uzupełnienia'
                     : formatBibNumber(scannedParticipant.bib_number)}
@@ -634,7 +636,7 @@ export default function Scanner() {
                         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                           {formatParticipantFieldLabel(field.label)}
                         </p>
-                        <p className={`mt-2 break-words text-lg font-bold leading-snug ${field.value ? 'text-foreground' : 'text-muted-foreground'}`}>
+                        <p className={`mt-2 break-words text-lg font-bold leading-snug [overflow-wrap:anywhere] ${field.value ? 'text-foreground' : 'text-muted-foreground'}`}>
                           {field.value || 'Brak danych'}
                         </p>
                       </div>
@@ -674,7 +676,7 @@ export default function Scanner() {
                             </Button>
                           </div>
                         ) : (
-                          <p className={`text-lg font-bold ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'text-muted-foreground' : 'text-foreground'}`}>
+                          <p className={`break-words text-lg font-bold leading-snug [overflow-wrap:anywhere] ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'text-muted-foreground' : 'text-foreground'}`}>
                             {isScannerBibNumberMissing(scannedParticipant.bib_number)
                               ? 'Do uzupełnienia'
                               : formatBibNumber(scannedParticipant.bib_number)}
@@ -693,7 +695,7 @@ export default function Scanner() {
                   <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                     <div className="rounded-xl border bg-background/90 px-4 py-3 shadow-sm">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Numer startowy</p>
-                      <p className={`mt-2 break-words text-xl font-black tabular-nums ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'text-muted-foreground' : 'text-foreground'}`}>
+                      <p className={`mt-2 break-words text-xl font-black leading-snug tabular-nums [overflow-wrap:anywhere] ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'text-muted-foreground' : 'text-foreground'}`}>
                         {isScannerBibNumberMissing(scannedParticipant.bib_number)
                           ? 'Do uzupełnienia'
                           : formatBibNumber(scannedParticipant.bib_number)}
@@ -701,20 +703,20 @@ export default function Scanner() {
                     </div>
                     <div className="rounded-xl border bg-background/90 px-4 py-3 shadow-sm">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Status</p>
-                      <p className="mt-2 text-lg font-bold text-foreground">{getParticipantStatusDefinition(scannedParticipant.status).label}</p>
+                      <p className="mt-2 break-words text-lg font-bold leading-snug text-foreground [overflow-wrap:anywhere]">{getParticipantStatusDefinition(scannedParticipant.status).label}</p>
                     </div>
                     <div className="rounded-xl border bg-background/90 px-4 py-3 shadow-sm sm:col-span-2 xl:col-span-1">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ostatnia odprawa</p>
-                      <p className="mt-2 break-words text-lg font-bold text-foreground">{formatScannerDateTime(scannedParticipant.checked_in_at)}</p>
+                      <p className="mt-2 break-words text-lg font-bold leading-snug text-foreground [overflow-wrap:anywhere]">{formatScannerDateTime(scannedParticipant.checked_in_at)}</p>
                     </div>
                     {scannedParticipant.sync_state && scannedParticipant.sync_state !== 'synced' && (
                       <div className="rounded-xl border bg-background/90 px-4 py-3 shadow-sm sm:col-span-2 xl:col-span-1">
                         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Synchronizacja</p>
-                        <p className="mt-2 text-lg font-bold text-foreground">
+                        <p className="mt-2 break-words text-lg font-bold leading-snug text-foreground [overflow-wrap:anywhere]">
                           {scannedParticipant.sync_state === 'pending_sync' ? 'Oczekuje na synchronizacje' : 'Wymaga weryfikacji'}
                         </p>
                         {scannedParticipant.sync_error && (
-                          <p className="mt-1 break-words text-xs text-muted-foreground">{scannedParticipant.sync_error}</p>
+                          <p className="mt-1 break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">{scannedParticipant.sync_error}</p>
                         )}
                       </div>
                     )}
@@ -725,7 +727,7 @@ export default function Scanner() {
               <div className="grid gap-3 rounded-2xl border bg-muted/20 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-4">
                 {scannedParticipant.status !== 'checked_in' && (
                   <Button
-                    className="scanner-check-in-action min-h-24 w-full flex-col whitespace-normal rounded-xl px-4 py-5 font-heading text-lg font-black uppercase tracking-normal sm:col-span-2 xl:col-span-4 [&_svg]:!size-8"
+                    className="scanner-check-in-action min-h-20 w-full flex-col whitespace-normal rounded-xl px-3 py-4 font-heading text-base font-black uppercase leading-tight tracking-normal sm:col-span-2 sm:min-h-24 sm:px-4 sm:py-5 sm:text-lg xl:col-span-4 [&_svg]:!size-7 sm:[&_svg]:!size-8"
                     onClick={() => void mutateStatus('checked_in', 'Uczestnik odprawiony')}
                     disabled={isMutating || isReadOnly}
                   >
@@ -744,7 +746,7 @@ export default function Scanner() {
                   </Button>
                 )}
                 {scannedParticipant.status !== 'checked_in_not_starting' && (
-                  <Button variant="outline" className="h-12 w-full" onClick={() => void mutateStatus('checked_in_not_starting', 'Uczestnik oznaczony jako bez startu')} disabled={isMutating || isReadOnly}>
+                  <Button variant="outline" className="h-auto min-h-12 w-full whitespace-normal text-center leading-snug" onClick={() => void mutateStatus('checked_in_not_starting', 'Uczestnik oznaczony jako bez startu')} disabled={isMutating || isReadOnly}>
                     {isMutating ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <UserX2 className="mr-1 h-4 w-4" />}
                     Oznacz jako bez startu
                   </Button>

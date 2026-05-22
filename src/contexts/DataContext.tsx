@@ -153,6 +153,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const participantFieldMappingsStateCacheRef = useRef(new Map<string, { fetchedAt: number; state: ParticipantFieldMappingsState }>());
   const participantFieldMappingsStateInFlightRef = useRef(new Map<string, Promise<ParticipantFieldMappingsState>>());
   const participantFieldMappingsFailureUntilRef = useRef(new Map<string, number>());
+  const localDataRevisionRef = useRef(0);
 
   const participants = useMemo(() => applyPendingMutations(participantRecords, pendingMutations), [participantRecords, pendingMutations]);
   const currentUser = useMemo(() => !authUser ? getDefaultCurrentUser() : users.find(user => user.id === authUser.id) || authUser, [users, authUser]);
@@ -245,6 +246,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const ensureOnline = useCallback((message = OFFLINE_ACTION_MESSAGE) => connectionState === 'online' ? null : message, [connectionState]);
+  const markLocalDataChanged = useCallback(() => { localDataRevisionRef.current += 1; }, []);
   const handleNetworkFailure = useCallback((error: unknown, options?: { immediate?: boolean }) => {
     if (!isNetworkRequestError(error)) return;
     networkFailureCountRef.current += 1;
@@ -311,11 +313,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [authUser?.id, hydrateData, setDegradedState]);
 
   const loadBootstrap = useCallback(async (silent = false) => {
+    const requestRevision = localDataRevisionRef.current;
     if (!silent) setIsLoading(true);
     if (!authUser || !token) { resetState(); setIsLoading(false); return; }
     try {
       const { payload } = await fetchJson(`${API_BASE_URL}/bootstrap`, { headers: getAuthHeaders() });
       const response = payload as BootstrapResponse;
+      if (requestRevision !== localDataRevisionRef.current) {
+        markConnectionHealthy();
+        return;
+      }
       const generatedAt = response.generated_at ?? new Date().toISOString();
       const snapshotVersion = response.snapshot_version ?? createBootstrapSnapshotVersion(response.data);
       hydrateData(response.data, 'network', generatedAt);
@@ -323,6 +330,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       await saveBootstrapSnapshot(buildOfflineSnapshot({ userId: authUser.id, selectedOrganizationId: readStoredSelectedOrganizationId(authUser.id), selectedEventId: readStoredSelectedEventId(authUser.id), organizations: Array.isArray(response.data.organizations) ? response.data.organizations.map(mapApiOrganizationToUi) : [], events: Array.isArray(response.data.events) ? response.data.events : [], archivedEvents: Array.isArray(response.data.archivedEvents) ? response.data.archivedEvents : [], users: (response.data.users ?? []).map(mapApiUserToUi), participants: (response.data.participants ?? []).map(participant => mapApiParticipantToUi(participant, '')), activityLog: Array.isArray(response.data.activityLog) ? response.data.activityLog : [], generatedAt, snapshotVersion }));
       await updateSyncMeta(authUser.id, generatedAt, null);
     } catch (error) {
+      if (requestRevision !== localDataRevisionRef.current) return;
       if (isApiResponseError(error) && error.status === 401) {
         clearSession();
         resetState();
@@ -758,53 +766,53 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (organization && organizationEventCount >= organization.event_limit) return { ok: false, error: 'Limit wydarzeń dla tej organizacji został osiągnięty' };
     const payload = (await fetchJson(`${API_BASE_URL}/events`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(eventData) })).payload as { data?: ApiEvent };
     if (!payload.data) return { ok: false, error: 'API zwróciło pustą odpowiedź podczas tworzenia wydarzenia' };
-    setEvents(previous => [...previous, payload.data]); addLog(`Utworzono wydarzenie: ${payload.data.name}`); return { ok: true, entityId: payload.data.id };
-  }), [addLog, archivedEvents, ensureOnline, events, getAuthHeaders, organizations, runMutation]);
+    markLocalDataChanged(); setEvents(previous => [...previous, payload.data]); addLog(`Utworzono wydarzenie: ${payload.data.name}`); return { ok: true, entityId: payload.data.id };
+  }), [addLog, archivedEvents, ensureOnline, events, getAuthHeaders, markLocalDataChanged, organizations, runMutation]);
 
   const updateEvent = useCallback(async (eventId: string, data: EventMutationInput) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const payload = (await fetchJson(`${API_BASE_URL}/events/${eventId}`, { method: 'PATCH', headers: getAuthHeaders(true), body: JSON.stringify(data) })).payload as { data?: ApiEvent };
     if (!payload.data) return { ok: false, error: 'API zwróciło pustą odpowiedź podczas aktualizacji wydarzenia' };
-    setEvents(previous => previous.map(event => event.id === eventId ? payload.data! : event)); addLog(`Zaktualizowano wydarzenie: ${payload.data.name}`); return { ok: true };
-  }), [addLog, ensureOnline, getAuthHeaders, runMutation]);
+    markLocalDataChanged(); setEvents(previous => previous.map(event => event.id === eventId ? payload.data! : event)); addLog(`Zaktualizowano wydarzenie: ${payload.data.name}`); return { ok: true };
+  }), [addLog, ensureOnline, getAuthHeaders, markLocalDataChanged, runMutation]);
 
   const archiveEvent = useCallback(async (eventId: string) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const existingEvent = events.find(event => event.id === eventId);
     const eventOfficeCloseAt = existingEvent ? getEventOfficeCloseAt(existingEvent) : null;
     if (eventOfficeCloseAt === null || Date.now() <= eventOfficeCloseAt.getTime()) return { ok: false, error: 'Do archiwum można przenieść tylko zakończone wydarzenia' };
-    await fetchJson(`${API_BASE_URL}/events/${eventId}/archive`, { method: 'POST', headers: getAuthHeaders() }); setEvents(previous => previous.filter(event => event.id !== eventId)); if (existingEvent) setArchivedEvents(previous => [{ ...existingEvent, archived_at: new Date().toISOString() }, ...previous]); if (selectedEventId === eventId) setSelectedEventId(''); if (existingEvent) addLog(`Zarchiwizowano wydarzenie: ${existingEvent.name}`); await loadBootstrap(true); return { ok: true };
-  }), [addLog, ensureOnline, events, getAuthHeaders, loadBootstrap, runMutation, selectedEventId, setSelectedEventId]);
+    await fetchJson(`${API_BASE_URL}/events/${eventId}/archive`, { method: 'POST', headers: getAuthHeaders() }); markLocalDataChanged(); setEvents(previous => previous.filter(event => event.id !== eventId)); if (existingEvent) setArchivedEvents(previous => [{ ...existingEvent, archived_at: new Date().toISOString() }, ...previous]); if (selectedEventId === eventId) setSelectedEventId(''); if (existingEvent) addLog(`Zarchiwizowano wydarzenie: ${existingEvent.name}`); await loadBootstrap(true); return { ok: true };
+  }), [addLog, ensureOnline, events, getAuthHeaders, loadBootstrap, markLocalDataChanged, runMutation, selectedEventId, setSelectedEventId]);
 
   const deleteEvent = useCallback(async (eventId: string) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const existingEvent = events.find(event => event.id === eventId);
     const eventOfficeCloseAt = existingEvent ? getEventOfficeCloseAt(existingEvent) : null;
     if (eventOfficeCloseAt !== null && Date.now() > eventOfficeCloseAt.getTime()) return { ok: false, error: 'Zakończone wydarzenia trzeba przenieść do archiwum zamiast usuwać' };
-    await fetchJson(`${API_BASE_URL}/events/${eventId}/delete-ui`, { method: 'POST', headers: getAuthHeaders() }); setEvents(previous => previous.filter(event => event.id !== eventId)); if (selectedEventId === eventId) setSelectedEventId(''); if (existingEvent) addLog(`Usunięto wydarzenie: ${existingEvent.name}`); await loadBootstrap(true); return { ok: true };
-  }), [addLog, ensureOnline, events, getAuthHeaders, loadBootstrap, runMutation, selectedEventId, setSelectedEventId]);
+    await fetchJson(`${API_BASE_URL}/events/${eventId}/delete-ui`, { method: 'POST', headers: getAuthHeaders() }); markLocalDataChanged(); setEvents(previous => previous.filter(event => event.id !== eventId)); if (selectedEventId === eventId) setSelectedEventId(''); if (existingEvent) addLog(`Usunięto wydarzenie: ${existingEvent.name}`); await loadBootstrap(true); return { ok: true };
+  }), [addLog, ensureOnline, events, getAuthHeaders, loadBootstrap, markLocalDataChanged, runMutation, selectedEventId, setSelectedEventId]);
 
   const addUser = useCallback(async (userData: UserCreateInput) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const payload = (await fetchJson(`${API_BASE_URL}/users`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ name: userData.name, email: userData.email, role: userData.role, organization_id: userData.organization_id, assigned_events: userData.assigned_events }) })).payload as { data?: ApiUser };
     if (!payload.data) return { ok: false, error: 'API user create returned empty payload' };
-    const createdUser = mapApiUserToUi(payload.data); setUsers(previous => [...previous, createdUser]); addLog(`Dodano użytkownika: ${createdUser.name}`); return { ok: true };
-  }), [addLog, ensureOnline, getAuthHeaders, runMutation]);
+    markLocalDataChanged(); const createdUser = mapApiUserToUi(payload.data); setUsers(previous => [...previous, createdUser]); addLog(`Dodano użytkownika: ${createdUser.name}`); return { ok: true };
+  }), [addLog, ensureOnline, getAuthHeaders, markLocalDataChanged, runMutation]);
 
   const updateUser = useCallback(async (userId: string, data: UserUpdateInput) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const payload = (await fetchJson(`${API_BASE_URL}/users/${userId}`, { method: 'PATCH', headers: getAuthHeaders(true), body: JSON.stringify(data) })).payload as { data?: ApiUser };
     if (!payload.data) return { ok: false, error: 'API user update returned empty payload' };
-    const updatedUser = mapApiUserToUi(payload.data); setUsers(previous => previous.map(user => user.id === userId ? updatedUser : user)); syncStoredAuthUser(user => user.id === userId ? updatedUser : user); return { ok: true };
-  }), [ensureOnline, getAuthHeaders, runMutation, syncStoredAuthUser]);
+    markLocalDataChanged(); const updatedUser = mapApiUserToUi(payload.data); setUsers(previous => previous.map(user => user.id === userId ? updatedUser : user)); syncStoredAuthUser(user => user.id === userId ? updatedUser : user); return { ok: true };
+  }), [ensureOnline, getAuthHeaders, markLocalDataChanged, runMutation, syncStoredAuthUser]);
 
   const createOrganization = useCallback(async (data: { name: string; event_limit: number }) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const payload = (await fetchJson(`${API_BASE_URL}/organizations`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(data) })).payload as { data?: ApiOrganization };
     if (!payload.data) return { ok: false, error: 'API organization create returned empty payload' };
     const createdOrganization = mapApiOrganizationToUi(payload.data);
-    setOrganizations(previous => [...previous, createdOrganization]); return { ok: true, entityId: createdOrganization.id };
-  }), [ensureOnline, getAuthHeaders, runMutation]);
+    markLocalDataChanged(); setOrganizations(previous => [...previous, createdOrganization]); return { ok: true, entityId: createdOrganization.id };
+  }), [ensureOnline, getAuthHeaders, markLocalDataChanged, runMutation]);
 
   const updateOrganization = useCallback(async (organizationId: string, data: OrganizationUpdateInput) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
@@ -832,8 +840,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const payload = (await fetchJson(`${API_BASE_URL}/users/${userId}/event-assignments`, { method: 'PATCH', headers: getAuthHeaders(true), body: JSON.stringify({ assigned_events: eventIds }) })).payload as { data?: ApiUser };
     if (!payload.data) return { ok: false, error: 'API scanner assignment returned empty payload' };
-    const updatedUser = mapApiUserToUi(payload.data); setUsers(previous => previous.map(user => user.id === userId ? updatedUser : user)); syncStoredAuthUser(user => user.id === userId ? updatedUser : user); return { ok: true };
-  }), [ensureOnline, getAuthHeaders, runMutation, syncStoredAuthUser]);
+    markLocalDataChanged(); const updatedUser = mapApiUserToUi(payload.data); setUsers(previous => previous.map(user => user.id === userId ? updatedUser : user)); syncStoredAuthUser(user => user.id === userId ? updatedUser : user); return { ok: true };
+  }), [ensureOnline, getAuthHeaders, markLocalDataChanged, runMutation, syncStoredAuthUser]);
 
   const removeUser = useCallback(async (id: string) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
