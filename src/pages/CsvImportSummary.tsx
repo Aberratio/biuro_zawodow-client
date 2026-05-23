@@ -33,18 +33,32 @@ interface ImportSummaryState {
     reset?: Record<string, unknown>;
   };
   headers?: string[];
+  sourceRows?: Record<string, string>[];
   emailColumn?: string;
   fileName?: string;
   importedAt?: string;
   mode?: 'append' | 'replace';
 }
 
-function getIssueRows(details: ImportRowIssue[] | undefined, rowNumbers: number[] | undefined): ImportRowIssue[] {
-  if (details && details.length > 0) return details;
+function getSourceRow(sourceRows: Record<string, string>[] | undefined, rowNumber: number): Record<string, string> {
+  return sourceRows?.[rowNumber - 2] ?? {};
+}
+
+function getIssueRows(
+  details: ImportRowIssue[] | undefined,
+  rowNumbers: number[] | undefined,
+  sourceRows?: Record<string, string>[],
+): ImportRowIssue[] {
+  if (details && details.length > 0) {
+    return details.map(issue => ({
+      ...issue,
+      row: Object.keys(issue.row ?? {}).length > 0 ? issue.row : getSourceRow(sourceRows, issue.row_number),
+    }));
+  }
   return (rowNumbers ?? []).map(rowNumber => ({
     row_number: rowNumber,
     reasons: ['Wiersz nie spełnił wymagań importu.'],
-    row: {},
+    row: getSourceRow(sourceRows, rowNumber),
   }));
 }
 
@@ -263,12 +277,12 @@ export default function CsvImportSummary() {
   useRouteEventContext(routeEventId);
 
   const invalidIssues = useMemo(
-    () => getIssueRows(summary?.invalid_row_details, summary?.invalid_rows),
-    [summary?.invalid_row_details, summary?.invalid_rows],
+    () => getIssueRows(summary?.invalid_row_details, summary?.invalid_rows, state.sourceRows),
+    [state.sourceRows, summary?.invalid_row_details, summary?.invalid_rows],
   );
   const duplicateIssues = useMemo(
-    () => getIssueRows(summary?.duplicate_row_details, []),
-    [summary?.duplicate_row_details],
+    () => getIssueRows(summary?.duplicate_row_details, [], state.sourceRows),
+    [state.sourceRows, summary?.duplicate_row_details],
   );
   const issueHeaders = useMemo(
     () => collectHeaders(state.headers, [...invalidIssues, ...duplicateIssues]),
@@ -466,6 +480,9 @@ export default function CsvImportSummary() {
         </Button>
         <PageHeader
           title="Podsumowanie importu CSV"
+          className="sm:flex-col lg:flex-row"
+          headingClassName="break-words"
+          actionsClassName="w-full sm:flex-row lg:w-auto"
           description={
             <>
               <p>Wydarzenie: <span className="font-medium text-foreground">{event.name}</span></p>
@@ -475,11 +492,19 @@ export default function CsvImportSummary() {
           actions={
             editableInvalidIssues.length > 0 ? (
               <>
-                <Button onClick={handleRetryEditedRows} disabled={!canRetryEditedRows || retryingImport}>
+                <Button
+                  onClick={handleRetryEditedRows}
+                  disabled={!canRetryEditedRows || retryingImport}
+                  className="w-full justify-center sm:w-auto"
+                >
                   {retryingImport ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-1 h-4 w-4" />}
                   Dopisz poprawione do bazy
                 </Button>
-                <Button variant="outline" onClick={() => downloadCsv(`do-poprawy-${eventId}.csv`, invalidHeaders, editableInvalidIssues)}>
+                <Button
+                  variant="outline"
+                  onClick={() => downloadCsv(`do-poprawy-${eventId}.csv`, invalidHeaders, editableInvalidIssues)}
+                  className="w-full justify-center sm:w-auto"
+                >
                   <Download className="mr-1 h-4 w-4" /> Pobierz CSV do poprawy
                 </Button>
               </>

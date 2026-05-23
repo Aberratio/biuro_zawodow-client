@@ -25,7 +25,7 @@ function createEvent(): Event {
   };
 }
 
-function renderSummary(createdCount: number, mode: 'append' | 'replace' = 'append') {
+function renderSummaryState(state: Record<string, unknown>) {
   useDataMock.mockReturnValue({
     events: [createEvent()],
     selectedEventId: 'event-1',
@@ -38,18 +38,7 @@ function renderSummary(createdCount: number, mode: 'append' | 'replace' = 'appen
     <MemoryRouter
       initialEntries={[{
         pathname: '/events/event-1/import/summary',
-        state: {
-          summary: {
-            created_count: createdCount,
-            duplicate_count: 0,
-            invalid_count: 0,
-            invalid_rows: [],
-          },
-          headers: ['Email'],
-          emailColumn: 'Email',
-          fileName: 'uczestnicy.csv',
-          mode,
-        },
+        state,
       }]}
     >
       <Routes>
@@ -57,6 +46,21 @@ function renderSummary(createdCount: number, mode: 'append' | 'replace' = 'appen
       </Routes>
     </MemoryRouter>,
   );
+}
+
+function renderSummary(createdCount: number, mode: 'append' | 'replace' = 'append') {
+  renderSummaryState({
+    summary: {
+      created_count: createdCount,
+      duplicate_count: 0,
+      invalid_count: 0,
+      invalid_rows: [],
+    },
+    headers: ['Email'],
+    emailColumn: 'Email',
+    fileName: 'uczestnicy.csv',
+    mode,
+  });
 }
 
 describe('CsvImportSummary page', () => {
@@ -77,5 +81,24 @@ describe('CsvImportSummary page', () => {
     renderSummary(3);
 
     expect(screen.getByText('Dodano 3 uczestników. Nowi uczestnicy zostali dopisani do wydarzenia.')).toBeInTheDocument();
+  });
+  it('shows source CSV row values for invalid rows when API returns only row numbers', () => {
+    renderSummaryState({
+      summary: {
+        created_count: 0,
+        duplicate_count: 0,
+        invalid_count: 1,
+        invalid_rows: [2],
+      },
+      headers: ['Email', 'Imie', 'Klub'],
+      sourceRows: [{ Email: 'bad-email', Imie: 'Jan', Klub: 'ABC' }],
+      emailColumn: 'Email',
+      fileName: 'uczestnicy.csv',
+      mode: 'append',
+    });
+
+    expect(screen.getByDisplayValue('bad-email')).toBeInTheDocument();
+    expect(screen.getByText('Jan')).toBeInTheDocument();
+    expect(screen.getByText('ABC')).toBeInTheDocument();
   });
 });

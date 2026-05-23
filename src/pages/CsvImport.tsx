@@ -140,6 +140,66 @@ function decodeCsvFile(buffer: ArrayBuffer): string {
   return new TextDecoder().decode(buffer);
 }
 
+function parseCsvLine(line: string, delimiter: string): string[] {
+  const cells: string[] = [];
+  let current = '';
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const nextChar = line[index + 1];
+
+    if (char === '"') {
+      if (quoted && nextChar === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+      continue;
+    }
+
+    if (char === delimiter && !quoted) {
+      cells.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  cells.push(current);
+  return cells;
+}
+
+function detectCsvDelimiter(lines: string[]): string {
+  const candidates = [';', ',', '\t'];
+  const sampleLines = lines.slice(0, 10);
+
+  return candidates
+    .map(delimiter => ({
+      delimiter,
+      score: sampleLines.reduce((sum, line) => sum + Math.max(0, parseCsvLine(line, delimiter).length - 1), 0),
+    }))
+    .sort((left, right) => right.score - left.score)[0]?.delimiter ?? ';';
+}
+
+function parseCsvRows(csvContent: string, headers: string[]): Record<string, string>[] {
+  const lines = csvContent
+    .replace(/^\uFEFF/, '')
+    .split(/\r\n|\n|\r/)
+    .filter(line => line.trim() !== '');
+
+  if (lines.length < 2 || headers.length === 0) return [];
+
+  const delimiter = detectCsvDelimiter(lines);
+
+  return lines.slice(1).map(line => {
+    const values = parseCsvLine(line, delimiter);
+    return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? '']));
+  });
+}
+
 export default function CsvImport() {
   const { id: routeEventId = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -443,6 +503,7 @@ export default function CsvImport() {
       state: {
         summary: result,
         headers: analysis?.headers ?? [],
+        sourceRows: analysis ? parseCsvRows(csvContent, analysis.headers) : [],
         emailColumn,
         fileName,
         importedAt: new Date().toISOString(),
