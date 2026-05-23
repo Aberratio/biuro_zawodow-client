@@ -28,10 +28,34 @@ function renderLogin() {
   );
 }
 
+function mockNavigator({
+  maxTouchPoints = 0,
+  platform = "Win32",
+  userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+}: {
+  maxTouchPoints?: number;
+  platform?: string;
+  userAgent?: string;
+} = {}) {
+  Object.defineProperty(window.navigator, "userAgent", {
+    configurable: true,
+    value: userAgent,
+  });
+  Object.defineProperty(window.navigator, "platform", {
+    configurable: true,
+    value: platform,
+  });
+  Object.defineProperty(window.navigator, "maxTouchPoints", {
+    configurable: true,
+    value: maxTouchPoints,
+  });
+}
+
 describe("Login page", () => {
   beforeEach(() => {
     loginMock.mockReset();
     vi.mocked(toast).mockReset();
+    mockNavigator();
   });
 
   it("validates required credentials before calling auth", () => {
@@ -66,5 +90,31 @@ describe("Login page", () => {
       title: expect.stringMatching(/logowania/i),
       variant: "destructive",
     }));
+  });
+
+  it("shows an active install button on iOS and opens Safari instructions on click", async () => {
+    mockNavigator({
+      maxTouchPoints: 5,
+      platform: "iPhone",
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    });
+
+    renderLogin();
+
+    const installButtons = await screen.findAllByRole("button", {
+      name: /Pobierz aplikacj/i,
+    });
+
+    expect(installButtons.length).toBeGreaterThan(0);
+    expect(installButtons[0]).toBeEnabled();
+    expect(screen.queryByText(/Udost/i)).not.toBeInTheDocument();
+
+    fireEvent.click(installButtons[0]);
+
+    expect(
+      await screen.findByRole("dialog", { name: /Instalacja na iPhonie/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Dodaj do ekranu/i)).toBeInTheDocument();
   });
 });
