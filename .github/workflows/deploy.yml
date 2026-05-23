@@ -67,7 +67,7 @@ jobs:
           fi
           echo "Building staging frontend with $API_TARGET API."
           npm ci
-          npm run build
+          npx vite build
 
       - name: Deploy to SeoHost by FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -118,7 +118,7 @@ jobs:
           fi
           echo "Building production frontend with $API_TARGET API."
           npm ci
-          npm run build
+          npx vite build
 
       - name: Package dist
         run: |
