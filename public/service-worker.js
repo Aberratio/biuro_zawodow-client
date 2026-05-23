@@ -1,15 +1,17 @@
 const CACHE_NAME = 'biuro-zawodow-app-shell-v2';
+const APP_SCOPE = self.registration.scope;
+const APP_SHELL_URL = new URL('', APP_SCOPE).toString();
 const APP_SHELL = [
-  '/',
-  '/favicon.ico',
-  '/favicon-16x16.png',
-  '/favicon-32x32.png',
-  '/apple-touch-icon.png',
-  '/android-chrome-192x192.png',
-  '/android-chrome-512x512.png',
-  '/site.webmanifest',
-  '/placeholder.svg',
-];
+  '',
+  'favicon.ico',
+  'favicon-16x16.png',
+  'favicon-32x32.png',
+  'apple-touch-icon.png',
+  'android-chrome-192x192.png',
+  'android-chrome-512x512.png',
+  'site.webmanifest',
+  'placeholder.svg',
+].map(path => new URL(path, APP_SCOPE).toString());
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -53,11 +55,11 @@ self.addEventListener('fetch', event => {
       fetch(request)
         .then(response => {
           const responseClone = response.clone();
-          void caches.open(CACHE_NAME).then(cache => cache.put('/', responseClone));
+          void caches.open(CACHE_NAME).then(cache => cache.put(APP_SHELL_URL, responseClone));
           return response;
         })
         .catch(async () => {
-          const cached = await caches.match('/');
+          const cached = await caches.match(APP_SHELL_URL);
           return cached ?? Response.error();
         })
     );

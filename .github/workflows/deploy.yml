@@ -1,0 +1,192 @@
+name: Deploy frontend
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: "Gdzie wdrożyć frontend?"
+        required: true
+        default: production
+        type: choice
+        options:
+          - staging
+          - production
+      api_target:
+        description: "Z którego API ma korzystać build?"
+        required: true
+        default: production
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'staging' }}
+  cancel-in-progress: false
+
+env:
+  DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'staging' }}
+  API_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.api_target || 'staging' }}
+
+jobs:
+  deploy-staging:
+    name: Deploy frontend staging FTP
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_target == 'staging')
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Build staging
+        env:
+          STAGING_API_URL: ${{ secrets.STAGING_API_URL }}
+          PRODUCTION_API_URL: ${{ secrets.PRODUCTION_API_URL }}
+          VITE_APP_ENV: staging
+          VITE_DEPLOY_ENV: staging
+        run: |
+          set -Eeuo pipefail
+          if [ "$API_TARGET" = "production" ]; then
+            export VITE_API_URL="$PRODUCTION_API_URL"
+          else
+            export VITE_API_URL="$STAGING_API_URL"
+          fi
+          echo "Building staging frontend with $API_TARGET API."
+          npm ci
+          npm run build
+
+      - name: Deploy to SeoHost by FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          local-dir: ./dist/
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          dangerous-clean-slate: false
+
+      - name: Health check
+        env:
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+        run: |
+          set -Eeuo pipefail
+          curl --fail --show-error --location "$FRONTEND_URL"
+
+  deploy-production:
+    name: Deploy frontend production SSH
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_target == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Build production
+        env:
+          STAGING_API_URL: ${{ secrets.STAGING_API_URL }}
+          PRODUCTION_API_URL: ${{ secrets.PRODUCTION_API_URL }}
+          VITE_APP_ENV: production
+          VITE_DEPLOY_ENV: production
+        run: |
+          set -Eeuo pipefail
+          if [ "$API_TARGET" = "production" ]; then
+            export VITE_API_URL="$PRODUCTION_API_URL"
+          else
+            export VITE_API_URL="$STAGING_API_URL"
+          fi
+          echo "Building production frontend with $API_TARGET API."
+          npm ci
+          npm run build
+
+      - name: Package dist
+        run: |
+          set -Eeuo pipefail
+          cd dist
+          zip -r ../frontend.zip .
+
+      - name: Configure SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload and unpack on Cyber_Folks
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          FRONTEND_REMOTE_DIR: ${{ secrets.FRONTEND_REMOTE_DIR }}
+        run: |
+          set -Eeuo pipefail
+          REMOTE_ZIP="$FRONTEND_REMOTE_DIR/.deploy/frontend-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}.zip"
+          printf -v REMOTE_ENV 'FRONTEND_REMOTE_DIR=%q REMOTE_ZIP=%q' "$FRONTEND_REMOTE_DIR" "$REMOTE_ZIP"
+
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "$REMOTE_ENV bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+
+          if [ -z "$FRONTEND_REMOTE_DIR" ]; then
+            echo "FRONTEND_REMOTE_DIR is required."
+            exit 10
+          fi
+
+          case "$FRONTEND_REMOTE_DIR" in
+            *..*)
+              echo "FRONTEND_REMOTE_DIR cannot contain '..'."
+              exit 11
+              ;;
+          esac
+
+          case "$FRONTEND_REMOTE_DIR" in
+            *public_html|*public_html/) ;;
+            *)
+              echo "FRONTEND_REMOTE_DIR must point to public_html."
+              exit 12
+              ;;
+          esac
+
+          mkdir -p "$FRONTEND_REMOTE_DIR/.deploy"
+          REMOTE
+
+          scp -i ~/.ssh/deploy_key -P "$SSH_PORT" frontend.zip "$SSH_USER@$SSH_HOST:$REMOTE_ZIP"
+
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "$REMOTE_ENV bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          unzip -o -q "$REMOTE_ZIP" -d "$FRONTEND_REMOTE_DIR"
+          rm -f "$REMOTE_ZIP"
+          echo "Frontend unpacked into $FRONTEND_REMOTE_DIR"
+          REMOTE
+
+      - name: Health check
+        env:
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+        run: |
+          set -Eeuo pipefail
+          curl --fail --show-error --location "$FRONTEND_URL"
