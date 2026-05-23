@@ -7,7 +7,6 @@ import {
   Loader2,
   Lock,
   Mail,
-  Share2,
   Smartphone,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,6 +19,14 @@ import { BrandWordmark } from "@/components/BrandWordmark";
 import { toast } from "@/hooks/use-toast";
 import { validateEmail, validateRequired } from "@/lib/form-validation";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type LoginFooterProps = {
   copyrightYears: string;
@@ -78,6 +85,7 @@ function LoginPwaInstallCard() {
     useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isInstallStarting, setIsInstallStarting] = useState(false);
+  const [isIosInstallDialogOpen, setIsIosInstallDialogOpen] = useState(false);
   const [showIosInstructions, setShowIosInstructions] = useState(false);
 
   useEffect(() => {
@@ -114,6 +122,9 @@ function LoginPwaInstallCard() {
 
   const handleInstallClick = async () => {
     if (!installPrompt) {
+      if (showIosInstructions) {
+        setIsIosInstallDialogOpen(true);
+      }
       return;
     }
 
@@ -138,48 +149,75 @@ function LoginPwaInstallCard() {
   }
 
   return (
-    <section
-      className="overflow-hidden rounded-[1.35rem] border border-[hsl(var(--button-highlight)/0.18)] bg-[linear-gradient(135deg,hsl(220_12%_11%/0.92),hsl(220_14%_7%/0.92))] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.05),0_18px_42px_hsl(var(--surface-shadow)/0.22)] backdrop-blur-xl md:rounded-2xl"
-      aria-label="Instalacja aplikacji PWA"
-    >
-      <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between md:p-5">
-        <div className="flex min-w-0 gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[hsl(var(--button-highlight)/0.22)] bg-[hsl(var(--button-highlight)/0.12)] text-[hsl(var(--button-highlight))]">
-            <Smartphone className="h-5 w-5" aria-hidden="true" />
+    <>
+      <section
+        className="overflow-hidden rounded-[1.35rem] border border-[hsl(var(--button-highlight)/0.18)] bg-[linear-gradient(135deg,hsl(220_12%_11%/0.92),hsl(220_14%_7%/0.92))] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.05),0_18px_42px_hsl(var(--surface-shadow)/0.22)] backdrop-blur-xl md:rounded-2xl"
+        aria-label="Instalacja aplikacji PWA"
+      >
+        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between md:p-5">
+          <div className="flex min-w-0 gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[hsl(var(--button-highlight)/0.22)] bg-[hsl(var(--button-highlight)/0.12)] text-[hsl(var(--button-highlight))]">
+              <Smartphone className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold leading-6 tracking-normal text-foreground">
+                Zainstaluj Biuro Zawodów
+              </h2>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold leading-6 tracking-normal text-foreground">
-              Zainstaluj Biuro Zawodów
-            </h2>
-          </div>
-        </div>
 
-        {installPrompt ? (
           <Button
             type="button"
             onClick={handleInstallClick}
             className="h-11 w-full shrink-0 rounded-2xl px-4 text-sm sm:w-auto"
-            disabled={isInstallStarting}
+            disabled={Boolean(installPrompt) && isInstallStarting}
           >
-            {isInstallStarting ? (
+            {installPrompt && isInstallStarting ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
               <Download className="h-4 w-4" aria-hidden="true" />
             )}
-            Pobierz Aplikację
+            Pobierz aplikację
           </Button>
-        ) : (
-          <div className="flex shrink-0 items-start gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm font-medium leading-5 text-foreground/82">
-            <Share2 className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--button-highlight))]" />
-            <span className="min-w-0">
-              {isIosSafari()
-                ? "Udostępnij, potem Dodaj do ekranu początkowego"
-                : "Otwórz w Safari, potem Dodaj do ekranu początkowego"}
-            </span>
-          </div>
-        )}
-      </div>
-    </section>
+        </div>
+      </section>
+
+      <Dialog
+        open={isIosInstallDialogOpen}
+        onOpenChange={setIsIosInstallDialogOpen}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Instalacja na iPhonie</DialogTitle>
+            <DialogDescription>
+              Safari nie pozwala stronie uruchomić instalatora automatycznie.
+              Dodaj aplikację z menu przeglądarki:
+            </DialogDescription>
+          </DialogHeader>
+          <ol className="space-y-3 text-sm leading-6 text-foreground/88">
+            {!isIosSafari() && <li>1. Otwórz tę stronę w Safari.</li>}
+            <li>
+              {isIosSafari() ? "1" : "2"}. Naciśnij ikonę kwadratu ze
+              strzałką.
+            </li>
+            <li>
+              {isIosSafari() ? "2" : "3"}. Wybierz „Dodaj do ekranu
+              początkowego”.
+            </li>
+            <li>{isIosSafari() ? "3" : "4"}. Potwierdź przyciskiem „Dodaj”.</li>
+          </ol>
+          <DialogFooter>
+            <Button
+              type="button"
+              onClick={() => setIsIosInstallDialogOpen(false)}
+              className="w-full sm:w-auto"
+            >
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

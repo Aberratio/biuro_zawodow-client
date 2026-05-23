@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       deploy_target:
-        description: "Gdzie wdrożyć frontend?"
+        description: "Where should the frontend be deployed?"
         required: true
         default: production
         type: choice
@@ -16,7 +16,7 @@ on:
           - staging
           - production
       api_target:
-        description: "Z którego API ma korzystać build?"
+        description: "Which API should the build use?"
         required: true
         default: production
         type: choice
@@ -133,10 +133,37 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           set -Eeuo pipefail
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_PORT" ] || [ -z "$SSH_PRIVATE_KEY" ]; then
+            echo "SSH_HOST, SSH_PORT and SSH_PRIVATE_KEY are required."
+            exit 30
+          fi
+
+          case "$SSH_HOST" in
+            http://*|https://*|*/*)
+              echo "SSH_HOST must be a hostname only, for example h29.seohost.pl."
+              exit 31
+              ;;
+          esac
+
+          case "$SSH_PORT" in
+            ''|*[!0-9]*)
+              echo "SSH_PORT must be a number."
+              exit 32
+              ;;
+          esac
+
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          if ! ssh-keyscan -T 15 -p "$SSH_PORT" -H "$SSH_HOST" > ~/.ssh/known_hosts; then
+            echo "Could not read SSH host key. Check SSH_HOST and SSH_PORT, and verify that SSH is enabled for this hosting account."
+            exit 33
+          fi
+
+          if [ ! -s ~/.ssh/known_hosts ]; then
+            echo "ssh-keyscan returned no host keys. Check SSH_HOST and SSH_PORT."
+            exit 34
+          fi
 
       - name: Upload and unpack on Cyber_Folks
         env:
