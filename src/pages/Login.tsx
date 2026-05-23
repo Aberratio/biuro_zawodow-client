@@ -63,6 +63,16 @@ function isIosDevice() {
   );
 }
 
+function isIosSafari() {
+  const userAgent = window.navigator.userAgent;
+
+  return (
+    isIosDevice() &&
+    /safari/i.test(userAgent) &&
+    !/crios|fxios|edgios|opios|fbav|fban|instagram/i.test(userAgent)
+  );
+}
+
 function LoginPwaInstallCard() {
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -162,7 +172,9 @@ function LoginPwaInstallCard() {
           <div className="flex shrink-0 items-start gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm font-medium leading-5 text-foreground/82">
             <Share2 className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--button-highlight))]" />
             <span className="min-w-0">
-              Udostępnij, potem Dodaj do ekranu początkowego
+              {isIosSafari()
+                ? "Udostępnij, potem Dodaj do ekranu początkowego"
+                : "Otwórz w Safari, potem Dodaj do ekranu początkowego"}
             </span>
           </div>
         )}
