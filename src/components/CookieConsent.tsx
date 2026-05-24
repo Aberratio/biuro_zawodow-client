@@ -36,7 +36,7 @@ export function CookieConsent() {
     );
   const [isBannerVisible, setIsBannerVisible] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
-  const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const mouseflowConfigured = isMouseflowConfigured();
 
   useEffect(() => watchMouseflowSensitiveElements(), []);
@@ -44,12 +44,12 @@ export function CookieConsent() {
   useEffect(() => {
     applyConsent(preferences);
     setIsBannerVisible(preferences === null);
-    setAnalyticsEnabled(Boolean(preferences?.analytics));
+    setAnalyticsEnabled(preferences?.analytics ?? true);
   }, [preferences]);
 
   useEffect(() => {
     const handleOpen = () => {
-      setAnalyticsEnabled(Boolean(getCookieConsentPreferences()?.analytics));
+      setAnalyticsEnabled(getCookieConsentPreferences()?.analytics ?? true);
       setIsPreferencesOpen(true);
       setIsBannerVisible(false);
     };
