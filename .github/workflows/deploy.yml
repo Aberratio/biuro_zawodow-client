@@ -23,6 +23,11 @@ on:
         options:
           - staging
           - production
+      skipTests:
+        description: "Skip frontend tests before build?"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -34,6 +39,7 @@ concurrency:
 env:
   DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'staging' }}
   API_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.api_target || 'staging' }}
+  SKIP_TESTS: ${{ github.event_name == 'workflow_dispatch' && inputs.skipTests || false }}
 
 jobs:
   deploy-staging:
@@ -52,6 +58,13 @@ jobs:
           node-version: "20"
           cache: npm
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run frontend tests
+        if: env.SKIP_TESTS != 'true'
+        run: npm test
+
       - name: Build staging
         env:
           STAGING_API_URL: ${{ secrets.STAGING_API_URL }}
@@ -66,7 +79,6 @@ jobs:
             export VITE_API_URL="$STAGING_API_URL"
           fi
           echo "Building staging frontend with $API_TARGET API."
-          npm ci
           npx vite build
 
       - name: Deploy to SeoHost by FTP
@@ -103,6 +115,13 @@ jobs:
           node-version: "20"
           cache: npm
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run frontend tests
+        if: env.SKIP_TESTS != 'true'
+        run: npm test
+
       - name: Build production
         env:
           STAGING_API_URL: ${{ secrets.STAGING_API_URL }}
@@ -117,7 +136,6 @@ jobs:
             export VITE_API_URL="$STAGING_API_URL"
           fi
           echo "Building production frontend with $API_TARGET API."
-          npm ci
           npx vite build
 
       - name: Package dist
