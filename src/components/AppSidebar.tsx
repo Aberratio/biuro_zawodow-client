@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import {
   Building2,
   CalendarDays,
+  Cookie,
+  FileText,
   FileUp,
   Info,
   LayoutDashboard,
@@ -58,6 +60,7 @@ import {
   buildEventPath,
   buildOrganizationPath,
 } from "@/lib/routes";
+import { openCookiePreferences } from "@/lib/cookie-consent";
 
 const allItems = [
   {
@@ -550,6 +553,29 @@ export function AppSidebar() {
                   <LogOut className="mr-2 h-4 w-4" />
                   Wyloguj
                 </Button>
+                <div className="grid gap-1 pt-2 text-xs text-sidebar-foreground/56">
+                  <NavLink
+                    to="/legal/privacy"
+                    className="rounded-[0.75rem] px-3 py-2 transition-colors hover:bg-sidebar-accent/55 hover:text-sidebar-foreground"
+                    activeClassName="bg-sidebar-accent/70 text-sidebar-foreground"
+                  >
+                    Polityka prywatności
+                  </NavLink>
+                  <NavLink
+                    to="/legal/terms"
+                    className="rounded-[0.75rem] px-3 py-2 transition-colors hover:bg-sidebar-accent/55 hover:text-sidebar-foreground"
+                    activeClassName="bg-sidebar-accent/70 text-sidebar-foreground"
+                  >
+                    Regulamin
+                  </NavLink>
+                  <button
+                    type="button"
+                    onClick={openCookiePreferences}
+                    className="rounded-[0.75rem] px-3 py-2 text-left transition-colors hover:bg-sidebar-accent/55 hover:text-sidebar-foreground"
+                  >
+                    Preferencje cookies
+                  </button>
+                </div>
               </div>
             ) : (
               <DropdownMenu>
@@ -567,6 +593,14 @@ export function AppSidebar() {
                   <DropdownMenuItem onClick={() => navigate("/profile")}>
                     <UserRound className="mr-2 h-4 w-4" />
                     Moj profil
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/legal/privacy")}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Prywatność
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={openCookiePreferences}>
+                    <Cookie className="mr-2 h-4 w-4" />
+                    Cookies
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
