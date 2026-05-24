@@ -27,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { openCookiePreferences } from "@/lib/cookie-consent";
 
 type LoginFooterProps = {
   copyrightYears: string;
@@ -252,6 +253,24 @@ function LoginFooter({
         , gdzie znajdują się wszystkie informacje oraz kontakt z
         właścicielami.
       </p>
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs">
+        <Link to="/legal/privacy" className={secondaryLinkClassName}>
+          Prywatność i RODO
+        </Link>
+        <Link to="/legal/terms" className={secondaryLinkClassName}>
+          Regulamin
+        </Link>
+        <Link to="/legal/cookies" className={secondaryLinkClassName}>
+          Cookies
+        </Link>
+        <button
+          type="button"
+          onClick={openCookiePreferences}
+          className={secondaryLinkClassName}
+        >
+          Preferencje cookies
+        </button>
+      </div>
     </footer>
   );
 }

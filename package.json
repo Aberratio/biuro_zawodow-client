@@ -9,6 +9,7 @@
     "build": "vite build",
     "build:safe": "npm run unlock:dist && vite build",
     "build:dev": "vite build --mode development",
+    "build:staging-kokot": "vite build --mode staging-kokot",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",

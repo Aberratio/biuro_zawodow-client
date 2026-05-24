@@ -14,6 +14,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider, useData } from "@/contexts/DataContext";
 import { Layout } from "@/components/Layout";
 import { RouteSeo } from "@/components/RouteSeo";
+import { CookieConsent } from "@/components/CookieConsent";
 import Dashboard from "./pages/Dashboard";
 import Events from "./pages/Events";
 import EventDetails from "./pages/EventDetails";
@@ -35,6 +36,7 @@ import ScannerInfo from "./pages/ScannerInfo";
 import Forbidden from "./pages/Forbidden";
 import NotFound from "./pages/NotFound";
 import Unauthorized from "./pages/Unauthorized";
+import Legal from "./pages/Legal";
 import { isScannerRole } from "@/lib/roles";
 
 const queryClient = new QueryClient();
@@ -294,6 +296,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/legal/:slug" element={<Legal />} />
       <Route path="/401" element={<Unauthorized />} />
       <Route path="/403" element={<Forbidden />} />
       <Route path="/404" element={<NotFound />} />
@@ -326,6 +329,7 @@ const App = () => (
         <Router>
           <RouteSeo />
           <AppRoutes />
+          <CookieConsent />
         </Router>
       </AuthProvider>
     </TooltipProvider>
