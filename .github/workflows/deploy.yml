@@ -15,14 +15,14 @@ on:
         options:
           - staging
           - production
-      api_target:
-        description: "Which API should the build use?"
+      deploy_method:
+        description: "How should the frontend be uploaded?"
         required: true
-        default: production
+        default: ftp
         type: choice
         options:
-          - staging
-          - production
+          - ftp
+          - ssh
       skipTests:
         description: "Skip frontend tests before build?"
         required: true
@@ -38,12 +38,12 @@ concurrency:
 
 env:
   DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'staging' }}
-  API_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.api_target || 'staging' }}
+  DEPLOY_METHOD: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_method || 'ftp' }}
   SKIP_TESTS: ${{ github.event_name == 'workflow_dispatch' && inputs.skipTests || false }}
 
 jobs:
   deploy-staging:
-    name: Deploy frontend staging FTP
+    name: Deploy frontend staging
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_target == 'staging')
     runs-on: ubuntu-latest
     environment: staging
@@ -65,23 +65,48 @@ jobs:
         if: env.SKIP_TESTS != 'true'
         run: npm test
 
+      - name: Validate deploy method
+        run: |
+          set -Eeuo pipefail
+          case "$DEPLOY_METHOD" in
+            ftp|ssh) ;;
+            "")
+              echo "DEPLOY_METHOD is empty. Falling back to ftp."
+              echo "DEPLOY_METHOD=ftp" >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "DEPLOY_METHOD must be ftp or ssh."
+              exit 20
+              ;;
+          esac
+
       - name: Build staging
         env:
-          STAGING_API_URL: ${{ secrets.STAGING_API_URL }}
-          PRODUCTION_API_URL: ${{ secrets.PRODUCTION_API_URL }}
+          API_URL: ${{ secrets.API_URL }}
+          VITE_MOUSEFLOW_ENABLED: ${{ secrets.VITE_MOUSEFLOW_ENABLED }}
+          VITE_MOUSEFLOW_PROJECT_ID: ${{ secrets.VITE_MOUSEFLOW_PROJECT_ID }}
+          VITE_LEGAL_ADMIN_NAME: ${{ secrets.VITE_LEGAL_ADMIN_NAME }}
+          VITE_LEGAL_ADMIN_ADDRESS: ${{ secrets.VITE_LEGAL_ADMIN_ADDRESS }}
+          VITE_LEGAL_CONTACT_EMAIL: ${{ secrets.VITE_LEGAL_CONTACT_EMAIL }}
           VITE_APP_ENV: staging
           VITE_DEPLOY_ENV: staging
         run: |
           set -Eeuo pipefail
-          if [ "$API_TARGET" = "production" ]; then
-            export VITE_API_URL="$PRODUCTION_API_URL"
-          else
-            export VITE_API_URL="$STAGING_API_URL"
+          if [ -z "$API_URL" ]; then
+            echo "API_URL is required in the selected GitHub Environment secrets."
+            exit 21
           fi
-          echo "Building staging frontend with $API_TARGET API."
+          export VITE_API_URL="$API_URL"
+          export VITE_MOUSEFLOW_ENABLED="${VITE_MOUSEFLOW_ENABLED:-false}"
+          export VITE_MOUSEFLOW_PROJECT_ID="${VITE_MOUSEFLOW_PROJECT_ID:-}"
+          export VITE_LEGAL_ADMIN_NAME="${VITE_LEGAL_ADMIN_NAME:-ZmierzymyCzas.pl}"
+          export VITE_LEGAL_ADMIN_ADDRESS="${VITE_LEGAL_ADMIN_ADDRESS:-}"
+          export VITE_LEGAL_CONTACT_EMAIL="${VITE_LEGAL_CONTACT_EMAIL:-}"
+          echo "Building staging frontend with API_URL from the staging GitHub Environment."
           npx vite build
 
-      - name: Deploy to SeoHost by FTP
+      - name: Deploy by FTP
+        if: env.DEPLOY_METHOD == 'ftp'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -92,59 +117,15 @@ jobs:
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
           dangerous-clean-slate: false
 
-      - name: Health check
-        env:
-          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
-        run: |
-          set -Eeuo pipefail
-          curl --fail --show-error --location "$FRONTEND_URL"
-
-  deploy-production:
-    name: Deploy frontend production SSH
-    if: github.event_name == 'workflow_dispatch' && inputs.deploy_target == 'production'
-    runs-on: ubuntu-latest
-    environment: production
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run frontend tests
-        if: env.SKIP_TESTS != 'true'
-        run: npm test
-
-      - name: Build production
-        env:
-          STAGING_API_URL: ${{ secrets.STAGING_API_URL }}
-          PRODUCTION_API_URL: ${{ secrets.PRODUCTION_API_URL }}
-          VITE_APP_ENV: production
-          VITE_DEPLOY_ENV: production
-        run: |
-          set -Eeuo pipefail
-          if [ "$API_TARGET" = "production" ]; then
-            export VITE_API_URL="$PRODUCTION_API_URL"
-          else
-            export VITE_API_URL="$STAGING_API_URL"
-          fi
-          echo "Building production frontend with $API_TARGET API."
-          npx vite build
-
       - name: Package dist
+        if: env.DEPLOY_METHOD == 'ssh'
         run: |
           set -Eeuo pipefail
           cd dist
           zip -r ../frontend.zip .
 
       - name: Configure SSH
+        if: env.DEPLOY_METHOD == 'ssh'
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
@@ -183,16 +164,23 @@ jobs:
             exit 34
           fi
 
-      - name: Upload and unpack on Cyber_Folks
+      - name: Upload and unpack by SSH
+        if: env.DEPLOY_METHOD == 'ssh'
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USER: ${{ secrets.SSH_USER }}
           FRONTEND_REMOTE_DIR: ${{ secrets.FRONTEND_REMOTE_DIR }}
+          FRONTEND_ALLOWED_PATH_FRAGMENT: ${{ secrets.FRONTEND_ALLOWED_PATH_FRAGMENT }}
         run: |
           set -Eeuo pipefail
+          if [ -z "$SSH_USER" ] || [ -z "$FRONTEND_REMOTE_DIR" ] || [ -z "$FRONTEND_ALLOWED_PATH_FRAGMENT" ]; then
+            echo "SSH_USER, FRONTEND_REMOTE_DIR and FRONTEND_ALLOWED_PATH_FRAGMENT are required."
+            exit 35
+          fi
+
           REMOTE_ZIP="$FRONTEND_REMOTE_DIR/.deploy/frontend-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}.zip"
-          printf -v REMOTE_ENV 'FRONTEND_REMOTE_DIR=%q REMOTE_ZIP=%q' "$FRONTEND_REMOTE_DIR" "$REMOTE_ZIP"
+          printf -v REMOTE_ENV 'FRONTEND_REMOTE_DIR=%q FRONTEND_ALLOWED_PATH_FRAGMENT=%q REMOTE_ZIP=%q' "$FRONTEND_REMOTE_DIR" "$FRONTEND_ALLOWED_PATH_FRAGMENT" "$REMOTE_ZIP"
 
           ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "$REMOTE_ENV bash -s" <<'REMOTE'
           set -Eeuo pipefail
@@ -202,10 +190,30 @@ jobs:
             exit 10
           fi
 
+          if [ -z "$FRONTEND_ALLOWED_PATH_FRAGMENT" ]; then
+            echo "FRONTEND_ALLOWED_PATH_FRAGMENT is required."
+            exit 13
+          fi
+
+          case "$FRONTEND_REMOTE_DIR" in
+            /|.|~|"$HOME")
+              echo "FRONTEND_REMOTE_DIR cannot point to /, ., ~ or home."
+              exit 14
+              ;;
+          esac
+
           case "$FRONTEND_REMOTE_DIR" in
             *..*)
               echo "FRONTEND_REMOTE_DIR cannot contain '..'."
               exit 11
+              ;;
+          esac
+
+          case "$FRONTEND_REMOTE_DIR" in
+            *"$FRONTEND_ALLOWED_PATH_FRAGMENT"*) ;;
+            *)
+              echo "FRONTEND_REMOTE_DIR must contain FRONTEND_ALLOWED_PATH_FRAGMENT."
+              exit 15
               ;;
           esac
 
@@ -216,6 +224,228 @@ jobs:
               exit 12
               ;;
           esac
+
+          if [ ! -d "$FRONTEND_REMOTE_DIR" ]; then
+            echo "FRONTEND_REMOTE_DIR must already exist."
+            exit 16
+          fi
+
+          if [ ! -f "$FRONTEND_REMOTE_DIR/.biuro-zawodow-frontend-root" ]; then
+            echo "Missing marker file: $FRONTEND_REMOTE_DIR/.biuro-zawodow-frontend-root"
+            exit 17
+          fi
+
+          mkdir -p "$FRONTEND_REMOTE_DIR/.deploy"
+          REMOTE
+
+          scp -i ~/.ssh/deploy_key -P "$SSH_PORT" frontend.zip "$SSH_USER@$SSH_HOST:$REMOTE_ZIP"
+
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "$REMOTE_ENV bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          unzip -o -q "$REMOTE_ZIP" -d "$FRONTEND_REMOTE_DIR"
+          rm -f "$REMOTE_ZIP"
+          echo "Frontend unpacked into $FRONTEND_REMOTE_DIR"
+          REMOTE
+
+      - name: Health check
+        env:
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+        run: |
+          set -Eeuo pipefail
+          curl --fail --show-error --location "$FRONTEND_URL"
+
+  deploy-production:
+    name: Deploy frontend production
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_target == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run frontend tests
+        if: env.SKIP_TESTS != 'true'
+        run: npm test
+
+      - name: Validate deploy method
+        run: |
+          set -Eeuo pipefail
+          case "$DEPLOY_METHOD" in
+            ftp|ssh) ;;
+            "")
+              echo "DEPLOY_METHOD is empty. Falling back to ftp."
+              echo "DEPLOY_METHOD=ftp" >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "DEPLOY_METHOD must be ftp or ssh."
+              exit 20
+              ;;
+          esac
+
+      - name: Build production
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          VITE_MOUSEFLOW_ENABLED: ${{ secrets.VITE_MOUSEFLOW_ENABLED }}
+          VITE_MOUSEFLOW_PROJECT_ID: ${{ secrets.VITE_MOUSEFLOW_PROJECT_ID }}
+          VITE_LEGAL_ADMIN_NAME: ${{ secrets.VITE_LEGAL_ADMIN_NAME }}
+          VITE_LEGAL_ADMIN_ADDRESS: ${{ secrets.VITE_LEGAL_ADMIN_ADDRESS }}
+          VITE_LEGAL_CONTACT_EMAIL: ${{ secrets.VITE_LEGAL_CONTACT_EMAIL }}
+          VITE_APP_ENV: production
+          VITE_DEPLOY_ENV: production
+        run: |
+          set -Eeuo pipefail
+          if [ -z "$API_URL" ]; then
+            echo "API_URL is required in the selected GitHub Environment secrets."
+            exit 21
+          fi
+          export VITE_API_URL="$API_URL"
+          export VITE_MOUSEFLOW_ENABLED="${VITE_MOUSEFLOW_ENABLED:-false}"
+          export VITE_MOUSEFLOW_PROJECT_ID="${VITE_MOUSEFLOW_PROJECT_ID:-}"
+          export VITE_LEGAL_ADMIN_NAME="${VITE_LEGAL_ADMIN_NAME:-ZmierzymyCzas.pl}"
+          export VITE_LEGAL_ADMIN_ADDRESS="${VITE_LEGAL_ADMIN_ADDRESS:-}"
+          export VITE_LEGAL_CONTACT_EMAIL="${VITE_LEGAL_CONTACT_EMAIL:-}"
+          echo "Building production frontend with API_URL from the production GitHub Environment."
+          npx vite build
+
+      - name: Deploy by FTP
+        if: env.DEPLOY_METHOD == 'ftp'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          local-dir: ./dist/
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          dangerous-clean-slate: false
+
+      - name: Package dist
+        if: env.DEPLOY_METHOD == 'ssh'
+        run: |
+          set -Eeuo pipefail
+          cd dist
+          zip -r ../frontend.zip .
+
+      - name: Configure SSH
+        if: env.DEPLOY_METHOD == 'ssh'
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_PORT" ] || [ -z "$SSH_PRIVATE_KEY" ]; then
+            echo "SSH_HOST, SSH_PORT and SSH_PRIVATE_KEY are required."
+            exit 30
+          fi
+
+          case "$SSH_HOST" in
+            http://*|https://*|*/*)
+              echo "SSH_HOST must be a hostname only, for example h29.seohost.pl."
+              exit 31
+              ;;
+          esac
+
+          case "$SSH_PORT" in
+            ''|*[!0-9]*)
+              echo "SSH_PORT must be a number."
+              exit 32
+              ;;
+          esac
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if ! ssh-keyscan -T 15 -p "$SSH_PORT" -H "$SSH_HOST" > ~/.ssh/known_hosts; then
+            echo "Could not read SSH host key. Check SSH_HOST and SSH_PORT, and verify that SSH is enabled for this hosting account."
+            exit 33
+          fi
+
+          if [ ! -s ~/.ssh/known_hosts ]; then
+            echo "ssh-keyscan returned no host keys. Check SSH_HOST and SSH_PORT."
+            exit 34
+          fi
+
+      - name: Upload and unpack by SSH
+        if: env.DEPLOY_METHOD == 'ssh'
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          FRONTEND_REMOTE_DIR: ${{ secrets.FRONTEND_REMOTE_DIR }}
+          FRONTEND_ALLOWED_PATH_FRAGMENT: ${{ secrets.FRONTEND_ALLOWED_PATH_FRAGMENT }}
+        run: |
+          set -Eeuo pipefail
+          if [ -z "$SSH_USER" ] || [ -z "$FRONTEND_REMOTE_DIR" ] || [ -z "$FRONTEND_ALLOWED_PATH_FRAGMENT" ]; then
+            echo "SSH_USER, FRONTEND_REMOTE_DIR and FRONTEND_ALLOWED_PATH_FRAGMENT are required."
+            exit 35
+          fi
+
+          REMOTE_ZIP="$FRONTEND_REMOTE_DIR/.deploy/frontend-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}.zip"
+          printf -v REMOTE_ENV 'FRONTEND_REMOTE_DIR=%q FRONTEND_ALLOWED_PATH_FRAGMENT=%q REMOTE_ZIP=%q' "$FRONTEND_REMOTE_DIR" "$FRONTEND_ALLOWED_PATH_FRAGMENT" "$REMOTE_ZIP"
+
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "$REMOTE_ENV bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+
+          if [ -z "$FRONTEND_REMOTE_DIR" ]; then
+            echo "FRONTEND_REMOTE_DIR is required."
+            exit 10
+          fi
+
+          if [ -z "$FRONTEND_ALLOWED_PATH_FRAGMENT" ]; then
+            echo "FRONTEND_ALLOWED_PATH_FRAGMENT is required."
+            exit 13
+          fi
+
+          case "$FRONTEND_REMOTE_DIR" in
+            /|.|~|"$HOME")
+              echo "FRONTEND_REMOTE_DIR cannot point to /, ., ~ or home."
+              exit 14
+              ;;
+          esac
+
+          case "$FRONTEND_REMOTE_DIR" in
+            *..*)
+              echo "FRONTEND_REMOTE_DIR cannot contain '..'."
+              exit 11
+              ;;
+          esac
+
+          case "$FRONTEND_REMOTE_DIR" in
+            *"$FRONTEND_ALLOWED_PATH_FRAGMENT"*) ;;
+            *)
+              echo "FRONTEND_REMOTE_DIR must contain FRONTEND_ALLOWED_PATH_FRAGMENT."
+              exit 15
+              ;;
+          esac
+
+          case "$FRONTEND_REMOTE_DIR" in
+            *public_html|*public_html/) ;;
+            *)
+              echo "FRONTEND_REMOTE_DIR must point to public_html."
+              exit 12
+              ;;
+          esac
+
+          if [ ! -d "$FRONTEND_REMOTE_DIR" ]; then
+            echo "FRONTEND_REMOTE_DIR must already exist."
+            exit 16
+          fi
+
+          if [ ! -f "$FRONTEND_REMOTE_DIR/.biuro-zawodow-frontend-root" ]; then
+            echo "Missing marker file: $FRONTEND_REMOTE_DIR/.biuro-zawodow-frontend-root"
+            exit 17
+          fi
 
           mkdir -p "$FRONTEND_REMOTE_DIR/.deploy"
           REMOTE
