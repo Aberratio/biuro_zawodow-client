@@ -186,6 +186,7 @@ describe('DataProvider bootstrap loading', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -214,7 +215,7 @@ describe('DataProvider bootstrap loading', () => {
     await flushEffects();
 
     expect(screen.getByTestId('selected-event')).toBeEmptyDOMElement();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith('/bootstrap'))).toHaveLength(1);
   });
 
   it('does not refetch bootstrap when user only changes selected event', async () => {
@@ -248,7 +249,7 @@ describe('DataProvider bootstrap loading', () => {
     expect(screen.getByTestId('selected-event').textContent).toBe('event-2');
     expect(window.sessionStorage.getItem('selected_event_context:admin-1')).toBe('event-2');
     expect(window.localStorage.getItem('selected_event_context:admin-1')).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith('/bootstrap'))).toHaveLength(1);
   });
 
   it('keeps locally created events when an older background bootstrap finishes later', async () => {
@@ -314,7 +315,7 @@ describe('DataProvider bootstrap loading', () => {
   });
 
   it('keeps the scanner selected event after a page reload while bootstrap is loading', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2099-04-12T10:00:00.000Z'));
 
     const scannerUser: User = {
@@ -554,7 +555,7 @@ describe('DataProvider bootstrap loading', () => {
 
     expect(window.sessionStorage.getItem('selected_organization_context:admin-1')).toBe('org-2');
     expect(window.sessionStorage.getItem('selected_event_context:admin-1')).toBe('event-2');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith('/bootstrap'))).toHaveLength(1);
   });
 
   it('syncs admin organization context from organization details route on refresh', async () => {

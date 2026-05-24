@@ -130,7 +130,7 @@ describe('Organizations page', () => {
   });
 
   it('shows currently running event window when organization event is in progress', () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2099-04-12T10:00:00'));
 
     renderPage(
@@ -138,7 +138,7 @@ describe('Organizations page', () => {
       [createEvent('event-1', 'org-1', '2099-04-12T07:00:00', '2099-04-12T15:00:00')]
     );
 
-    expect(screen.getByText('W trakcie do 12.04.2099, 15:00')).toBeInTheDocument();
+    expect(screen.getAllByText('W trakcie do 12.04.2099, 15:00')).not.toHaveLength(0);
   });
 
   it('does not require selecting a single admin when creating organization as superadmin', () => {

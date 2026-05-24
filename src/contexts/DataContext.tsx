@@ -369,7 +369,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(intervalId);
   }, [authUser?.id, connectionState, loadBootstrap, token]);
   useEffect(() => { if (authUser?.id) void updateSyncMeta(authUser.id, lastSyncAt, offlineSinceAt); }, [authUser?.id, lastSyncAt, offlineSinceAt, updateSyncMeta]);
-  useEffect(() => { if (currentRole !== 'admin') { if (selectedOrganizationId !== '') setSelectedOrganizationId(''); return; } const nextSelectedOrganizationId = resolveSelectedOrganizationId(selectableOrganizations, selectedOrganizationId); if (nextSelectedOrganizationId !== selectedOrganizationId) setSelectedOrganizationId(nextSelectedOrganizationId); }, [currentRole, selectableOrganizations, selectedOrganizationId, setSelectedOrganizationId]);
+  useEffect(() => {
+    if (currentRole !== 'admin') {
+      if (selectedOrganizationId !== '') setSelectedOrganizationId('');
+      return;
+    }
+
+    if (isLoading) return;
+
+    const nextSelectedOrganizationId = resolveSelectedOrganizationId(selectableOrganizations, selectedOrganizationId);
+    if (nextSelectedOrganizationId !== selectedOrganizationId) setSelectedOrganizationId(nextSelectedOrganizationId);
+  }, [currentRole, isLoading, selectableOrganizations, selectedOrganizationId, setSelectedOrganizationId]);
   useEffect(() => {
     if (isLoading) return;
 

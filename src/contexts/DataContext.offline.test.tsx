@@ -398,15 +398,14 @@ describe('DataProvider offline cache and queue', () => {
       </DataProvider>,
     );
 
-    await waitFor(() => expect(screen.getByTestId('connection-state').textContent).toMatch(/degraded|offline/));
+    await vi.waitFor(() => expect(screen.getByTestId('connection-state').textContent).toMatch(/degraded|offline/));
 
     await act(async () => {
-      vi.advanceTimersByTime(15_000);
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(15_000);
     });
 
-    await waitFor(() => expect(screen.getByTestId('connection-state').textContent).toBe('online'));
     vi.useRealTimers();
+    await waitFor(() => expect(screen.getByTestId('connection-state').textContent).toBe('online'));
   });
 
   it('deduplicates participant field mappings requests for the same event', async () => {
