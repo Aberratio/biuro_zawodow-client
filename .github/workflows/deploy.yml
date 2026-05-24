@@ -171,16 +171,17 @@ jobs:
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USER: ${{ secrets.SSH_USER }}
           FRONTEND_REMOTE_DIR: ${{ secrets.FRONTEND_REMOTE_DIR }}
-          FRONTEND_ALLOWED_PATH_FRAGMENT: ${{ secrets.FRONTEND_ALLOWED_PATH_FRAGMENT }}
+          FRONTEND_ALLOWED_ROOT: ${{ secrets.FRONTEND_ALLOWED_ROOT }}
         run: |
           set -Eeuo pipefail
-          if [ -z "$SSH_USER" ] || [ -z "$FRONTEND_REMOTE_DIR" ] || [ -z "$FRONTEND_ALLOWED_PATH_FRAGMENT" ]; then
-            echo "SSH_USER, FRONTEND_REMOTE_DIR and FRONTEND_ALLOWED_PATH_FRAGMENT are required."
+          if [ -z "$SSH_USER" ] || [ -z "$FRONTEND_REMOTE_DIR" ] || [ -z "$FRONTEND_ALLOWED_ROOT" ]; then
+            echo "SSH_USER, FRONTEND_REMOTE_DIR and FRONTEND_ALLOWED_ROOT are required."
             exit 35
           fi
 
-          REMOTE_ZIP="$FRONTEND_REMOTE_DIR/.deploy/frontend-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}.zip"
-          printf -v REMOTE_ENV 'FRONTEND_REMOTE_DIR=%q FRONTEND_ALLOWED_PATH_FRAGMENT=%q REMOTE_ZIP=%q' "$FRONTEND_REMOTE_DIR" "$FRONTEND_ALLOWED_PATH_FRAGMENT" "$REMOTE_ZIP"
+          DEPLOY_ID="${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"
+          REMOTE_ZIP="$FRONTEND_REMOTE_DIR/.deploy/frontend-${DEPLOY_ID}.zip"
+          printf -v REMOTE_ENV 'FRONTEND_REMOTE_DIR=%q FRONTEND_ALLOWED_ROOT=%q REMOTE_ZIP=%q DEPLOY_ID=%q' "$FRONTEND_REMOTE_DIR" "$FRONTEND_ALLOWED_ROOT" "$REMOTE_ZIP" "$DEPLOY_ID"
 
           ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "$REMOTE_ENV bash -s" <<'REMOTE'
           set -Eeuo pipefail
@@ -190,10 +191,18 @@ jobs:
             exit 10
           fi
 
-          if [ -z "$FRONTEND_ALLOWED_PATH_FRAGMENT" ]; then
-            echo "FRONTEND_ALLOWED_PATH_FRAGMENT is required."
+          if [ -z "$FRONTEND_ALLOWED_ROOT" ]; then
+            echo "FRONTEND_ALLOWED_ROOT is required."
             exit 13
           fi
+
+          case "$FRONTEND_ALLOWED_ROOT" in
+            /*) ;;
+            *)
+              echo "FRONTEND_ALLOWED_ROOT must be an absolute path."
+              exit 18
+              ;;
+          esac
 
           case "$FRONTEND_REMOTE_DIR" in
             /|.|~|"$HOME")
@@ -209,42 +218,58 @@ jobs:
               ;;
           esac
 
-          case "$FRONTEND_REMOTE_DIR" in
-            *"$FRONTEND_ALLOWED_PATH_FRAGMENT"*) ;;
+          command -v realpath >/dev/null
+          FRONTEND_REMOTE_DIR_REAL="$(realpath -e "$FRONTEND_REMOTE_DIR")"
+          FRONTEND_ALLOWED_ROOT_REAL="$(realpath -e "$FRONTEND_ALLOWED_ROOT")"
+
+          case "$FRONTEND_REMOTE_DIR_REAL/" in
+            "$FRONTEND_ALLOWED_ROOT_REAL"/*|"$FRONTEND_ALLOWED_ROOT_REAL/") ;;
             *)
-              echo "FRONTEND_REMOTE_DIR must contain FRONTEND_ALLOWED_PATH_FRAGMENT."
+              echo "FRONTEND_REMOTE_DIR is outside FRONTEND_ALLOWED_ROOT."
+              echo "FRONTEND_REMOTE_DIR_REAL=$FRONTEND_REMOTE_DIR_REAL"
+              echo "FRONTEND_ALLOWED_ROOT_REAL=$FRONTEND_ALLOWED_ROOT_REAL"
               exit 15
               ;;
           esac
 
-          case "$FRONTEND_REMOTE_DIR" in
-            *public_html|*public_html/) ;;
+          case "$FRONTEND_REMOTE_DIR_REAL" in
+            *public_html|*public_html/*|*public_html/) ;;
             *)
-              echo "FRONTEND_REMOTE_DIR must point to public_html."
+              echo "FRONTEND_REMOTE_DIR must point to public_html or a directory inside public_html."
               exit 12
               ;;
           esac
 
-          if [ ! -d "$FRONTEND_REMOTE_DIR" ]; then
+          if [ ! -d "$FRONTEND_REMOTE_DIR_REAL" ]; then
             echo "FRONTEND_REMOTE_DIR must already exist."
             exit 16
           fi
 
-          if [ ! -f "$FRONTEND_REMOTE_DIR/.biuro-zawodow-frontend-root" ]; then
-            echo "Missing marker file: $FRONTEND_REMOTE_DIR/.biuro-zawodow-frontend-root"
+          if [ ! -f "$FRONTEND_REMOTE_DIR_REAL/.biuro-zawodow-frontend-root" ]; then
+            echo "Missing marker file: $FRONTEND_REMOTE_DIR_REAL/.biuro-zawodow-frontend-root"
             exit 17
           fi
 
-          mkdir -p "$FRONTEND_REMOTE_DIR/.deploy"
+          mkdir -p "$FRONTEND_REMOTE_DIR_REAL/.deploy"
           REMOTE
 
           scp -i ~/.ssh/deploy_key -P "$SSH_PORT" frontend.zip "$SSH_USER@$SSH_HOST:$REMOTE_ZIP"
 
           ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "$REMOTE_ENV bash -s" <<'REMOTE'
           set -Eeuo pipefail
-          unzip -o -q "$REMOTE_ZIP" -d "$FRONTEND_REMOTE_DIR"
+          FRONTEND_REMOTE_DIR_REAL="$(realpath -e "$FRONTEND_REMOTE_DIR")"
+          FRONTEND_ALLOWED_ROOT_REAL="$(realpath -e "$FRONTEND_ALLOWED_ROOT")"
+          case "$FRONTEND_REMOTE_DIR_REAL/" in
+            "$FRONTEND_ALLOWED_ROOT_REAL"/*|"$FRONTEND_ALLOWED_ROOT_REAL/") ;;
+            *)
+              echo "FRONTEND_REMOTE_DIR is outside FRONTEND_ALLOWED_ROOT."
+              exit 15
+              ;;
+          esac
+          REMOTE_ZIP="$FRONTEND_REMOTE_DIR_REAL/.deploy/frontend-${DEPLOY_ID}.zip"
+          unzip -o -q "$REMOTE_ZIP" -d "$FRONTEND_REMOTE_DIR_REAL"
           rm -f "$REMOTE_ZIP"
-          echo "Frontend unpacked into $FRONTEND_REMOTE_DIR"
+          echo "Frontend unpacked into $FRONTEND_REMOTE_DIR_REAL"
           REMOTE
 
       - name: Health check
@@ -383,16 +408,17 @@ jobs:
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USER: ${{ secrets.SSH_USER }}
           FRONTEND_REMOTE_DIR: ${{ secrets.FRONTEND_REMOTE_DIR }}
-          FRONTEND_ALLOWED_PATH_FRAGMENT: ${{ secrets.FRONTEND_ALLOWED_PATH_FRAGMENT }}
+          FRONTEND_ALLOWED_ROOT: ${{ secrets.FRONTEND_ALLOWED_ROOT }}
         run: |
           set -Eeuo pipefail
-          if [ -z "$SSH_USER" ] || [ -z "$FRONTEND_REMOTE_DIR" ] || [ -z "$FRONTEND_ALLOWED_PATH_FRAGMENT" ]; then
-            echo "SSH_USER, FRONTEND_REMOTE_DIR and FRONTEND_ALLOWED_PATH_FRAGMENT are required."
+          if [ -z "$SSH_USER" ] || [ -z "$FRONTEND_REMOTE_DIR" ] || [ -z "$FRONTEND_ALLOWED_ROOT" ]; then
+            echo "SSH_USER, FRONTEND_REMOTE_DIR and FRONTEND_ALLOWED_ROOT are required."
             exit 35
           fi
 
-          REMOTE_ZIP="$FRONTEND_REMOTE_DIR/.deploy/frontend-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}.zip"
-          printf -v REMOTE_ENV 'FRONTEND_REMOTE_DIR=%q FRONTEND_ALLOWED_PATH_FRAGMENT=%q REMOTE_ZIP=%q' "$FRONTEND_REMOTE_DIR" "$FRONTEND_ALLOWED_PATH_FRAGMENT" "$REMOTE_ZIP"
+          DEPLOY_ID="${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"
+          REMOTE_ZIP="$FRONTEND_REMOTE_DIR/.deploy/frontend-${DEPLOY_ID}.zip"
+          printf -v REMOTE_ENV 'FRONTEND_REMOTE_DIR=%q FRONTEND_ALLOWED_ROOT=%q REMOTE_ZIP=%q DEPLOY_ID=%q' "$FRONTEND_REMOTE_DIR" "$FRONTEND_ALLOWED_ROOT" "$REMOTE_ZIP" "$DEPLOY_ID"
 
           ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "$REMOTE_ENV bash -s" <<'REMOTE'
           set -Eeuo pipefail
@@ -402,10 +428,18 @@ jobs:
             exit 10
           fi
 
-          if [ -z "$FRONTEND_ALLOWED_PATH_FRAGMENT" ]; then
-            echo "FRONTEND_ALLOWED_PATH_FRAGMENT is required."
+          if [ -z "$FRONTEND_ALLOWED_ROOT" ]; then
+            echo "FRONTEND_ALLOWED_ROOT is required."
             exit 13
           fi
+
+          case "$FRONTEND_ALLOWED_ROOT" in
+            /*) ;;
+            *)
+              echo "FRONTEND_ALLOWED_ROOT must be an absolute path."
+              exit 18
+              ;;
+          esac
 
           case "$FRONTEND_REMOTE_DIR" in
             /|.|~|"$HOME")
@@ -421,42 +455,58 @@ jobs:
               ;;
           esac
 
-          case "$FRONTEND_REMOTE_DIR" in
-            *"$FRONTEND_ALLOWED_PATH_FRAGMENT"*) ;;
+          command -v realpath >/dev/null
+          FRONTEND_REMOTE_DIR_REAL="$(realpath -e "$FRONTEND_REMOTE_DIR")"
+          FRONTEND_ALLOWED_ROOT_REAL="$(realpath -e "$FRONTEND_ALLOWED_ROOT")"
+
+          case "$FRONTEND_REMOTE_DIR_REAL/" in
+            "$FRONTEND_ALLOWED_ROOT_REAL"/*|"$FRONTEND_ALLOWED_ROOT_REAL/") ;;
             *)
-              echo "FRONTEND_REMOTE_DIR must contain FRONTEND_ALLOWED_PATH_FRAGMENT."
+              echo "FRONTEND_REMOTE_DIR is outside FRONTEND_ALLOWED_ROOT."
+              echo "FRONTEND_REMOTE_DIR_REAL=$FRONTEND_REMOTE_DIR_REAL"
+              echo "FRONTEND_ALLOWED_ROOT_REAL=$FRONTEND_ALLOWED_ROOT_REAL"
               exit 15
               ;;
           esac
 
-          case "$FRONTEND_REMOTE_DIR" in
-            *public_html|*public_html/) ;;
+          case "$FRONTEND_REMOTE_DIR_REAL" in
+            *public_html|*public_html/*|*public_html/) ;;
             *)
-              echo "FRONTEND_REMOTE_DIR must point to public_html."
+              echo "FRONTEND_REMOTE_DIR must point to public_html or a directory inside public_html."
               exit 12
               ;;
           esac
 
-          if [ ! -d "$FRONTEND_REMOTE_DIR" ]; then
+          if [ ! -d "$FRONTEND_REMOTE_DIR_REAL" ]; then
             echo "FRONTEND_REMOTE_DIR must already exist."
             exit 16
           fi
 
-          if [ ! -f "$FRONTEND_REMOTE_DIR/.biuro-zawodow-frontend-root" ]; then
-            echo "Missing marker file: $FRONTEND_REMOTE_DIR/.biuro-zawodow-frontend-root"
+          if [ ! -f "$FRONTEND_REMOTE_DIR_REAL/.biuro-zawodow-frontend-root" ]; then
+            echo "Missing marker file: $FRONTEND_REMOTE_DIR_REAL/.biuro-zawodow-frontend-root"
             exit 17
           fi
 
-          mkdir -p "$FRONTEND_REMOTE_DIR/.deploy"
+          mkdir -p "$FRONTEND_REMOTE_DIR_REAL/.deploy"
           REMOTE
 
           scp -i ~/.ssh/deploy_key -P "$SSH_PORT" frontend.zip "$SSH_USER@$SSH_HOST:$REMOTE_ZIP"
 
           ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "$REMOTE_ENV bash -s" <<'REMOTE'
           set -Eeuo pipefail
-          unzip -o -q "$REMOTE_ZIP" -d "$FRONTEND_REMOTE_DIR"
+          FRONTEND_REMOTE_DIR_REAL="$(realpath -e "$FRONTEND_REMOTE_DIR")"
+          FRONTEND_ALLOWED_ROOT_REAL="$(realpath -e "$FRONTEND_ALLOWED_ROOT")"
+          case "$FRONTEND_REMOTE_DIR_REAL/" in
+            "$FRONTEND_ALLOWED_ROOT_REAL"/*|"$FRONTEND_ALLOWED_ROOT_REAL/") ;;
+            *)
+              echo "FRONTEND_REMOTE_DIR is outside FRONTEND_ALLOWED_ROOT."
+              exit 15
+              ;;
+          esac
+          REMOTE_ZIP="$FRONTEND_REMOTE_DIR_REAL/.deploy/frontend-${DEPLOY_ID}.zip"
+          unzip -o -q "$REMOTE_ZIP" -d "$FRONTEND_REMOTE_DIR_REAL"
           rm -f "$REMOTE_ZIP"
-          echo "Frontend unpacked into $FRONTEND_REMOTE_DIR"
+          echo "Frontend unpacked into $FRONTEND_REMOTE_DIR_REAL"
           REMOTE
 
       - name: Health check
