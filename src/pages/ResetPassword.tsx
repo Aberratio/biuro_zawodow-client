@@ -72,7 +72,7 @@ export default function ResetPassword() {
       <Card className="relative z-10 w-full max-w-md overflow-hidden">
         <CardHeader className="border-b border-border/70 bg-muted/20">
           <CardTitle>Ustaw nowe hasło</CardTitle>
-          <CardDescription>Link resetujący jest ważny przez 60 minut.</CardDescription>
+          <CardDescription>Ustaw hasło z linku otrzymanego w wiadomości e-mail.</CardDescription>
         </CardHeader>
         <CardContent>
           {token === '' ? (
