@@ -82,6 +82,7 @@ export default function Scanner() {
     pendingMutationCount,
     scannerMode,
     getParticipantFieldMappings,
+    selectEventContext,
   } = useData();
   const [view, setView] = useState<ScannerView>('idle');
   const [scannedParticipant, setScannedParticipant] = useState<Participant | null>(null);
@@ -196,13 +197,18 @@ export default function Scanner() {
       }
 
       const participant = result.data.participant;
+      const scannedEventId = participant.event_id || result.data.event.id;
+      if (scannedEventId && scannedEventId !== activeEventId) {
+        selectEventContext(scannedEventId);
+      }
+
       setScannedParticipant(participant);
       addToRecent(participant);
       setView('detail');
     } finally {
       scanRequestInFlightRef.current = false;
     }
-  }, [addToRecent, scanParticipantQr]);
+  }, [activeEventId, addToRecent, scanParticipantQr, selectEventContext]);
 
   const handleSearchSelect = useCallback((participant: Participant) => {
     if (successTimerRef.current) {
@@ -739,7 +745,7 @@ export default function Scanner() {
                   <Button
                     variant="outline"
                     className="h-12 w-full"
-                    onClick={() => navigate(buildEventParticipantPath(selectedEvent.id, scannedParticipant.id), { state: { openEdit: true } })}
+                    onClick={() => navigate(buildEventParticipantPath(scannedParticipant.event_id || selectedEvent.id, scannedParticipant.id), { state: { openEdit: true } })}
                     disabled={isMutating}
                   >
                     Edytuj dane uczestnika
