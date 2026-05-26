@@ -52,7 +52,10 @@ function getIssueRows(
   if (details && details.length > 0) {
     return details.map(issue => ({
       ...issue,
-      row: Object.keys(issue.row ?? {}).length > 0 ? issue.row : getSourceRow(sourceRows, issue.row_number),
+      row: {
+        ...getSourceRow(sourceRows, issue.row_number),
+        ...(issue.row ?? {}),
+      },
     }));
   }
   return (rowNumbers ?? []).map(rowNumber => ({

@@ -938,15 +938,17 @@ export default function OrganizationDetails() {
   return (
     <div className="flex flex-col gap-6 pb-6">
       <div className="space-y-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate("/organizations")}
-          className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
-        >
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Wróć do listy wszystkich organizacji
-        </Button>
+        {currentRole !== "editor" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/organizations")}
+            className="w-fit touch-manipulation rounded-full px-1 text-[0.98rem] font-medium text-[hsl(var(--button-highlight))] hover:bg-transparent hover:text-[hsl(var(--button-highlight))]"
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Wróć do listy wszystkich organizacji
+          </Button>
+        )}
 
         <PageHeader
           title={organization.name}
@@ -1282,7 +1284,7 @@ export default function OrganizationDetails() {
           onOpenChange={setScannersSectionOpen}
           action={
             canManageScanners ? (
-              <div className="grid gap-2 sm:block">
+              <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center">
                 <Button
                   size="sm"
                   variant="outline"
