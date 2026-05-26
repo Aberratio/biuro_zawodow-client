@@ -320,6 +320,7 @@ export default function EventDetails() {
     useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [editReopeningOffice, setEditReopeningOffice] = useState(false);
   const [scannerDialogOpen, setScannerDialogOpen] = useState(false);
   const [managedScannerRole, setManagedScannerRole] =
     useState<ManagedScannerRole>("scanner");
@@ -531,6 +532,7 @@ export default function EventDetails() {
 
   const resetEditState = () => {
     setEditErrors({});
+    setEditReopeningOffice(false);
 
     if (!event) {
       setEditForm({
@@ -546,6 +548,7 @@ export default function EventDetails() {
   };
 
   const openReopenOfficeDialog = () => {
+    setEditReopeningOffice(true);
     setEditForm({
       ...buildEditFormFromEvent(event),
       office_close_at: getDefaultReopenCloseAt(new Date(nowTimestamp)),
@@ -559,6 +562,7 @@ export default function EventDetails() {
     const currentOfficeOpenAt = toLocalDateTimeValue(event.office_open_at);
 
     return (
+      editReopeningOffice ||
       isEventOfficeOpen(event, new Date(nowTimestamp)) ||
       submittedOfficeOpenAt === currentOfficeOpenAt
     );
@@ -870,6 +874,7 @@ export default function EventDetails() {
       organization_id: event.organization_id,
       office_open_at: submittedOfficeOpenAt,
       office_close_at: submittedOfficeCloseAt,
+      reopen_office: editReopeningOffice,
     });
     setEditSaving(false);
 
@@ -886,6 +891,7 @@ export default function EventDetails() {
     }
 
     setEditOpen(false);
+    setEditReopeningOffice(false);
     setEditErrors({});
     toast({ title: "Zaktualizowano wydarzenie" });
   };
@@ -1114,7 +1120,10 @@ export default function EventDetails() {
             {canEditEvent && (
               <Button
                 variant="outline"
-                onClick={() => setEditOpen(true)}
+                onClick={() => {
+                  setEditReopeningOffice(false);
+                  setEditOpen(true);
+                }}
                 className="event-detail-secondary-action h-12 w-full"
                 disabled={!isOnline}
               >

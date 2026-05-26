@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getEventOfficeValidationErrors,
   getEventOfficeRangeValidationResult,
   isEventCurrentOrUpcoming,
   isEventOfficeStartAtOrAfterNow,
@@ -78,5 +79,21 @@ describe('isEventOfficeStartAtOrAfterNow', () => {
     expect(
       isEventOfficeStartAtOrAfterNow('2099-04-12T06:59:00', new Date('2099-04-12T07:00:00')),
     ).toBe(false);
+  });
+});
+
+describe('getEventOfficeValidationErrors', () => {
+  it('rejects a past office open time by default', () => {
+    expect(
+      getEventOfficeValidationErrors('2000-04-12T07:00:00', '2099-04-12T15:00:00').office_open_at,
+    ).toBeTruthy();
+  });
+
+  it('allows a past office open time when reopening keeps the original open time', () => {
+    expect(
+      getEventOfficeValidationErrors('2000-04-12T07:00:00', '2099-04-12T15:00:00', {
+        allowPastOpenAt: true,
+      }),
+    ).toEqual({});
   });
 });

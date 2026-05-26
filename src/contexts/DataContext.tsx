@@ -3,11 +3,12 @@ import type { ActivityLog, ConnectionState, Event, Organization, Participant, Pa
 import { useAuth } from '@/contexts/AuthContext';
 import { API_BASE_URL, fetchJson, getApiErrorCode, isApiResponseError, isNetworkRequestError } from '@/lib/api';
 import { type ApiEvent, type ApiOrganization, type ApiParticipant, type ApiUser, type BootstrapResponse, type ParticipantQrPreviewResponse, type ParticipantScanApiResponse, OFFLINE_ACTION_MESSAGE, applyPendingMutations, buildOfflineSnapshot, createBootstrapSnapshotVersion, createClientMutationId, extractConflictParticipant, getDefaultCurrentUser, getDeviceId, getInitialConnectionState, getSelectableOrganizationsForUser, getVisibleEventsForUser, mapApiOrganizationToUi, mapApiParticipantToUi, mapApiUserToUi, participantUiIdToApiId, persistStoredSelectedEventId, persistStoredSelectedOrganizationId, readStoredSelectedEventId, readStoredSelectedOrganizationId, resolveSelectedEventId, resolveSelectedOrganizationId } from '@/lib/data-context-helpers';
-import { deletePendingMutation, loadBootstrapSnapshot, loadPendingMutations, loadSyncMeta, saveBootstrapSnapshot, savePendingMutation, saveSyncMeta, updatePendingMutation, type PendingParticipantMutation } from '@/lib/offline-store';
+import { deletePendingMutation, loadBootstrapSnapshot, loadPendingMutations, loadSyncMeta, saveBootstrapSnapshot, savePendingMutation, saveSyncMeta, updatePendingMutation, type OfflineBootstrapSnapshot, type PendingParticipantMutation } from '@/lib/offline-store';
 import { getEventOfficeCloseAt, isEventOfficeOpen } from '@/lib/events';
 
 type UserCreateInput = Omit<User, 'id' | 'password'>;
 type EventMutationInput = Omit<Event, 'id' | 'archived_at' | 'deleted_at'>;
+type EventUpdateInput = EventMutationInput & { reopen_office?: boolean };
 
 interface MutationResult { ok: boolean; error?: string; entityId?: string; queued?: boolean; }
 interface ParticipantBibNumberConflict { bibNumber: string; conflictingParticipants: Participant[]; }
@@ -52,7 +53,7 @@ interface DataContextType {
   getParticipantFieldMappings: (eventId: string) => Promise<ParticipantFieldMapping[]>;
   addParticipantManually: (eventId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
   createEvent: (e: EventMutationInput) => Promise<MutationResult>;
-  updateEvent: (eventId: string, data: EventMutationInput) => Promise<MutationResult>;
+  updateEvent: (eventId: string, data: EventUpdateInput) => Promise<MutationResult>;
   archiveEvent: (eventId: string) => Promise<MutationResult>;
   deleteEvent: (eventId: string) => Promise<MutationResult>;
   addUser: (u: UserCreateInput) => Promise<MutationResult>;
@@ -285,7 +286,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [handleNetworkFailure, markConnectionHealthy]);
 
-  const hydrateData = useCallback((responseData: BootstrapResponse['data'], source: SnapshotSource, generatedAt: string, preferredOrganizationId = '', preferredEventId = '') => {
+  const hydrateData = useCallback((responseData: BootstrapResponse['data'] | OfflineBootstrapSnapshot['data'], source: SnapshotSource, generatedAt: string, preferredOrganizationId = '', preferredEventId = '') => {
     if (!authUser) return;
     const nextOrganizations = Array.isArray(responseData.organizations) ? responseData.organizations.map(mapApiOrganizationToUi) : [];
     const nextEvents = Array.isArray(responseData.events) ? responseData.events : [];
@@ -779,7 +780,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     markLocalDataChanged(); setEvents(previous => [...previous, payload.data]); addLog(`Utworzono wydarzenie: ${payload.data.name}`); return { ok: true, entityId: payload.data.id };
   }), [addLog, archivedEvents, ensureOnline, events, getAuthHeaders, markLocalDataChanged, organizations, runMutation]);
 
-  const updateEvent = useCallback(async (eventId: string, data: EventMutationInput) => runMutation(async () => {
+  const updateEvent = useCallback(async (eventId: string, data: EventUpdateInput) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const payload = (await fetchJson(`${API_BASE_URL}/events/${eventId}`, { method: 'PATCH', headers: getAuthHeaders(true), body: JSON.stringify(data) })).payload as { data?: ApiEvent };
     if (!payload.data) return { ok: false, error: 'API zwróciło pustą odpowiedź podczas aktualizacji wydarzenia' };
