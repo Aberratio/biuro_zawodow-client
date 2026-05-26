@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import CsvImportSummary from '@/pages/CsvImportSummary';
@@ -26,11 +26,21 @@ function createEvent(): Event {
 }
 
 function renderSummaryState(state: Record<string, unknown>) {
+  const runParticipantImport = vi.fn().mockResolvedValue({
+    created_count: 0,
+    duplicate_count: 0,
+    invalid_count: 0,
+    invalid_rows: [],
+    invalid_row_details: [],
+    duplicate_row_details: [],
+    participants: [],
+  });
+
   useDataMock.mockReturnValue({
     events: [createEvent()],
     selectedEventId: 'event-1',
     isLoading: false,
-    runParticipantImport: vi.fn(),
+    runParticipantImport,
     connectionState: 'online',
   });
 
@@ -46,6 +56,8 @@ function renderSummaryState(state: Record<string, unknown>) {
       </Routes>
     </MemoryRouter>,
   );
+
+  return { runParticipantImport };
 }
 
 function renderSummary(createdCount: number, mode: 'append' | 'replace' = 'append') {
@@ -100,5 +112,41 @@ describe('CsvImportSummary page', () => {
     expect(screen.getByDisplayValue('bad-email')).toBeInTheDocument();
     expect(screen.getByText('Jan')).toBeInTheDocument();
     expect(screen.getByText('ABC')).toBeInTheDocument();
+  });
+
+  it('uses the full source row when saving an invalid row with a corrected email', async () => {
+    const { runParticipantImport } = renderSummaryState({
+      summary: {
+        created_count: 0,
+        duplicate_count: 0,
+        invalid_count: 1,
+        invalid_rows: [2],
+        invalid_row_details: [{
+          row_number: 2,
+          reasons: ['Brak adresu e-mail w kolumnie "Email".'],
+          row: { Email: '' },
+        }],
+      },
+      headers: ['Email', 'Imie', 'Nazwisko', 'Klub'],
+      sourceRows: [{ Email: '', Imie: 'Jan', Nazwisko: 'Kowalski', Klub: 'ABC' }],
+      emailColumn: 'Email',
+      fileName: 'uczestnicy.csv',
+      mode: 'append',
+    });
+
+    expect(screen.getByText('Jan')).toBeInTheDocument();
+    expect(screen.getByText('Kowalski')).toBeInTheDocument();
+    expect(screen.getByText('ABC')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('email@example.com'), {
+      target: { value: 'jan@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Dopisz$/ }));
+
+    await waitFor(() => expect(runParticipantImport).toHaveBeenCalled());
+    expect(runParticipantImport).toHaveBeenCalledWith(
+      'event-1',
+      'Email;Imie;Nazwisko;Klub\r\njan@example.com;Jan;Kowalski;ABC',
+    );
   });
 });
