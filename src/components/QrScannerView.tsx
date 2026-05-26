@@ -51,12 +51,21 @@ interface QrScannerViewProps {
   paused?: boolean;
 }
 
-const SCANNER_REGION_ID = 'qr-scanner-region';
+const SCANNER_REGION_ID_PREFIX = 'qr-scanner-region';
 const QR_SCANNER_MODULE_PATH = '/vendor/qr-scanner/qr-scanner.min.js';
 const START_RECOVERY_DELAY_MS = 700;
 const START_TIMEOUT_MS = 6500;
 const SCAN_LOCK_RELEASE_DELAY_MS = 250;
 const TARGET_CAMERA_ASPECT_RATIO = 4 / 3;
+
+let scannerRegionSequence = 0;
+
+class ScannerStartTimeoutError extends Error {
+  constructor() {
+    super('QR scanner camera start timed out.');
+    this.name = 'ScannerStartTimeoutError';
+  }
+}
 
 function isRearCameraLabel(label: string) {
   return /back|rear|environment/i.test(label);
@@ -163,6 +172,31 @@ function stopContainerVideoTracks(container: HTMLDivElement | null) {
   });
 }
 
+function createScannerRegion(container: HTMLDivElement | null) {
+  if (!container) {
+    throw new Error('QR scanner container is not available.');
+  }
+
+  stopContainerVideoTracks(container);
+  container.replaceChildren();
+
+  const region = document.createElement('div');
+  scannerRegionSequence += 1;
+  region.id = `${SCANNER_REGION_ID_PREFIX}-${scannerRegionSequence}`;
+  container.appendChild(region);
+
+  return region;
+}
+
+function removeScannerRegion(region: HTMLDivElement | null) {
+  if (!region) {
+    return;
+  }
+
+  stopContainerVideoTracks(region);
+  region.remove();
+}
+
 async function cleanupScanner(scanner: Html5Qrcode, container: HTMLDivElement | null) {
   try {
     const state = scanner.getState();
@@ -194,17 +228,26 @@ async function startWithVideoRecovery(
   }, START_RECOVERY_DELAY_MS);
 
   let startTimeout: number | undefined;
+  const startPromise = scanner.start(cameraIdOrConfig, configuration, onScanSuccess, () => {});
 
   try {
     await Promise.race([
-      scanner.start(cameraIdOrConfig, configuration, onScanSuccess, () => {}),
+      startPromise,
       new Promise<never>((_, reject) => {
         startTimeout = window.setTimeout(() => {
           stopContainerVideoTracks(container);
-          reject(new Error('QR scanner camera start timed out.'));
+          reject(new ScannerStartTimeoutError());
         }, START_TIMEOUT_MS);
       }),
     ]);
+  } catch (error) {
+    if (error instanceof ScannerStartTimeoutError) {
+      void startPromise
+        .then(() => cleanupScanner(scanner, container))
+        .catch(() => stopContainerVideoTracks(container));
+    }
+
+    throw error;
   } finally {
     window.clearTimeout(recoveryTimer);
     if (startTimeout !== undefined) {
@@ -377,7 +420,7 @@ function AppleQrScannerView({ onScan, paused }: QrScannerViewProps) {
   }
 
   return (
-    <div className="relative rounded-lg bg-black">
+    <div className="relative overflow-hidden rounded-lg bg-black">
       <div className="qr-scanner-region w-full">
         <video ref={videoRef} className="h-full w-full bg-black object-cover" />
       </div>
@@ -390,7 +433,7 @@ function AppleQrScannerView({ onScan, paused }: QrScannerViewProps) {
       )}
 
       {(cameraState === 'denied' || cameraState === 'error') && (
-        <div className="aspect-[4/3] flex flex-col items-center justify-center bg-muted gap-3 p-6">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted gap-3 p-6">
           <CameraOff className="h-10 w-10 text-muted-foreground/50" />
           <p className="text-sm font-semibold text-muted-foreground">
             {cameraState === 'denied' ? 'Brak dostępu do kamery' : 'Nie można uruchomić kamery'}
@@ -440,6 +483,7 @@ function AppleQrScannerView({ onScan, paused }: QrScannerViewProps) {
 function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerRegionRef = useRef<HTMLDivElement | null>(null);
   const [cameraState, setCameraState] = useState<CameraState>('requesting');
   const onScanRef = useRef(onScan);
   const scanInProgressRef = useRef(false);
@@ -474,7 +518,9 @@ function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
 
       const startAttempts: Array<() => Promise<void>> = [
         async () => {
-          const scanner = new Html5Qrcode(SCANNER_REGION_ID, currentScannerConfig);
+          const scannerRegion = createScannerRegion(scannerContainer);
+          scannerRegionRef.current = scannerRegion;
+          const scanner = new Html5Qrcode(scannerRegion.id, currentScannerConfig);
           scannerRef.current = scanner;
           await startWithVideoRecovery(
             scanner,
@@ -484,18 +530,20 @@ function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
               videoConstraints: createPreferredVideoConstraints(),
             },
             onScanSuccess,
-            scannerContainer,
+            scannerRegion,
           );
         },
         async () => {
-          const scanner = new Html5Qrcode(SCANNER_REGION_ID, currentScannerConfig);
+          const scannerRegion = createScannerRegion(scannerContainer);
+          scannerRegionRef.current = scannerRegion;
+          const scanner = new Html5Qrcode(scannerRegion.id, currentScannerConfig);
           scannerRef.current = scanner;
           await startWithVideoRecovery(
             scanner,
             { facingMode: 'environment' },
             baseScanConfig,
             onScanSuccess,
-            scannerContainer,
+            scannerRegion,
           );
         },
         async () => {
@@ -509,14 +557,16 @@ function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
             ? baseScanConfig
             : { ...baseScanConfig, disableFlip: false };
 
-          const scanner = new Html5Qrcode(SCANNER_REGION_ID, currentScannerConfig);
+          const scannerRegion = createScannerRegion(scannerContainer);
+          scannerRegionRef.current = scannerRegion;
+          const scanner = new Html5Qrcode(scannerRegion.id, currentScannerConfig);
           scannerRef.current = scanner;
           await startWithVideoRecovery(
             scanner,
             preferredCamera.id,
             scanConfig,
             onScanSuccess,
-            scannerContainer,
+            scannerRegion,
           );
         },
       ];
@@ -531,7 +581,7 @@ function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
 
           try {
             await startAttempt();
-            await ensureVideoPlayback(scannerContainer);
+            await ensureVideoPlayback(scannerRegionRef.current);
 
             if (mounted) {
               setCameraState('active');
@@ -540,12 +590,15 @@ function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
           } catch (error) {
             lastError = error;
             const scanner = scannerRef.current;
+            const scannerRegion = scannerRegionRef.current;
             scannerRef.current = null;
+            scannerRegionRef.current = null;
             if (scanner) {
-              await cleanupScanner(scanner, scannerContainer);
+              await cleanupScanner(scanner, scannerRegion);
             } else {
-              stopContainerVideoTracks(scannerContainer);
+              stopContainerVideoTracks(scannerRegion);
             }
+            removeScannerRegion(scannerRegion);
           }
         }
 
@@ -566,12 +619,15 @@ function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
     return () => {
       mounted = false;
       const scanner = scannerRef.current;
+      const scannerRegion = scannerRegionRef.current;
       scannerRef.current = null;
+      scannerRegionRef.current = null;
       if (scanner) {
-        void cleanupScanner(scanner, scannerContainer);
+        void cleanupScanner(scanner, scannerRegion);
       } else {
-        stopContainerVideoTracks(scannerContainer);
+        stopContainerVideoTracks(scannerRegion);
       }
+      removeScannerRegion(scannerRegion);
     };
   }, [paused]);
 
@@ -584,9 +640,9 @@ function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
   }
 
   return (
-    <div className="relative rounded-lg bg-black">
+    <div className="relative overflow-hidden rounded-lg bg-black">
       {/* Camera feed renders here */}
-      <div ref={containerRef} id={SCANNER_REGION_ID} className="qr-scanner-region w-full" />
+      <div ref={containerRef} className="qr-scanner-region w-full" />
 
       {/* Overlay states */}
       {cameraState === 'requesting' && (
@@ -597,7 +653,7 @@ function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
       )}
 
       {(cameraState === 'denied' || cameraState === 'error') && (
-        <div className="aspect-[4/3] flex flex-col items-center justify-center bg-muted gap-3 p-6">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted gap-3 p-6">
           <CameraOff className="h-10 w-10 text-muted-foreground/50" />
           <p className="text-sm font-semibold text-muted-foreground">
             {cameraState === 'denied' ? 'Brak dostępu do kamery' : 'Nie można uruchomić kamery'}
