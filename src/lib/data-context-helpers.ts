@@ -1,5 +1,5 @@
 import type { ActivityLog, ConnectionState, Event, Organization, Participant, ParticipantStatus, User } from '@/types';
-import type { OfflineBootstrapSnapshot, PendingParticipantMutation } from '@/lib/offline-store';
+import { createSnapshotVersion, type OfflineBootstrapSnapshot, type PendingParticipantMutation } from '@/lib/offline-store';
 import { API_BASE_URL } from '@/lib/api';
 import { normalizeParticipantStatus } from '@/lib/participant-status';
 import { isEventOfficeOpen } from '@/lib/events';
@@ -141,7 +141,22 @@ export function persistStoredSelectedEventId(userId: string, eventId: string): v
   persistStoredContextValue(getSelectedEventStorageKey(userId), eventId);
 }
 
-type ParticipantLike = Partial<ApiParticipant> & Partial<Participant>;
+interface ParticipantLike {
+  id?: string | number;
+  event_id?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  display_name?: string | null;
+  name?: string | null;
+  email?: string | null;
+  bib_number?: string | null;
+  qr_code?: string | null;
+  custom_fields?: Record<string, string> | null;
+  important_field_aliases?: string[] | null;
+  status?: ParticipantStatus | 'pending' | string | null;
+  email_status?: 'not_sent' | 'sent' | string | null;
+  checked_in_at?: string | null;
+}
 
 function toTrimmedString(value: unknown): string {
   if (typeof value === 'string') return value.trim();

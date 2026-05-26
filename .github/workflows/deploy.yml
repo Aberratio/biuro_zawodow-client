@@ -63,7 +63,7 @@ jobs:
 
       - name: Run frontend tests
         if: env.SKIP_TESTS != 'true'
-        run: npm test
+        run: npm run check
 
       - name: Validate deploy method
         run: |
@@ -300,7 +300,7 @@ jobs:
 
       - name: Run frontend tests
         if: env.SKIP_TESTS != 'true'
-        run: npm test
+        run: npm run check
 
       - name: Validate deploy method
         run: |
