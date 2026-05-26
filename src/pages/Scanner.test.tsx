@@ -44,10 +44,10 @@ vi.mock('@/components/QrScannerView', () => ({
   ),
 }));
 
-function createEvent(): Event {
+function createEvent(id = 'event-1', name = 'Bieg Miejski'): Event {
   return {
-    id: 'event-1',
-    name: 'Bieg Miejski',
+    id,
+    name,
     location: 'Warszawa',
     organization_id: 'org-1',
     office_open_at: '2099-04-12T07:00:00',
@@ -116,17 +116,22 @@ function createMappings(): ParticipantFieldMapping[] {
 function createDataState(
   role: User['role'],
   bibNumber = '',
-  options?: { mappings?: ParticipantFieldMapping[]; participant?: Participant; mappingError?: boolean },
+  options?: { mappings?: ParticipantFieldMapping[]; participant?: Participant; mappingError?: boolean; events?: Event[]; selectedEventId?: string },
 ) {
   const event = createEvent();
+  const events = options?.events ?? [event];
+  const selectedEventId = options?.selectedEventId ?? event.id;
+  const selectedEvent = events.find(entry => entry.id === selectedEventId) ?? event;
   const participant = options?.participant ?? createParticipant(bibNumber);
+  const scanEvent = events.find(entry => entry.id === participant.event_id) ?? selectedEvent;
 
   return {
     participants: [participant],
-    events: [event],
+    events,
     activityLog: [],
-    selectedEventId: event.id,
-    selectedOrganizationId: event.organization_id,
+    selectedEventId,
+    selectedOrganizationId: selectedEvent.organization_id,
+    selectEventContext: vi.fn(),
     updateParticipantStatus: vi.fn(async () => ({ ok: true })),
     updateParticipantBibNumber: vi.fn(async () => ({ ok: true })),
     updateParticipantDetails: vi.fn(async () => ({ ok: true })),
@@ -135,12 +140,12 @@ function createDataState(
       ok: true,
       data: {
         participant,
-        event,
+        event: scanEvent,
         access: { allowed: true },
       },
     })),
     isLoading: false,
-    visibleEvents: [event],
+    visibleEvents: events,
     connectionState: 'online',
     pendingMutationCount: 0,
     scannerMode: 'online',
@@ -151,7 +156,7 @@ function createDataState(
     deleteParticipant: vi.fn(async () => ({ ok: true })),
     getParticipantQrPreview: vi.fn(async () => ({
       participant,
-      event,
+      event: scanEvent,
       qr_code_svg_data_uri: 'data:image/svg+xml;base64,PHN2Zy8+',
       qr_code_image_url: 'https://example.com/qr.svg',
     })),
@@ -282,6 +287,35 @@ describe('Scanner page', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('heading', { name: 'Edytuj dane uczestnika' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('textbox', { name: 'Email' })).toHaveValue('anna@example.com');
+  });
+
+  it('opens the scanned participant under its own event when scanner plus has multiple events', async () => {
+    const firstEvent = createEvent('event-1', 'Bieg Miejski');
+    const secondEvent = createEvent('event-2', 'Triathlon');
+    const participant = {
+      ...createParticipant(''),
+      event_id: secondEvent.id,
+    };
+    const dataState = createDataState('scanner_plus', '', {
+      events: [firstEvent, secondEvent],
+      participant,
+      selectedEventId: firstEvent.id,
+    });
+    useDataMock.mockReturnValue(dataState);
+
+    renderPages();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
+    await screen.findByRole('button', { name: 'Edytuj dane uczestnika' });
+
+    await waitFor(() => {
+      expect(dataState.selectEventContext).toHaveBeenCalledWith(secondEvent.id);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edytuj dane uczestnika' }));
+
+    const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('textbox', { name: 'Email' })).toHaveValue('anna@example.com');
   });
 

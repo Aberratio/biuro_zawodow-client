@@ -590,17 +590,43 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     return payload.data;
   }, [applyOnlineOnly, getAuthHeaders]);
+  const rememberParticipantFieldMappingsState = useCallback((eventId: string, state: ParticipantFieldMappingsState) => {
+    const fetchedAt = Date.now();
+    participantFieldMappingsStateCacheRef.current.set(eventId, { fetchedAt, state });
+    participantFieldMappingsCacheRef.current.set(eventId, { fetchedAt, mappings: state.mappings });
+    participantFieldMappingsFailureUntilRef.current.delete(eventId);
+  }, []);
+  const markParticipantImportBaselineCache = useCallback((eventId: string) => {
+    const cachedState = participantFieldMappingsStateCacheRef.current.get(eventId)?.state;
+    const cachedMappings = participantFieldMappingsCacheRef.current.get(eventId)?.mappings;
+    const mappings = cachedState?.mappings ?? cachedMappings ?? [];
+
+    if (mappings.length === 0) {
+      participantFieldMappingsStateCacheRef.current.delete(eventId);
+      participantFieldMappingsFailureUntilRef.current.delete(eventId);
+      return;
+    }
+
+    rememberParticipantFieldMappingsState(eventId, {
+      has_mapping: true,
+      has_baseline_import: true,
+      mappings,
+    });
+  }, [rememberParticipantFieldMappingsState]);
   const confirmParticipantImportMapping = useCallback(async (eventId: string, payload: ParticipantImportMappingPayload) => {
     const mappings = ((await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/events/${eventId}/participant-imports/confirm`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(payload) }))).payload as { data?: ParticipantFieldMapping[] }).data ?? [];
     const cachedState = participantFieldMappingsStateCacheRef.current.get(eventId)?.state;
-    participantFieldMappingsCacheRef.current.set(eventId, { fetchedAt: Date.now(), mappings });
-    participantFieldMappingsStateCacheRef.current.set(eventId, { fetchedAt: Date.now(), state: { has_mapping: mappings.length > 0, has_baseline_import: cachedState?.has_baseline_import ?? false, mappings } });
-    participantFieldMappingsFailureUntilRef.current.delete(eventId);
+    rememberParticipantFieldMappingsState(eventId, { has_mapping: mappings.length > 0, has_baseline_import: cachedState?.has_baseline_import ?? false, mappings });
     return mappings;
-  }, [applyOnlineOnly, getAuthHeaders]);
+  }, [applyOnlineOnly, getAuthHeaders, rememberParticipantFieldMappingsState]);
   const runParticipantImport = useCallback(async (eventId: string, csvContent: string) => {
     const payload = (await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/events/${eventId}/participant-imports/run`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ csv_content: csvContent }) }))).payload as { data?: Record<string, unknown> };
     const data = payload.data ?? {}; const createdParticipants = Array.isArray(data.participants) ? data.participants.map((participant: ApiParticipant) => mapApiParticipantToUi(participant, eventId)) : []; setParticipantRecords(previous => [...previous, ...createdParticipants]); if (createdParticipants.length > 0) addLog(`Import CSV (${createdParticipants.length} uczestników)`);
+    if (createdParticipants.length > 0) {
+      markParticipantImportBaselineCache(eventId);
+    } else {
+      participantFieldMappingsStateCacheRef.current.delete(eventId);
+    }
     return {
       created_count: Number(data.created_count ?? 0),
       duplicate_count: Number(data.duplicate_count ?? 0),
@@ -610,7 +636,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       duplicate_row_details: mapParticipantImportRowIssues(data.duplicate_row_details),
       participants: createdParticipants,
     };
-  }, [addLog, applyOnlineOnly, getAuthHeaders]);
+  }, [addLog, applyOnlineOnly, getAuthHeaders, markParticipantImportBaselineCache]);
   const replaceParticipantImport = useCallback(async (eventId: string, csvContent: string, mapping: ParticipantImportMappingPayload, confirmQrSent = false) => {
     const payload = (await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/events/${eventId}/participant-imports/replace`, {
       method: 'POST',
