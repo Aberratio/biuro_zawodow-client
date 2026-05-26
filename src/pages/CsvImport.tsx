@@ -1035,7 +1035,7 @@ export default function CsvImport() {
             <AlertDialogTitle>Ten CSV wygląda jak inna lista</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <span className="block">
-                Wykryto różnice między zapisaną listą a nowym plikiem. Różnica w składzie uczestników wynosi około {participantDifferencePercent}%.
+                Wykryto różnice między zapisaną listą a nowym plikiem.
               </span>
               {analysis?.list_difference?.columns_differ && (
                 <span className="block">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Cookie, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -174,9 +175,16 @@ export function CookieConsent() {
                   </Label>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     Sesja, bezpieczeństwo, stan interfejsu i zapis preferencji.
+                    Nie można ich wyłączyć, bo aplikacja nie działałaby
+                    prawidłowo.
                   </p>
                 </div>
-                <Switch checked disabled aria-label="Niezbędne cookies" />
+                <Badge
+                  variant="outline"
+                  className="shrink-0 border-[hsl(var(--button-highlight)/0.3)] bg-[hsl(var(--button-highlight)/0.1)] text-[hsl(var(--button-highlight))]"
+                >
+                  Zawsze aktywne
+                </Badge>
               </div>
             </div>
 
