@@ -255,7 +255,7 @@ function LoginFooter({
       </p>
       <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs">
         <Link to="/legal/privacy" className={secondaryLinkClassName}>
-          Prywatność i RODO
+          Polityka Prywatności
         </Link>
         <Link to="/legal/terms" className={secondaryLinkClassName}>
           Regulamin
