@@ -3,11 +3,14 @@ import { ArrowLeft, Cookie, FileText, Scale, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandWordmark } from "@/components/BrandWordmark";
 import { openCookiePreferences } from "@/lib/cookie-consent";
+import { cn } from "@/lib/utils";
 
 type LegalSection = {
   title: string;
-  body: string[];
+  body: LegalBlock[];
 };
+
+type LegalBlock = string | { items: string[] };
 
 type LegalDocument = {
   title: string;
@@ -17,178 +20,632 @@ type LegalDocument = {
   sections: LegalSection[];
 };
 
-const legalAdminName =
-  import.meta.env.VITE_LEGAL_ADMIN_NAME?.trim() || "ZmierzymyCzas.pl";
-const legalAdminAddress =
-  import.meta.env.VITE_LEGAL_ADMIN_ADDRESS?.trim() ||
-  "adres korespondencyjny wskazany w umowie lub panelu kontaktowym administratora";
-const legalContactEmail =
-  import.meta.env.VITE_LEGAL_CONTACT_EMAIL?.trim() ||
-  "kanał kontaktowy wskazany w serwisie zmierzymyczas.pl";
-
 const legalDocuments: Record<string, LegalDocument> = {
   privacy: {
-    title: "Polityka prywatności i RODO",
-    lead:
-      "Informacje o przetwarzaniu danych osobowych użytkowników panelu Biuro Zawodów.",
-    updatedAt: "24 maja 2026",
+    title: "Polityka Prywatności",
+    lead: "Zasady przetwarzania danych osobowych użytkowników biura zawodów.",
+    updatedAt: "26 maja 2026 r.",
     icon: ShieldCheck,
     sections: [
       {
-        title: "Administrator danych",
+        title: "1. Informacje podstawowe",
         body: [
-          `Administratorem danych jest ${legalAdminName}, operator usługi udostępniający panel Biuro Zawodów. Adres korespondencyjny: ${legalAdminAddress}.`,
-          `Sprawy dotyczące ochrony danych osobowych należy kierować na: ${legalContactEmail}.`,
+          "Niniejsza Polityka Prywatności określa zasady przetwarzania danych osobowych użytkowników serwisu internetowego www.zmierzymyczas.pl",
+          "Administratorem danych osobowych jest:",
+          "Dobre Czasy s.c.\nul. Morcinka 43\n45-531 Opole\nPolska",
+          "Kontakt w sprawach związanych z ochroną danych osobowych:\nE-mail: biuro@zmierzymyczas.pl\nTelefon: 501 146 066, 604 429 349",
+          "Administrator dokłada szczególnej staranności w celu ochrony prywatności użytkowników oraz bezpieczeństwa przekazywanych danych osobowych.",
         ],
       },
       {
-        title: "Zakres danych",
+        title: "2. Zakres zbieranych danych",
         body: [
-          "Panel może przetwarzać dane kont użytkowników, organizacji, wydarzeń, uczestników zawodów, zgłoszeń, odpraw, kodów QR, historii importu CSV, logów technicznych i działań administracyjnych.",
-          "Zakres danych uczestników zależy od importu i konfiguracji wydarzenia. Może obejmować imię, nazwisko, e-mail, telefon, numer startowy, kategorię, klub, miasto, kraj, status płatności, notatki organizacyjne i dane potrzebne do obsługi biura zawodów.",
+          "W zależności od celu korzystania z serwisu możemy przetwarzać następujące dane:",
+          {
+            items: [
+              "imię i nazwisko,",
+              "adres e-mail,",
+              "numer telefonu,",
+              "data urodzenia,",
+              "płeć,",
+              "miejscowość,",
+              "klub sportowy,",
+              "numer startowy,",
+              "wyniki sportowe,",
+              "dane dotyczące płatności,",
+              "adres IP,",
+              "dane zapisywane w plikach cookies,",
+              "dane techniczne dotyczące urządzenia i przeglądarki.",
+            ],
+          },
+          "Podanie danych jest dobrowolne, jednak w niektórych przypadkach niezbędne do realizacji usługi, w szczególności zapisów na wydarzenia sportowe.",
         ],
       },
       {
-        title: "Cele i podstawy prawne",
+        title: "3. Cele i podstawy prawne przetwarzania danych",
         body: [
-          "Dane są przetwarzane w celu prowadzenia kont użytkowników, obsługi wydarzeń sportowych, weryfikacji uprawnień, odprawy uczestników, wysyłki kodów QR, bezpieczeństwa aplikacji oraz dokumentowania działań w systemie.",
-          "Podstawą przetwarzania jest wykonanie umowy lub działań przed jej zawarciem, obowiązek prawny, prawnie uzasadniony interes administratora polegający na zabezpieczeniu i rozliczalności usługi oraz zgoda tam, gdzie jest wymagana, w szczególności dla analityki i nagrywania sesji.",
+          "Dane osobowe przetwarzane są zgodnie z Rozporządzeniem Parlamentu Europejskiego i Rady (UE) 2016/679 (RODO).",
+          "Dane przetwarzamy w następujących celach:",
+          "a) Realizacja zapisów na wydarzenia sportowe",
+          "Podstawa prawna: art. 6 ust. 1 lit. b RODO – wykonanie umowy.",
+          "Obejmuje m.in.:",
+          {
+            items: [
+              "rejestrację uczestników,",
+              "prowadzenie list startowych,",
+              "pomiar czasu,",
+              "publikację wyników,",
+              "kontakt organizacyjny,",
+              "obsługę płatności.",
+            ],
+          },
+          "b) Realizacja obowiązków prawnych",
+          "Podstawa prawna: art. 6 ust. 1 lit. c RODO.",
+          "Dotyczy to m.in. obowiązków księgowych i podatkowych.",
+          "c) Marketing własnych usług",
+          "Podstawa prawna: art. 6 ust. 1 lit. f RODO – prawnie uzasadniony interes administratora.",
+          "Obejmuje m.in.:",
+          {
+            items: [
+              "wysyłkę informacji o wydarzeniach,",
+              "publikację materiałów promocyjnych,",
+              "prowadzenie statystyk i analiz.",
+            ],
+          },
+          "d) Zgoda użytkownika",
+          "Podstawa prawna: art. 6 ust. 1 lit. a RODO.",
+          "Dotyczy działań wymagających odrębnej zgody, np. marketingu partnerów lub zapisów do newslettera.",
+          "Zgodę można wycofać w dowolnym momencie.",
         ],
       },
       {
-        title: "Mouseflow i analityka",
+        title: "4. Publikacja wyników sportowych i wizerunku",
         body: [
-          "Mouseflow jest narzędziem analitycznym do nagrywania sesji, map aktywności i diagnostyki użyteczności. Skrypt Mouseflow w tej aplikacji ładuje się dopiero po wyrażeniu zgody na analitykę.",
-          "Aplikacja oznacza pola formularzy jako pomijane w Mouseflow. Przed produkcyjnym użyciem należy dodatkowo skonfigurować maskowanie w panelu Mouseflow, podpisać DPA, ograniczyć retencję nagrań i wykluczyć widoki zawierające dane szczególnie wrażliwe albo zbędne do diagnostyki.",
+          "W związku z organizacją wydarzeń sportowych Administrator może publikować:",
+          {
+            items: [
+              "listy startowe,",
+              "wyniki zawodów,",
+              "galerie zdjęć,",
+              "materiały video,",
+              "relacje z wydarzeń.",
+            ],
+          },
+          "Publikowane dane mogą obejmować:",
+          {
+            items: [
+              "imię i nazwisko,",
+              "miejscowość,",
+              "klub,",
+              "kategorię wiekową,",
+              "osiągnięty wynik,",
+              "wizerunek utrwalony podczas wydarzenia.",
+            ],
+          },
+          "Publikacja wyników i relacji stanowi uzasadniony interes administratora związany z organizacją wydarzeń sportowych.",
         ],
       },
       {
-        title: "Odbiorcy danych i powierzenie",
+        title: "5. Odbiorcy danych",
         body: [
-          "Dane mogą być przekazywane dostawcom hostingu, poczty, utrzymania systemu, narzędzi diagnostycznych i podmiotom wspierającym administratora w realizacji usługi.",
-          "Z każdym procesorem, który przetwarza dane osobowe w imieniu administratora, należy zawrzeć umowę powierzenia przetwarzania danych. Dotyczy to także Mouseflow, jeżeli analityka jest aktywna.",
+          "Dane mogą być przekazywane podmiotom współpracującym z Administratorem wyłącznie w zakresie niezbędnym do realizacji usług, w szczególności:",
+          {
+            items: [
+              "organizatorom wydarzeń sportowych,",
+              "operatorom płatności,",
+              "dostawcom hostingu,",
+              "firmom świadczącym usługi IT,",
+              "podmiotom obsługującym mailing,",
+              "firmom księgowym,",
+              "podmiotom odpowiedzialnym za pomiar czasu.",
+            ],
+          },
+          "Dane mogą zostać udostępnione również uprawnionym organom publicznym, jeśli wymagają tego przepisy prawa.",
         ],
       },
       {
-        title: "Okres przechowywania",
+        title: "6. Okres przechowywania danych",
         body: [
-          "Dane są przechowywane przez okres niezbędny do realizacji usługi, obsługi wydarzeń, rozliczeń, dochodzenia lub obrony roszczeń oraz spełnienia obowiązków prawnych.",
-          "Dane analityczne i nagrania sesji powinny mieć możliwie krótką retencję, dopasowaną do celu diagnostycznego i ustawioną w panelu dostawcy.",
+          "Dane będą przechowywane:",
+          {
+            items: [
+              "przez okres niezbędny do realizacji usług,",
+              "przez okres wymagany przepisami prawa,",
+              "do momentu przedawnienia roszczeń,",
+              "do czasu wycofania zgody – w przypadku danych przetwarzanych na podstawie zgody.",
+            ],
+          },
+          "Wyniki sportowe mogą być przechowywane bezterminowo ze względu na historyczny i archiwalny charakter danych sportowych.",
         ],
       },
       {
-        title: "Prawa osób",
+        title: "7. Prawa użytkownika",
         body: [
-          "Osobie, której dane dotyczą, przysługuje prawo dostępu do danych, sprostowania, usunięcia, ograniczenia przetwarzania, przenoszenia danych, sprzeciwu oraz wycofania zgody bez wpływu na zgodność wcześniejszego przetwarzania.",
-          "Osoba, której dane dotyczą, ma prawo wnieść skargę do Prezesa Urzędu Ochrony Danych Osobowych.",
+          "Każdej osobie, której dane dotyczą, przysługuje prawo do:",
+          {
+            items: [
+              "dostępu do danych,",
+              "sprostowania danych,",
+              "usunięcia danych,",
+              "ograniczenia przetwarzania,",
+              "przenoszenia danych,",
+              "wniesienia sprzeciwu wobec przetwarzania,",
+              "cofnięcia zgody,",
+              "wniesienia skargi do Prezesa Urzędu Ochrony Danych Osobowych.",
+            ],
+          },
+          "Kontakt w sprawach dotyczących realizacji praw użytkownika: biuro@zmierzymyczas.pl",
+        ],
+      },
+      {
+        title: "8. Pliki cookies",
+        body: [
+          "Serwis wykorzystuje pliki cookies oraz podobne technologie w celu:",
+          {
+            items: [
+              "prawidłowego działania strony,",
+              "utrzymania sesji użytkownika,",
+              "prowadzenia statystyk,",
+              "poprawy jakości usług,",
+              "działań marketingowych.",
+            ],
+          },
+          "Cookies mogą być wykorzystywane przez:",
+          {
+            items: [
+              "narzędzia reklamowe Google,",
+              "inne narzędzia analityczne i marketingowe.",
+            ],
+          },
+          "Użytkownik może samodzielnie zarządzać ustawieniami cookies w swojej przeglądarce.",
+          "Jeżeli serwis korzysta z banera zgód cookies, użytkownik może zmienić swoje preferencje w dowolnym momencie.",
+        ],
+      },
+      {
+        title: "9. Profilowanie",
+        body: [
+          "Dane użytkowników mogą być przetwarzane w sposób zautomatyzowany, w tym profilowane, wyłącznie w zakresie niezbędnym do działań marketingowych oraz statystycznych.",
+          "Profilowanie nie wywołuje skutków prawnych wobec użytkownika.",
+        ],
+      },
+      {
+        title: "10. Bezpieczeństwo danych",
+        body: [
+          "Administrator stosuje odpowiednie środki techniczne i organizacyjne zapewniające ochronę przetwarzanych danych osobowych odpowiednią do zagrożeń oraz kategorii danych objętych ochroną.",
+        ],
+      },
+      {
+        title: "11. Linki do innych stron",
+        body: [
+          "Serwis może zawierać odnośniki do innych stron internetowych. Administrator nie odpowiada za zasady prywatności obowiązujące na tych stronach.",
+        ],
+      },
+      {
+        title: "12. Zmiany polityki prywatności",
+        body: [
+          "Administrator zastrzega sobie prawo do wprowadzania zmian w niniejszej Polityce Prywatności.",
+          "Aktualna wersja dokumentu jest zawsze dostępna na stronie: www.zmierzymyczas.pl",
+        ],
+      },
+      {
+        title: "13. Data obowiązywania",
+        body: [
+          "Polityka Prywatności obowiązuje od dnia: 26 maja 2026 r.",
         ],
       },
     ],
   },
   terms: {
-    title: "Regulamin aplikacji",
+    title: "Regulamin",
     lead:
-      "Zasady korzystania z panelu Biuro Zawodów przez organizatorów, administratorów i operatorów.",
-    updatedAt: "24 maja 2026",
+      "Regulamin świadczenia usług drogą elektroniczną dla systemu biura zawodów.",
+    updatedAt: "26 maja 2026 r.",
     icon: Scale,
     sections: [
       {
-        title: "Charakter usługi",
+        title: "§1. Postanowienia ogólne",
         body: [
-          "Biuro Zawodów jest panelem służącym do organizacyjnej obsługi wydarzeń sportowych, w szczególności zarządzania wydarzeniami, uczestnikami, importem CSV, odprawą i wysyłką kodów QR.",
-          "Aplikacja jest przeznaczona dla uprawnionych użytkowników. Dostęp wymaga konta i roli nadanej przez administratora lub organizację.",
+          "Niniejszy Regulamin określa zasady korzystania z internetowego systemu obsługi biura zawodów udostępnianego przez Dobre Czasy s.c.",
+          "System służy do obsługi wydarzeń sportowych, w szczególności:",
+          {
+            items: [
+              "zarządzania biurem zawodów,",
+              "weryfikacji uczestników,",
+              "wydawania pakietów startowych,",
+              "obsługi kodów QR,",
+              "zarządzania listami startowymi,",
+              "obsługi zapisów,",
+              "kontroli wydanych pakietów,",
+              "prowadzenia odpraw i rejestracji uczestników,",
+              "komunikacji organizacyjnej związanej z wydarzeniem sportowym.",
+            ],
+          },
+          "Regulamin stanowi regulamin świadczenia usług drogą elektroniczną w rozumieniu ustawy z dnia 18 lipca 2002 r. o świadczeniu usług drogą elektroniczną.",
+          "Korzystanie z Systemu oznacza akceptację niniejszego Regulaminu.",
         ],
       },
       {
-        title: "Obowiązki użytkownika",
+        title: "§2. Dane Usługodawcy",
         body: [
-          "Użytkownik powinien korzystać z aplikacji zgodnie z prawem, nadanymi uprawnieniami, instrukcjami administratora oraz zasadą minimalizacji danych.",
-          "Zabronione jest udostępnianie konta osobom trzecim, obchodzenie zabezpieczeń, importowanie danych bez podstawy prawnej oraz wykorzystywanie danych uczestników poza celem obsługi wydarzenia.",
+          "Usługodawcą i operatorem Systemu jest:",
+          "DOBRE CZASY SPÓŁKA CYWILNA SŁAWOMIR SMOLIŃSKI, KRZYSZTOF DRUSZCZ\nul. Gustawa Morcinka 43\n45-531 Opole\nNIP: 7543099101\nREGON: 362696290",
+          "Kontakt:",
+          "e-mail: BIURO@ZMIERZMYCZAS.PL\ntel.: 501 146 066 / 604 429 349",
         ],
       },
       {
-        title: "Dane i odpowiedzialność organizatora",
+        title: "§3. Definicje",
         body: [
-          "Organizator odpowiada za poprawność i legalność danych importowanych do aplikacji oraz za poinformowanie uczestników o przetwarzaniu ich danych, jeżeli działa jako administrator albo współadministrator danych.",
-          "Operator aplikacji odpowiada za utrzymanie systemu w zakresie określonym umową lub ustaleniami z organizatorem.",
+          "Użyte w Regulaminie określenia oznaczają:",
+          {
+            items: [
+              "System – internetowa platforma biura zawodów dostępna pod adresem biuro.zmierzymyczas.pl;",
+              "Usługodawca – Dobre Czasy s.c.;",
+              "Organizator – podmiot korzystający z Systemu w celu obsługi wydarzenia sportowego;",
+              "Operator Biura – osoba upoważniona przez Organizatora do korzystania z Systemu;",
+              "Uczestnik – osoba zgłoszona do udziału w wydarzeniu sportowym;",
+              "Kod QR – indywidualny kod identyfikacyjny przypisany uczestnikowi;",
+              "Wydarzenie – impreza sportowa obsługiwana za pomocą Systemu;",
+              "Konto – indywidualny dostęp do Systemu zabezpieczony loginem i hasłem.",
+            ],
+          },
         ],
       },
       {
-        title: "Bezpieczeństwo",
+        title: "§4. Zakres świadczonych usług",
         body: [
-          "Użytkownik powinien chronić hasło, wylogowywać się z urządzeń współdzielonych i nie zapisywać danych uczestników poza zatwierdzonymi narzędziami.",
-          "Podejrzenie naruszenia bezpieczeństwa należy niezwłocznie zgłosić administratorowi usługi.",
+          "System umożliwia:",
+          {
+            items: [
+              "obsługę biura zawodów,",
+              "rejestrację uczestników,",
+              "skanowanie kodów QR,",
+              "weryfikację danych uczestników,",
+              "oznaczanie wydanych pakietów startowych,",
+              "kontrolę statusu uczestnika,",
+              "eksport danych,",
+              "obsługę wielu wydarzeń sportowych,",
+              "zarządzanie operatorami biura,",
+              "generowanie list i raportów.",
+            ],
+          },
+          "Usługodawca może rozwijać funkcjonalności Systemu bez konieczności zmiany Regulaminu, o ile nie wpływa to na prawa użytkowników.",
+          "System może być czasowo niedostępny z przyczyn technicznych, serwisowych lub bezpieczeństwa.",
         ],
       },
       {
-        title: "Zmiany regulaminu",
+        title: "§5. Warunki korzystania z Systemu",
         body: [
-          "Regulamin może być aktualizowany wraz ze zmianami aplikacji, prawa lub modelu świadczenia usługi. Aktualna wersja jest dostępna w aplikacji.",
+          "Korzystanie z Systemu wymaga:",
+          {
+            items: [
+              "dostępu do Internetu,",
+              "aktualnej przeglądarki internetowej,",
+              "urządzenia umożliwiającego odczyt kodów QR (w przypadku korzystania z funkcji skanowania).",
+            ],
+          },
+          "Organizator zobowiązany jest:",
+          {
+            items: [
+              "podawać prawdziwe dane,",
+              "zabezpieczać dane logowania,",
+              "korzystać z Systemu zgodnie z prawem,",
+              "nie udostępniać kont osobom nieuprawnionym.",
+            ],
+          },
+          "Zabrania się:",
+          {
+            items: [
+              "podejmowania prób ingerencji w działanie Systemu,",
+              "kopiowania lub modyfikowania Systemu bez zgody Usługodawcy,",
+              "wykorzystywania Systemu do działań niezgodnych z prawem.",
+            ],
+          },
+        ],
+      },
+      {
+        title: "§6. Kody QR i bezpieczeństwo identyfikacji",
+        body: [
+          "Każdy kod QR przypisany jest indywidualnie do konkretnego uczestnika.",
+          "Organizator odpowiada za prawidłową weryfikację uczestnika podczas wydawania pakietu startowego.",
+          "Zeskanowanie kodu QR może skutkować:",
+          {
+            items: [
+              "oznaczeniem uczestnika jako zweryfikowanego,",
+              "potwierdzeniem odbioru pakietu,",
+              "zmianą statusu uczestnika w Systemie.",
+            ],
+          },
+          "Usługodawca nie odpowiada za błędy wynikające z:",
+          {
+            items: [
+              "przekazania kodu QR osobom trzecim,",
+              "błędnej obsługi przez Organizatora,",
+              "działania urządzeń zewnętrznych,",
+              "braku dostępu do Internetu po stronie Organizatora.",
+            ],
+          },
+          "Organizator zobowiązany jest do ochrony danych uczestników zgodnie z obowiązującymi przepisami prawa, w szczególności RODO.",
+        ],
+      },
+      {
+        title: "§7. Dane osobowe i RODO",
+        body: [
+          "Administratorem danych osobowych uczestników jest Organizator wydarzenia sportowego.",
+          "Dobre Czasy s.c. działa jako podmiot przetwarzający dane na podstawie art. 28 RODO, w zakresie niezbędnym do świadczenia usług Systemu.",
+          "Szczegółowe zasady przetwarzania danych określa Polityka Prywatności dostępna w Serwisie.",
+          "Organizator zobowiązany jest posiadać odpowiednie podstawy prawne do przetwarzania danych uczestników.",
+        ],
+      },
+      {
+        title: "§8. Odpowiedzialność",
+        body: [
+          "Usługodawca dokłada należytej staranności w celu zapewnienia prawidłowego działania Systemu.",
+          "Usługodawca nie ponosi odpowiedzialności za:",
+          {
+            items: [
+              "przerwy wynikające z działania siły wyższej,",
+              "problemy po stronie dostawców Internetu,",
+              "błędne dane wprowadzone przez Organizatora,",
+              "szkody wynikające z nieprawidłowego korzystania z Systemu,",
+              "utratę danych wynikającą z działań osób nieuprawnionych po stronie Organizatora.",
+            ],
+          },
+          "Organizator odpowiada za:",
+          {
+            items: [
+              "poprawność danych uczestników,",
+              "zgodność wydarzenia z obowiązującymi przepisami,",
+              "legalność przetwarzania danych,",
+              "prawidłowość procesu wydawania pakietów.",
+            ],
+          },
+        ],
+      },
+      {
+        title: "§9. Reklamacje",
+        body: [
+          "Reklamacje dotyczące działania Systemu można składać:",
+          {
+            items: ["mailowo na adres: BIURO@ZMIERZMYCZAS.PL"],
+          },
+          "Reklamacja powinna zawierać:",
+          {
+            items: [
+              "dane zgłaszającego,",
+              "opis problemu,",
+              "datę wystąpienia problemu,",
+              "nazwę wydarzenia.",
+            ],
+          },
+          "Reklamacje rozpatrywane są w terminie do 14 dni roboczych.",
+        ],
+      },
+      {
+        title: "§10. Prawa autorskie",
+        body: [
+          "System, jego wygląd, kod źródłowy, funkcjonalności oraz materiały graficzne podlegają ochronie prawnej.",
+          "Zabrania się kopiowania, rozpowszechniania lub wykorzystywania elementów Systemu bez zgody Usługodawcy.",
+        ],
+      },
+      {
+        title: "§11. Postanowienia końcowe",
+        body: [
+          "W sprawach nieuregulowanych Regulaminem zastosowanie mają przepisy:",
+          {
+            items: [
+              "Kodeksu cywilnego,",
+              "ustawy o świadczeniu usług drogą elektroniczną,",
+              "ustawy o prawach konsumenta,",
+              "RODO,",
+              "innych właściwych przepisów prawa polskiego.",
+            ],
+          },
+          "Regulamin dostępny jest nieodpłatnie w formie elektronicznej.",
+          "Usługodawca zastrzega sobie prawo do zmiany Regulaminu z ważnych przyczyn prawnych, technicznych lub organizacyjnych.",
+          "Zmiany Regulaminu publikowane będą w Systemie przed wejściem ich w życie.",
+          "Regulamin obowiązuje od dnia: 26 maja 2026 r.",
         ],
       },
     ],
   },
   cookies: {
-    title: "Polityka cookies",
-    lead:
-      "Informacje o plikach cookies, pamięci lokalnej i zgodach na analitykę.",
-    updatedAt: "24 maja 2026",
+    title: "Polityka Cookies",
+    lead: "Zasady wykorzystywania plików cookies w systemie biura zawodów.",
+    updatedAt: "26 maja 2026 r.",
     icon: Cookie,
     sections: [
       {
-        title: "Rodzaje wykorzystywanych technologii",
+        title: "§1. Informacje ogólne",
         body: [
-          "Aplikacja używa cookies i pamięci lokalnej przeglądarki do utrzymania sesji, bezpieczeństwa, zapamiętania ustawień interfejsu oraz zapisania decyzji o zgodzie.",
-          "Analityka Mouseflow jest opcjonalna. Skrypt ładuje się wyłącznie po wyrażeniu zgody na analitykę i nagrywanie sesji.",
+          "1. Niniejsza Polityka Cookies określa zasady wykorzystywania plików cookies oraz podobnych technologii w serwisie:",
+          "biuro.zmierzymyczas.pl",
+          "2. Administratorem serwisu jest:",
+          "DOBRE CZASY SPÓŁKA CYWILNA SŁAWOMIR SMOLIŃSKI, KRZYSZTOF DRUSZCZ\nul. Gustawa Morcinka 43\n45-531 Opole\nNIP: 7543099101\nREGON: 362696290",
+          "Kontakt:",
+          {
+            items: ["BIURO@ZMIERZMYCZAS.PL", "501 146 066", "604 429 349"],
+          },
         ],
       },
       {
-        title: "Cookies niezbędne",
+        title: "§2. Czym są pliki cookies",
         body: [
-          "Niezbędne cookies są wymagane do działania aplikacji, logowania, zabezpieczenia sesji, zapamiętania stanu panelu bocznego i zapisania preferencji prywatności.",
-          "Tych cookies nie można wyłączyć w panelu preferencji, ponieważ bez nich aplikacja nie działałaby prawidłowo.",
+          "1. Cookies to niewielkie pliki tekstowe zapisywane na urządzeniu użytkownika podczas korzystania ze strony internetowej.",
+          "2. Cookies umożliwiają m.in.:",
+          {
+            items: [
+              "prawidłowe działanie serwisu,",
+              "utrzymanie sesji logowania,",
+              "zwiększenie bezpieczeństwa,",
+              "zapamiętywanie ustawień użytkownika,",
+              "poprawę wydajności systemu.",
+            ],
+          },
         ],
       },
       {
-        title: "Analityka Mouseflow",
+        title: "§3. Rodzaje wykorzystywanych cookies",
         body: [
-          "Po zgodzie Mouseflow może zapisywać identyfikatory sesji i zbierać informacje o interakcjach w aplikacji w celu diagnozowania problemów UX.",
-          "Zgoda jest dobrowolna i może zostać zmieniona w dowolnym momencie. Brak zgody nie ogranicza dostępu do aplikacji.",
+          "Serwis może wykorzystywać:",
+          "a) Cookies niezbędne",
+          "Są wymagane do prawidłowego działania systemu biura zawodów, w szczególności:",
+          {
+            items: [
+              "logowania,",
+              "utrzymania sesji,",
+              "autoryzacji użytkownika,",
+              "zabezpieczeń systemowych.",
+            ],
+          },
+          "Bez tych plików korzystanie z systemu może być niemożliwe.",
+          "b) Cookies funkcjonalne",
+          "Pozwalają zapamiętać ustawienia użytkownika oraz usprawniają korzystanie z serwisu.",
+          "c) Cookies bezpieczeństwa",
+          "Wykorzystywane są do:",
+          {
+            items: [
+              "ochrony przed nieautoryzowanym dostępem,",
+              "wykrywania nadużyć,",
+              "zabezpieczenia kont użytkowników.",
+            ],
+          },
         ],
       },
       {
-        title: "Zmiana zgody",
+        title: "§4. Zarządzanie cookies",
         body: [
-          "Preferencje można zmienić przyciskiem poniżej albo linkiem w stopce logowania i w panelu bocznym po zalogowaniu.",
+          "1. Użytkownik może samodzielnie zarządzać ustawieniami cookies poprzez ustawienia swojej przeglądarki internetowej.",
+          "2. Ograniczenie stosowania cookies może wpłynąć na działanie niektórych funkcji systemu.",
+          "3. Szczegółowe informacje dotyczące zarządzania cookies dostępne są w ustawieniach przeglądarki internetowej użytkownika.",
+        ],
+      },
+      {
+        title: "§5. Dane osobowe",
+        body: [
+          "1. Pliki cookies mogą zawierać dane umożliwiające identyfikację użytkownika wyłącznie w zakresie niezbędnym do działania systemu.",
+          "2. Szczegółowe informacje dotyczące przetwarzania danych osobowych znajdują się w Polityce Prywatności serwisu.",
+        ],
+      },
+      {
+        title: "§6. Zmiany polityki cookies",
+        body: [
+          "1. Administrator zastrzega sobie prawo do zmiany niniejszej Polityki Cookies.",
+          "2. Aktualna wersja dokumentu publikowana jest w serwisie.",
+          "3. Polityka Cookies obowiązuje od dnia: 26 maja 2026 r.",
         ],
       },
     ],
   },
   dpa: {
-    title: "Powierzenie przetwarzania danych",
-    lead:
-      "Lista kontrolna umów powierzenia i wymagań dla dostawców przetwarzających dane.",
-    updatedAt: "24 maja 2026",
+    title: "RODO",
+    lead: "Umowa powierzenia przetwarzania danych osobowych.",
+    updatedAt: "26 maja 2026 r.",
     icon: FileText,
     sections: [
       {
-        title: "Wymagane umowy",
+        title: "§1. Strony umowy",
         body: [
-          "Przed produkcyjnym uruchomieniem należy mieć podpisane lub zaakceptowane umowy powierzenia z dostawcami, którzy przetwarzają dane osobowe w imieniu administratora.",
-          "Dotyczy to w szczególności hostingu, poczty transakcyjnej, obsługi technicznej, kopii zapasowych i Mouseflow, jeżeli włączona jest analityka.",
+          "Umowa zawarta pomiędzy:",
+          "Administratorem danych:",
+          "Organizatorem wydarzenia sportowego korzystającym z systemu biuro.zmierzymyczas.pl",
+          "a",
+          "Podmiotem przetwarzającym:",
+          "DOBRE CZASY SPÓŁKA CYWILNA SŁAWOMIR SMOLIŃSKI, KRZYSZTOF DRUSZCZ\nul. Gustawa Morcinka 43\n45-531 Opole\nNIP: 7543099101\nREGON: 362696290",
+          "zwanym dalej „Procesorem”.",
         ],
       },
       {
-        title: "Minimalne wymagania dla Mouseflow",
+        title: "§2. Przedmiot umowy",
         body: [
-          "W panelu Mouseflow należy wymusić maskowanie pól formularzy, wykluczyć strony zawierające dane zbędne do diagnozy UX, ustawić retencję nagrań, ograniczyć dostęp użytkowników i udokumentować podstawę prawną zgody.",
-          "Klucze projektów Mouseflow powinny być rozdzielone na staging i produkcję przez zmienne VITE_MOUSEFLOW_PROJECT_ID w odpowiednich plikach środowiskowych.",
+          "1. Administrator powierza Procesorowi przetwarzanie danych osobowych uczestników wydarzeń sportowych w zakresie niezbędnym do świadczenia usług systemu biura zawodów.",
+          "2. Powierzenie obejmuje dane przetwarzane w systemie:",
+          "biuro.zmierzymyczas.pl",
         ],
       },
       {
-        title: "Dokumentacja",
+        title: "§3. Zakres i cel przetwarzania",
         body: [
-          "Administrator powinien prowadzić rejestr czynności przetwarzania lub równoważną dokumentację, uwzględniającą cele, kategorie danych, odbiorców, retencję i środki bezpieczeństwa.",
+          "1. Dane przetwarzane są wyłącznie w celu:",
+          {
+            items: [
+              "obsługi biura zawodów,",
+              "identyfikacji uczestników,",
+              "obsługi kodów QR,",
+              "wydawania pakietów startowych,",
+              "prowadzenia list startowych,",
+              "obsługi wyników i klasyfikacji,",
+              "komunikacji organizacyjnej.",
+            ],
+          },
+          "2. Zakres danych może obejmować:",
+          {
+            items: [
+              "imię i nazwisko,",
+              "adres e-mail,",
+              "numer telefonu,",
+              "miejscowość,",
+              "klub sportowy,",
+              "datę urodzenia,",
+              "płeć,",
+              "wyniki sportowe,",
+              "identyfikatory uczestników,",
+              "dane związane z uczestnictwem w wydarzeniu.",
+            ],
+          },
+        ],
+      },
+      {
+        title: "§4. Obowiązki Procesora",
+        body: [
+          "Procesor zobowiązuje się do:",
+          {
+            items: [
+              "przetwarzania danych wyłącznie na udokumentowane polecenie Administratora,",
+              "zapewnienia poufności danych,",
+              "stosowania odpowiednich środków technicznych i organizacyjnych,",
+              "zabezpieczenia danych przed utratą, zniszczeniem lub nieuprawnionym dostępem,",
+              "dopuszczania do danych wyłącznie osób upoważnionych,",
+              "wspierania Administratora w realizacji obowiązków wynikających z RODO.",
+            ],
+          },
+        ],
+      },
+      {
+        title: "§5. Podpowierzenie danych",
+        body: [
+          "1. Procesor może korzystać z podwykonawców świadczących usługi:",
+          {
+            items: [
+              "hostingowe,",
+              "informatyczne,",
+              "serwerowe,",
+              "związane z utrzymaniem systemu.",
+            ],
+          },
+          "2. Procesor odpowiada za działania podwykonawców jak za własne.",
+        ],
+      },
+      {
+        title: "§6. Czas obowiązywania",
+        body: [
+          "1. Umowa obowiązuje przez okres korzystania z systemu biuro.zmierzymyczas.pl.",
+          "2. Po zakończeniu współpracy dane mogą zostać usunięte lub zanonimizowane zgodnie z obowiązującymi przepisami prawa oraz polityką retencji danych.",
+        ],
+      },
+      {
+        title: "§7. Kontrola i odpowiedzialność",
+        body: [
+          "1. Administrator ma prawo zwrócić się do Procesora o informacje dotyczące sposobu przetwarzania danych.",
+          "2. Procesor odpowiada za przetwarzanie danych zgodnie z obowiązującymi przepisami prawa.",
+        ],
+      },
+      {
+        title: "§8. Postanowienia końcowe",
+        body: [
+          "1. W sprawach nieuregulowanych zastosowanie mają przepisy RODO oraz prawa polskiego.",
+          "2. Umowa stanowi integralną część korzystania z systemu biuro.zmierzymyczas.pl.",
+          "3. Dokument obowiązuje od dnia: 26 maja 2026 r.",
         ],
       },
     ],
@@ -196,11 +653,33 @@ const legalDocuments: Record<string, LegalDocument> = {
 };
 
 const legalLinks = [
-  { to: "/legal/privacy", label: "Prywatność i RODO" },
+  { to: "/legal/privacy", label: "Polityka Prywatności" },
   { to: "/legal/terms", label: "Regulamin" },
   { to: "/legal/cookies", label: "Cookies" },
-  { to: "/legal/dpa", label: "Powierzenie danych" },
+  { to: "/legal/dpa", label: "RODO" },
 ];
+
+function getLegalParagraphClass(value: string) {
+  const text = value.trim();
+  const hasLineBreak = value.includes("\n");
+  const isSubheading = /^[a-d]\)\s/.test(text);
+  const isIntroLabel = text.endsWith(":");
+  const isNumberedPoint = /^\d+\.\s/.test(text);
+
+  return cn(
+    "whitespace-pre-line text-[0.95rem] leading-7",
+    hasLineBreak
+      ? "rounded-[0.85rem] border border-white/10 bg-white/[0.035] px-4 py-3 font-medium text-foreground/85 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04)]"
+      : "text-foreground/72",
+    isIntroLabel &&
+      !hasLineBreak &&
+      "pt-2 font-semibold text-foreground/90",
+    isSubheading &&
+      "mt-5 rounded-[0.75rem] bg-[hsl(var(--button-highlight)/0.1)] px-3 py-2 font-semibold text-foreground",
+    isNumberedPoint &&
+      "border-l border-[hsl(var(--button-highlight)/0.22)] pl-4",
+  );
+}
 
 export default function Legal() {
   const { slug } = useParams<{ slug: string }>();
@@ -281,20 +760,43 @@ export default function Legal() {
             </nav>
           </aside>
 
-          <div className="min-w-0 space-y-4">
-            <article className="space-y-4">
+          <div className="min-w-0 space-y-5">
+            <article className="space-y-5">
               {document.sections.map((section) => (
                 <section
                   key={section.title}
-                  className="rounded-[1.15rem] border border-white/10 bg-[linear-gradient(180deg,hsl(220_12%_10%/0.9),hsl(220_14%_7%/0.9))] p-5 shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04)]"
+                  className="overflow-hidden rounded-[1.15rem] border border-white/10 bg-[linear-gradient(180deg,hsl(220_12%_10%/0.92),hsl(220_14%_7%/0.92))] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04),0_18px_44px_hsl(var(--surface-shadow)/0.2)]"
                 >
-                  <h2 className="text-xl font-semibold tracking-normal">
-                    {section.title}
-                  </h2>
-                  <div className="mt-3 space-y-3 text-sm leading-7 text-muted-foreground">
-                    {section.body.map((paragraph) => (
-                      <p key={paragraph}>{paragraph}</p>
-                    ))}
+                  <div className="border-b border-white/10 bg-white/[0.025] px-5 py-4 sm:px-6">
+                    <h2 className="text-xl font-semibold leading-snug tracking-normal text-foreground">
+                      {section.title}
+                    </h2>
+                  </div>
+                  <div className="space-y-4 px-5 py-5 sm:px-6">
+                    {section.body.map((block, index) =>
+                      typeof block === "string" ? (
+                        <p
+                          key={`${section.title}-${index}`}
+                          className={getLegalParagraphClass(block)}
+                        >
+                          {block}
+                        </p>
+                      ) : (
+                        <ul
+                          key={`${section.title}-${index}`}
+                          className="ml-2 list-disc space-y-2 border-l border-[hsl(var(--button-highlight)/0.24)] py-1 pl-8 marker:text-[hsl(var(--button-highlight))] sm:ml-4 sm:pl-9"
+                        >
+                          {block.items.map((item) => (
+                            <li
+                              key={item}
+                              className="pl-1 text-[0.95rem] leading-7 text-foreground/76"
+                            >
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      ),
+                    )}
                   </div>
                 </section>
               ))}
