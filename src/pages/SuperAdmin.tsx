@@ -8,10 +8,12 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Database,
   Edit3,
   KeyRound,
   Loader2,
   Plus,
+  RefreshCw,
   Search,
   Shield,
   UserRound,
@@ -100,8 +102,31 @@ type AuditMeta = {
   total_pages: number;
 };
 
+type DatabaseTableSummary = {
+  name: string;
+  row_estimate?: number | null;
+};
+
+type DatabaseColumn = {
+  name: string;
+  type: string;
+  nullable: boolean;
+  key: string;
+  default: string | null;
+  extra: string;
+};
+
+type DatabaseMeta = {
+  selected_table: string | null;
+  page: number;
+  per_page: number;
+  total: number;
+  total_pages: number;
+};
+
 const AUDIT_PAGE_SIZE = 50;
 const AUDIT_ENTITY_OPTION_LIMIT = 12;
+const DATABASE_PAGE_SIZE = 100;
 
 const roleLabels: Record<Role, string> = {
   superadmin: "Superadmin",
@@ -169,6 +194,20 @@ export default function SuperAdmin() {
   const [auditPage, setAuditPage] = useState(1);
   const [hasLoadedRemoteAudit, setHasLoadedRemoteAudit] = useState(false);
   const [isAuditLoading, setIsAuditLoading] = useState(false);
+  const [databaseTables, setDatabaseTables] = useState<DatabaseTableSummary[]>([]);
+  const [selectedDatabaseTable, setSelectedDatabaseTable] = useState("");
+  const [databaseColumns, setDatabaseColumns] = useState<DatabaseColumn[]>([]);
+  const [databaseRows, setDatabaseRows] = useState<Record<string, unknown>[]>([]);
+  const [databaseMeta, setDatabaseMeta] = useState<DatabaseMeta>({
+    selected_table: null,
+    page: 1,
+    per_page: DATABASE_PAGE_SIZE,
+    total: 0,
+    total_pages: 1,
+  });
+  const [databasePage, setDatabasePage] = useState(1);
+  const [hasLoadedDatabase, setHasLoadedDatabase] = useState(false);
+  const [isDatabaseLoading, setIsDatabaseLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("admins");
 
   const allEvents = useMemo(() => [...events, ...archivedEvents], [archivedEvents, events]);
@@ -308,6 +347,57 @@ export default function SuperAdmin() {
     }
   };
 
+  const loadDatabase = async (nextTable = selectedDatabaseTable, nextPage = databasePage) => {
+    setIsDatabaseLoading(true);
+    try {
+      const params = new URLSearchParams({
+        limit: String(DATABASE_PAGE_SIZE),
+        page: String(nextPage),
+      });
+      if (nextTable) {
+        params.set("table", nextTable);
+      }
+
+      const { payload } = await fetchJson(`${API_BASE_URL}/superadmin/database?${params.toString()}`, {
+        headers: getAuthHeaders(),
+      });
+      const responseData = payload as {
+        tables?: DatabaseTableSummary[];
+        columns?: DatabaseColumn[];
+        rows?: Record<string, unknown>[];
+        meta?: Partial<DatabaseMeta>;
+      };
+      const tables = Array.isArray(responseData.tables) ? responseData.tables : [];
+      const columns = Array.isArray(responseData.columns) ? responseData.columns : [];
+      const rows = Array.isArray(responseData.rows) ? responseData.rows : [];
+      const selectedTable = typeof responseData.meta?.selected_table === "string"
+        ? responseData.meta.selected_table
+        : nextTable || "";
+
+      setDatabaseTables(tables);
+      setDatabaseColumns(columns);
+      setDatabaseRows(rows);
+      setSelectedDatabaseTable(selectedTable);
+      setDatabaseMeta({
+        selected_table: selectedTable || null,
+        page: Number(responseData.meta?.page ?? nextPage),
+        per_page: Number(responseData.meta?.per_page ?? DATABASE_PAGE_SIZE),
+        total: Number(responseData.meta?.total ?? rows.length),
+        total_pages: Math.max(1, Number(responseData.meta?.total_pages ?? 1)),
+      });
+      setDatabasePage(Number(responseData.meta?.page ?? nextPage));
+      setHasLoadedDatabase(true);
+    } catch (error) {
+      toast({
+        title: "Nie udało się pobrać danych z bazy",
+        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDatabaseLoading(false);
+    }
+  };
+
   const resetAdminForm = () => {
     setAdminForm({ name: "", email: "" });
     setEditAdmin(null);
@@ -442,10 +532,28 @@ export default function SuperAdmin() {
     }
   };
 
+  const selectDatabaseTable = (tableName: string) => {
+    setSelectedDatabaseTable(tableName);
+    setDatabasePage(1);
+    void loadDatabase(tableName, 1);
+  };
+
+  const goToDatabasePage = (page: number) => {
+    const nextPage = Math.min(Math.max(1, page), databaseMeta.total_pages);
+    if (nextPage === databasePage || isDatabaseLoading || !selectedDatabaseTable) return;
+
+    setDatabasePage(nextPage);
+    void loadDatabase(selectedDatabaseTable, nextPage);
+  };
+
   const auditRangeStart = displayedAuditMeta.total === 0
     ? 0
     : (displayedAuditMeta.page - 1) * displayedAuditMeta.per_page + 1;
   const auditRangeEnd = Math.min(displayedAuditMeta.total, displayedAuditMeta.page * displayedAuditMeta.per_page);
+  const databaseRangeStart = databaseMeta.total === 0
+    ? 0
+    : (databaseMeta.page - 1) * databaseMeta.per_page + 1;
+  const databaseRangeEnd = Math.min(databaseMeta.total, databaseMeta.page * databaseMeta.per_page);
 
   if (isLoading) {
     return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
@@ -481,12 +589,16 @@ export default function SuperAdmin() {
           if (value === "audit" && !hasLoadedRemoteAudit && !isAuditLoading) {
             void loadAudit("all", null, 1);
           }
+          if (value === "database" && isOnline && !hasLoadedDatabase && !isDatabaseLoading) {
+            void loadDatabase("", 1);
+          }
         }}
         className="space-y-5"
       >
-        <TabsList className="grid h-auto w-full grid-cols-3 sm:w-auto">
+        <TabsList className="grid h-auto w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
           <TabsTrigger value="admins">Admini</TabsTrigger>
           <TabsTrigger value="audit">Audyt</TabsTrigger>
+          <TabsTrigger value="database">Baza danych</TabsTrigger>
           <TabsTrigger value="control">Kontrola</TabsTrigger>
         </TabsList>
 
@@ -722,6 +834,175 @@ export default function SuperAdmin() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="database" className="space-y-4">
+          <Card>
+            <CardContent className="space-y-4 p-4 sm:p-5">
+              <div className="grid gap-3 lg:grid-cols-[minmax(16rem,26rem)_auto_1fr]">
+                <div className="space-y-2">
+                  <Label>Tabela</Label>
+                  <Select
+                    value={selectedDatabaseTable}
+                    onValueChange={selectDatabaseTable}
+                    disabled={!isOnline || isDatabaseLoading || databaseTables.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={hasLoadedDatabase ? "Wybierz tabelę" : "Załaduj listę tabel"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {databaseTables.map((table) => (
+                        <SelectItem key={table.name} value={table.name}>
+                          {table.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void loadDatabase(selectedDatabaseTable, selectedDatabaseTable ? databasePage : 1)}
+                    disabled={!isOnline || isDatabaseLoading}
+                    className="w-full lg:w-auto"
+                  >
+                    {isDatabaseLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    Odśwież
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap items-end gap-2">
+                  <Badge variant="secondary">{databaseTables.length} tabel</Badge>
+                  {selectedDatabaseTable && (
+                    <>
+                      <Badge variant="outline">{databaseColumns.length} kolumn</Badge>
+                      <Badge variant="outline">{databaseMeta.total} wierszy</Badge>
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <CardTitle className="flex min-w-0 items-center gap-2 text-lg">
+                <Database className="h-5 w-5 shrink-0" />
+                <span className="truncate">{selectedDatabaseTable || "Dane tabeli"}</span>
+              </CardTitle>
+              {selectedDatabaseTable && (
+                <p className="shrink-0 text-sm text-muted-foreground">
+                  {databaseRangeStart}-{databaseRangeEnd} z {databaseMeta.total}
+                </p>
+              )}
+            </CardHeader>
+            <CardContent className="p-0">
+              {!selectedDatabaseTable && (
+                <div className="px-4 py-8 text-center text-sm text-muted-foreground sm:px-5">
+                  Wybierz tabelę, aby zobaczyć wszystkie jej kolumny i wiersze.
+                </div>
+              )}
+
+              {selectedDatabaseTable && (
+                <>
+                  <div className="overflow-x-auto">
+                    <Table className="min-w-[960px]">
+                      <TableHeader>
+                        <TableRow>
+                          {databaseColumns.map((column) => (
+                            <TableHead key={column.name} className="min-w-40 align-top">
+                              <span className="block truncate font-mono text-xs">{column.name}</span>
+                              <span className="block truncate text-[0.68rem] font-normal text-muted-foreground">
+                                {column.type}{column.key ? ` · ${column.key}` : ""}
+                              </span>
+                            </TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {databaseRows.map((row, rowIndex) => (
+                          <TableRow key={`${selectedDatabaseTable}-${databaseMeta.page}-${rowIndex}`}>
+                            {databaseColumns.map((column) => {
+                              const value = formatDatabaseValue(row[column.name]);
+                              const isNull = row[column.name] === null || typeof row[column.name] === "undefined";
+
+                              return (
+                                <TableCell
+                                  key={column.name}
+                                  title={value}
+                                  className={`max-w-[18rem] truncate whitespace-nowrap font-mono text-xs ${isNull ? "text-muted-foreground" : ""}`}
+                                >
+                                  {value}
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        ))}
+                        {databaseRows.length === 0 && !isDatabaseLoading && (
+                          <TableRow>
+                            <TableCell colSpan={Math.max(databaseColumns.length, 1)} className="py-8 text-center text-sm text-muted-foreground">
+                              Brak wierszy w wybranej tabeli.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {isDatabaseLoading && (
+                          <TableRow>
+                            <TableCell colSpan={Math.max(databaseColumns.length, 1)} className="py-8 text-center text-sm text-muted-foreground">
+                              <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                              Ładowanie danych...
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {databaseMeta.total_pages > 1 && (
+                    <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                      <p className="text-sm text-muted-foreground">
+                        Strona {databaseMeta.page} z {databaseMeta.total_pages}
+                      </p>
+                      <Pagination className="mx-0 w-auto justify-start sm:justify-end">
+                        <PaginationContent>
+                          <PaginationItem>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => goToDatabasePage(databaseMeta.page - 1)}
+                              disabled={databaseMeta.page <= 1 || isDatabaseLoading}
+                              aria-label="Poprzednia strona"
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                          </PaginationItem>
+                          <PaginationItem>
+                            <span className="flex h-9 min-w-20 items-center justify-center rounded-md border px-3 text-sm tabular-nums">
+                              {databaseMeta.page} / {databaseMeta.total_pages}
+                            </span>
+                          </PaginationItem>
+                          <PaginationItem>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => goToDatabasePage(databaseMeta.page + 1)}
+                              disabled={databaseMeta.page >= databaseMeta.total_pages || isDatabaseLoading}
+                              aria-label="Następna strona"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="control" className="space-y-3 sm:space-y-4">
           <div className="grid gap-2 sm:gap-4 lg:grid-cols-2">
             <ControlCard title="Role" icon={Shield}>
@@ -798,6 +1079,22 @@ export default function SuperAdmin() {
       </Dialog>
     </div>
   );
+}
+
+function formatDatabaseValue(value: unknown): string {
+  if (value === null || typeof value === "undefined") {
+    return "NULL";
+  }
+
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+
+  return String(value);
 }
 
 function MetricCard({

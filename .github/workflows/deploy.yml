@@ -83,8 +83,8 @@ jobs:
       - name: Build staging
         env:
           API_URL: ${{ secrets.API_URL }}
-          VITE_MOUSEFLOW_ENABLED: ${{ secrets.VITE_MOUSEFLOW_ENABLED }}
-          VITE_MOUSEFLOW_PROJECT_ID: ${{ secrets.VITE_MOUSEFLOW_PROJECT_ID }}
+          VITE_SMARTLOOK_ENABLED: ${{ secrets.VITE_SMARTLOOK_ENABLED }}
+          VITE_SMARTLOOK_PROJECT_KEY: ${{ secrets.VITE_SMARTLOOK_PROJECT_KEY }}
           VITE_LEGAL_ADMIN_NAME: ${{ secrets.VITE_LEGAL_ADMIN_NAME }}
           VITE_LEGAL_ADMIN_ADDRESS: ${{ secrets.VITE_LEGAL_ADMIN_ADDRESS }}
           VITE_LEGAL_CONTACT_EMAIL: ${{ secrets.VITE_LEGAL_CONTACT_EMAIL }}
@@ -97,8 +97,8 @@ jobs:
             exit 21
           fi
           export VITE_API_URL="$API_URL"
-          export VITE_MOUSEFLOW_ENABLED="${VITE_MOUSEFLOW_ENABLED:-false}"
-          export VITE_MOUSEFLOW_PROJECT_ID="${VITE_MOUSEFLOW_PROJECT_ID:-}"
+          export VITE_SMARTLOOK_ENABLED="${VITE_SMARTLOOK_ENABLED:-false}"
+          export VITE_SMARTLOOK_PROJECT_KEY="${VITE_SMARTLOOK_PROJECT_KEY:-}"
           export VITE_LEGAL_ADMIN_NAME="${VITE_LEGAL_ADMIN_NAME:-ZmierzymyCzas.pl}"
           export VITE_LEGAL_ADMIN_ADDRESS="${VITE_LEGAL_ADMIN_ADDRESS:-}"
           export VITE_LEGAL_CONTACT_EMAIL="${VITE_LEGAL_CONTACT_EMAIL:-}"
@@ -320,8 +320,8 @@ jobs:
       - name: Build production
         env:
           API_URL: ${{ secrets.API_URL }}
-          VITE_MOUSEFLOW_ENABLED: ${{ secrets.VITE_MOUSEFLOW_ENABLED }}
-          VITE_MOUSEFLOW_PROJECT_ID: ${{ secrets.VITE_MOUSEFLOW_PROJECT_ID }}
+          VITE_SMARTLOOK_ENABLED: ${{ secrets.VITE_SMARTLOOK_ENABLED }}
+          VITE_SMARTLOOK_PROJECT_KEY: ${{ secrets.VITE_SMARTLOOK_PROJECT_KEY }}
           VITE_LEGAL_ADMIN_NAME: ${{ secrets.VITE_LEGAL_ADMIN_NAME }}
           VITE_LEGAL_ADMIN_ADDRESS: ${{ secrets.VITE_LEGAL_ADMIN_ADDRESS }}
           VITE_LEGAL_CONTACT_EMAIL: ${{ secrets.VITE_LEGAL_CONTACT_EMAIL }}
@@ -334,8 +334,8 @@ jobs:
             exit 21
           fi
           export VITE_API_URL="$API_URL"
-          export VITE_MOUSEFLOW_ENABLED="${VITE_MOUSEFLOW_ENABLED:-false}"
-          export VITE_MOUSEFLOW_PROJECT_ID="${VITE_MOUSEFLOW_PROJECT_ID:-}"
+          export VITE_SMARTLOOK_ENABLED="${VITE_SMARTLOOK_ENABLED:-false}"
+          export VITE_SMARTLOOK_PROJECT_KEY="${VITE_SMARTLOOK_PROJECT_KEY:-}"
           export VITE_LEGAL_ADMIN_NAME="${VITE_LEGAL_ADMIN_NAME:-ZmierzymyCzas.pl}"
           export VITE_LEGAL_ADMIN_ADDRESS="${VITE_LEGAL_ADMIN_ADDRESS:-}"
           export VITE_LEGAL_CONTACT_EMAIL="${VITE_LEGAL_CONTACT_EMAIL:-}"
