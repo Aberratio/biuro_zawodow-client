@@ -19,14 +19,14 @@ import {
   type CookieConsentPreferences,
 } from "@/lib/cookie-consent";
 import {
-  isMouseflowConfigured,
-  loadMouseflowAfterConsent,
-  watchMouseflowSensitiveElements,
-} from "@/lib/mouseflow";
+  isSmartlookConfigured,
+  loadSmartlookAfterConsent,
+  watchSmartlookSensitiveElements,
+} from "@/lib/smartlook";
 
 function applyConsent(preferences: CookieConsentPreferences | null) {
   if (preferences?.analytics) {
-    loadMouseflowAfterConsent();
+    loadSmartlookAfterConsent();
   }
 }
 
@@ -38,9 +38,9 @@ export function CookieConsent() {
   const [isBannerVisible, setIsBannerVisible] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
-  const mouseflowConfigured = isMouseflowConfigured();
+  const smartlookConfigured = isSmartlookConfigured();
 
-  useEffect(() => watchMouseflowSensitiveElements(), []);
+  useEffect(() => watchSmartlookSensitiveElements(), []);
 
   useEffect(() => {
     applyConsent(preferences);
@@ -95,7 +95,7 @@ export function CookieConsent() {
                 </h2>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
                   Używamy niezbędnych cookies do działania aplikacji. Analitykę i
-                  nagrywanie sesji Mouseflow uruchamiamy tylko po Twojej zgodzie.
+                  nagrywanie sesji Smartlook uruchamiamy tylko po Twojej zgodzie.
                   Pola formularzy są maskowane przed nagrywaniem.
                 </p>
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -138,9 +138,9 @@ export function CookieConsent() {
                 className="h-11 rounded-[0.95rem]"
                 onClick={() => savePreferences(true)}
                 title={
-                  mouseflowConfigured
+                  smartlookConfigured
                     ? undefined
-                    : "Brak VITE_MOUSEFLOW_PROJECT_ID dla tego środowiska"
+                    : "Brak VITE_SMARTLOOK_PROJECT_KEY dla tego środowiska"
                 }
               >
                 Akceptuję
@@ -195,21 +195,21 @@ export function CookieConsent() {
                     Analityka i nagrywanie sesji
                   </Label>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    Mouseflow pomaga wykrywać problemy z obsługą panelu. Skrypt
+                    Smartlook pomaga wykrywać problemy z obsługą panelu. Skrypt
                     ładuje się dopiero po zgodzie, a pola formularzy są oznaczane
                     jako pomijane w nagraniach.
                   </p>
-                  {!mouseflowConfigured && (
+                  {!smartlookConfigured && (
                     <p className="mt-2 text-xs leading-5 text-[hsl(var(--button-highlight))]">
-                      W tym środowisku brakuje klucza Mouseflow, więc ta opcja
+                      W tym środowisku brakuje klucza Smartlook, więc ta opcja
                       nie uruchomi skryptu.
                     </p>
                   )}
                 </div>
                 <Switch
                   id="analytics-consent"
-                  checked={analyticsEnabled && mouseflowConfigured}
-                  disabled={!mouseflowConfigured}
+                  checked={analyticsEnabled && smartlookConfigured}
+                  disabled={!smartlookConfigured}
                   onCheckedChange={setAnalyticsEnabled}
                   aria-label="Analityka i nagrywanie sesji"
                 />

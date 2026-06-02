@@ -193,8 +193,8 @@ const legalDocuments: Record<string, LegalDocument> = {
           "Cookies mogą być wykorzystywane przez:",
           {
             items: [
-              "narzędzia reklamowe Google,",
-              "inne narzędzia analityczne i marketingowe.",
+              "narzędzie Smartlook do analityki i nagrywania sesji po uzyskaniu zgody użytkownika,",
+              "inne narzędzia analityczne i marketingowe, jeżeli zostaną wdrożone w serwisie.",
             ],
           },
           "Użytkownik może samodzielnie zarządzać ustawieniami cookies w swojej przeglądarce.",
@@ -452,7 +452,7 @@ const legalDocuments: Record<string, LegalDocument> = {
   cookies: {
     title: "Polityka Cookies",
     lead: "Zasady wykorzystywania plików cookies w systemie biura zawodów.",
-    updatedAt: "26 maja 2026 r.",
+    updatedAt: "29 maja 2026 r.",
     icon: Cookie,
     sections: [
       {
@@ -501,7 +501,17 @@ const legalDocuments: Record<string, LegalDocument> = {
           "Bez tych plików korzystanie z systemu może być niemożliwe.",
           "b) Cookies funkcjonalne",
           "Pozwalają zapamiętać ustawienia użytkownika oraz usprawniają korzystanie z serwisu.",
-          "c) Cookies bezpieczeństwa",
+          "c) Cookies analityczne",
+          "Po wyrażeniu zgody serwis może uruchamiać Smartlook w celu analizy sposobu korzystania z panelu, wykrywania problemów technicznych i poprawy jakości obsługi.",
+          {
+            items: [
+              "SL_C_23361dd035530_SID i SL_L_23361dd035530_SID - identyfikacja sesji, użytkownika i projektu Smartlook,",
+              "SL_C_23361dd035530_DOMAIN - tymczasowe wykrycie domeny bazowej,",
+              "SMARTLOOK_LS_QUEUED_CHUNKS - lokalne przechowanie danych oczekujących na wysłanie do Smartlook.",
+            ],
+          },
+          "Pola formularzy i elementy oznaczone jako wrażliwe są maskowane przed nagrywaniem. Smartlook jest uruchamiany z regionem EU dopiero po wyrażeniu zgody na analitykę.",
+          "d) Cookies bezpieczeństwa",
           "Wykorzystywane są do:",
           {
             items: [
