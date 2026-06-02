@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isStagingGateEnabled } from "@/lib/staging-gate";
+import { getStagingGatePassword, isStagingGateEnabled } from "@/lib/staging-gate";
 
-const STAGING_GATE_PASSWORD = "xd";
 const STAGING_GATE_STORAGE_KEY = "staging_gate_unlocked";
 
 function readUnlocked(): boolean {
@@ -27,6 +26,7 @@ function saveUnlocked(): void {
 }
 
 export function StagingGate({ children }: { children: ReactNode }) {
+  const expectedPassword = getStagingGatePassword(import.meta.env);
   const [password, setPassword] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(readUnlocked);
   const [hasError, setHasError] = useState(false);
@@ -38,7 +38,7 @@ export function StagingGate({ children }: { children: ReactNode }) {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (password === STAGING_GATE_PASSWORD) {
+    if (password === expectedPassword) {
       saveUnlocked();
       setIsUnlocked(true);
       return;
