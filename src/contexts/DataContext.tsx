@@ -6,7 +6,7 @@ import { type ApiEvent, type ApiOrganization, type ApiParticipant, type ApiUser,
 import { deletePendingMutation, loadBootstrapSnapshot, loadPendingMutations, loadSyncMeta, saveBootstrapSnapshot, savePendingMutation, saveSyncMeta, updatePendingMutation, type OfflineBootstrapSnapshot, type PendingParticipantMutation } from '@/lib/offline-store';
 import { getEventOfficeCloseAt, isEventOfficeOpen } from '@/lib/events';
 
-type UserCreateInput = Omit<User, 'id' | 'password'>;
+type UserCreateInput = Omit<User, 'id' | 'password'> & { password?: string };
 type EventMutationInput = Omit<Event, 'id' | 'archived_at' | 'deleted_at'>;
 type EventUpdateInput = EventMutationInput & { reopen_office?: boolean };
 
@@ -64,6 +64,7 @@ interface DataContextType {
   deleteOrganization: (organizationId: string) => Promise<MutationResult>;
   removeUser: (id: string) => Promise<MutationResult>;
   triggerUserPasswordReset: (id: string) => Promise<MutationResult>;
+  setUserPassword: (id: string, password: string) => Promise<MutationResult>;
   changeRole: (userId: string, role: Role) => Promise<MutationResult>;
   assignScannerEvents: (userId: string, eventIds: string[]) => Promise<MutationResult>;
   sendParticipantQrEmail: (participantId: string) => Promise<MutationResult>;
@@ -831,7 +832,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const addUser = useCallback(async (userData: UserCreateInput) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
-    const payload = (await fetchJson(`${API_BASE_URL}/users`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ name: userData.name, email: userData.email, role: userData.role, organization_id: userData.organization_id, assigned_events: userData.assigned_events }) })).payload as { data?: ApiUser };
+    const createUserPayload: Record<string, unknown> = { name: userData.name, email: userData.email, role: userData.role, organization_id: userData.organization_id, assigned_events: userData.assigned_events };
+    if (userData.password) createUserPayload.password = userData.password;
+    const payload = (await fetchJson(`${API_BASE_URL}/users`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(createUserPayload) })).payload as { data?: ApiUser };
     if (!payload.data) return { ok: false, error: 'API user create returned empty payload' };
     markLocalDataChanged(); const createdUser = mapApiUserToUi(payload.data); setUsers(previous => [...previous, createdUser]); addLog(`Dodano użytkownika: ${createdUser.name}`); return { ok: true };
   }), [addLog, ensureOnline, getAuthHeaders, markLocalDataChanged, runMutation]);
@@ -888,6 +891,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const triggerUserPasswordReset = useCallback(async (id: string) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const existingUser = users.find(user => user.id === id); await fetchJson(`${API_BASE_URL}/users/${id}/password-reset`, { method: 'POST', headers: getAuthHeaders() }); if (existingUser) addLog(`Wysłano reset hasła użytkownikowi: ${existingUser.name}`); return { ok: true };
+  }), [addLog, ensureOnline, getAuthHeaders, runMutation, users]);
+
+  const setUserPassword = useCallback(async (id: string, password: string) => runMutation(async () => {
+    const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
+    const existingUser = users.find(user => user.id === id);
+    await fetchJson(`${API_BASE_URL}/users/${id}/password`, { method: 'PATCH', headers: getAuthHeaders(true), body: JSON.stringify({ password }) });
+    if (existingUser) addLog(`Ustawiono hasło użytkownikowi: ${existingUser.name}`);
+    return { ok: true };
   }), [addLog, ensureOnline, getAuthHeaders, runMutation, users]);
 
   const changeRole = useCallback(async (userId: string, role: Role) => runMutation(async () => {
@@ -1023,7 +1034,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [buildExportFallbackName, downloadCsvResponse, ensureOnline, getAuthHeaders, handleNetworkFailure]);
 
   return (
-    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, replaceParticipantImport, resetEventParticipantList, getParticipantFieldMappingsState, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, exportEventParticipantChangesCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
+    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, replaceParticipantImport, resetEventParticipantList, getParticipantFieldMappingsState, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, setUserPassword, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, exportEventParticipantChangesCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
       {children}
     </DataContext.Provider>
   );

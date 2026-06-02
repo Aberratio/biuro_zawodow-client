@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/table";
 import TableSkeleton from "@/components/skeletons/TableSkeleton";
 import { SuccessActionDialog } from "@/components/SuccessActionDialog";
+import { PasswordRequirements } from "@/components/PasswordRequirements";
 import { toast } from "@/hooks/use-toast";
 import {
   formatEventOfficeWindow,
@@ -67,7 +68,9 @@ import {
   validateEmail,
   validateNonNegativeInteger,
   validateRequired,
+  validateStrongPassword,
 } from "@/lib/form-validation";
+import { generateStrongPassword } from "@/lib/password";
 import { getRoleLabel, isScannerRole } from "@/lib/roles";
 import {
   buildEventPath,
@@ -79,6 +82,8 @@ import {
   Archive,
   Building2,
   ChevronDown,
+  Eye,
+  EyeOff,
   KeyRound,
   Loader2,
   Pencil,
@@ -86,6 +91,7 @@ import {
   Trash2,
   Calculator,
   Icon,
+  UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
@@ -184,6 +190,7 @@ export default function OrganizationDetails() {
     deleteOrganization,
     removeUser,
     triggerUserPasswordReset,
+    setUserPassword,
     changeRole,
     assignScannerEvents,
     isLoading,
@@ -207,6 +214,8 @@ export default function OrganizationDetails() {
   const [archiveUserConfirmOpen, setArchiveUserConfirmOpen] = useState(false);
   const [passwordResetConfirmOpen, setPasswordResetConfirmOpen] =
     useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
   const [isSavingOrganization, setIsSavingOrganization] = useState(false);
@@ -215,6 +224,7 @@ export default function OrganizationDetails() {
   const [isChangingScannerRole, setIsChangingScannerRole] = useState(false);
   const [isArchivingUser, setIsArchivingUser] = useState(false);
   const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
+  const [isSettingPassword, setIsSettingPassword] = useState(false);
   const [isSavingScannerAssignments, setIsSavingScannerAssignments] =
     useState(false);
   const [selectedActionUser, setSelectedActionUser] = useState<User | null>(
@@ -229,7 +239,17 @@ export default function OrganizationDetails() {
     name: "",
     email: "",
     assigned_events: [] as string[],
+    use_manual_password: false,
+    password: "",
   });
+  const [showMemberPassword, setShowMemberPassword] = useState(false);
+  const [passwordDraft, setPasswordDraft] = useState("");
+  const [showPasswordDraft, setShowPasswordDraft] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState<{
+    password?: string;
+    form?: string;
+  }>({});
+  const [profileUser, setProfileUser] = useState<User | null>(null);
   const [eventForm, setEventForm] = useState({
     name: "",
     location: "",
@@ -248,6 +268,7 @@ export default function OrganizationDetails() {
   const [memberErrors, setMemberErrors] = useState<{
     name?: string;
     email?: string;
+    password?: string;
     form?: string;
   }>({});
   const [limitErrors, setLimitErrors] = useState<{
@@ -402,7 +423,15 @@ export default function OrganizationDetails() {
   };
 
   const openMemberDialog = (role: MemberRole) => {
-    setMemberForm({ role, name: "", email: "", assigned_events: [] });
+    setMemberForm({
+      role,
+      name: "",
+      email: "",
+      assigned_events: [],
+      use_manual_password: false,
+      password: "",
+    });
+    setShowMemberPassword(false);
     setMemberDialogOpen(true);
   };
 
@@ -437,6 +466,35 @@ export default function OrganizationDetails() {
     setPasswordResetConfirmOpen(true);
   };
 
+  const openPasswordDialog = (user: User) => {
+    setSelectedActionUser(user);
+    setPasswordDraft("");
+    setPasswordErrors({});
+    setShowPasswordDraft(false);
+    setPasswordDialogOpen(true);
+  };
+
+  const openProfileDialog = (user: User) => {
+    setProfileUser(user);
+    setProfileDialogOpen(true);
+  };
+
+  const generateMemberPassword = () => {
+    setMemberForm((prev) => ({
+      ...prev,
+      use_manual_password: true,
+      password: generateStrongPassword(),
+    }));
+    setShowMemberPassword(true);
+    setMemberErrors((prev) => ({ ...prev, password: undefined, form: undefined }));
+  };
+
+  const generatePasswordDraft = () => {
+    setPasswordDraft(generateStrongPassword());
+    setShowPasswordDraft(true);
+    setPasswordErrors({});
+  };
+
   const toggleScannerEvent = (eventId: string, checked: boolean) => {
     setMemberForm((prev) => ({
       ...prev,
@@ -465,9 +523,12 @@ export default function OrganizationDetails() {
     const nextErrors = {
       name: validateRequired(memberForm.name, "Podaj imię i nazwisko."),
       email: validateEmail(memberForm.email),
+      password: memberForm.use_manual_password
+        ? validateStrongPassword(memberForm.password)
+        : "",
     };
 
-    if (nextErrors.name || nextErrors.email) {
+    if (nextErrors.name || nextErrors.email || nextErrors.password) {
       setMemberErrors(nextErrors);
       return;
     }
@@ -484,6 +545,7 @@ export default function OrganizationDetails() {
             assignableScannerEventIds.has(eventId),
           )
         : [],
+      password: memberForm.use_manual_password ? memberForm.password : undefined,
     });
     setIsSubmittingMember(false);
 
@@ -935,6 +997,43 @@ export default function OrganizationDetails() {
     });
   };
 
+  const handleSetPassword = async () => {
+    if (!selectedActionUser) return;
+
+    const passwordError = validateStrongPassword(passwordDraft);
+    if (passwordError) {
+      setPasswordErrors({ password: passwordError });
+      return;
+    }
+
+    setPasswordErrors({});
+    setIsSettingPassword(true);
+    const result = await setUserPassword(selectedActionUser.id, passwordDraft);
+    setIsSettingPassword(false);
+
+    if (!result.ok) {
+      setPasswordErrors({
+        form: result.error ?? "Nie udało się ustawić hasła.",
+      });
+      toast({
+        title: "Nie udało się ustawić hasła",
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const targetUser = selectedActionUser;
+    setPasswordDialogOpen(false);
+    setSelectedActionUser(null);
+    setPasswordDraft("");
+    setPasswordErrors({});
+    toast({
+      title: "Ustawiono hasło",
+      description: `Konto ${targetUser.email} może logować się nowym hasłem.`,
+    });
+  };
+
   return (
     <div className="flex flex-col gap-6 pb-6">
       <div className="space-y-6">
@@ -1215,7 +1314,7 @@ export default function OrganizationDetails() {
                         Email
                       </TableHead>
                       {canManageMemberAccounts && (
-                        <TableHead className="h-12 w-[250px] px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                        <TableHead className="h-12 w-[320px] px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
                           Akcje
                         </TableHead>
                       )}
@@ -1235,11 +1334,20 @@ export default function OrganizationDetails() {
                         </TableCell>
                         {canManageMemberAccounts && (
                           <TableCell className="px-5 sm:px-7">
-                            <div className="flex flex-col gap-2 sm:flex-row">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className={`${actionButtonClassName} w-full sm:w-auto`}
+                                className={`${actionButtonClassName} w-full`}
+                                onClick={() => openProfileDialog(organizer)}
+                              >
+                                <UserRound className="mr-1 h-3.5 w-3.5" />
+                                Profil
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className={`${actionButtonClassName} w-full`}
                                 onClick={() =>
                                   openPasswordResetDialog(organizer)
                                 }
@@ -1249,8 +1357,17 @@ export default function OrganizationDetails() {
                               </Button>
                               <Button
                                 size="sm"
+                                variant="outline"
+                                className={`${actionButtonClassName} w-full`}
+                                onClick={() => openPasswordDialog(organizer)}
+                              >
+                                <KeyRound className="mr-1 h-3.5 w-3.5" />
+                                Ustaw hasło
+                              </Button>
+                              <Button
+                                size="sm"
                                 variant="destructive"
-                                className={`${actionButtonClassName} w-full sm:w-auto`}
+                                className={`${actionButtonClassName} w-full`}
                                 onClick={() => openArchiveUserDialog(organizer)}
                               >
                                 <Trash2 className="mr-1 h-3.5 w-3.5" />
@@ -1373,6 +1490,14 @@ export default function OrganizationDetails() {
                         {canManageScanners && (
                           <TableCell className="min-w-[11.5rem] px-5 align-top sm:min-w-[13.5rem] sm:px-7 lg:min-w-[240px]">
                             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
+                                onClick={() => openProfileDialog(scanner)}
+                              >
+                                Profil
+                              </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -1707,6 +1832,152 @@ export default function OrganizationDetails() {
       </AlertDialog>
 
       <Dialog
+        open={passwordDialogOpen}
+        onOpenChange={(open) => {
+          setPasswordDialogOpen(open);
+          if (!open) {
+            setSelectedActionUser(null);
+            setPasswordDraft("");
+            setPasswordErrors({});
+            setShowPasswordDraft(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ustaw hasło</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-xl border bg-muted/30 px-3 py-2 text-sm">
+              <p className="font-medium">{selectedActionUser?.name}</p>
+              <p className="break-all text-xs text-muted-foreground">
+                {selectedActionUser?.email}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="organization-existing-user-password">Nowe hasło</Label>
+              <div className="flex gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Input
+                    id="organization-existing-user-password"
+                    type={showPasswordDraft ? "text" : "password"}
+                    value={passwordDraft}
+                    onChange={(event) => {
+                      setPasswordDraft(event.target.value);
+                      setPasswordErrors((prev) => ({
+                        ...prev,
+                        password: undefined,
+                        form: undefined,
+                      }));
+                    }}
+                    autoComplete="new-password"
+                    className="pr-10"
+                    aria-invalid={Boolean(passwordErrors.password || passwordErrors.form)}
+                    aria-describedby={
+                      passwordErrors.password
+                        ? "organization-existing-user-password-error"
+                        : undefined
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                    onClick={() => setShowPasswordDraft((visible) => !visible)}
+                    aria-label={showPasswordDraft ? "Ukryj hasło" : "Pokaż hasło"}
+                  >
+                    {showPasswordDraft ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={generatePasswordDraft}
+                  className="shrink-0"
+                >
+                  <KeyRound className="mr-1 h-4 w-4" />
+                  Generator
+                </Button>
+              </div>
+              <PasswordRequirements password={passwordDraft} />
+              <FieldError id="organization-existing-user-password-error">
+                {passwordErrors.password}
+              </FieldError>
+            </div>
+            <FieldError id="organization-existing-user-password-form-error">
+              {passwordErrors.form}
+            </FieldError>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPasswordDialogOpen(false)}
+              disabled={isSettingPassword}
+            >
+              Anuluj
+            </Button>
+            <Button
+              onClick={() => void handleSetPassword()}
+              disabled={isSettingPassword || !selectedActionUser}
+              aria-busy={isSettingPassword}
+            >
+              {isSettingPassword && (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              )}
+              {isSettingPassword ? "Zapisywanie..." : "Zapisz hasło"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={profileDialogOpen}
+        onOpenChange={(open) => {
+          setProfileDialogOpen(open);
+          if (!open) setProfileUser(null);
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Profil użytkownika</DialogTitle>
+          </DialogHeader>
+          {profileUser && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <UserRound className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{profileUser.name}</p>
+                  <p className="break-all text-xs text-muted-foreground">
+                    {profileUser.email}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3 text-sm">
+                <ProfileRow label="Rola" value={getRoleLabel(profileUser.role)} />
+                <ProfileRow label="Organizacja" value={organization.name} />
+                {isScannerRole(profileUser.role) && (
+                  <ProfileRow
+                    label="Przypisane wydarzenia"
+                    value={getEventNames(profileUser.assigned_events)}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setProfileDialogOpen(false)}>Zamknij</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={scannerEditDialogOpen}
         onOpenChange={(open) => {
           setScannerEditDialogOpen(open);
@@ -1818,7 +2089,7 @@ export default function OrganizationDetails() {
                   <p className="text-sm font-medium">Konto operatora</p>
                   <p className="text-xs text-muted-foreground">
                     {canManageMemberAccounts
-                      ? "Reset hasła i usunięcie konta są dostępne w tym oknie."
+                      ? "Reset, ręczne hasło i usunięcie konta są dostępne w tym oknie."
                       : "Usunięcie konta jest dostępne w tym oknie."}
                   </p>
                 </div>
@@ -1832,6 +2103,17 @@ export default function OrganizationDetails() {
                     >
                       <KeyRound className="mr-1 h-4 w-4" />
                       Reset hasła
+                    </Button>
+                  )}
+                  {canManageMemberAccounts && (
+                    <Button
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                      onClick={() => openPasswordDialog(selectedScanner)}
+                      disabled={isSavingScanner || isChangingScannerRole}
+                    >
+                      <KeyRound className="mr-1 h-4 w-4" />
+                      Ustaw hasło
                     </Button>
                   )}
                   <Button
@@ -1940,10 +2222,93 @@ export default function OrganizationDetails() {
                 {memberErrors.email}
               </FieldError>
             </div>
-            <p className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              Po zapisaniu konto zostanie utworzone, a użytkownik dostanie e-mail
-              z linkiem do ustawienia hasła.
-            </p>
+            <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
+              <label className="flex items-start gap-3 text-sm">
+                <Checkbox
+                  className="mt-0.5 rounded-[2px]"
+                  checked={memberForm.use_manual_password}
+                  onCheckedChange={(checked) => {
+                    const enabled = checked === true;
+                    setMemberForm((prev) => ({
+                      ...prev,
+                      use_manual_password: enabled,
+                      password: enabled ? prev.password : "",
+                    }));
+                    setMemberErrors((prev) => ({
+                      ...prev,
+                      password: undefined,
+                      form: undefined,
+                    }));
+                  }}
+                />
+                <span>
+                  <span className="block font-medium">Ustaw hasło ręcznie</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Bez tej opcji użytkownik dostanie e-mail z linkiem do ustawienia hasła.
+                  </span>
+                </span>
+              </label>
+              {memberForm.use_manual_password && (
+                <div className="space-y-2">
+                  <Label htmlFor="organization-member-password">Hasło</Label>
+                  <div className="flex gap-2">
+                    <div className="relative min-w-0 flex-1">
+                      <Input
+                        id="organization-member-password"
+                        type={showMemberPassword ? "text" : "password"}
+                        value={memberForm.password}
+                        onChange={(event) => {
+                          setMemberForm((prev) => ({
+                            ...prev,
+                            password: event.target.value,
+                          }));
+                          setMemberErrors((prev) => ({
+                            ...prev,
+                            password: undefined,
+                            form: undefined,
+                          }));
+                        }}
+                        autoComplete="new-password"
+                        className="pr-10"
+                        aria-invalid={Boolean(memberErrors.password)}
+                        aria-describedby={
+                          memberErrors.password
+                            ? "organization-member-password-error"
+                            : undefined
+                        }
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                        onClick={() => setShowMemberPassword((visible) => !visible)}
+                        aria-label={showMemberPassword ? "Ukryj hasło" : "Pokaż hasło"}
+                      >
+                        {showMemberPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={generateMemberPassword}
+                      className="shrink-0"
+                    >
+                      <KeyRound className="mr-1 h-4 w-4" />
+                      Generator
+                    </Button>
+                  </div>
+                  <PasswordRequirements password={memberForm.password} />
+                  <FieldError id="organization-member-password-error">
+                    {memberErrors.password}
+                  </FieldError>
+                </div>
+              )}
+            </div>
             {isScannerRole(memberForm.role) &&
               assignableScannerEvents.length > 0 && (
                 <div className="space-y-2">
@@ -2245,6 +2610,15 @@ export default function OrganizationDetails() {
         }}
         onSecondaryAction={() => setCreatedEventSuccess(null)}
       />
+    </div>
+  );
+}
+
+function ProfileRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border px-3 py-2">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 break-words font-medium">{value || "Brak"}</p>
     </div>
   );
 }
