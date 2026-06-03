@@ -30,6 +30,13 @@ import { FieldError } from "@/components/ui/field-error";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -39,6 +46,7 @@ import {
   ArrowLeft,
   Calendar,
   ChevronDown,
+  ChevronUp,
   Download,
   FileUp,
   Info,
@@ -53,7 +61,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import DetailSkeleton from "@/components/skeletons/DetailSkeleton";
-import { ParticipantFieldMapping, User } from "@/types";
+import type { ParticipantFieldMapping, ParticipantFieldRole, User } from "@/types";
 import {
   formatEventOfficeEnd,
   formatEventOfficeStart,
@@ -84,6 +92,14 @@ import {
 } from "@/lib/routes";
 
 type OfficeStatusTone = "open" | "upcoming" | "closed";
+type EditableMappingRole = Extract<ParticipantFieldRole, "custom" | "important_custom">;
+
+type MappingDraft = ParticipantFieldMapping;
+
+type MappingDraftErrors = {
+  aliases: Record<string, string>;
+  form?: string;
+};
 
 interface OfficeStatusSummary {
   tone: OfficeStatusTone;
@@ -92,6 +108,18 @@ interface OfficeStatusSummary {
   detail: string;
   timingLabel: string;
   timingValue: string;
+}
+
+const mappingRoleLabels: Record<ParticipantFieldRole, string> = {
+  email: "E-mail",
+  display_name_part: "Część nazwy",
+  bib_number: "Numer startowy",
+  custom: "Pole dodatkowe",
+  important_custom: "Wyróżnij przy odprawie",
+};
+
+function isEditableMappingRole(role: ParticipantFieldRole): role is EditableMappingRole {
+  return role === "custom" || role === "important_custom";
 }
 
 function buildEditFormFromEvent(event: {
@@ -304,6 +332,7 @@ export default function EventDetails() {
     setSelectedEventId,
     isLoading,
     getParticipantFieldMappingsState,
+    updateParticipantFieldMappings,
     addParticipantManually,
     addUser,
     assignScannerEvents,
@@ -319,6 +348,12 @@ export default function EventDetails() {
   const [hasBaselineParticipantImport, setHasBaselineParticipantImport] =
     useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [mappingDialogOpen, setMappingDialogOpen] = useState(false);
+  const [mappingDrafts, setMappingDrafts] = useState<MappingDraft[]>([]);
+  const [mappingErrors, setMappingErrors] = useState<MappingDraftErrors>({
+    aliases: {},
+  });
+  const [mappingSaving, setMappingSaving] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editReopeningOffice, setEditReopeningOffice] = useState(false);
   const [scannerDialogOpen, setScannerDialogOpen] = useState(false);
@@ -529,6 +564,7 @@ export default function EventDetails() {
     isEventCurrentOrUpcoming(event, now);
   const canAssignScannersToEvent =
     !isArchivedEvent && officeCloseAt !== null && now <= officeCloseAt;
+  const canEditParticipantMappings = currentRole === "superadmin" && hasSavedMapping;
 
   const resetEditState = () => {
     setEditErrors({});
@@ -545,6 +581,146 @@ export default function EventDetails() {
     }
 
     setEditForm(buildEditFormFromEvent(event));
+  };
+
+  const resetMappingDialogState = () => {
+    setMappingDrafts(mappings);
+    setMappingErrors({ aliases: {} });
+  };
+
+  const openMappingDialog = () => {
+    resetMappingDialogState();
+    setMappingDialogOpen(true);
+  };
+
+  const updateMappingDraft = (
+    sourceColumnName: string,
+    patch: Partial<MappingDraft>,
+  ) => {
+    setMappingDrafts((current) =>
+      current.map((mapping) =>
+        mapping.source_column_name === sourceColumnName
+          ? { ...mapping, ...patch }
+          : mapping,
+      ),
+    );
+    setMappingErrors((current) => ({
+      ...current,
+      aliases: {
+        ...current.aliases,
+        [sourceColumnName]: "",
+      },
+      form: undefined,
+    }));
+  };
+
+  const moveMappingDraft = (sourceColumnName: string, direction: -1 | 1) => {
+    setMappingDrafts((current) => {
+      const currentIndex = current.findIndex(
+        (mapping) => mapping.source_column_name === sourceColumnName,
+      );
+      const nextIndex = currentIndex + direction;
+      if (
+        currentIndex < 0 ||
+        nextIndex < 0 ||
+        nextIndex >= current.length ||
+        current[currentIndex].field_role === "email" ||
+        current[nextIndex].field_role === "email"
+      ) {
+        return current;
+      }
+
+      const next = [...current];
+      [next[currentIndex], next[nextIndex]] = [
+        next[nextIndex],
+        next[currentIndex],
+      ];
+      return next.map((mapping, index) => ({
+        ...mapping,
+        display_order: mapping.field_role === "email" ? 0 : index,
+      }));
+    });
+    setMappingErrors({ aliases: {} });
+  };
+
+  const validateMappingDrafts = () => {
+    const aliasErrors: Record<string, string> = {};
+    const activeAliases = new Set<string>();
+    let activeDisplayNamePartCount = 0;
+
+    for (const mapping of mappingDrafts) {
+      if (mapping.field_role === "email") continue;
+
+      const alias = mapping.alias.trim();
+      if (!alias) {
+        aliasErrors[mapping.source_column_name] = "Podaj etykietę pola.";
+      }
+
+      if (mapping.is_active) {
+        if (mapping.field_role === "display_name_part") {
+          activeDisplayNamePartCount += 1;
+        }
+
+        const aliasKey = alias.toLocaleLowerCase("pl-PL");
+        if (aliasKey && activeAliases.has(aliasKey)) {
+          aliasErrors[mapping.source_column_name] =
+            "Ta etykieta jest już użyta w aktywnym mapowaniu.";
+        }
+        if (aliasKey) activeAliases.add(aliasKey);
+      }
+    }
+
+    const form =
+      activeDisplayNamePartCount === 0
+        ? "Zostaw co najmniej jedną aktywną kolumnę budującą nazwę uczestnika."
+        : undefined;
+
+    return { aliases: aliasErrors, form };
+  };
+
+  const handleSaveMappingDrafts = async () => {
+    const nextErrors = validateMappingDrafts();
+    if (Object.keys(nextErrors.aliases).length > 0 || nextErrors.form) {
+      setMappingErrors(nextErrors);
+      return;
+    }
+
+    setMappingErrors({ aliases: {} });
+    setMappingSaving(true);
+    const orderedMappings = mappingDrafts.map((mapping, index) => ({
+      ...mapping,
+      alias: mapping.alias.trim(),
+      is_required:
+        !mapping.is_active && mapping.field_role !== "email"
+          ? false
+          : mapping.field_role === "email" ||
+              mapping.field_role === "display_name_part"
+          ? true
+          : mapping.is_required,
+      is_active: mapping.field_role === "email" ? true : mapping.is_active,
+      display_order: mapping.field_role === "email" ? 0 : index,
+    }));
+    const result = await updateParticipantFieldMappings(event.id, orderedMappings);
+    setMappingSaving(false);
+
+    if (!result.ok) {
+      setMappingErrors({
+        aliases: {},
+        form: result.error ?? "Nie udało się zapisać mapowania.",
+      });
+      toast({
+        title: "Nie udało się zapisać mapowania",
+        description: result.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setMappings(result.mappings);
+    setHasBaselineParticipantImport(result.has_baseline_import);
+    setManualFields(buildEmptyParticipantFieldValues(result.mappings));
+    setMappingDialogOpen(false);
+    toast({ title: "Zapisano mapowanie kolumn" });
   };
 
   const openReopenOfficeDialog = () => {
@@ -1271,6 +1447,16 @@ export default function EventDetails() {
                     <Plus className="mr-1 h-4 w-4" /> Dodaj uczestnika ręcznie
                   </Button>
                 )}
+                {canEditParticipantMappings && (
+                  <Button
+                    variant="outline"
+                    onClick={openMappingDialog}
+                    className="event-detail-operation-button h-11 justify-start"
+                    disabled={!isOnline}
+                  >
+                    <Pencil className="mr-1 h-4 w-4" /> Edytuj mapowanie kolumn
+                  </Button>
+                )}
                 {isFinishedEvent && (
                   <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
                     <Info className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1572,6 +1758,183 @@ export default function EventDetails() {
             >
               {editSaving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               Zapisz
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={mappingDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setMappingDialogOpen(nextOpen);
+          if (!nextOpen) resetMappingDialogState();
+        }}
+      >
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-4xl">
+          <DialogHeader className="shrink-0 px-6 pb-2 pt-6">
+            <DialogTitle>Mapowanie kolumn uczestników</DialogTitle>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Kolumna CSV i role systemowe pozostają zablokowane. Zmiana etykiety przenosi zapisane wartości uczestników na nową nazwę pola.
+            </p>
+          </DialogHeader>
+          <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4">
+            <div className="space-y-3">
+              {mappingDrafts.map((mapping, index) => {
+                const aliasError = mappingErrors.aliases[mapping.source_column_name];
+                const isSystemRole =
+                  mapping.field_role === "email" ||
+                  mapping.field_role === "display_name_part" ||
+                  mapping.field_role === "bib_number";
+                const canMoveUp = index > 1 && mapping.field_role !== "email";
+                const canMoveDown =
+                  index < mappingDrafts.length - 1 &&
+                  mapping.field_role !== "email" &&
+                  mappingDrafts[index + 1]?.field_role !== "email";
+
+                return (
+                  <div
+                    key={mapping.source_column_name}
+                    className="grid gap-3 rounded-lg border border-border/70 p-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(12rem,0.9fr)_auto]"
+                  >
+                    <div className="min-w-0">
+                      <Label>Kolumna CSV</Label>
+                      <p className="mt-2 truncate rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                        {mapping.source_column_name}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <Label htmlFor={`mapping-alias-${index}`}>Etykieta</Label>
+                      <Input
+                        id={`mapping-alias-${index}`}
+                        value={mapping.alias}
+                        disabled={mapping.field_role === "email"}
+                        onChange={(eventValue) =>
+                          updateMappingDraft(mapping.source_column_name, {
+                            alias: eventValue.target.value,
+                          })
+                        }
+                        className="mt-2"
+                        aria-invalid={Boolean(aliasError)}
+                        aria-describedby={
+                          aliasError ? `mapping-alias-${index}-error` : undefined
+                        }
+                      />
+                      <FieldError id={`mapping-alias-${index}-error`} className="mt-2">
+                        {aliasError}
+                      </FieldError>
+                    </div>
+                    <div>
+                      <Label>Rola</Label>
+                      <Select
+                        value={mapping.field_role}
+                        disabled={!isEditableMappingRole(mapping.field_role)}
+                        onValueChange={(value) =>
+                          updateMappingDraft(mapping.source_column_name, {
+                            field_role: value as EditableMappingRole,
+                          })
+                        }
+                      >
+                        <SelectTrigger className="mt-2">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {isEditableMappingRole(mapping.field_role) ? (
+                            <>
+                              <SelectItem value="custom">
+                                {mappingRoleLabels.custom}
+                              </SelectItem>
+                              <SelectItem value="important_custom">
+                                {mappingRoleLabels.important_custom}
+                              </SelectItem>
+                            </>
+                          ) : (
+                            <SelectItem value={mapping.field_role}>
+                              {mappingRoleLabels[mapping.field_role]}
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {isSystemRole && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Rola systemowa
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-3 lg:items-end">
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() =>
+                            moveMappingDraft(mapping.source_column_name, -1)
+                          }
+                          disabled={!canMoveUp}
+                          aria-label="Przesuń pole wyżej"
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() =>
+                            moveMappingDraft(mapping.source_column_name, 1)
+                          }
+                          disabled={!canMoveDown}
+                          aria-label="Przesuń pole niżej"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <label className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={mapping.is_active}
+                          disabled={mapping.field_role === "email"}
+                          onCheckedChange={(checked) =>
+                            updateMappingDraft(mapping.source_column_name, {
+                              is_active: checked === true,
+                            })
+                          }
+                        />
+                        Aktywne
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={mapping.is_active ? mapping.is_required : false}
+                          disabled={
+                            !mapping.is_active ||
+                            mapping.field_role === "email" ||
+                            mapping.field_role === "display_name_part"
+                          }
+                          onCheckedChange={(checked) =>
+                            updateMappingDraft(mapping.source_column_name, {
+                              is_required: checked === true,
+                            })
+                          }
+                        />
+                        Wymagane
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <FieldError id="event-mapping-form-error" className="mt-4">
+              {mappingErrors.form}
+            </FieldError>
+          </div>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
+            <Button
+              type="button"
+              className="w-full sm:w-auto"
+              onClick={() => void handleSaveMappingDrafts()}
+              disabled={mappingSaving || !isOnline}
+            >
+              {mappingSaving && (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              )}
+              Zapisz mapowanie
             </Button>
           </DialogFooter>
         </DialogContent>
