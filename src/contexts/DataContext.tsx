@@ -18,6 +18,7 @@ interface ParticipantImportListDifference { columns_differ: boolean; missing_col
 interface ParticipantImportAnalysis { headers: string[]; sample_rows: Record<string, string>[]; email_candidates: { column: string; matched_count: number }[]; has_mapping: boolean; has_baseline_import: boolean; mappings: ParticipantFieldMapping[]; missing_required_columns: string[]; row_count: number; existing_participant_count: number; sent_qr_email_count: number; list_difference: ParticipantImportListDifference; }
 interface ParticipantImportMappingFieldInput { source_column_name: string; alias: string; field_role: 'display_name_part' | 'bib_number' | 'custom' | 'important_custom'; is_active: boolean; }
 interface ParticipantImportMappingPayload { csv_columns: string[]; email_column: string; fields: ParticipantImportMappingFieldInput[]; }
+interface ParticipantFieldMappingUpdateResult extends MutationResult { mappings: ParticipantFieldMapping[]; has_baseline_import: boolean; }
 interface ParticipantImportRowIssue { row_number: number; reasons: string[]; row: Record<string, string>; matched_by?: string; }
 interface ParticipantImportRunResult { created_count: number; duplicate_count: number; invalid_count: number; invalid_rows: number[]; invalid_row_details: ParticipantImportRowIssue[]; duplicate_row_details: ParticipantImportRowIssue[]; participants: Participant[]; reset?: Record<string, unknown>; }
 interface ParticipantListResetResult extends MutationResult { deleted_participant_count: number; deleted_mapping_count: number; deleted_baseline_record_count: number; deleted_change_log_count: number; qrEmailsSent?: boolean; sent_qr_email_count?: number; }
@@ -51,6 +52,7 @@ interface DataContextType {
   resetEventParticipantList: (eventId: string, confirmQrSent?: boolean) => Promise<ParticipantListResetResult>;
   getParticipantFieldMappingsState: (eventId: string) => Promise<ParticipantFieldMappingsState>;
   getParticipantFieldMappings: (eventId: string) => Promise<ParticipantFieldMapping[]>;
+  updateParticipantFieldMappings: (eventId: string, mappings: ParticipantFieldMapping[]) => Promise<ParticipantFieldMappingUpdateResult>;
   addParticipantManually: (eventId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
   createEvent: (e: EventMutationInput) => Promise<MutationResult>;
   updateEvent: (eventId: string, data: EventUpdateInput) => Promise<MutationResult>;
@@ -791,6 +793,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return request;
   }, [applyOnlineOnly, getAuthHeaders]);
 
+  const updateParticipantFieldMappings = useCallback(async (eventId: string, mappings: ParticipantFieldMapping[]): Promise<ParticipantFieldMappingUpdateResult> => {
+    try {
+      const offlineError = ensureOnline();
+      if (offlineError) return { ok: false, error: offlineError, mappings: [], has_baseline_import: false };
+
+      const payload = (await fetchJson(`${API_BASE_URL}/events/${eventId}/participant-field-mappings`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({ mappings }),
+      })).payload as { data?: { has_mapping?: boolean; has_baseline_import?: boolean; mappings?: ParticipantFieldMapping[] } };
+      const state = {
+        has_mapping: Boolean(payload.data?.has_mapping),
+        has_baseline_import: Boolean(payload.data?.has_baseline_import),
+        mappings: payload.data?.mappings ?? [],
+      };
+      rememberParticipantFieldMappingsState(eventId, state);
+      addLog('Zaktualizowano mapowanie pól uczestników');
+      return { ok: true, mappings: state.mappings, has_baseline_import: state.has_baseline_import };
+    } catch (error) {
+      handleNetworkFailure(error);
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Nie udało się zapisać mapowania pól uczestników.',
+        mappings: [],
+        has_baseline_import: false,
+      };
+    }
+  }, [addLog, ensureOnline, getAuthHeaders, handleNetworkFailure, rememberParticipantFieldMappingsState]);
+
   const addParticipantManually = useCallback(async (eventId: string, email: string, fieldValues: Record<string, string>) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const payload = (await fetchJson(`${API_BASE_URL}/events/${eventId}/participants/manual`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ email, field_values: fieldValues }) })).payload as { data?: ApiParticipant };
@@ -1034,7 +1065,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [buildExportFallbackName, downloadCsvResponse, ensureOnline, getAuthHeaders, handleNetworkFailure]);
 
   return (
-    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, replaceParticipantImport, resetEventParticipantList, getParticipantFieldMappingsState, getParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, setUserPassword, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, exportEventParticipantChangesCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
+    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, replaceParticipantImport, resetEventParticipantList, getParticipantFieldMappingsState, getParticipantFieldMappings, updateParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, setUserPassword, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, exportEventParticipantChangesCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
       {children}
     </DataContext.Provider>
   );
