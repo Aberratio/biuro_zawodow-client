@@ -65,6 +65,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { API_BASE_URL, fetchJson } from "@/lib/api";
+import { mapApiUserToUi, type ApiUser } from "@/lib/data-context-helpers";
 import { validateStrongPassword } from "@/lib/form-validation";
 import { participantCountsAsCheckedIn } from "@/lib/participant-status";
 import { generateStrongPassword } from "@/lib/password";
@@ -77,6 +78,7 @@ import type { ParticipantStatus, Role, User } from "@/types";
 
 type AuditScope = "all" | "user" | "organization" | "event" | "participant";
 type UserRoleTab = "admin" | "editor" | "scanner" | "scanner_plus";
+type ManagedUserRole = Exclude<Role, "superadmin">;
 
 type AuditEntry = {
   source: "activity" | "participant_change";
@@ -140,6 +142,13 @@ const USER_ROLE_TABS: Array<{ value: UserRoleTab; label: string }> = [
   { value: "editor", label: "Organizatorzy" },
   { value: "scanner", label: "Operatorzy" },
   { value: "scanner_plus", label: "Operator Plus" },
+];
+
+const MANAGED_USER_ROLE_OPTIONS: Array<{ value: ManagedUserRole; label: string }> = [
+  { value: "admin", label: "Admin" },
+  { value: "editor", label: "Organizator" },
+  { value: "scanner", label: "Operator" },
+  { value: "scanner_plus", label: "Operator+" },
 ];
 
 const roleLabels: Record<Role, string> = {
@@ -238,6 +247,13 @@ export default function SuperAdmin() {
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [userForm, setUserForm] = useState({ name: "", email: "" });
   const [isSavingUser, setIsSavingUser] = useState(false);
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [roleUser, setRoleUser] = useState<User | null>(null);
+  const [roleForm, setRoleForm] = useState<{ role: ManagedUserRole; organization_id: string }>({
+    role: "editor",
+    organization_id: "",
+  });
+  const [isSavingUserRole, setIsSavingUserRole] = useState(false);
   const [selectedActionUser, setSelectedActionUser] = useState<User | null>(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordDraft, setPasswordDraft] = useState("");
@@ -275,6 +291,11 @@ export default function SuperAdmin() {
   const eventById = useMemo(() => {
     return new Map(allEvents.map((event) => [event.id, event]));
   }, [allEvents]);
+
+  const organizationOptions = useMemo(
+    () => [...organizations].sort((left, right) => left.name.localeCompare(right.name, "pl")),
+    [organizations],
+  );
 
   const activeRoleUsers = useMemo(() => {
     const query = normalizeSearch(userSearch);
@@ -623,6 +644,17 @@ export default function SuperAdmin() {
     setUserDialogOpen(true);
   };
 
+  const openRoleDialog = (user: User) => {
+    if (user.role === "superadmin") return;
+
+    setRoleUser(user);
+    setRoleForm({
+      role: user.role,
+      organization_id: user.organization_id ?? "",
+    });
+    setRoleDialogOpen(true);
+  };
+
   const saveUser = async () => {
     if (!editUser) return;
 
@@ -652,6 +684,57 @@ export default function SuperAdmin() {
     toast({ title: "Zapisano konto użytkownika" });
     if (activeTab === "audit" || hasLoadedRemoteAudit) {
       await loadAudit();
+    }
+  };
+
+  const saveUserRole = async () => {
+    if (!roleUser) return;
+
+    if (roleForm.role !== "admin" && !roleForm.organization_id) {
+      toast({
+        title: "Wybierz organizację",
+        description: "Organizacja jest wymagana dla organizatora i operatorów.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingUserRole(true);
+
+    try {
+      const payload = (await fetchJson(`${API_BASE_URL}/superadmin/users/${roleUser.id}/role`, {
+        method: "PATCH",
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({
+          role: roleForm.role,
+          organization_id: roleForm.role === "admin" ? null : roleForm.organization_id,
+        }),
+      })).payload as { data?: ApiUser };
+
+      if (!payload.data) {
+        throw new Error("API user role change returned empty payload");
+      }
+
+      const updatedUser = mapApiUserToUi(payload.data);
+
+      setRoleDialogOpen(false);
+      setRoleUser(null);
+      setProfileUser((previous) => (previous?.id === updatedUser.id ? updatedUser : previous));
+
+      toast({ title: `Zmieniono rolę na ${roleLabels[updatedUser.role]}` });
+      await refreshData();
+
+      if (activeTab === "audit" || hasLoadedRemoteAudit) {
+        await loadAudit();
+      }
+    } catch (error) {
+      toast({
+        title: "Nie udało się zmienić roli",
+        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingUserRole(false);
     }
   };
 
@@ -1000,6 +1083,9 @@ export default function SuperAdmin() {
                               <EyeOff className="h-4 w-4" />
                             </Button>
                           )}
+                          <Button variant="ghost" size="icon" onClick={() => openRoleDialog(admin)} disabled={!isOnline} title="Zmień rolę" aria-label={`Zmień rolę konta ${admin.name}`}>
+                            <Shield className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => openUserLogs(admin)} title="Logi konta" aria-label={`Zobacz logi konta ${admin.name}`}>
                             <Activity className="h-4 w-4" />
                           </Button>
@@ -1457,6 +1543,10 @@ export default function SuperAdmin() {
                   <Edit3 className="mr-1 h-4 w-4" />
                   Edytuj
                 </Button>
+                <Button variant="outline" size="sm" onClick={() => openRoleDialog(profileUser)} disabled={!isOnline}>
+                  <Shield className="mr-1 h-4 w-4" />
+                  Zmień rolę
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => resetAdminPassword(profileUser)} disabled={!isOnline}>
                   <KeyRound className="mr-1 h-4 w-4" />
                   Reset hasła
@@ -1531,6 +1621,81 @@ export default function SuperAdmin() {
             <Button onClick={() => void saveUser()} disabled={isSavingUser}>
               {isSavingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Zapisz
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={roleDialogOpen}
+        onOpenChange={(open) => {
+          setRoleDialogOpen(open);
+          if (!open) {
+            setRoleUser(null);
+            setRoleForm({ role: "editor", organization_id: "" });
+          }
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Zmień rolę konta</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">{roleUser?.name}</p>
+              <p className="break-all text-xs text-muted-foreground">{roleUser?.email}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="superadmin-user-role">Rola</Label>
+              <Select
+                value={roleForm.role}
+                onValueChange={(value) => setRoleForm((previous) => ({ ...previous, role: value as ManagedUserRole }))}
+              >
+                <SelectTrigger id="superadmin-user-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MANAGED_USER_ROLE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {roleForm.role !== "admin" && (
+              <div className="space-y-2">
+                <Label htmlFor="superadmin-user-role-organization">Organizacja</Label>
+                <Select
+                  value={roleForm.organization_id}
+                  onValueChange={(value) => setRoleForm((previous) => ({ ...previous, organization_id: value }))}
+                >
+                  <SelectTrigger id="superadmin-user-role-organization">
+                    <SelectValue placeholder="Wybierz organizację" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organizationOptions.map((organization) => (
+                      <SelectItem key={organization.id} value={organization.id}>
+                        {organization.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {roleForm.role === "admin" && (
+              <p className="text-sm text-muted-foreground">
+                Konto admina nie jest przypisane do jednej organizacji i zachowuje pełny dostęp.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRoleDialogOpen(false)} disabled={isSavingUserRole}>
+              Anuluj
+            </Button>
+            <Button onClick={() => void saveUserRole()} disabled={isSavingUserRole || !roleUser}>
+              {isSavingUserRole && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Zapisz rolę
             </Button>
           </DialogFooter>
         </DialogContent>
