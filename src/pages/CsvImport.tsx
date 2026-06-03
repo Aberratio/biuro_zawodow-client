@@ -58,7 +58,7 @@ function getPreviewFieldRoleLabel(role: MappingPreviewField['role']): string {
     case 'email':
       return 'Email';
     case 'display_name_part':
-      return 'Część nazwy';
+      return 'Imię i Nazwisko';
     case 'bib_number':
       return 'Numer startowy';
     case 'important_custom':
@@ -407,7 +407,7 @@ export default function CsvImport() {
     const roleOptions: Array<{ value: EditableFieldRole; label: string }> = [
       { value: 'important_custom', label: 'Wyróżnij przy odprawie' },
       { value: 'custom', label: 'Pole własne' },
-      { value: 'display_name_part', label: 'Część nazwy' },
+      { value: 'display_name_part', label: 'Imię i Nazwisko' },
       { value: 'bib_number', label: 'Numer startowy' },
       { value: 'ignore', label: 'Ignoruj' },
     ];
@@ -785,7 +785,7 @@ export default function CsvImport() {
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-md border border-sky-400/50 bg-sky-500/10 px-3 py-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Część nazwy</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Imię i Nazwisko</p>
                       <p className="mt-1 text-xs text-muted-foreground">Buduje nazwę uczestnika (zazwyczaj kolumny imię i nazwisko). Wybierz co najmniej jedną taką kolumnę.</p>
                     </div>
                     <div className="rounded-md border border-amber-400/50 bg-amber-500/10 px-3 py-2">
@@ -853,7 +853,7 @@ export default function CsvImport() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="ignore">Ignoruj</SelectItem>
-                              <SelectItem value="display_name_part">Część nazwy</SelectItem>
+                              <SelectItem value="display_name_part">Imię i Nazwisko</SelectItem>
                               <SelectItem value="bib_number" disabled={Boolean(bibNumberColumn && bibNumberColumn !== field.source_column_name)}>
                                 Numer startowy
                               </SelectItem>
