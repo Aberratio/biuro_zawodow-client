@@ -10,6 +10,8 @@ import {
   ChevronRight,
   Database,
   Edit3,
+  Eye,
+  EyeOff,
   KeyRound,
   Loader2,
   Plus,
@@ -23,6 +25,7 @@ import {
 
 import { PageHeader } from "@/components/PageHeader";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
+import { PasswordRequirements } from "@/components/PasswordRequirements";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -61,7 +65,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { API_BASE_URL, fetchJson } from "@/lib/api";
+import { validateStrongPassword } from "@/lib/form-validation";
 import { participantCountsAsCheckedIn } from "@/lib/participant-status";
+import { generateStrongPassword } from "@/lib/password";
 import {
   buildEventParticipantPath,
   buildEventPath,
@@ -70,6 +76,7 @@ import {
 import type { ParticipantStatus, Role, User } from "@/types";
 
 type AuditScope = "all" | "user" | "organization" | "event" | "participant";
+type UserRoleTab = "admin" | "editor" | "scanner" | "scanner_plus";
 
 type AuditEntry = {
   source: "activity" | "participant_change";
@@ -128,6 +135,13 @@ const AUDIT_PAGE_SIZE = 50;
 const AUDIT_ENTITY_OPTION_LIMIT = 12;
 const DATABASE_PAGE_SIZE = 100;
 
+const USER_ROLE_TABS: Array<{ value: UserRoleTab; label: string }> = [
+  { value: "admin", label: "Admini" },
+  { value: "editor", label: "Organizatorzy" },
+  { value: "scanner", label: "Operatorzy" },
+  { value: "scanner_plus", label: "Operator Plus" },
+];
+
 const roleLabels: Record<Role, string> = {
   superadmin: "Superadmin",
   admin: "Admin",
@@ -171,6 +185,11 @@ export default function SuperAdmin() {
     participants,
     activityLog,
     addUser,
+    updateUser,
+    removeUser,
+    triggerUserPasswordReset,
+    setUserPassword,
+    changeRole,
     refreshData,
     isLoading,
     connectionState,
@@ -208,15 +227,27 @@ export default function SuperAdmin() {
   const [databasePage, setDatabasePage] = useState(1);
   const [hasLoadedDatabase, setHasLoadedDatabase] = useState(false);
   const [isDatabaseLoading, setIsDatabaseLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("admins");
+  const [activeTab, setActiveTab] = useState("users");
+  const [activeUserRoleTab, setActiveUserRoleTab] = useState<UserRoleTab>("admin");
+  const [userSearch, setUserSearch] = useState("");
+  const [userOrganizationFilter, setUserOrganizationFilter] = useState("all");
+  const [userEventFilter, setUserEventFilter] = useState("all");
+  const [profileUser, setProfileUser] = useState<User | null>(null);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [userForm, setUserForm] = useState({ name: "", email: "" });
+  const [isSavingUser, setIsSavingUser] = useState(false);
+  const [selectedActionUser, setSelectedActionUser] = useState<User | null>(null);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordDraft, setPasswordDraft] = useState("");
+  const [showPasswordDraft, setShowPasswordDraft] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState<{ password?: string; form?: string }>({});
+  const [isSettingPassword, setIsSettingPassword] = useState(false);
+  const [isChangingUserRole, setIsChangingUserRole] = useState(false);
 
   const allEvents = useMemo(() => [...events, ...archivedEvents], [archivedEvents, events]);
   const isOnline = connectionState === "online";
-
-  const adminUsers = useMemo(
-    () => users.filter((user) => user.role === "admin").sort((left, right) => left.name.localeCompare(right.name, "pl")),
-    [users],
-  );
 
   const roleCounts = useMemo(() => {
     return users.reduce<Record<Role, number>>(
@@ -236,6 +267,63 @@ export default function SuperAdmin() {
     () => participants.filter((participant) => participantCountsAsCheckedIn(participant)).length,
     [participants],
   );
+
+  const organizationNameById = useMemo(() => {
+    return new Map(organizations.map((organization) => [organization.id, organization.name]));
+  }, [organizations]);
+
+  const eventById = useMemo(() => {
+    return new Map(allEvents.map((event) => [event.id, event]));
+  }, [allEvents]);
+
+  const activeRoleUsers = useMemo(() => {
+    const query = normalizeSearch(userSearch);
+
+    return users
+      .filter((user) => user.role === activeUserRoleTab)
+      .filter((user) => {
+        if (userOrganizationFilter !== "all" && user.organization_id !== userOrganizationFilter) {
+          return false;
+        }
+
+        if (userEventFilter !== "all") {
+          if (user.role === "editor") {
+            return allEvents.some(
+              (event) => event.id === userEventFilter && event.organization_id === user.organization_id,
+            );
+          }
+
+          if (!user.assigned_events.includes(userEventFilter)) {
+            return false;
+          }
+        }
+
+        if (!query) return true;
+
+        const organizationName = user.organization_id ? organizationNameById.get(user.organization_id) ?? "" : "";
+        const assignedEventNames = user.assigned_events
+          .map((eventId) => eventById.get(eventId)?.name ?? eventId)
+          .join(" ");
+        const haystack = `${user.name} ${user.email} ${roleLabels[user.role]} ${organizationName} ${assignedEventNames}`;
+
+        return haystack.toLocaleLowerCase("pl-PL").includes(query);
+      })
+      .sort((left, right) => left.name.localeCompare(right.name, "pl"));
+  }, [
+    activeUserRoleTab,
+    allEvents,
+    eventById,
+    organizationNameById,
+    userEventFilter,
+    userOrganizationFilter,
+    userSearch,
+    users,
+  ]);
+
+  const availableEventFilters = useMemo(() => {
+    if (userOrganizationFilter === "all") return allEvents;
+    return allEvents.filter((event) => event.organization_id === userOrganizationFilter);
+  }, [allEvents, userOrganizationFilter]);
 
   const entityOptions = useMemo<EntityOption[]>(() => {
     if (auditScope === "user") {
@@ -465,10 +553,17 @@ export default function SuperAdmin() {
 
   const resetAdminPassword = async (admin: User) => {
     try {
-      await fetchJson(`${API_BASE_URL}/superadmin/admins/${admin.id}/password-reset`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      });
+      if (admin.role === "admin") {
+        await fetchJson(`${API_BASE_URL}/superadmin/admins/${admin.id}/password-reset`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+        });
+      } else {
+        const result = await triggerUserPasswordReset(admin.id);
+        if (!result.ok) {
+          throw new Error(result.error ?? "Nie udało się wysłać resetu.");
+        }
+      }
       toast({ title: "Wysłano reset hasła" });
       if (activeTab === "audit" || hasLoadedRemoteAudit) {
         await loadAudit();
@@ -483,25 +578,161 @@ export default function SuperAdmin() {
   };
 
   const archiveAdmin = async (admin: User) => {
-    const confirmed = window.confirm(`Zarchiwizować konto admina ${admin.name}?`);
+    const confirmed = window.confirm(`Zarchiwizować konto ${admin.name}?`);
     if (!confirmed) return;
 
     try {
-      await fetchJson(`${API_BASE_URL}/superadmin/admins/${admin.id}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      });
-      toast({ title: "Zarchiwizowano konto admina" });
+      if (admin.role === "admin") {
+        await fetchJson(`${API_BASE_URL}/superadmin/admins/${admin.id}`, {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        });
+      } else {
+        const result = await removeUser(admin.id);
+        if (!result.ok) {
+          throw new Error(result.error ?? "Nie udało się zarchiwizować konta.");
+        }
+      }
+      toast({ title: "Zarchiwizowano konto" });
       await refreshData();
       if (activeTab === "audit" || hasLoadedRemoteAudit) {
         await loadAudit();
       }
     } catch (error) {
       toast({
-        title: "Nie udało się zarchiwizować admina",
+        title: "Nie udało się zarchiwizować konta",
         description: error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
+    }
+  };
+
+  const openUserDetails = (user: User) => {
+    setProfileUser(user);
+    setProfileDialogOpen(true);
+  };
+
+  const openEditUser = (user: User) => {
+    if (user.role === "admin") {
+      openEditAdmin(user);
+      return;
+    }
+
+    setEditUser(user);
+    setUserForm({ name: user.name, email: user.email });
+    setUserDialogOpen(true);
+  };
+
+  const saveUser = async () => {
+    if (!editUser) return;
+
+    const name = userForm.name.trim();
+    const email = userForm.email.trim();
+    if (!name || !email) {
+      toast({ title: "Uzupełnij nazwę i e-mail", variant: "destructive" });
+      return;
+    }
+
+    setIsSavingUser(true);
+    const result = await updateUser(editUser.id, { name, email });
+    setIsSavingUser(false);
+
+    if (!result.ok) {
+      toast({
+        title: "Nie udało się zapisać użytkownika",
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUserDialogOpen(false);
+    setEditUser(null);
+    setUserForm({ name: "", email: "" });
+    toast({ title: "Zapisano konto użytkownika" });
+    if (activeTab === "audit" || hasLoadedRemoteAudit) {
+      await loadAudit();
+    }
+  };
+
+  const generatePasswordDraft = () => {
+    setPasswordDraft(generateStrongPassword());
+    setPasswordErrors({});
+  };
+
+  const openPasswordDialog = (user: User) => {
+    setSelectedActionUser(user);
+    setPasswordDraft(generateStrongPassword());
+    setPasswordErrors({});
+    setShowPasswordDraft(false);
+    setPasswordDialogOpen(true);
+  };
+
+  const saveUserPassword = async () => {
+    if (!selectedActionUser) return;
+
+    const passwordError = validateStrongPassword(passwordDraft);
+    if (passwordError) {
+      setPasswordErrors({ password: passwordError });
+      return;
+    }
+
+    setIsSettingPassword(true);
+    const result = await setUserPassword(selectedActionUser.id, passwordDraft);
+    setIsSettingPassword(false);
+
+    if (!result.ok) {
+      setPasswordErrors({ form: result.error ?? "Nie udało się ustawić hasła." });
+      return;
+    }
+
+    const targetUser = selectedActionUser;
+    setPasswordDialogOpen(false);
+    setSelectedActionUser(null);
+    setPasswordDraft("");
+    setPasswordErrors({});
+    toast({
+      title: "Ustawiono hasło",
+      description: `Konto ${targetUser.email} może logować się nowym hasłem.`,
+    });
+    if (activeTab === "audit" || hasLoadedRemoteAudit) {
+      await loadAudit();
+    }
+  };
+
+  const openUserLogs = (user: User) => {
+    const entity = {
+      id: user.id,
+      label: user.name,
+      meta: `${user.email} · ${roleLabels[user.role]}`,
+    };
+    setAuditScope("user");
+    setSelectedEntity(entity);
+    setEntitySearch(user.name);
+    setAuditPage(1);
+    setActiveTab("audit");
+    void loadAudit("user", entity, 1);
+  };
+
+  const toggleScannerRole = async (user: User) => {
+    const nextRole = user.role === "scanner" ? "scanner_plus" : "scanner";
+    setIsChangingUserRole(true);
+    const result = await changeRole(user.id, nextRole);
+    setIsChangingUserRole(false);
+
+    if (!result.ok) {
+      toast({
+        title: "Nie udało się zmienić roli",
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({ title: `Zmieniono rolę na ${roleLabels[nextRole]}` });
+    await refreshData();
+    if (profileUser?.id === user.id) {
+      setProfileUser({ ...user, role: nextRole });
     }
   };
 
@@ -596,52 +827,191 @@ export default function SuperAdmin() {
         className="space-y-5"
       >
         <TabsList className="grid h-auto w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
-          <TabsTrigger value="admins">Admini</TabsTrigger>
+          <TabsTrigger value="users">Userzy</TabsTrigger>
           <TabsTrigger value="audit">Audyt</TabsTrigger>
           <TabsTrigger value="database">Baza danych</TabsTrigger>
           <TabsTrigger value="control">Kontrola</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="admins" className="space-y-4">
+        <TabsContent value="users" className="space-y-4">
+          <Tabs
+            value={activeUserRoleTab}
+            onValueChange={(value) => {
+              setActiveUserRoleTab(value as UserRoleTab);
+              setUserEventFilter("all");
+            }}
+            className="space-y-4"
+          >
+            <TabsList className="grid h-auto w-full grid-cols-2 lg:w-auto lg:grid-cols-4">
+              {USER_ROLE_TABS.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value} className="gap-2">
+                  {tab.label}
+                  <Badge variant="secondary" className="px-1.5 py-0 text-[0.65rem]">
+                    {roleCounts[tab.value]}
+                  </Badge>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            <Card>
+              <CardContent className="space-y-4 p-4 sm:p-5">
+                <div className="grid gap-3 lg:grid-cols-[minmax(14rem,1fr)_minmax(12rem,16rem)_minmax(12rem,16rem)_auto]">
+                  <div className="space-y-2">
+                    <Label htmlFor="superadmin-user-search">Szukaj</Label>
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="superadmin-user-search"
+                        value={userSearch}
+                        onChange={(event) => setUserSearch(event.target.value)}
+                        placeholder="Nazwa, e-mail, organizacja, wydarzenie"
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Organizacja</Label>
+                    <Select
+                      value={userOrganizationFilter}
+                      onValueChange={(value) => {
+                        setUserOrganizationFilter(value);
+                        setUserEventFilter("all");
+                      }}
+                      disabled={activeUserRoleTab === "admin"}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Wszystkie</SelectItem>
+                        {organizations.map((organization) => (
+                          <SelectItem key={organization.id} value={organization.id}>
+                            {organization.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Wydarzenie</Label>
+                    <Select
+                      value={userEventFilter}
+                      onValueChange={setUserEventFilter}
+                      disabled={activeUserRoleTab === "admin" || availableEventFilters.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Wszystkie</SelectItem>
+                        {availableEventFilters.map((event) => (
+                          <SelectItem key={event.id} value={event.id}>
+                            {event.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full lg:w-auto"
+                      onClick={() => {
+                        setUserSearch("");
+                        setUserOrganizationFilter("all");
+                        setUserEventFilter("all");
+                      }}
+                    >
+                      Wyczyść
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3">
-              <CardTitle className="text-lg">Konta adminów</CardTitle>
-              <Badge variant="secondary">{adminUsers.length}</Badge>
+              <CardTitle className="text-lg">Konta użytkowników</CardTitle>
+              <Badge variant="secondary">{activeRoleUsers.length}</Badge>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Admin</TableHead>
-                    <TableHead>E-mail</TableHead>
+                    <TableHead>Konto</TableHead>
+                    <TableHead>Organizacja i przypisania</TableHead>
                     <TableHead className="hidden sm:table-cell">Rola</TableHead>
                     <TableHead className="text-right">Akcje</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {adminUsers.map((admin) => (
+                  {activeRoleUsers.map((admin) => {
+                    const organizationName = admin.organization_id
+                      ? organizationNameById.get(admin.organization_id) ?? admin.organization_id
+                      : "Wszystkie organizacje";
+                    const assignedEventNames = admin.assigned_events
+                      .map((eventId) => eventById.get(eventId)?.name ?? eventId)
+                      .join(", ");
+                    const organizationEventCount = admin.organization_id
+                      ? allEvents.filter((event) => event.organization_id === admin.organization_id).length
+                      : allEvents.length;
+
+                    return (
                     <TableRow key={admin.id}>
-                      <TableCell className="font-medium">{admin.name}</TableCell>
-                      <TableCell className="break-all text-sm text-muted-foreground">{admin.email}</TableCell>
+                      <TableCell>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{admin.name}</p>
+                          <p className="break-all text-xs text-muted-foreground">{admin.email}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1 text-sm">
+                          <p className="line-clamp-1">{organizationName}</p>
+                          {admin.role === "admin" && (
+                            <p className="text-xs text-muted-foreground">Pełny dostęp do systemu</p>
+                          )}
+                          {admin.role === "editor" && (
+                            <p className="text-xs text-muted-foreground">{organizationEventCount} wydarzeń organizacji</p>
+                          )}
+                          {(admin.role === "scanner" || admin.role === "scanner_plus") && (
+                            <p className="truncate text-xs text-muted-foreground">
+                              {admin.assigned_events.length > 0 ? assignedEventNames : "Brak przypisanych wydarzeń"}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="hidden sm:table-cell">
-                        <Badge variant="outline">Admin</Badge>
+                        <Badge variant="outline">{roleLabels[admin.role]}</Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => openEditAdmin(admin)} disabled={!isOnline} title="Edytuj" aria-label={`Edytuj admina ${admin.name}`}>
+                          <Button variant="ghost" size="icon" onClick={() => openUserDetails(admin)} title="Szczegóły konta" aria-label={`Szczegóły konta ${admin.name}`}>
+                            <UserRound className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => openEditUser(admin)} disabled={!isOnline} title="Edytuj" aria-label={`Edytuj konto ${admin.name}`}>
                             <Edit3 className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => resetAdminPassword(admin)} disabled={!isOnline} title="Reset hasła" aria-label={`Wyślij reset hasła adminowi ${admin.name}`}>
+                          <Button variant="ghost" size="icon" onClick={() => resetAdminPassword(admin)} disabled={!isOnline} title="Reset hasła" aria-label={`Wyślij reset hasła dla ${admin.name}`}>
                             <KeyRound className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => archiveAdmin(admin)} disabled={!isOnline} title="Archiwizuj" aria-label={`Archiwizuj admina ${admin.name}`}>
+                          {admin.role !== "admin" && (
+                            <Button variant="ghost" size="icon" onClick={() => openPasswordDialog(admin)} disabled={!isOnline} title="Ustaw hasło" aria-label={`Ustaw hasło dla ${admin.name}`}>
+                              <EyeOff className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" onClick={() => openUserLogs(admin)} title="Logi konta" aria-label={`Zobacz logi konta ${admin.name}`}>
+                            <Activity className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => archiveAdmin(admin)} disabled={!isOnline} title="Archiwizuj" aria-label={`Archiwizuj konto ${admin.name}`}>
                             <Archive className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
-                  {adminUsers.length === 0 && (
+                    );
+                  })}
+                  {activeRoleUsers.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
                         Brak kont adminów.
@@ -652,6 +1022,7 @@ export default function SuperAdmin() {
               </Table>
             </CardContent>
           </Card>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="audit" className="space-y-4">
@@ -1037,6 +1408,204 @@ export default function SuperAdmin() {
       </Tabs>
 
       <Dialog
+        open={profileDialogOpen}
+        onOpenChange={(open) => {
+          setProfileDialogOpen(open);
+          if (!open) setProfileUser(null);
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Szczegóły konta</DialogTitle>
+          </DialogHeader>
+          {profileUser && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="font-medium">{profileUser.name}</p>
+                <p className="break-all text-sm text-muted-foreground">{profileUser.email}</p>
+              </div>
+              <div className="grid gap-3 text-sm sm:grid-cols-2">
+                <AccountDetail label="Rola" value={roleLabels[profileUser.role]} />
+                <AccountDetail
+                  label="Organizacja"
+                  value={
+                    profileUser.organization_id
+                      ? organizationNameById.get(profileUser.organization_id) ?? profileUser.organization_id
+                      : "Wszystkie organizacje"
+                  }
+                />
+                <AccountDetail label="ID konta" value={profileUser.id} />
+                <AccountDetail
+                  label="Przypisane wydarzenia"
+                  value={
+                    profileUser.role === "admin"
+                      ? "Pełny dostęp"
+                      : profileUser.role === "editor"
+                        ? `${allEvents.filter((event) => event.organization_id === profileUser.organization_id).length} wydarzeń organizacji`
+                        : profileUser.assigned_events
+                            .map((eventId) => eventById.get(eventId)?.name ?? eventId)
+                            .join(", ") || "Brak"
+                  }
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => openUserLogs(profileUser)}>
+                  <Activity className="mr-1 h-4 w-4" />
+                  Logi
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => openEditUser(profileUser)} disabled={!isOnline}>
+                  <Edit3 className="mr-1 h-4 w-4" />
+                  Edytuj
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => resetAdminPassword(profileUser)} disabled={!isOnline}>
+                  <KeyRound className="mr-1 h-4 w-4" />
+                  Reset hasła
+                </Button>
+                {profileUser.role !== "admin" && (
+                  <Button variant="outline" size="sm" onClick={() => openPasswordDialog(profileUser)} disabled={!isOnline}>
+                    <EyeOff className="mr-1 h-4 w-4" />
+                    Ustaw hasło
+                  </Button>
+                )}
+                {(profileUser.role === "scanner" || profileUser.role === "scanner_plus") && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void toggleScannerRole(profileUser)}
+                    disabled={!isOnline || isChangingUserRole}
+                  >
+                    {isChangingUserRole && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                    {profileUser.role === "scanner" ? "Zmień na Operator Plus" : "Zmień na Operator"}
+                  </Button>
+                )}
+                <Button variant="destructive" size="sm" onClick={() => archiveAdmin(profileUser)} disabled={!isOnline}>
+                  <Archive className="mr-1 h-4 w-4" />
+                  Archiwizuj
+                </Button>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setProfileDialogOpen(false)}>Zamknij</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={userDialogOpen}
+        onOpenChange={(open) => {
+          setUserDialogOpen(open);
+          if (!open) {
+            setEditUser(null);
+            setUserForm({ name: "", email: "" });
+          }
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edytuj konto</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="superadmin-user-name">Nazwa</Label>
+              <Input
+                id="superadmin-user-name"
+                value={userForm.name}
+                onChange={(event) => setUserForm((previous) => ({ ...previous, name: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="superadmin-user-email">E-mail</Label>
+              <Input
+                id="superadmin-user-email"
+                type="email"
+                value={userForm.email}
+                onChange={(event) => setUserForm((previous) => ({ ...previous, email: event.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUserDialogOpen(false)} disabled={isSavingUser}>
+              Anuluj
+            </Button>
+            <Button onClick={() => void saveUser()} disabled={isSavingUser}>
+              {isSavingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Zapisz
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={passwordDialogOpen}
+        onOpenChange={(open) => {
+          setPasswordDialogOpen(open);
+          if (!open) {
+            setSelectedActionUser(null);
+            setPasswordDraft("");
+            setShowPasswordDraft(false);
+            setPasswordErrors({});
+          }
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ustaw hasło</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">{selectedActionUser?.name}</p>
+              <p className="break-all text-xs text-muted-foreground">{selectedActionUser?.email}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="superadmin-user-password">Nowe hasło</Label>
+              <div className="flex gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Input
+                    id="superadmin-user-password"
+                    type={showPasswordDraft ? "text" : "password"}
+                    value={passwordDraft}
+                    onChange={(event) => {
+                      setPasswordDraft(event.target.value);
+                      setPasswordErrors({});
+                    }}
+                    autoComplete="new-password"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                    onClick={() => setShowPasswordDraft((visible) => !visible)}
+                    aria-label={showPasswordDraft ? "Ukryj hasło" : "Pokaż hasło"}
+                  >
+                    {showPasswordDraft ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <Button type="button" variant="outline" onClick={generatePasswordDraft}>
+                  <KeyRound className="mr-1 h-4 w-4" />
+                  Generator
+                </Button>
+              </div>
+              <PasswordRequirements password={passwordDraft} />
+              <FieldError id="superadmin-user-password-error">{passwordErrors.password}</FieldError>
+            </div>
+            <FieldError id="superadmin-user-password-form-error">{passwordErrors.form}</FieldError>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPasswordDialogOpen(false)} disabled={isSettingPassword}>
+              Anuluj
+            </Button>
+            <Button onClick={() => void saveUserPassword()} disabled={isSettingPassword || !selectedActionUser}>
+              {isSettingPassword && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              Zapisz hasło
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={adminDialogOpen}
         onOpenChange={(nextOpen) => {
           setAdminDialogOpen(nextOpen);
@@ -1121,6 +1690,15 @@ function MetricCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function AccountDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border bg-background/60 p-3">
+      <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="mt-1 break-words text-sm font-medium">{value}</p>
+    </div>
   );
 }
 
