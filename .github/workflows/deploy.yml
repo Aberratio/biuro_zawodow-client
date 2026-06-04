@@ -85,9 +85,11 @@ jobs:
           API_URL: ${{ secrets.API_URL }}
           VITE_SMARTLOOK_ENABLED: ${{ secrets.VITE_SMARTLOOK_ENABLED }}
           VITE_SMARTLOOK_PROJECT_KEY: ${{ secrets.VITE_SMARTLOOK_PROJECT_KEY }}
-          VITE_LEGAL_ADMIN_NAME: ${{ secrets.VITE_LEGAL_ADMIN_NAME }}
-          VITE_LEGAL_ADMIN_ADDRESS: ${{ secrets.VITE_LEGAL_ADMIN_ADDRESS }}
-          VITE_LEGAL_CONTACT_EMAIL: ${{ secrets.VITE_LEGAL_CONTACT_EMAIL }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_TRACES_SAMPLE_RATE: ${{ secrets.VITE_SENTRY_TRACES_SAMPLE_RATE }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           VITE_APP_ENV: staging
           VITE_STAGING_GATE_PASSWORD: ${{ secrets.VITE_STAGING_GATE_PASSWORD }}
         run: |
@@ -99,9 +101,8 @@ jobs:
           export VITE_API_URL="$API_URL"
           export VITE_SMARTLOOK_ENABLED="${VITE_SMARTLOOK_ENABLED:-false}"
           export VITE_SMARTLOOK_PROJECT_KEY="${VITE_SMARTLOOK_PROJECT_KEY:-}"
-          export VITE_LEGAL_ADMIN_NAME="${VITE_LEGAL_ADMIN_NAME:-ZmierzymyCzas.pl}"
-          export VITE_LEGAL_ADMIN_ADDRESS="${VITE_LEGAL_ADMIN_ADDRESS:-}"
-          export VITE_LEGAL_CONTACT_EMAIL="${VITE_LEGAL_CONTACT_EMAIL:-}"
+          export VITE_SENTRY_ENVIRONMENT=staging
+          export VITE_APP_RELEASE="${GITHUB_SHA}"
           echo "Building staging frontend with API_URL from the staging GitHub Environment."
           npx vite build
 
@@ -322,9 +323,11 @@ jobs:
           API_URL: ${{ secrets.API_URL }}
           VITE_SMARTLOOK_ENABLED: ${{ secrets.VITE_SMARTLOOK_ENABLED }}
           VITE_SMARTLOOK_PROJECT_KEY: ${{ secrets.VITE_SMARTLOOK_PROJECT_KEY }}
-          VITE_LEGAL_ADMIN_NAME: ${{ secrets.VITE_LEGAL_ADMIN_NAME }}
-          VITE_LEGAL_ADMIN_ADDRESS: ${{ secrets.VITE_LEGAL_ADMIN_ADDRESS }}
-          VITE_LEGAL_CONTACT_EMAIL: ${{ secrets.VITE_LEGAL_CONTACT_EMAIL }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_TRACES_SAMPLE_RATE: ${{ secrets.VITE_SENTRY_TRACES_SAMPLE_RATE }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           VITE_APP_ENV: production
         run: |
           set -Eeuo pipefail
@@ -335,9 +338,8 @@ jobs:
           export VITE_API_URL="$API_URL"
           export VITE_SMARTLOOK_ENABLED="${VITE_SMARTLOOK_ENABLED:-false}"
           export VITE_SMARTLOOK_PROJECT_KEY="${VITE_SMARTLOOK_PROJECT_KEY:-}"
-          export VITE_LEGAL_ADMIN_NAME="${VITE_LEGAL_ADMIN_NAME:-ZmierzymyCzas.pl}"
-          export VITE_LEGAL_ADMIN_ADDRESS="${VITE_LEGAL_ADMIN_ADDRESS:-}"
-          export VITE_LEGAL_CONTACT_EMAIL="${VITE_LEGAL_CONTACT_EMAIL:-}"
+          export VITE_SENTRY_ENVIRONMENT=production
+          export VITE_APP_RELEASE="${GITHUB_SHA}"
           echo "Building production frontend with API_URL from the production GitHub Environment."
           npx vite build
 

@@ -3,16 +3,22 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity,
+  AlertTriangle,
   Archive,
   Building2,
   CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Cloud,
+  Copy,
   Database,
+  Download,
   Edit3,
   Eye,
   EyeOff,
   KeyRound,
+  FileText,
   Loader2,
   Plus,
   RefreshCw,
@@ -70,6 +76,7 @@ import { validateStrongPassword } from "@/lib/form-validation";
 import { participantCountsAsCheckedIn } from "@/lib/participant-status";
 import { generateStrongPassword } from "@/lib/password";
 import {
+  buildEventEmailsPath,
   buildEventParticipantPath,
   buildEventPath,
   buildOrganizationPath,
@@ -81,7 +88,7 @@ type UserRoleTab = "admin" | "editor" | "scanner" | "scanner_plus";
 type ManagedUserRole = Exclude<Role, "superadmin">;
 
 type AuditEntry = {
-  source: "activity" | "participant_change";
+  source: "audit" | "activity" | "participant_change";
   id: string;
   action: string;
   timestamp: string;
@@ -96,6 +103,15 @@ type AuditEntry = {
   change_type?: string | null;
   change_source?: string | null;
   changed_fields?: string[];
+  category?: string | null;
+  action_code?: string | null;
+  outcome?: string | null;
+  severity?: string | null;
+  request_id?: string | null;
+  user_role?: string | null;
+  target_type?: string | null;
+  target_id?: string | null;
+  metadata?: Record<string, unknown>;
 };
 
 type EntityOption = {
@@ -123,6 +139,7 @@ type DatabaseColumn = {
   key: string;
   default: string | null;
   extra: string;
+  masked?: boolean;
 };
 
 type DatabaseMeta = {
@@ -133,9 +150,93 @@ type DatabaseMeta = {
   total_pages: number;
 };
 
+type ServerLogEntry = {
+  id: string;
+  timestamp: string;
+  level: string;
+  event_code: string;
+  message: string;
+  request_id?: string | null;
+  method?: string | null;
+  path?: string | null;
+  user_id?: string | null;
+  user_role?: string | null;
+  context?: Record<string, unknown>;
+};
+
+type LoggingStatus = {
+  writable: boolean;
+  retention_days: number;
+  level: string;
+  last_entry_at?: string | null;
+  sentry_configured: boolean;
+};
+
+type OperationalSeverity = "critical" | "warning" | "info";
+
+type OperationalIssue = {
+  id: string;
+  severity: OperationalSeverity;
+  category: string;
+  title: string;
+  description: string;
+  count: number;
+  organization_id?: string | null;
+  organization_name?: string | null;
+  event_id?: string | null;
+  event_name?: string | null;
+};
+
+type SyncEventStatus = {
+  event_id: string;
+  event_name: string;
+  organization_id: string;
+  organization_name: string;
+  sync_mode: "cloud" | "local_authoritative";
+  sync_status: "idle" | "pending" | "syncing" | "conflict";
+  conflicts_count: number;
+  last_exported_at?: string | null;
+  last_synced_at?: string | null;
+  pending_count: number;
+  outbox_conflict_count: number;
+  error_count: number;
+  last_error?: string | null;
+};
+
+type OperationsSummary = {
+  critical_alerts: number;
+  warning_alerts: number;
+  quality_issues: number;
+  sync_conflicts: number;
+  active_rate_limit_blocks: number;
+};
+
+type OperationsData = {
+  generated_at?: string | null;
+  summary: OperationsSummary;
+  alerts: OperationalIssue[];
+  sync_events: SyncEventStatus[];
+  quality_issues: OperationalIssue[];
+};
+
 const AUDIT_PAGE_SIZE = 50;
 const AUDIT_ENTITY_OPTION_LIMIT = 12;
 const DATABASE_PAGE_SIZE = 100;
+const SERVER_LOG_PAGE_SIZE = 50;
+
+const EMPTY_OPERATIONS_DATA: OperationsData = {
+  generated_at: null,
+  summary: {
+    critical_alerts: 0,
+    warning_alerts: 0,
+    quality_issues: 0,
+    sync_conflicts: 0,
+    active_rate_limit_blocks: 0,
+  },
+  alerts: [],
+  sync_events: [],
+  quality_issues: [],
+};
 
 const USER_ROLE_TABS: Array<{ value: UserRoleTab; label: string }> = [
   { value: "admin", label: "Admini" },
@@ -212,6 +313,8 @@ export default function SuperAdmin() {
   const [entitySearch, setEntitySearch] = useState("");
   const [selectedEntity, setSelectedEntity] = useState<EntityOption | null>(null);
   const [auditQuery, setAuditQuery] = useState("");
+  const [auditCategory, setAuditCategory] = useState("all");
+  const [auditOutcome, setAuditOutcome] = useState("all");
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   const [auditMeta, setAuditMeta] = useState<AuditMeta>({
     page: 1,
@@ -222,6 +325,17 @@ export default function SuperAdmin() {
   const [auditPage, setAuditPage] = useState(1);
   const [hasLoadedRemoteAudit, setHasLoadedRemoteAudit] = useState(false);
   const [isAuditLoading, setIsAuditLoading] = useState(false);
+  const [serverLogSource, setServerLogSource] = useState<"application" | "php">("application");
+  const [serverLogLevel, setServerLogLevel] = useState("all");
+  const [serverLogQuery, setServerLogQuery] = useState("");
+  const [serverLogEntries, setServerLogEntries] = useState<ServerLogEntry[]>([]);
+  const [serverLogMeta, setServerLogMeta] = useState<AuditMeta>({ page: 1, per_page: SERVER_LOG_PAGE_SIZE, total: 0, total_pages: 1 });
+  const [serverLogPage, setServerLogPage] = useState(1);
+  const [hasLoadedServerLogs, setHasLoadedServerLogs] = useState(false);
+  const [isServerLogsLoading, setIsServerLogsLoading] = useState(false);
+  const [loggingStatus, setLoggingStatus] = useState<LoggingStatus | null>(null);
+  const [selectedServerLog, setSelectedServerLog] = useState<ServerLogEntry | null>(null);
+  const [serverLogDialogOpen, setServerLogDialogOpen] = useState(false);
   const [databaseTables, setDatabaseTables] = useState<DatabaseTableSummary[]>([]);
   const [selectedDatabaseTable, setSelectedDatabaseTable] = useState("");
   const [databaseColumns, setDatabaseColumns] = useState<DatabaseColumn[]>([]);
@@ -236,6 +350,9 @@ export default function SuperAdmin() {
   const [databasePage, setDatabasePage] = useState(1);
   const [hasLoadedDatabase, setHasLoadedDatabase] = useState(false);
   const [isDatabaseLoading, setIsDatabaseLoading] = useState(false);
+  const [operationsData, setOperationsData] = useState<OperationsData>(EMPTY_OPERATIONS_DATA);
+  const [hasLoadedOperations, setHasLoadedOperations] = useState(false);
+  const [isOperationsLoading, setIsOperationsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("users");
   const [activeUserRoleTab, setActiveUserRoleTab] = useState<UserRoleTab>("admin");
   const [userSearch, setUserSearch] = useState("");
@@ -430,6 +547,8 @@ export default function SuperAdmin() {
       });
       if (nextEntity?.id) params.set("id", nextEntity.id);
       if (auditQuery.trim()) params.set("q", auditQuery.trim());
+      if (auditCategory !== "all") params.set("category", auditCategory);
+      if (auditOutcome !== "all") params.set("outcome", auditOutcome);
 
       const { payload } = await fetchJson(`${API_BASE_URL}/superadmin/audit?${params.toString()}`, {
         headers: getAuthHeaders(),
@@ -453,6 +572,86 @@ export default function SuperAdmin() {
       });
     } finally {
       setIsAuditLoading(false);
+    }
+  };
+
+  const loadServerLogs = async (nextPage = serverLogPage) => {
+    setIsServerLogsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        source: serverLogSource,
+        limit: String(SERVER_LOG_PAGE_SIZE),
+        page: String(nextPage),
+      });
+      if (serverLogLevel !== "all") params.set("level", serverLogLevel);
+      if (serverLogQuery.trim()) params.set("q", serverLogQuery.trim());
+
+      const [{ payload: logsPayload }, { payload: statusPayload }] = await Promise.all([
+        fetchJson(`${API_BASE_URL}/superadmin/server-logs?${params.toString()}`, { headers: getAuthHeaders() }),
+        fetchJson(`${API_BASE_URL}/superadmin/logging-status`, { headers: getAuthHeaders() }),
+      ]);
+      const logsData = logsPayload as { data?: ServerLogEntry[]; meta?: Partial<AuditMeta> };
+      const entries = Array.isArray(logsData.data) ? logsData.data : [];
+      setServerLogEntries(entries);
+      setServerLogMeta({
+        page: Number(logsData.meta?.page ?? nextPage),
+        per_page: Number(logsData.meta?.per_page ?? SERVER_LOG_PAGE_SIZE),
+        total: Number(logsData.meta?.total ?? entries.length),
+        total_pages: Math.max(1, Number(logsData.meta?.total_pages ?? 1)),
+      });
+      setServerLogPage(Number(logsData.meta?.page ?? nextPage));
+      setLoggingStatus((statusPayload as { data?: LoggingStatus }).data ?? null);
+      setHasLoadedServerLogs(true);
+    } catch (error) {
+      toast({
+        title: "Nie udało się pobrać logów serwera",
+        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsServerLogsLoading(false);
+    }
+  };
+
+  const openServerLog = async (entry: ServerLogEntry) => {
+    try {
+      const date = entry.timestamp.slice(0, 10);
+      const { payload } = await fetchJson(
+        `${API_BASE_URL}/superadmin/server-logs/${serverLogSource}/${date}/${encodeURIComponent(entry.id)}`,
+        { headers: getAuthHeaders() },
+      );
+      setSelectedServerLog((payload as { data?: ServerLogEntry }).data ?? entry);
+      setServerLogDialogOpen(true);
+    } catch (error) {
+      toast({
+        title: "Nie udało się pobrać szczegółów logu",
+        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const exportServerLogs = async () => {
+    const params = new URLSearchParams({ source: serverLogSource });
+    if (serverLogLevel !== "all") params.set("level", serverLogLevel);
+    if (serverLogQuery.trim()) params.set("q", serverLogQuery.trim());
+    try {
+      const response = await fetch(`${API_BASE_URL}/superadmin/server-logs/export.csv?${params.toString()}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!response.ok) throw new Error(`Eksport zakończył się błędem ${response.status}`);
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `logi-serwera-${serverLogSource}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast({
+        title: "Nie udało się wyeksportować logów",
+        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -504,6 +703,39 @@ export default function SuperAdmin() {
       });
     } finally {
       setIsDatabaseLoading(false);
+    }
+  };
+
+  const loadOperations = async () => {
+    setIsOperationsLoading(true);
+    try {
+      const { payload } = await fetchJson(`${API_BASE_URL}/superadmin/operations`, {
+        headers: getAuthHeaders(),
+      });
+      const responseData = payload as Partial<OperationsData>;
+
+      setOperationsData({
+        generated_at: typeof responseData.generated_at === "string" ? responseData.generated_at : null,
+        summary: {
+          critical_alerts: Number(responseData.summary?.critical_alerts ?? 0),
+          warning_alerts: Number(responseData.summary?.warning_alerts ?? 0),
+          quality_issues: Number(responseData.summary?.quality_issues ?? 0),
+          sync_conflicts: Number(responseData.summary?.sync_conflicts ?? 0),
+          active_rate_limit_blocks: Number(responseData.summary?.active_rate_limit_blocks ?? 0),
+        },
+        alerts: Array.isArray(responseData.alerts) ? responseData.alerts : [],
+        sync_events: Array.isArray(responseData.sync_events) ? responseData.sync_events : [],
+        quality_issues: Array.isArray(responseData.quality_issues) ? responseData.quality_issues : [],
+      });
+      setHasLoadedOperations(true);
+    } catch (error) {
+      toast({
+        title: "Nie udało się pobrać danych operacyjnych",
+        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsOperationsLoading(false);
     }
   };
 
@@ -903,17 +1135,24 @@ export default function SuperAdmin() {
           if (value === "audit" && !hasLoadedRemoteAudit && !isAuditLoading) {
             void loadAudit("all", null, 1);
           }
+          if (value === "server-logs" && isOnline && !hasLoadedServerLogs && !isServerLogsLoading) {
+            void loadServerLogs(1);
+          }
           if (value === "database" && isOnline && !hasLoadedDatabase && !isDatabaseLoading) {
             void loadDatabase("", 1);
+          }
+          if (value === "control" && isOnline && !hasLoadedOperations && !isOperationsLoading) {
+            void loadOperations();
           }
         }}
         className="space-y-5"
       >
-        <TabsList className="grid h-auto w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
+        <TabsList className="grid h-auto w-full grid-cols-2 sm:w-auto sm:grid-cols-5">
           <TabsTrigger value="users">Userzy</TabsTrigger>
           <TabsTrigger value="audit">Audyt</TabsTrigger>
+          <TabsTrigger value="server-logs">Logi serwera</TabsTrigger>
           <TabsTrigger value="database">Baza danych</TabsTrigger>
-          <TabsTrigger value="control">Kontrola</TabsTrigger>
+          <TabsTrigger value="control">Operacje</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-4">
@@ -1114,7 +1353,7 @@ export default function SuperAdmin() {
         <TabsContent value="audit" className="space-y-4">
           <Card>
             <CardContent className="space-y-4 p-4 sm:p-5">
-              <div className="grid gap-3 lg:grid-cols-[13rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
+              <div className="grid gap-3 lg:grid-cols-[11rem_11rem_11rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
                 <div className="space-y-2">
                   <Label>Zakres</Label>
                   <Select value={auditScope} onValueChange={(value) => changeAuditScope(value as AuditScope)}>
@@ -1127,6 +1366,38 @@ export default function SuperAdmin() {
                       <SelectItem value="organization">Organizacja</SelectItem>
                       <SelectItem value="event">Wydarzenie</SelectItem>
                       <SelectItem value="participant">Uczestnik</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Kategoria</Label>
+                  <Select value={auditCategory} onValueChange={setAuditCategory}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Wszystkie</SelectItem>
+                      <SelectItem value="authentication">Logowanie</SelectItem>
+                      <SelectItem value="users">Użytkownicy</SelectItem>
+                      <SelectItem value="organizations">Organizacje</SelectItem>
+                      <SelectItem value="events">Wydarzenia</SelectItem>
+                      <SelectItem value="participants">Uczestnicy</SelectItem>
+                      <SelectItem value="imports">Importy</SelectItem>
+                      <SelectItem value="exports">Eksporty</SelectItem>
+                      <SelectItem value="emails">E-maile</SelectItem>
+                      <SelectItem value="system">System</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Wynik</Label>
+                  <Select value={auditOutcome} onValueChange={setAuditOutcome}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Wszystkie</SelectItem>
+                      <SelectItem value="success">Sukces</SelectItem>
+                      <SelectItem value="failure">Błąd</SelectItem>
+                      <SelectItem value="blocked">Zablokowane</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1222,6 +1493,7 @@ export default function SuperAdmin() {
                       <TableCell>
                         <div className="space-y-1">
                           <p className="text-sm font-medium">{entry.action}</p>
+                          {entry.action_code && <p className="font-mono text-xs text-muted-foreground">{entry.action_code}</p>}
                           {entry.changed_fields && entry.changed_fields.length > 0 && (
                             <p className="text-xs text-muted-foreground">{entry.changed_fields.join(", ")}</p>
                           )}
@@ -1230,10 +1502,13 @@ export default function SuperAdmin() {
                       <TableCell>
                         <RelatedAuditData entry={entry} />
                       </TableCell>
-                      <TableCell className="text-sm">{entry.user_name || "-"}</TableCell>
+                      <TableCell className="text-sm">
+                        <p>{entry.user_name || "-"}</p>
+                        {entry.request_id && <p className="truncate font-mono text-xs text-muted-foreground">{entry.request_id}</p>}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={entry.source === "participant_change" ? "secondary" : "outline"}>
-                          {entry.source === "participant_change" ? "zmiana" : "aktywność"}
+                          {entry.source === "participant_change" ? "zmiana" : entry.source === "audit" ? "audyt" : "aktywność"}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -1285,6 +1560,114 @@ export default function SuperAdmin() {
                       </PaginationItem>
                     </PaginationContent>
                   </Pagination>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="server-logs" className="space-y-4">
+          <Card>
+            <CardContent className="space-y-4 p-4 sm:p-5">
+              <div className="grid gap-3 lg:grid-cols-[12rem_12rem_minmax(0,1fr)_auto_auto]">
+                <div className="space-y-2">
+                  <Label>Źródło</Label>
+                  <Select value={serverLogSource} onValueChange={(value) => setServerLogSource(value as "application" | "php")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="application">Aplikacja</SelectItem>
+                      <SelectItem value="php">Błędy PHP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Poziom</Label>
+                  <Select value={serverLogLevel} onValueChange={setServerLogLevel}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Wszystkie</SelectItem>
+                      <SelectItem value="info">Info</SelectItem>
+                      <SelectItem value="warning">Warning</SelectItem>
+                      <SelectItem value="error">Error</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Tekst, kod lub request ID</Label>
+                  <Input value={serverLogQuery} onChange={(event) => setServerLogQuery(event.target.value)} placeholder="Szukaj w logach..." />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={() => void loadServerLogs(1)} disabled={isServerLogsLoading} className="w-full lg:w-auto">
+                    {isServerLogsLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                    Szukaj
+                  </Button>
+                </div>
+                <div className="flex items-end">
+                  <Button variant="outline" onClick={() => void exportServerLogs()} disabled={isServerLogsLoading} className="w-full lg:w-auto">
+                    <Download className="mr-2 h-4 w-4" />
+                    Eksport CSV
+                  </Button>
+                </div>
+              </div>
+              {loggingStatus && (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge variant={loggingStatus.writable ? "secondary" : "destructive"}>
+                    zapis {loggingStatus.writable ? "aktywny" : "niedostępny"}
+                  </Badge>
+                  <Badge variant="outline">retencja {loggingStatus.retention_days} dni</Badge>
+                  <Badge variant="outline">poziom {loggingStatus.level}</Badge>
+                  <Badge variant="outline">Sentry {loggingStatus.sentry_configured ? "aktywne" : "wyłączone"}</Badge>
+                  <Badge variant="outline">ostatni wpis {formatDateTime(loggingStatus.last_entry_at)}</Badge>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2 text-lg"><FileText className="h-5 w-5" />Logi serwera</CardTitle>
+              <p className="text-sm text-muted-foreground">{serverLogMeta.total} wpisów</p>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table className="min-w-[1100px] table-fixed">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[10rem]">Czas</TableHead>
+                    <TableHead className="w-[7rem]">Poziom</TableHead>
+                    <TableHead className="w-[15rem]">Kod</TableHead>
+                    <TableHead>Komunikat</TableHead>
+                    <TableHead className="w-[17rem]">Request ID</TableHead>
+                    <TableHead className="w-[7rem]">Akcja</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {serverLogEntries.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(entry.timestamp)}</TableCell>
+                      <TableCell><Badge variant={entry.level === "error" || entry.level === "critical" ? "destructive" : "outline"}>{entry.level}</Badge></TableCell>
+                      <TableCell className="truncate font-mono text-xs" title={entry.event_code}>{entry.event_code}</TableCell>
+                      <TableCell className="truncate text-sm" title={entry.message}>{entry.message}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <button type="button" className="flex max-w-full items-center gap-1 hover:underline" onClick={() => void navigator.clipboard.writeText(entry.request_id || "")}>
+                          <Copy className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{entry.request_id || "-"}</span>
+                        </button>
+                      </TableCell>
+                      <TableCell><Button size="sm" variant="ghost" onClick={() => void openServerLog(entry)}>Szczegóły</Button></TableCell>
+                    </TableRow>
+                  ))}
+                  {serverLogEntries.length === 0 && (
+                    <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">Brak logów dla wybranego zakresu.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              {serverLogMeta.total_pages > 1 && (
+                <div className="flex items-center justify-between border-t px-4 py-3">
+                  <p className="text-sm text-muted-foreground">Strona {serverLogMeta.page} z {serverLogMeta.total_pages}</p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={serverLogMeta.page <= 1 || isServerLogsLoading} onClick={() => void loadServerLogs(serverLogMeta.page - 1)}>Poprzednia</Button>
+                    <Button variant="outline" size="sm" disabled={serverLogMeta.page >= serverLogMeta.total_pages || isServerLogsLoading} onClick={() => void loadServerLogs(serverLogMeta.page + 1)}>Następna</Button>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -1368,7 +1751,10 @@ export default function SuperAdmin() {
                         <TableRow>
                           {databaseColumns.map((column) => (
                             <TableHead key={column.name} className="min-w-40 align-top">
-                              <span className="block truncate font-mono text-xs">{column.name}</span>
+                              <span className="flex items-center gap-1.5 truncate font-mono text-xs">
+                                {column.name}
+                                {column.masked && <Badge variant="secondary" className="px-1 py-0 text-[0.6rem]">maskowane</Badge>}
+                              </span>
                               <span className="block truncate text-[0.68rem] font-normal text-muted-foreground">
                                 {column.type}{column.key ? ` · ${column.key}` : ""}
                               </span>
@@ -1461,6 +1847,171 @@ export default function SuperAdmin() {
         </TabsContent>
 
         <TabsContent value="control" className="space-y-3 sm:space-y-4">
+          <Card>
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <div>
+                <p className="font-medium">Centrum operacyjne</p>
+                <p className="text-sm text-muted-foreground">
+                  Alerty, synchronizacja i jakość danych wymagające uwagi superadmina.
+                  {operationsData.generated_at ? ` Ostatnia aktualizacja: ${formatDateTime(operationsData.generated_at)}.` : ""}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void loadOperations()}
+                disabled={!isOnline || isOperationsLoading}
+                className="w-full sm:w-auto"
+              >
+                {isOperationsLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                Odśwież
+              </Button>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              icon={AlertTriangle}
+              label="Alerty krytyczne"
+              value={operationsData.summary.critical_alerts}
+              detail={`${operationsData.summary.warning_alerts} ostrzeżeń`}
+            />
+            <MetricCard
+              icon={Cloud}
+              label="Konflikty synchronizacji"
+              value={operationsData.summary.sync_conflicts}
+              detail={`${operationsData.sync_events.length} monitorowanych wydarzeń`}
+            />
+            <MetricCard
+              icon={CheckCircle2}
+              label="Problemy jakości"
+              value={operationsData.summary.quality_issues}
+              detail="grupy wymagające weryfikacji"
+            />
+            <MetricCard
+              icon={Shield}
+              label="Blokady logowania"
+              value={operationsData.summary.active_rate_limit_blocks}
+              detail="aktywne blokady rate limit"
+            />
+          </div>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <CardTitle className="text-lg">Alerty operacyjne</CardTitle>
+              <Badge variant={operationsData.alerts.length > 0 ? "destructive" : "secondary"}>
+                {operationsData.alerts.length}
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {isOperationsLoading && !hasLoadedOperations && (
+                <p className="text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                  Ładowanie alertów...
+                </p>
+              )}
+              {!isOperationsLoading && hasLoadedOperations && operationsData.alerts.length === 0 && (
+                <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  Brak aktywnych alertów operacyjnych.
+                </div>
+              )}
+              {operationsData.alerts.map((issue) => (
+                <OperationalIssueRow key={issue.id} issue={issue} />
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <CardTitle className="text-lg">Konsola synchronizacji</CardTitle>
+              <Badge variant="secondary">{operationsData.sync_events.length}</Badge>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table className="min-w-[980px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Wydarzenie</TableHead>
+                      <TableHead>Tryb</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Outbox</TableHead>
+                      <TableHead>Ostatnia synchronizacja</TableHead>
+                      <TableHead>Błąd</TableHead>
+                      <TableHead className="text-right">Akcja</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {operationsData.sync_events.map((syncEvent) => {
+                      const conflictCount = syncEvent.conflicts_count + syncEvent.outbox_conflict_count;
+                      return (
+                        <TableRow key={syncEvent.event_id}>
+                          <TableCell>
+                            <p className="font-medium">{syncEvent.event_name}</p>
+                            <p className="text-xs text-muted-foreground">{syncEvent.organization_name}</p>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {syncEvent.sync_mode === "local_authoritative" ? "lokalny" : "cloud"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={syncEvent.sync_status === "conflict" || conflictCount > 0 ? "destructive" : "secondary"}>
+                              {syncStatusLabel(syncEvent.sync_status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <span className="block">oczekuje: {syncEvent.pending_count}</span>
+                            <span className="block text-muted-foreground">konflikty: {conflictCount}, błędy: {syncEvent.error_count}</span>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                            {formatDateTime(syncEvent.last_synced_at)}
+                          </TableCell>
+                          <TableCell className="max-w-[18rem] truncate text-sm text-muted-foreground" title={syncEvent.last_error ?? ""}>
+                            {syncEvent.last_error || "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button asChild variant="ghost" size="sm">
+                              <Link to={buildEventPath(syncEvent.event_id)}>Wydarzenie</Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {hasLoadedOperations && operationsData.sync_events.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                          Brak wydarzeń korzystających z synchronizacji.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <CardTitle className="text-lg">Kontrola jakości danych</CardTitle>
+              <Badge variant={operationsData.quality_issues.length > 0 ? "secondary" : "outline"}>
+                {operationsData.quality_issues.length}
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {!isOperationsLoading && hasLoadedOperations && operationsData.quality_issues.length === 0 && (
+                <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  Nie wykryto problemów jakości danych.
+                </div>
+              )}
+              {operationsData.quality_issues.map((issue) => (
+                <OperationalIssueRow key={issue.id} issue={issue} />
+              ))}
+            </CardContent>
+          </Card>
+
+          <p className="pt-2 text-sm font-medium text-muted-foreground">Statystyki systemu</p>
           <div className="grid gap-2 sm:gap-4 lg:grid-cols-2">
             <ControlCard title="Role" icon={Shield}>
               {Object.entries(roleCounts).map(([role, count]) => (
@@ -1492,6 +2043,33 @@ export default function SuperAdmin() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={serverLogDialogOpen} onOpenChange={setServerLogDialogOpen}>
+        <DialogContent className="max-h-[85vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Szczegóły logu serwera</DialogTitle>
+          </DialogHeader>
+          {selectedServerLog && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">{selectedServerLog.level}</Badge>
+                <Badge variant="outline">{selectedServerLog.event_code}</Badge>
+                <Badge variant="outline">{formatDateTime(selectedServerLog.timestamp)}</Badge>
+              </div>
+              <p className="text-sm">{selectedServerLog.message}</p>
+              <pre className="max-h-[50vh] overflow-auto rounded-md border bg-muted/40 p-3 text-xs">
+                {JSON.stringify(selectedServerLog, null, 2)}
+              </pre>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => void navigator.clipboard.writeText(selectedServerLog?.request_id || "")}>
+              <Copy className="mr-2 h-4 w-4" />Kopiuj request ID
+            </Button>
+            <Button onClick={() => setServerLogDialogOpen(false)}>Zamknij</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={profileDialogOpen}
@@ -1829,6 +2407,66 @@ function formatDatabaseValue(value: unknown): string {
   }
 
   return String(value);
+}
+
+function syncStatusLabel(status: SyncEventStatus["sync_status"]): string {
+  return {
+    idle: "spoczynek",
+    pending: "oczekuje",
+    syncing: "synchronizacja",
+    conflict: "konflikt",
+  }[status];
+}
+
+function operationalIssuePath(issue: OperationalIssue): string | null {
+  if (issue.event_id) {
+    return issue.category === "event_unsent_emails"
+      ? buildEventEmailsPath(issue.event_id)
+      : buildEventPath(issue.event_id);
+  }
+
+  if (issue.organization_id) {
+    return buildOrganizationPath(issue.organization_id);
+  }
+
+  return null;
+}
+
+function OperationalIssueRow({ issue }: { issue: OperationalIssue }) {
+  const actionPath = operationalIssuePath(issue);
+  const contextLabel = [issue.organization_name, issue.event_name].filter(Boolean).join(" · ");
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+      <div className="flex min-w-0 gap-3">
+        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+          issue.severity === "critical"
+            ? "bg-destructive/10 text-destructive"
+            : issue.severity === "warning"
+              ? "bg-amber-500/10 text-amber-700"
+              : "bg-primary/10 text-primary"
+        }`}>
+          {issue.severity === "info" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium">{issue.title}</p>
+            <Badge variant={issue.severity === "critical" ? "destructive" : issue.severity === "warning" ? "secondary" : "outline"}>
+              {issue.severity === "critical" ? "krytyczne" : issue.severity === "warning" ? "ostrzeżenie" : "informacja"}
+            </Badge>
+            {issue.count > 1 && <Badge variant="outline">{issue.count}</Badge>}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{issue.description}</p>
+          {contextLabel && <p className="mt-1 truncate text-xs text-muted-foreground">{contextLabel}</p>}
+        </div>
+      </div>
+      {actionPath && (
+        <Button asChild variant="outline" size="sm" className="shrink-0">
+          <Link to={actionPath}>Przejdź</Link>
+        </Button>
+      )}
+    </div>
+  );
 }
 
 function MetricCard({
