@@ -194,6 +194,7 @@ const legalDocuments: Record<string, LegalDocument> = {
           {
             items: [
               "narzędzie Smartlook do analityki i nagrywania sesji po uzyskaniu zgody użytkownika,",
+              "narzędzie Sentry do wykrywania błędów technicznych bez przesyłania treści formularzy, haseł, tokenów i danych identyfikujących użytkownika,",
               "inne narzędzia analityczne i marketingowe, jeżeli zostaną wdrożone w serwisie.",
             ],
           },
@@ -511,6 +512,7 @@ const legalDocuments: Record<string, LegalDocument> = {
             ],
           },
           "Pola formularzy i elementy oznaczone jako wrażliwe są maskowane przed nagrywaniem. Smartlook jest uruchamiany z regionem EU dopiero po wyrażeniu zgody na analitykę.",
+          "Sentry może działać niezależnie od zgody analitycznej wyłącznie w celu zapewnienia bezpieczeństwa i niezawodności serwisu. Do Sentry nie są wysyłane treści formularzy, hasła, tokeny, cookies ani dane identyfikujące użytkownika.",
           "d) Cookies bezpieczeństwa",
           "Wykorzystywane są do:",
           {

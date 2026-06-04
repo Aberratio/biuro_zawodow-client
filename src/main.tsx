@@ -1,8 +1,16 @@
 import { createRoot } from "react-dom/client";
+import { AppErrorBoundary } from "@/components/AppErrorBoundary";
+import { initializeSentry } from "@/lib/sentry";
 import App from "./App.tsx";
 import "./index.css";
 
-createRoot(document.getElementById("root")!).render(<App />);
+initializeSentry();
+
+createRoot(document.getElementById("root")!).render(
+  <AppErrorBoundary>
+    <App />
+  </AppErrorBoundary>,
+);
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
