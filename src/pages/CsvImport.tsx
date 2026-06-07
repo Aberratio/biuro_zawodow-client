@@ -1058,7 +1058,7 @@ export default function CsvImport() {
                 setReplacementPromptOpen(false);
               }}
             >
-              Usuń starą listę i zastąp nową listą
+              Usuń starą listę i importuj nową
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
