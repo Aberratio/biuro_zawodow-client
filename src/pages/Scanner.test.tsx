@@ -309,6 +309,9 @@ describe('Scanner page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
     await screen.findByRole('button', { name: 'Edytuj dane uczestnika' });
 
+    expect(screen.getByText('Wydarzenie')).toBeInTheDocument();
+    expect(screen.getByText('Triathlon')).toBeInTheDocument();
+
     await waitFor(() => {
       expect(dataState.selectEventContext).toHaveBeenCalledWith(secondEvent.id);
     });

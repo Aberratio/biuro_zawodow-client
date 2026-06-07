@@ -12,7 +12,7 @@ import { FieldError } from '@/components/ui/field-error';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import type { Participant, ParticipantFieldMapping } from '@/types';
+import type { Event, Participant, ParticipantFieldMapping } from '@/types';
 import QrScannerView from '@/components/QrScannerView';
 import ParticipantSearch from '@/components/ParticipantSearch';
 import ScannerSkeleton from '@/components/skeletons/ScannerSkeleton';
@@ -86,6 +86,7 @@ export default function Scanner() {
   } = useData();
   const [view, setView] = useState<ScannerView>('idle');
   const [scannedParticipant, setScannedParticipant] = useState<Participant | null>(null);
+  const [scannedEvent, setScannedEvent] = useState<Event | null>(null);
   const [recentScans, setRecentScans] = useState<Participant[]>([]);
   const [showRecent, setShowRecent] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
@@ -108,6 +109,22 @@ export default function Scanner() {
   const isOnline = connectionState === 'online';
   const hasParticipantDataManagementAccess = canManageParticipantData(currentRole);
   const canUseParticipantAdminConflictActions = canUseParticipantAdminActions(currentRole);
+  const resolveParticipantEvent = useCallback((participant: Participant) => (
+    visibleEvents.find(event => event.id === participant.event_id)
+    ?? (selectedEvent?.id === participant.event_id ? selectedEvent : null)
+    ?? selectedEvent
+  ), [selectedEvent, visibleEvents]);
+  const scannedParticipantEvent = useMemo(() => {
+    if (!scannedParticipant) {
+      return null;
+    }
+
+    if (scannedEvent?.id === scannedParticipant.event_id) {
+      return scannedEvent;
+    }
+
+    return resolveParticipantEvent(scannedParticipant);
+  }, [resolveParticipantEvent, scannedEvent, scannedParticipant]);
 
   const eventParticipants = useMemo(
     () => participants.filter(participant => participant.event_id === activeEventId),
@@ -143,10 +160,11 @@ export default function Scanner() {
     }
 
     setScannedParticipant(refreshedParticipant);
+    setScannedEvent(resolveParticipantEvent(refreshedParticipant));
     setRecentScans(previous =>
       previous.map(entry => (entry.id === refreshedParticipant.id ? refreshedParticipant : entry)),
     );
-  }, [participants, scannedParticipant]);
+  }, [participants, resolveParticipantEvent, scannedParticipant]);
 
   useEffect(() => {
     setBibNumberValue(normalizeScannerBibNumberInput(scannedParticipant?.bib_number));
@@ -162,24 +180,27 @@ export default function Scanner() {
 
   const syncParticipantInView = useCallback((participant: Participant) => {
     setScannedParticipant(participant);
+    setScannedEvent(resolveParticipantEvent(participant));
     setRecentScans(previous =>
       previous.map(entry => (entry.id === participant.id ? participant : entry)),
     );
-  }, []);
+  }, [resolveParticipantEvent]);
 
-  const showSuccessScreen = useCallback((participant: Participant) => {
+  const showSuccessScreen = useCallback((participant: Participant, participantEvent: Event | null = resolveParticipantEvent(participant)) => {
     if (successTimerRef.current) {
       clearTimeout(successTimerRef.current);
     }
     setScannedParticipant(participant);
+    setScannedEvent(participantEvent);
     addToRecent(participant);
     setView('success');
     toast({ title: 'Zarejestrowany', description: participant.name });
     successTimerRef.current = setTimeout(() => {
       setView('idle');
       setScannedParticipant(null);
+      setScannedEvent(null);
     }, 1800);
-  }, [addToRecent]);
+  }, [addToRecent, resolveParticipantEvent]);
 
   const handleQrScan = useCallback(async (decodedText: string) => {
     if (scanRequestInFlightRef.current) {
@@ -197,6 +218,7 @@ export default function Scanner() {
       }
 
       const participant = result.data.participant;
+      setScannedEvent(result.data.event);
       const scannedEventId = participant.event_id || result.data.event.id;
       if (scannedEventId && scannedEventId !== activeEventId) {
         selectEventContext(scannedEventId);
@@ -215,9 +237,10 @@ export default function Scanner() {
       clearTimeout(successTimerRef.current);
     }
     setScannedParticipant(participant);
+    setScannedEvent(resolveParticipantEvent(participant));
     addToRecent(participant);
     setView('detail');
-  }, [addToRecent]);
+  }, [addToRecent, resolveParticipantEvent]);
 
   const resetToIdle = useCallback(() => {
     if (successTimerRef.current) {
@@ -225,6 +248,7 @@ export default function Scanner() {
     }
     setView('idle');
     setScannedParticipant(null);
+    setScannedEvent(null);
   }, []);
 
   const mutateStatus = useCallback(async (status: Participant['status'], successTitle: string) => {
@@ -259,7 +283,7 @@ export default function Scanner() {
       if (status === 'not_checked_in') {
         syncParticipantInView(updatedParticipant);
       } else {
-        showSuccessScreen(updatedParticipant);
+        showSuccessScreen(updatedParticipant, scannedParticipantEvent);
       }
 
       toast({
@@ -271,7 +295,7 @@ export default function Scanner() {
     } finally {
       setIsMutating(false);
     }
-  }, [isReadOnly, scannedParticipant, showSuccessScreen, syncParticipantInView, updateParticipantStatus]);
+  }, [isReadOnly, scannedParticipant, scannedParticipantEvent, showSuccessScreen, syncParticipantInView, updateParticipantStatus]);
 
   const handleSaveBibNumber = useCallback(async () => {
     if (!scannedParticipant) {
@@ -534,6 +558,11 @@ export default function Scanner() {
           <CheckCircle className="mx-auto h-16 w-16 sm:h-20 sm:w-20" strokeWidth={2.5} />
           <p className="mx-auto max-w-full break-words font-heading text-[clamp(1.5rem,9vw,3.75rem)] font-black leading-tight tracking-tight [overflow-wrap:anywhere]">{status.shortLabel.toUpperCase()}</p>
           <p className="break-words text-xl font-bold leading-tight [overflow-wrap:anywhere] sm:text-2xl md:text-3xl">{scannedParticipant.name}</p>
+          {scannedParticipantEvent && (
+            <p className="break-words text-base font-semibold leading-snug opacity-90 [overflow-wrap:anywhere] sm:text-lg">
+              {scannedParticipantEvent.name}
+            </p>
+          )}
           <p className={`break-words font-black leading-tight [overflow-wrap:anywhere] ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'font-heading text-2xl sm:text-3xl md:text-4xl' : 'font-mono text-4xl tabular-nums sm:text-5xl md:text-7xl'}`}>
             {formatBibNumber(scannedParticipant.bib_number)}
           </p>
@@ -601,6 +630,14 @@ export default function Scanner() {
                 <div className="min-w-0">
                   <CardTitle className="break-words text-2xl leading-tight [overflow-wrap:anywhere] sm:text-3xl lg:text-4xl">{scannedParticipant.name}</CardTitle>
                   <p className="mt-2 break-all text-base font-medium leading-snug text-muted-foreground [overflow-wrap:anywhere] sm:text-lg">{scannedParticipant.email}</p>
+                  {scannedParticipantEvent && (
+                    <div className="mt-3 rounded-xl border bg-background/80 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Wydarzenie</p>
+                      <p className="mt-1 break-words text-base font-bold leading-snug text-foreground [overflow-wrap:anywhere] sm:text-lg">
+                        {scannedParticipantEvent.name}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <span className={`min-w-0 max-w-full whitespace-normal break-words rounded-2xl border border-primary/30 bg-primary/10 px-5 py-4 text-left font-black leading-tight [overflow-wrap:anywhere] lg:text-right ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'font-heading text-2xl text-muted-foreground sm:text-3xl' : 'font-mono text-4xl tabular-nums text-primary sm:text-5xl'}`}>
                   {isScannerBibNumberMissing(scannedParticipant.bib_number)
@@ -855,7 +892,7 @@ export default function Scanner() {
               {showRecent && (
                 <div className="mt-2 space-y-1">
                   {recentScans.map(participant => (
-                    <div key={participant.id} className="flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-2 hover:bg-accent/30" onClick={() => { setScannedParticipant(participant); setView('detail'); }}>
+                    <div key={participant.id} className="flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-2 hover:bg-accent/30" onClick={() => { setScannedParticipant(participant); setScannedEvent(resolveParticipantEvent(participant)); setView('detail'); }}>
                       <span className="min-w-0 truncate font-medium">{participant.name}</span>
                       <span className="shrink-0 text-xs text-muted-foreground">{formatBibNumber(participant.bib_number)}</span>
                     </div>
