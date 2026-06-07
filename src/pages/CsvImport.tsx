@@ -1049,8 +1049,8 @@ export default function CsvImport() {
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Zostaw starą listę</AlertDialogCancel>
+          <AlertDialogFooter className="sm:flex sm:flex-col-reverse sm:gap-3">
+            <AlertDialogCancel>Zostaw starą listę i dodaj z nowej listy</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
@@ -1058,7 +1058,7 @@ export default function CsvImport() {
                 setReplacementPromptOpen(false);
               }}
             >
-              Usuń starą i wgraj nową
+              Usuń starą listę i zastąp nową listą
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
