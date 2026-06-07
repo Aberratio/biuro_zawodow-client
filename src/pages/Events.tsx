@@ -698,7 +698,7 @@ export default function Events() {
                   <TableHead className="hidden md:table-cell">
                     Lokalizacja
                   </TableHead>
-                  <TableHead>Biuro</TableHead>
+                  <TableHead>Godziny otwarcia biura</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
