@@ -48,8 +48,11 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
+  Eye,
+  EyeOff,
   FileUp,
   Info,
+  KeyRound,
   Loader2,
   Mail,
   MapPin,
@@ -81,10 +84,16 @@ import {
   getActiveParticipantMappings,
 } from "@/lib/participant-fields";
 import { participantCountsAsCheckedIn } from "@/lib/participant-status";
-import { validateEmail, validateRequired } from "@/lib/form-validation";
+import {
+  validateEmail,
+  validateRequired,
+  validateStrongPassword,
+} from "@/lib/form-validation";
 import { getRoleLabel, isScannerRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
+import { PasswordRequirements } from "@/components/PasswordRequirements";
+import { generateStrongPassword } from "@/lib/password";
 import {
   buildEventEmailsPath,
   buildEventImportPath,
@@ -369,10 +378,15 @@ export default function EventDetails() {
   const [scannerCreateForm, setScannerCreateForm] = useState({
     name: "",
     email: "",
+    use_manual_password: false,
+    password: "",
   });
+  const [showScannerCreatePassword, setShowScannerCreatePassword] =
+    useState(false);
   const [scannerCreateErrors, setScannerCreateErrors] = useState<{
     name?: string;
     email?: string;
+    password?: string;
     form?: string;
   }>({});
   const [manualEmail, setManualEmail] = useState("");
@@ -786,8 +800,28 @@ export default function EventDetails() {
   const resetScannerDialogState = () => {
     setScannerManagerTab("existing");
     setScannerSearchQuery("");
-    setScannerCreateForm({ name: "", email: "" });
+    setScannerCreateForm({
+      name: "",
+      email: "",
+      use_manual_password: false,
+      password: "",
+    });
+    setShowScannerCreatePassword(false);
     setScannerCreateErrors({});
+  };
+
+  const generateScannerCreatePassword = () => {
+    setScannerCreateForm((current) => ({
+      ...current,
+      use_manual_password: true,
+      password: generateStrongPassword(),
+    }));
+    setShowScannerCreatePassword(true);
+    setScannerCreateErrors((current) => ({
+      ...current,
+      password: undefined,
+      form: undefined,
+    }));
   };
 
   const openScannerDialog = (role: ManagedScannerRole) => {
@@ -862,9 +896,12 @@ export default function EventDetails() {
         "Podaj imię i nazwisko operatora.",
       ),
       email: validateEmail(scannerCreateForm.email),
+      password: scannerCreateForm.use_manual_password
+        ? validateStrongPassword(scannerCreateForm.password)
+        : "",
     };
 
-    if (nextErrors.name || nextErrors.email) {
+    if (nextErrors.name || nextErrors.email || nextErrors.password) {
       setScannerCreateErrors(nextErrors);
       return;
     }
@@ -877,6 +914,9 @@ export default function EventDetails() {
       role: managedScannerRole,
       organization_id: event.organization_id,
       assigned_events: [event.id],
+      password: scannerCreateForm.use_manual_password
+        ? scannerCreateForm.password
+        : undefined,
     });
     setScannerCreateSaving(false);
 
@@ -2198,10 +2238,116 @@ export default function EventDetails() {
                   </FieldError>
                 </div>
 
+                <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
+                  <label className="flex items-start gap-3 text-sm">
+                    <Checkbox
+                      className="mt-0.5 rounded-[2px]"
+                      checked={scannerCreateForm.use_manual_password}
+                      onCheckedChange={(checked) => {
+                        const enabled = checked === true;
+                        setScannerCreateForm((current) => ({
+                          ...current,
+                          use_manual_password: enabled,
+                          password: enabled ? current.password : "",
+                        }));
+                        setScannerCreateErrors((current) => ({
+                          ...current,
+                          password: undefined,
+                          form: undefined,
+                        }));
+                      }}
+                    />
+                    <span>
+                      <span className="block font-medium">
+                        Ustaw hasło ręcznie
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        Bez tej opcji użytkownik dostanie e-mail z linkiem do
+                        ustawienia hasła.
+                      </span>
+                    </span>
+                  </label>
+                  {scannerCreateForm.use_manual_password && (
+                    <div className="space-y-2">
+                      <Label htmlFor="event-scanner-create-password">
+                        Hasło
+                      </Label>
+                      <div className="flex gap-2">
+                        <div className="relative min-w-0 flex-1">
+                          <Input
+                            id="event-scanner-create-password"
+                            type={
+                              showScannerCreatePassword ? "text" : "password"
+                            }
+                            value={scannerCreateForm.password}
+                            onChange={(eventValue) => {
+                              setScannerCreateForm((current) => ({
+                                ...current,
+                                password: eventValue.target.value,
+                              }));
+                              setScannerCreateErrors((current) => ({
+                                ...current,
+                                password: undefined,
+                                form: undefined,
+                              }));
+                            }}
+                            autoComplete="new-password"
+                            className="pr-10"
+                            aria-invalid={Boolean(
+                              scannerCreateErrors.password,
+                            )}
+                            aria-describedby={
+                              scannerCreateErrors.password
+                                ? "event-scanner-create-password-error"
+                                : undefined
+                            }
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                            onClick={() =>
+                              setShowScannerCreatePassword(
+                                (visible) => !visible,
+                              )
+                            }
+                            aria-label={
+                              showScannerCreatePassword
+                                ? "Ukryj hasło"
+                                : "Pokaż hasło"
+                            }
+                          >
+                            {showScannerCreatePassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={generateScannerCreatePassword}
+                          className="shrink-0"
+                        >
+                          <KeyRound className="mr-1 h-4 w-4" />
+                          Generator
+                        </Button>
+                      </div>
+                      <PasswordRequirements
+                        password={scannerCreateForm.password}
+                      />
+                      <FieldError id="event-scanner-create-password-error">
+                        {scannerCreateErrors.password}
+                      </FieldError>
+                    </div>
+                  )}
+                </div>
+
                 <p className="rounded-xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                   Konto zostanie dodane do organizacji i od razu przypisane do
-                  tego wydarzenia. Użytkownik dostanie e-mail z linkiem do
-                  ustawienia hasła.
+                  tego wydarzenia.
                 </p>
 
                 <FieldError id="event-scanner-create-form-error">

@@ -81,6 +81,7 @@ import {
   ArrowLeft,
   Archive,
   Building2,
+  CalendarCheck,
   ChevronDown,
   Eye,
   EyeOff,
@@ -90,7 +91,6 @@ import {
   Plus,
   Trash2,
   Calculator,
-  Icon,
   UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -1496,6 +1496,7 @@ export default function OrganizationDetails() {
                                 className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
                                 onClick={() => openProfileDialog(scanner)}
                               >
+                                <UserRound className="mr-1 h-3.5 w-3.5" />
                                 Profil
                               </Button>
                               <Button
@@ -1504,6 +1505,7 @@ export default function OrganizationDetails() {
                                 className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
                                 onClick={() => openScannerEditDialog(scanner)}
                               >
+                                <Pencil className="mr-1 h-3.5 w-3.5" />
                                 Edytuj
                               </Button>
                               <Button
@@ -1514,6 +1516,7 @@ export default function OrganizationDetails() {
                                   openScannerAssignmentsDialog(scanner.id)
                                 }
                               >
+                                <CalendarCheck className="mr-1 h-3.5 w-3.5" />
                                 Przypisz
                               </Button>
                             </div>
@@ -1987,11 +1990,11 @@ export default function OrganizationDetails() {
           }
         }}
       >
-        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden sm:max-w-lg">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Edytuj dane operatora</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
             <div>
               <Label htmlFor="scanner-edit-name">Imię i nazwisko</Label>
               <Input
@@ -2093,11 +2096,11 @@ export default function OrganizationDetails() {
                       : "Usunięcie konta jest dostępne w tym oknie."}
                   </p>
                 </div>
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {canManageMemberAccounts && (
                     <Button
                       variant="outline"
-                      className="w-full sm:w-auto"
+                      className="w-full"
                       onClick={() => openPasswordResetDialog(selectedScanner)}
                       disabled={isSavingScanner || isChangingScannerRole}
                     >
@@ -2108,7 +2111,7 @@ export default function OrganizationDetails() {
                   {canManageMemberAccounts && (
                     <Button
                       variant="outline"
-                      className="w-full sm:w-auto"
+                      className="w-full"
                       onClick={() => openPasswordDialog(selectedScanner)}
                       disabled={isSavingScanner || isChangingScannerRole}
                     >
@@ -2118,7 +2121,7 @@ export default function OrganizationDetails() {
                   )}
                   <Button
                     variant="destructive"
-                    className="w-full sm:w-auto"
+                    className="w-full sm:col-span-2"
                     onClick={() => openArchiveUserDialog(selectedScanner)}
                     disabled={isSavingScanner || isChangingScannerRole}
                   >
@@ -2129,7 +2132,7 @@ export default function OrganizationDetails() {
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <Button
               className="w-full sm:w-auto"
               onClick={handleSaveScanner}
