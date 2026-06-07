@@ -575,7 +575,7 @@ describe('CsvImport page', () => {
     fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
 
     await screen.findByText('Ten CSV wygląda jak inna lista');
-    fireEvent.click(screen.getByRole('button', { name: 'Usuń starą i wgraj nową' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Usuń starą listę i importuj nową' }));
 
     await screen.findByText('Mapowanie kolumn');
     fireEvent.click(screen.getByRole('button', { name: 'Usuń starą listę i importuj nową' }));
