@@ -639,7 +639,7 @@ export default function Scanner() {
                     </div>
                   )}
                 </div>
-                <span className={`min-w-0 max-w-full whitespace-normal break-words rounded-2xl border border-primary/30 bg-primary/10 px-5 py-4 text-left font-black leading-tight [overflow-wrap:anywhere] lg:text-right ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'font-heading text-2xl text-muted-foreground sm:text-3xl' : 'font-mono text-4xl tabular-nums text-primary sm:text-5xl'}`}>
+                <span className={`min-w-0 max-w-full whitespace-normal break-words rounded-2xl border border-primary/30 bg-primary/10 px-5 py-4 text-left font-black leading-tight [overflow-wrap:anywhere] ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'font-heading text-2xl text-muted-foreground sm:text-3xl' : 'font-mono text-4xl tabular-nums text-primary sm:text-5xl'}`}>
                   {isScannerBibNumberMissing(scannedParticipant.bib_number)
                     ? 'Do uzupełnienia'
                     : formatBibNumber(scannedParticipant.bib_number)}
