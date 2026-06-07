@@ -16,12 +16,27 @@ export function canUseParticipantAdminActions(role: Role): boolean {
   return PARTICIPANT_ADMIN_ACTION_ROLES.includes(role);
 }
 
-export function getRoleLabel(role: Role): string {
-  if (role === 'superadmin') return 'Superadmin';
-  if (role === 'admin') return 'Admin';
-  if (role === 'editor') return 'Organizator';
-  if (role === 'scanner_plus') return 'Operator Plus';
-  return 'Operator';
+type RoleLabelForm = 'nominative' | 'accusative';
+
+const roleLabels: Record<RoleLabelForm, Record<Role, string>> = {
+  nominative: {
+    superadmin: 'Superadmin',
+    admin: 'Admin',
+    editor: 'Organizator',
+    scanner: 'Operator',
+    scanner_plus: 'Operator Plus',
+  },
+  accusative: {
+    superadmin: 'Superadmina',
+    admin: 'Admina',
+    editor: 'Organizatora',
+    scanner: 'Operatora',
+    scanner_plus: 'Operatora Plus',
+  },
+};
+
+export function getRoleLabel(role: Role, form: RoleLabelForm = 'nominative'): string {
+  return roleLabels[form][role];
 }
 
 export function getScannerPermissionLabel(role: Role): string {

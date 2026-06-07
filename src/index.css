@@ -950,7 +950,7 @@ All colors MUST be HSL.
     display: grid;
     gap: 0.75rem;
     min-width: 0;
-    padding: 0 1.125rem 1rem;
+    padding: 1rem 1.125rem;
     background: hsl(220 10% 7% / 0.5);
   }
 

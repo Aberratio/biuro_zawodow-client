@@ -20,7 +20,20 @@ describe('role helpers', () => {
   });
 
   it('returns stable labels for every role and scanner permission tier', () => {
-    expect(roles.map(getRoleLabel)).toEqual(['Superadmin', 'Admin', 'Organizator', 'Operator', 'Operator Plus']);
+    expect(roles.map((role) => getRoleLabel(role))).toEqual([
+      'Superadmin',
+      'Admin',
+      'Organizator',
+      'Operator',
+      'Operator Plus',
+    ]);
+    expect(roles.map((role) => getRoleLabel(role, 'accusative'))).toEqual([
+      'Superadmina',
+      'Admina',
+      'Organizatora',
+      'Operatora',
+      'Operatora Plus',
+    ]);
     expect(getScannerPermissionLabel('scanner')).toBe('Ograniczone');
     expect(getScannerPermissionLabel('scanner_plus')).toBe('Rozszerzone');
   });
