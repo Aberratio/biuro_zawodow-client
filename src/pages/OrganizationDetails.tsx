@@ -2157,9 +2157,7 @@ export default function OrganizationDetails() {
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {memberForm.role === "editor"
-                ? "Dodaj organizatora"
-                : `Dodaj ${getRoleLabel(memberForm.role).toLocaleLowerCase("pl-PL")}`}
+              {`Dodaj ${getRoleLabel(memberForm.role, "accusative").toLocaleLowerCase("pl-PL")}`}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
