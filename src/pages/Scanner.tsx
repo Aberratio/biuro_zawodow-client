@@ -558,11 +558,6 @@ export default function Scanner() {
           <CheckCircle className="mx-auto h-16 w-16 sm:h-20 sm:w-20" strokeWidth={2.5} />
           <p className="mx-auto max-w-full break-words font-heading text-[clamp(1.5rem,9vw,3.75rem)] font-black leading-tight tracking-tight [overflow-wrap:anywhere]">{status.shortLabel.toUpperCase()}</p>
           <p className="break-words text-xl font-bold leading-tight [overflow-wrap:anywhere] sm:text-2xl md:text-3xl">{scannedParticipant.name}</p>
-          {scannedParticipantEvent && (
-            <p className="break-words text-base font-semibold leading-snug opacity-90 [overflow-wrap:anywhere] sm:text-lg">
-              {scannedParticipantEvent.name}
-            </p>
-          )}
           <p className={`break-words font-black leading-tight [overflow-wrap:anywhere] ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'font-heading text-2xl sm:text-3xl md:text-4xl' : 'font-mono text-4xl tabular-nums sm:text-5xl md:text-7xl'}`}>
             {formatBibNumber(scannedParticipant.bib_number)}
           </p>
@@ -630,14 +625,6 @@ export default function Scanner() {
                 <div className="min-w-0">
                   <CardTitle className="break-words text-2xl leading-tight [overflow-wrap:anywhere] sm:text-3xl lg:text-4xl">{scannedParticipant.name}</CardTitle>
                   <p className="mt-2 break-all text-base font-medium leading-snug text-muted-foreground [overflow-wrap:anywhere] sm:text-lg">{scannedParticipant.email}</p>
-                  {scannedParticipantEvent && (
-                    <div className="mt-3 rounded-xl border bg-background/80 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Wydarzenie</p>
-                      <p className="mt-1 break-words text-base font-bold leading-snug text-foreground [overflow-wrap:anywhere] sm:text-lg">
-                        {scannedParticipantEvent.name}
-                      </p>
-                    </div>
-                  )}
                 </div>
                 <span className={`min-w-0 max-w-full whitespace-normal break-words rounded-2xl border border-primary/30 bg-primary/10 px-5 py-4 text-left font-black leading-tight [overflow-wrap:anywhere] ${isScannerBibNumberMissing(scannedParticipant.bib_number) ? 'font-heading text-2xl text-muted-foreground sm:text-3xl' : 'font-mono text-4xl tabular-nums text-primary sm:text-5xl'}`}>
                   {isScannerBibNumberMissing(scannedParticipant.bib_number)
@@ -815,6 +802,14 @@ export default function Scanner() {
               {!hasRemainingParticipantData && (
                 <div className="rounded-2xl border border-dashed bg-muted/10 px-4 py-5 text-sm text-muted-foreground">
                   Poza danymi do weryfikacji nie ma dodatkowych pól do pokazania.
+                </div>
+              )}
+              {scannedParticipantEvent && (
+                <div className="rounded-2xl border border-dashed bg-muted/10 px-4 py-4 text-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Wydarzenie</p>
+                  <p className="mt-1 break-words font-semibold leading-snug text-foreground [overflow-wrap:anywhere]">
+                    {scannedParticipantEvent.name}
+                  </p>
                 </div>
               )}
             </CardContent>
