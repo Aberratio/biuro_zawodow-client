@@ -208,7 +208,6 @@ export default function OrganizationDetails() {
   } | null>(null);
   const [organizationEditOpen, setOrganizationEditOpen] = useState(false);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
-  const [scannerEditDialogOpen, setScannerEditDialogOpen] = useState(false);
   const [deleteOrganizationConfirmOpen, setDeleteOrganizationConfirmOpen] =
     useState(false);
   const [archiveUserConfirmOpen, setArchiveUserConfirmOpen] = useState(false);
@@ -446,16 +445,6 @@ export default function OrganizationDetails() {
     setScannerAssignmentsDialogOpen(true);
   };
 
-  const openScannerEditDialog = (scanner: User) => {
-    setSelectedScanner(scanner);
-    setScannerDraft({
-      name: scanner.name,
-      email: scanner.email,
-    });
-    setScannerErrors({});
-    setScannerEditDialogOpen(true);
-  };
-
   const openArchiveUserDialog = (user: User) => {
     setSelectedActionUser(user);
     setArchiveUserConfirmOpen(true);
@@ -476,6 +465,16 @@ export default function OrganizationDetails() {
 
   const openProfileDialog = (user: User) => {
     setProfileUser(user);
+    if (isScannerRole(user.role)) {
+      setSelectedScanner(user);
+      setScannerDraft({
+        name: user.name,
+        email: user.email,
+      });
+    } else {
+      setSelectedScanner(null);
+    }
+    setScannerErrors({});
     setProfileDialogOpen(true);
   };
 
@@ -885,8 +884,15 @@ export default function OrganizationDetails() {
       return;
     }
 
-    setScannerEditDialogOpen(false);
-    setSelectedScanner(null);
+    const updatedScanner = {
+      ...selectedScanner,
+      name: scannerDraft.name.trim(),
+      email: scannerDraft.email.trim(),
+    };
+    setSelectedScanner(updatedScanner);
+    setProfileUser((prev) =>
+      prev?.id === updatedScanner.id ? updatedScanner : prev,
+    );
     setScannerErrors({});
     toast({ title: "Zaktualizowano dane operatora" });
   };
@@ -908,6 +914,9 @@ export default function OrganizationDetails() {
     }
 
     setSelectedScanner((prev) =>
+      prev && prev.id === scanner.id ? { ...prev, role } : prev,
+    );
+    setProfileUser((prev) =>
       prev && prev.id === scanner.id ? { ...prev, role } : prev,
     );
     toast({
@@ -958,9 +967,12 @@ export default function OrganizationDetails() {
     setArchiveUserConfirmOpen(false);
     setSelectedActionUser(null);
     if (selectedScanner?.id === archivedUser.id) {
-      setScannerEditDialogOpen(false);
       setSelectedScanner(null);
       setScannerErrors({});
+    }
+    if (profileUser?.id === archivedUser.id) {
+      setProfileDialogOpen(false);
+      setProfileUser(null);
     }
     toast({
       title:
@@ -1314,7 +1326,7 @@ export default function OrganizationDetails() {
                         Email
                       </TableHead>
                       {canManageMemberAccounts && (
-                        <TableHead className="h-12 w-[320px] px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
+                        <TableHead className="h-12 w-[9rem] px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
                           Akcje
                         </TableHead>
                       )}
@@ -1333,47 +1345,16 @@ export default function OrganizationDetails() {
                           {organizer.email}
                         </TableCell>
                         {canManageMemberAccounts && (
-                          <TableCell className="px-5 sm:px-7">
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className={`${actionButtonClassName} w-full`}
-                                onClick={() => openProfileDialog(organizer)}
-                              >
-                                <UserRound className="mr-1 h-3.5 w-3.5" />
-                                Profil
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className={`${actionButtonClassName} w-full`}
-                                onClick={() =>
-                                  openPasswordResetDialog(organizer)
-                                }
-                              >
-                                <KeyRound className="mr-1 h-3.5 w-3.5" />
-                                Reset hasła
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className={`${actionButtonClassName} w-full`}
-                                onClick={() => openPasswordDialog(organizer)}
-                              >
-                                <KeyRound className="mr-1 h-3.5 w-3.5" />
-                                Ustaw hasło
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className={`${actionButtonClassName} w-full`}
-                                onClick={() => openArchiveUserDialog(organizer)}
-                              >
-                                <Trash2 className="mr-1 h-3.5 w-3.5" />
-                                Usuń
-                              </Button>
-                            </div>
+                          <TableCell className="min-w-[9rem] px-5 sm:px-7">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className={`${actionButtonClassName} w-full`}
+                              onClick={() => openProfileDialog(organizer)}
+                            >
+                              <UserRound className="mr-1 h-3.5 w-3.5" />
+                              Profil
+                            </Button>
                           </TableCell>
                         )}
                       </TableRow>
@@ -1502,16 +1483,7 @@ export default function OrganizationDetails() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
-                                onClick={() => openScannerEditDialog(scanner)}
-                              >
-                                <Pencil className="mr-1 h-3.5 w-3.5" />
-                                Edytuj
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
+                                className={`${actionButtonClassName} w-full px-5 whitespace-normal text-center leading-[1.15rem]`}
                                 onClick={() =>
                                   openScannerAssignmentsDialog(scanner.id)
                                 }
@@ -1942,15 +1914,19 @@ export default function OrganizationDetails() {
         open={profileDialogOpen}
         onOpenChange={(open) => {
           setProfileDialogOpen(open);
-          if (!open) setProfileUser(null);
+          if (!open) {
+            setProfileUser(null);
+            setSelectedScanner(null);
+            setScannerErrors({});
+          }
         }}
       >
-        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden sm:max-w-lg">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Profil użytkownika</DialogTitle>
           </DialogHeader>
           {profileUser && (
-            <div className="space-y-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
               <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <UserRound className="h-5 w-5" />
@@ -1972,180 +1948,231 @@ export default function OrganizationDetails() {
                   />
                 )}
               </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button onClick={() => setProfileDialogOpen(false)}>Zamknij</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={scannerEditDialogOpen}
-        onOpenChange={(open) => {
-          setScannerEditDialogOpen(open);
-          if (!open) {
-            setSelectedScanner(null);
-            setScannerErrors({});
-          }
-        }}
-      >
-        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden sm:max-w-lg">
-          <DialogHeader className="shrink-0">
-            <DialogTitle>Edytuj dane operatora</DialogTitle>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-            <div>
-              <Label htmlFor="scanner-edit-name">Imię i nazwisko</Label>
-              <Input
-                id="scanner-edit-name"
-                value={scannerDraft.name}
-                onChange={(event) => {
-                  setScannerDraft((prev) => ({
-                    ...prev,
-                    name: event.target.value,
-                  }));
-                  setScannerErrors((prev) => ({
-                    ...prev,
-                    name: undefined,
-                    form: undefined,
-                  }));
-                }}
-                className="mt-2"
-                required
-                aria-invalid={Boolean(scannerErrors.name)}
-                aria-describedby={
-                  scannerErrors.name ? "scanner-edit-name-error" : undefined
-                }
-              />
-              <FieldError id="scanner-edit-name-error" className="mt-2">
-                {scannerErrors.name}
-              </FieldError>
-            </div>
-            <div>
-              <Label htmlFor="scanner-edit-email">Email</Label>
-              <Input
-                id="scanner-edit-email"
-                type="email"
-                value={scannerDraft.email}
-                onChange={(event) => {
-                  setScannerDraft((prev) => ({
-                    ...prev,
-                    email: event.target.value,
-                  }));
-                  setScannerErrors((prev) => ({
-                    ...prev,
-                    email: undefined,
-                    form: undefined,
-                  }));
-                }}
-                className="mt-2"
-                required
-                aria-invalid={Boolean(scannerErrors.email)}
-                aria-describedby={
-                  scannerErrors.email ? "scanner-edit-email-error" : undefined
-                }
-              />
-              <FieldError id="scanner-edit-email-error" className="mt-2">
-                {scannerErrors.email}
-              </FieldError>
-            </div>
-            <FieldError id="scanner-edit-form-error">
-              {scannerErrors.form}
-            </FieldError>
-            {selectedScanner && canManageScanners && (
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Rola operatora</p>
-                  <p className="text-xs text-muted-foreground">
-                    Aktualna rola: {getRoleLabel(selectedScanner.role)}
-                  </p>
+              {selectedScanner && canManageScanners && (
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Dane operatora</p>
+                    <p className="text-xs text-muted-foreground">
+                      Zmień podstawowe dane widoczne w organizacji.
+                    </p>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <Label htmlFor="scanner-profile-name">Imię i nazwisko</Label>
+                      <Input
+                        id="scanner-profile-name"
+                        value={scannerDraft.name}
+                        onChange={(event) => {
+                          setScannerDraft((prev) => ({
+                            ...prev,
+                            name: event.target.value,
+                          }));
+                          setScannerErrors((prev) => ({
+                            ...prev,
+                            name: undefined,
+                            form: undefined,
+                          }));
+                        }}
+                        className="mt-2"
+                        required
+                        aria-invalid={Boolean(scannerErrors.name)}
+                        aria-describedby={
+                          scannerErrors.name
+                            ? "scanner-profile-name-error"
+                            : undefined
+                        }
+                      />
+                      <FieldError id="scanner-profile-name-error" className="mt-2">
+                        {scannerErrors.name}
+                      </FieldError>
+                    </div>
+                    <div>
+                      <Label htmlFor="scanner-profile-email">Email</Label>
+                      <Input
+                        id="scanner-profile-email"
+                        type="email"
+                        value={scannerDraft.email}
+                        onChange={(event) => {
+                          setScannerDraft((prev) => ({
+                            ...prev,
+                            email: event.target.value,
+                          }));
+                          setScannerErrors((prev) => ({
+                            ...prev,
+                            email: undefined,
+                            form: undefined,
+                          }));
+                        }}
+                        className="mt-2"
+                        required
+                        aria-invalid={Boolean(scannerErrors.email)}
+                        aria-describedby={
+                          scannerErrors.email
+                            ? "scanner-profile-email-error"
+                            : undefined
+                        }
+                      />
+                      <FieldError id="scanner-profile-email-error" className="mt-2">
+                        {scannerErrors.email}
+                      </FieldError>
+                    </div>
+                    <FieldError id="scanner-profile-form-error">
+                      {scannerErrors.form}
+                    </FieldError>
+                    <Button
+                      className="w-full sm:w-auto"
+                      onClick={handleSaveScanner}
+                      disabled={
+                        isSavingScanner ||
+                        isChangingScannerRole ||
+                        !selectedScanner
+                      }
+                      aria-busy={isSavingScanner}
+                    >
+                      {isSavingScanner && (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      )}
+                      {isSavingScanner ? "Zapisywanie..." : "Zapisz dane"}
+                    </Button>
+                  </div>
                 </div>
-                <Button
-                  variant="outline"
-                  className="mt-3 w-full sm:w-auto"
-                  onClick={() =>
-                    void handleChangeScannerRole(
-                      selectedScanner,
-                      selectedScanner.role === "scanner"
-                        ? "scanner_plus"
-                        : "scanner",
-                    )
-                  }
-                  disabled={isChangingScannerRole || isSavingScanner}
-                  aria-busy={isChangingScannerRole}
-                >
-                  {isChangingScannerRole && (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  )}
-                  {isChangingScannerRole
-                    ? "Zmiana roli..."
-                    : selectedScanner.role === "scanner"
-                      ? "Zmień na Operator Plus"
-                      : "Zmień na Operator"}
-                </Button>
-              </div>
-            )}
-            {selectedScanner && canManageScanners && (
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Konto operatora</p>
-                  <p className="text-xs text-muted-foreground">
-                    {canManageMemberAccounts
-                      ? "Reset, ręczne hasło i usunięcie konta są dostępne w tym oknie."
-                      : "Usunięcie konta jest dostępne w tym oknie."}
-                  </p>
+              )}
+              {selectedScanner && canManageScanners && (
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Rola operatora</p>
+                    <p className="text-xs text-muted-foreground">
+                      Aktualna rola: {getRoleLabel(selectedScanner.role)}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="mt-3 w-full sm:w-auto"
+                    onClick={() =>
+                      void handleChangeScannerRole(
+                        selectedScanner,
+                        selectedScanner.role === "scanner"
+                          ? "scanner_plus"
+                          : "scanner",
+                      )
+                    }
+                    disabled={isChangingScannerRole || isSavingScanner}
+                    aria-busy={isChangingScannerRole}
+                  >
+                    {isChangingScannerRole && (
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    )}
+                    {isChangingScannerRole
+                      ? "Zmiana roli..."
+                      : selectedScanner.role === "scanner"
+                        ? "Zmień na Operator Plus"
+                        : "Zmień na Operator"}
+                  </Button>
                 </div>
-                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {canManageMemberAccounts && (
+              )}
+              {canManageMemberAccounts && profileUser.role === "editor" && (
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Zarządzanie kontem</p>
+                    <p className="text-xs text-muted-foreground">
+                      Reset hasła, ręczne ustawienie hasła i usunięcie konta
+                      wymagają osobnego potwierdzenia.
+                    </p>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <Button
                       variant="outline"
-                      className="w-full"
-                      onClick={() => openPasswordResetDialog(selectedScanner)}
-                      disabled={isSavingScanner || isChangingScannerRole}
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setProfileDialogOpen(false);
+                        openPasswordResetDialog(profileUser);
+                      }}
                     >
                       <KeyRound className="mr-1 h-4 w-4" />
                       Reset hasła
                     </Button>
-                  )}
-                  {canManageMemberAccounts && (
                     <Button
                       variant="outline"
-                      className="w-full"
-                      onClick={() => openPasswordDialog(selectedScanner)}
-                      disabled={isSavingScanner || isChangingScannerRole}
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setProfileDialogOpen(false);
+                        openPasswordDialog(profileUser);
+                      }}
                     >
                       <KeyRound className="mr-1 h-4 w-4" />
                       Ustaw hasło
                     </Button>
-                  )}
-                  <Button
-                    variant="destructive"
-                    className="w-full sm:col-span-2"
-                    onClick={() => openArchiveUserDialog(selectedScanner)}
-                    disabled={isSavingScanner || isChangingScannerRole}
-                  >
-                    <Trash2 className="mr-1 h-4 w-4" />
-                    Usuń konto
-                  </Button>
+                    <Button
+                      variant="destructive"
+                      className="w-full justify-start sm:col-span-2"
+                      onClick={() => {
+                        setProfileDialogOpen(false);
+                        openArchiveUserDialog(profileUser);
+                      }}
+                    >
+                      <Trash2 className="mr-1 h-4 w-4" />
+                      Usuń konto
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter className="shrink-0">
-            <Button
-              className="w-full sm:w-auto"
-              onClick={handleSaveScanner}
-              disabled={
-                isSavingScanner || isChangingScannerRole || !selectedScanner
-              }
-              aria-busy={isSavingScanner}
-            >
-              {isSavingScanner && (
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
               )}
-              {isSavingScanner ? "Zapisywanie..." : "Zapisz zmiany"}
-            </Button>
+              {selectedScanner && canManageScanners && (
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Zarządzanie kontem</p>
+                    <p className="text-xs text-muted-foreground">
+                      Reset hasła, ręczne ustawienie hasła i usunięcie konta
+                      wymagają osobnego potwierdzenia.
+                    </p>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {canManageMemberAccounts && (
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => {
+                          setProfileDialogOpen(false);
+                          openPasswordResetDialog(selectedScanner);
+                        }}
+                        disabled={isSavingScanner || isChangingScannerRole}
+                      >
+                        <KeyRound className="mr-1 h-4 w-4" />
+                        Reset hasła
+                      </Button>
+                    )}
+                    {canManageMemberAccounts && (
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => {
+                          setProfileDialogOpen(false);
+                          openPasswordDialog(selectedScanner);
+                        }}
+                        disabled={isSavingScanner || isChangingScannerRole}
+                      >
+                        <KeyRound className="mr-1 h-4 w-4" />
+                        Ustaw hasło
+                      </Button>
+                    )}
+                    <Button
+                      variant="destructive"
+                      className="w-full justify-start sm:col-span-2"
+                      onClick={() => {
+                        setProfileDialogOpen(false);
+                        openArchiveUserDialog(selectedScanner);
+                      }}
+                      disabled={isSavingScanner || isChangingScannerRole}
+                    >
+                      <Trash2 className="mr-1 h-4 w-4" />
+                      Usuń konto
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="shrink-0">
+            <Button onClick={() => setProfileDialogOpen(false)}>Zamknij</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
