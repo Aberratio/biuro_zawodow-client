@@ -146,6 +146,9 @@ describe("SuperAdmin page", () => {
             event_code: "database.exception",
             message: "Database error",
             request_id: "req-12345678",
+            method: "GET",
+            path: "/superadmin/server-logs",
+            context: { status: 500 },
           }],
           meta: { page: 1, per_page: 50, total: 1, total_pages: 1 },
         },
@@ -165,9 +168,9 @@ describe("SuperAdmin page", () => {
     renderPage();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Logi serwera" }), { button: 0 });
 
-    await waitFor(() => expect(screen.getByText("database.exception")).toBeInTheDocument());
-    expect(screen.getByText("Database error")).toBeInTheDocument();
-    expect(screen.getByText("req-12345678")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("/superadmin/server-logs")).toBeInTheDocument());
+    expect(screen.getByText("500")).toBeInTheDocument();
+    expect(screen.getByText("GET")).toBeInTheDocument();
     expect(screen.getByText("Sentry aktywne")).toBeInTheDocument();
   });
 });

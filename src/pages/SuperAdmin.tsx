@@ -81,6 +81,7 @@ import {
   buildEventPath,
   buildOrganizationPath,
 } from "@/lib/routes";
+import { cn } from "@/lib/utils";
 import type { ParticipantStatus, Role, User } from "@/types";
 
 type AuditScope = "all" | "user" | "organization" | "event" | "participant";
@@ -275,6 +276,32 @@ function formatDateTime(value?: string | null): string {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);
+}
+
+function getServerLogStatus(entry: ServerLogEntry): string {
+  const status = entry.context?.status;
+  return typeof status === "number" || typeof status === "string" ? String(status) : "-";
+}
+
+function getServerLogMethod(entry: ServerLogEntry): string {
+  return entry.method?.trim().toUpperCase() || "-";
+}
+
+function getServerLogMethodClassName(method: string): string {
+  switch (method) {
+    case "GET":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "POST":
+      return "border-sky-200 bg-sky-50 text-sky-700";
+    case "PATCH":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "PUT":
+      return "border-violet-200 bg-violet-50 text-violet-700";
+    case "DELETE":
+      return "border-rose-200 bg-rose-50 text-rose-700";
+    default:
+      return "border-border/70 bg-background/60 text-foreground";
+  }
 }
 
 function normalizeSearch(value: string): string {
@@ -1635,27 +1662,31 @@ export default function SuperAdmin() {
                   <TableRow>
                     <TableHead className="w-[10rem]">Czas</TableHead>
                     <TableHead className="w-[7rem]">Poziom</TableHead>
-                    <TableHead className="w-[15rem]">Kod</TableHead>
-                    <TableHead>Komunikat</TableHead>
-                    <TableHead className="w-[17rem]">Request ID</TableHead>
+                    <TableHead>Endpoint</TableHead>
+                    <TableHead className="w-[8rem]">Status</TableHead>
+                    <TableHead className="w-[8rem]">Typ</TableHead>
                     <TableHead className="w-[7rem]">Akcja</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {serverLogEntries.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(entry.timestamp)}</TableCell>
-                      <TableCell><Badge variant={entry.level === "error" || entry.level === "critical" ? "destructive" : "outline"}>{entry.level}</Badge></TableCell>
-                      <TableCell className="truncate font-mono text-xs" title={entry.event_code}>{entry.event_code}</TableCell>
-                      <TableCell className="truncate text-sm" title={entry.message}>{entry.message}</TableCell>
-                      <TableCell className="font-mono text-xs">
-                        <button type="button" className="flex max-w-full items-center gap-1 hover:underline" onClick={() => void navigator.clipboard.writeText(entry.request_id || "")}>
-                          <Copy className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{entry.request_id || "-"}</span>
-                        </button>
-                      </TableCell>
-                      <TableCell><Button size="sm" variant="ghost" onClick={() => void openServerLog(entry)}>Szczegóły</Button></TableCell>
-                    </TableRow>
-                  ))}
+                  {serverLogEntries.map((entry) => {
+                    const method = getServerLogMethod(entry);
+
+                    return (
+                      <TableRow key={entry.id}>
+                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(entry.timestamp)}</TableCell>
+                        <TableCell><Badge variant={entry.level === "error" || entry.level === "critical" ? "destructive" : "outline"}>{entry.level}</Badge></TableCell>
+                        <TableCell className="truncate font-mono text-xs" title={entry.path || "-"}>{entry.path || "-"}</TableCell>
+                        <TableCell className="font-mono text-xs">{getServerLogStatus(entry)}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={cn("font-mono", getServerLogMethodClassName(method))}>
+                            {method}
+                          </Badge>
+                        </TableCell>
+                        <TableCell><Button size="sm" variant="ghost" onClick={() => void openServerLog(entry)}>Szczegóły</Button></TableCell>
+                      </TableRow>
+                    );
+                  })}
                   {serverLogEntries.length === 0 && (
                     <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">Brak logów dla wybranego zakresu.</TableCell></TableRow>
                   )}
