@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { SessionState, User } from '@/types';
-import { isJwtExpired } from '@/lib/auth-token';
-import { API_BASE_URL, fetchJson, isApiResponseError, isNetworkRequestError } from '@/lib/api';
+import { API_BASE_URL, fetchJson, getApiRetryAfter, isApiResponseError, isNetworkRequestError } from '@/lib/api';
 import { clearOfflineData } from '@/lib/offline-store';
+
+export type LoginClientDiagnostics = Record<string, unknown>;
 
 interface AuthContextType {
   user: User | null;
@@ -10,7 +11,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAuthLoading: boolean;
   sessionState: SessionState;
-  login: (email: string, password: string) => Promise<LoginResult>;
+  login: (email: string, password: string, clientDiagnostics?: LoginClientDiagnostics) => Promise<LoginResult>;
   forgotPassword: (email: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
   resetPassword: (token: string, password: string, passwordConfirmation: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
   changePassword: (currentPassword: string, newPassword: string, newPasswordConfirmation: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
@@ -26,6 +27,9 @@ interface AuthMeResponse {
 type LoginResult = {
   ok: boolean;
   error?: string;
+  status?: number;
+  retryAfter?: number;
+  requestId?: string | null;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -118,11 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [sessionState, setSessionState] = useState<SessionState>(() => {
     const initialToken = loadToken();
-    if (!initialToken || isJwtExpired(initialToken)) {
-      return 'expired';
-    }
-
-    return 'online';
+    return initialToken ? 'online' : 'expired';
   });
 
   const clearSession = useCallback(() => {
@@ -165,11 +165,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = loadUser();
 
     if (!storedToken || !storedUser) {
-      clearSession();
-      return;
-    }
-
-    if (isJwtExpired(storedToken)) {
       clearSession();
       return;
     }
@@ -234,12 +229,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [revalidateStoredSession, sessionState, token, user]);
 
-  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
+  const login = useCallback(async (email: string, password: string, clientDiagnostics: LoginClientDiagnostics = {}): Promise<LoginResult> => {
     try {
       const { payload } = await fetchJson(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ email: email.trim(), password, client_diagnostics: clientDiagnostics }),
       });
 
       const responsePayload = payload as {
@@ -261,9 +256,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           clearSession();
         }
 
+        const retryAfter = getApiRetryAfter(error);
+        const requestSuffix = error.requestId ? ` Numer zgłoszenia: ${error.requestId}.` : '';
+        const fallbackMessage = error.status === 401
+          ? 'Nieprawidłowy e-mail lub hasło.'
+          : error.status === 429
+            ? 'Zbyt wiele prób logowania. Spróbuj ponownie za chwilę.'
+            : 'Nie udało się zalogować.';
+
         return {
           ok: false,
-          error: error.message || 'Nieprawidłowy e-mail lub hasło.',
+          error: `${error.message || fallbackMessage}${requestSuffix}`,
+          status: error.status,
+          retryAfter: retryAfter ?? undefined,
+          requestId: error.requestId,
         };
       }
 

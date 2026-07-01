@@ -33,12 +33,14 @@ export const API_BASE_URL = resolveApiBaseUrl();
 export class ApiResponseError extends Error {
   status: number;
   payload: unknown;
+  requestId: string | null;
 
-  constructor(message: string, status: number, payload: unknown) {
+  constructor(message: string, status: number, payload: unknown, requestId: string | null = null) {
     super(message);
     this.name = 'ApiResponseError';
     this.status = status;
     this.payload = payload;
+    this.requestId = requestId;
   }
 }
 
@@ -86,6 +88,7 @@ export async function fetchJson(input: RequestInfo | URL, options: FetchJsonOpti
         getErrorMessage(payload, `Żądanie zakończyło się błędem ${response.status}`),
         response.status,
         payload,
+        response.headers.get('x-request-id'),
       );
     }
 
@@ -124,4 +127,18 @@ export function getApiErrorCode(error: unknown): string | null {
   }
 
   return null;
+}
+
+export function getApiRetryAfter(error: unknown): number | null {
+  if (!isApiResponseError(error)) {
+    return null;
+  }
+
+  const payload = error.payload;
+  if (!payload || typeof payload !== 'object' || !('retry_after' in payload)) {
+    return null;
+  }
+
+  const retryAfter = Number(payload.retry_after);
+  return Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : null;
 }

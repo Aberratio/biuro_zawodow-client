@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/ui/field-error";
 import { BrandWordmark } from "@/components/BrandWordmark";
 import { toast } from "@/hooks/use-toast";
+import { API_BASE_URL } from "@/lib/api";
 import { validateEmail, validateRequired } from "@/lib/form-validation";
 import { cn } from "@/lib/utils";
 import {
@@ -28,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { openCookiePreferences } from "@/lib/cookie-consent";
+import { checkBrowserStorage, type BrowserStorageDiagnostics } from "@/lib/browser-storage";
 
 type LoginFooterProps = {
   copyrightYears: string;
@@ -79,6 +81,43 @@ function isIosSafari() {
     /safari/i.test(userAgent) &&
     !/crios|fxios|edgios|opios|fbav|fban|instagram/i.test(userAgent)
   );
+}
+
+function getDisplayMode() {
+  if (window.matchMedia("(display-mode: standalone)").matches) return "standalone";
+  if (window.matchMedia("(display-mode: fullscreen)").matches) return "fullscreen";
+  if (window.matchMedia("(display-mode: minimal-ui)").matches) return "minimal-ui";
+  return "browser";
+}
+
+function buildLoginClientDiagnostics(storage: BrowserStorageDiagnostics) {
+  return {
+    client_timestamp: new Date().toISOString(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    language: window.navigator.language,
+    languages: Array.from(window.navigator.languages ?? []).join(","),
+    platform: window.navigator.platform,
+    user_agent: window.navigator.userAgent,
+    online: window.navigator.onLine,
+    cookie_enabled: window.navigator.cookieEnabled,
+    display_mode: getDisplayMode(),
+    standalone: isRunningAsInstalledPwa(),
+    visibility_state: document.visibilityState,
+    current_url: window.location.href,
+    api_base_url: API_BASE_URL,
+    app_environment: import.meta.env.VITE_APP_ENV || "unknown",
+    app_release: import.meta.env.VITE_APP_RELEASE || "unknown",
+    can_persist_session: storage.canPersistSession,
+    session_storage_available: storage.sessionStorageAvailable,
+    local_storage_available: storage.localStorageAvailable,
+    indexed_db_available: storage.indexedDbAvailable,
+    storage_warnings: storage.warnings,
+    screen: {
+      width: window.screen.width,
+      height: window.screen.height,
+      pixel_ratio: window.devicePixelRatio,
+    },
+  };
 }
 
 function LoginPwaInstallCard() {
@@ -281,6 +320,8 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showMobilePassword, setShowMobilePassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [errors, setErrors] = useState<{
     email?: string;
     password?: string;
@@ -288,9 +329,27 @@ export default function Login() {
   }>({});
   const currentYear = new Date().getFullYear();
   const copyrightYears = currentYear > 2026 ? `2026-${currentYear}` : "2026";
+  const rateLimitRemainingSeconds =
+    rateLimitUntil === null ? 0 : Math.max(0, Math.ceil((rateLimitUntil - nowMs) / 1000));
+  const isRateLimited = rateLimitRemainingSeconds > 0;
+
+  useEffect(() => {
+    if (rateLimitUntil === null) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      const nextNow = Date.now();
+      setNowMs(nextNow);
+      if (nextNow >= rateLimitUntil) {
+        setRateLimitUntil(null);
+      }
+    }, 1_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [rateLimitUntil]);
 
   const handleEmailChange = (value: string) => {
     setEmail(value);
+    setRateLimitUntil(null);
     setErrors((previous) => ({
       ...previous,
       email: undefined,
@@ -309,6 +368,10 @@ export default function Login() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isRateLimited) {
+      return;
+    }
+
     const nextErrors = {
       email: validateEmail(email),
       password: validateRequired(password, "Podaj hasło."),
@@ -323,12 +386,34 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      const result = await login(email, password);
+      const storageDiagnostics = await checkBrowserStorage();
+      if (storageDiagnostics.blockingError) {
+        setErrors({ form: storageDiagnostics.blockingError });
+        toast({
+          title: "Przeglądarka blokuje sesję",
+          description: storageDiagnostics.blockingError,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      storageDiagnostics.warnings.forEach(message => {
+        toast({
+          title: "Ograniczona pamięć aplikacji",
+          description: message,
+        });
+      });
+
+      const result = await login(email, password, buildLoginClientDiagnostics(storageDiagnostics));
       if (!result.ok) {
         const message = result.error ?? "Nieprawidłowy e-mail lub hasło.";
+        if (result.status === 429 && result.retryAfter) {
+          setRateLimitUntil(Date.now() + result.retryAfter * 1000);
+          setNowMs(Date.now());
+        }
         setErrors({ form: message });
         toast({
-          title: "Błąd logowania",
+          title: result.status === 429 ? "Zbyt wiele prób" : "Błąd logowania",
           description: message,
           variant: "destructive",
         });
@@ -466,13 +551,13 @@ export default function Login() {
                 type="submit"
                 size="lg"
                 className="mt-2 h-16 w-full rounded-[1.35rem] border-[hsl(var(--button-highlight)/0.86)] bg-[linear-gradient(180deg,hsl(40_40%_44%)_0%,hsl(39_29%_31%)_48%,hsl(38_24%_22%)_100%)] text-[1.12rem] font-semibold shadow-[inset_0_1px_0_hsl(var(--foreground)/0.14),0_0_0_1px_hsl(var(--button-highlight)/0.12),0_12px_24px_hsl(var(--surface-shadow)/0.28)] hover:bg-[linear-gradient(180deg,hsl(40_42%_47%)_0%,hsl(39_30%_33%)_48%,hsl(38_25%_24%)_100%)] hover:translate-y-0"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isRateLimited}
                 aria-busy={isSubmitting}
               >
                 {isSubmitting && (
                   <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                 )}
-                {isSubmitting ? "Logowanie..." : "Zaloguj się"}
+                {isSubmitting ? "Logowanie..." : isRateLimited ? `Spróbuj za ${rateLimitRemainingSeconds}s` : "Zaloguj się"}
               </Button>
 
               <div className="flex justify-end pt-1">
@@ -596,13 +681,13 @@ export default function Login() {
                     type="submit"
                     size="lg"
                     className="h-12 w-full rounded-2xl text-sm"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isRateLimited}
                     aria-busy={isSubmitting}
                   >
                     {isSubmitting && (
                       <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                     )}
-                    {isSubmitting ? "Logowanie..." : "Zaloguj się"}
+                    {isSubmitting ? "Logowanie..." : isRateLimited ? `Spróbuj za ${rateLimitRemainingSeconds}s` : "Zaloguj się"}
                   </Button>
 
                   <div className="flex justify-end">

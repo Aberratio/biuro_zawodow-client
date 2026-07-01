@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Login from "@/pages/Login";
 import { toast } from "@/hooks/use-toast";
+import { checkBrowserStorage } from "@/lib/browser-storage";
 
 const loginMock = vi.fn();
 
@@ -18,6 +19,10 @@ vi.mock("@/components/BrandWordmark", () => ({
 
 vi.mock("@/hooks/use-toast", () => ({
   toast: vi.fn(),
+}));
+
+vi.mock("@/lib/browser-storage", () => ({
+  checkBrowserStorage: vi.fn(),
 }));
 
 function renderLogin() {
@@ -55,6 +60,13 @@ describe("Login page", () => {
   beforeEach(() => {
     loginMock.mockReset();
     vi.mocked(toast).mockReset();
+    vi.mocked(checkBrowserStorage).mockResolvedValue({
+      canPersistSession: true,
+      sessionStorageAvailable: true,
+      localStorageAvailable: true,
+      indexedDbAvailable: true,
+      warnings: [],
+    });
     mockNavigator();
   });
 
@@ -82,12 +94,48 @@ describe("Login page", () => {
     fireEvent.submit(form as HTMLFormElement);
 
     await waitFor(() => {
-      expect(loginMock).toHaveBeenCalledWith("admin@example.com", "wrong-password");
+      expect(loginMock).toHaveBeenCalledWith(
+        "admin@example.com",
+        "wrong-password",
+        expect.objectContaining({
+          can_persist_session: true,
+          session_storage_available: true,
+          local_storage_available: true,
+          indexed_db_available: true,
+        }),
+      );
     });
 
     expect(screen.getAllByText(/Nieprawid/i).length).toBeGreaterThan(0);
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({
       title: expect.stringMatching(/logowania/i),
+      variant: "destructive",
+    }));
+  });
+
+  it("disables login with a countdown when auth is rate limited", async () => {
+    loginMock.mockResolvedValue({
+      ok: false,
+      status: 429,
+      retryAfter: 30,
+      error: "Zbyt wiele prób logowania. Spróbuj ponownie później.",
+    });
+    const { container } = renderLogin();
+    const emailInput = container.querySelector("#login-desktop-email") as HTMLInputElement;
+    const passwordInput = container.querySelector("#login-desktop-password") as HTMLInputElement;
+    const form = emailInput.closest("form");
+
+    fireEvent.change(emailInput, { target: { value: "admin@example.com" } });
+    fireEvent.change(passwordInput, { target: { value: "wrong-password" } });
+    fireEvent.submit(form as HTMLFormElement);
+
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button", { name: /Spróbuj za 30s/i });
+      expect(buttons.length).toBeGreaterThan(0);
+      expect(buttons.every(button => button.hasAttribute("disabled"))).toBe(true);
+    });
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Zbyt wiele prób",
       variant: "destructive",
     }));
   });
