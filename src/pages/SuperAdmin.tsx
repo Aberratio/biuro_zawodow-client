@@ -165,6 +165,13 @@ type ServerLogEntry = {
   context?: Record<string, unknown>;
 };
 
+type AuditFilterOverrides = {
+  category?: string;
+  outcome?: string;
+  query?: string;
+  actionCode?: string;
+};
+
 type LoggingStatus = {
   writable: boolean;
   retention_days: number;
@@ -304,6 +311,50 @@ function getServerLogMethodClassName(method: string): string {
   }
 }
 
+function formatJson(value: unknown): string {
+  return JSON.stringify(value ?? {}, null, 2);
+}
+
+function getNestedValue(source: Record<string, unknown> | undefined, path: string): unknown {
+  return path.split(".").reduce<unknown>((current, part) => {
+    if (!current || typeof current !== "object") return undefined;
+    return (current as Record<string, unknown>)[part];
+  }, source);
+}
+
+function metadataText(entry: AuditEntry, path: string): string {
+  const value = getNestedValue(entry.metadata, path);
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+    ? String(value)
+    : "";
+}
+
+function AuditMetadataSummary({ entry }: { entry: AuditEntry }) {
+  if (!entry.metadata || entry.source !== "audit") return null;
+
+  const browser = metadataText(entry, "client.user_agent") || metadataText(entry, "request.user_agent");
+  const platform = metadataText(entry, "client.platform") || metadataText(entry, "request.sec_ch_ua_platform");
+  const displayMode = metadataText(entry, "client.display_mode");
+  const failureReason = metadataText(entry, "failure_reason");
+  const emailDomain = metadataText(entry, "email_domain");
+  const storage = [
+    metadataText(entry, "client.can_persist_session") && `sesja ${metadataText(entry, "client.can_persist_session")}`,
+    metadataText(entry, "client.indexed_db_available") && `IndexedDB ${metadataText(entry, "client.indexed_db_available")}`,
+    metadataText(entry, "client.online") && `online ${metadataText(entry, "client.online")}`,
+  ].filter(Boolean);
+
+  return (
+    <div className="flex flex-wrap gap-1 pt-1">
+      {failureReason && <Badge variant="destructive" className="text-[0.68rem]">{failureReason}</Badge>}
+      {emailDomain && <Badge variant="outline" className="text-[0.68rem]">@{emailDomain}</Badge>}
+      {platform && <Badge variant="outline" className="max-w-[12rem] truncate text-[0.68rem]">{platform}</Badge>}
+      {displayMode && <Badge variant="outline" className="text-[0.68rem]">{displayMode}</Badge>}
+      {storage.map((item) => <Badge key={String(item)} variant="secondary" className="text-[0.68rem]">{item}</Badge>)}
+      {browser && <span className="block w-full truncate text-xs text-muted-foreground">{browser}</span>}
+    </div>
+  );
+}
+
 function normalizeSearch(value: string): string {
   return value.trim().toLocaleLowerCase("pl-PL");
 }
@@ -352,6 +403,8 @@ export default function SuperAdmin() {
   const [auditPage, setAuditPage] = useState(1);
   const [hasLoadedRemoteAudit, setHasLoadedRemoteAudit] = useState(false);
   const [isAuditLoading, setIsAuditLoading] = useState(false);
+  const [selectedAuditEntry, setSelectedAuditEntry] = useState<AuditEntry | null>(null);
+  const [auditDialogOpen, setAuditDialogOpen] = useState(false);
   const [serverLogSource, setServerLogSource] = useState<"application" | "php">("application");
   const [serverLogLevel, setServerLogLevel] = useState("all");
   const [serverLogQuery, setServerLogQuery] = useState("");
@@ -564,18 +617,27 @@ export default function SuperAdmin() {
     : localAuditEntries.slice((auditPage - 1) * AUDIT_PAGE_SIZE, auditPage * AUDIT_PAGE_SIZE);
   const displayedAuditMeta = hasLoadedRemoteAudit ? auditMeta : localAuditMeta;
 
-  const loadAudit = async (nextScope = auditScope, nextEntity = selectedEntity, nextPage = auditPage) => {
+  const loadAudit = async (
+    nextScope = auditScope,
+    nextEntity = selectedEntity,
+    nextPage = auditPage,
+    overrides: AuditFilterOverrides = {},
+  ) => {
     setIsAuditLoading(true);
     try {
+      const nextQuery = overrides.query ?? auditQuery;
+      const nextCategory = overrides.category ?? auditCategory;
+      const nextOutcome = overrides.outcome ?? auditOutcome;
       const params = new URLSearchParams({
         scope: nextScope,
         limit: String(AUDIT_PAGE_SIZE),
         page: String(nextPage),
       });
       if (nextEntity?.id) params.set("id", nextEntity.id);
-      if (auditQuery.trim()) params.set("q", auditQuery.trim());
-      if (auditCategory !== "all") params.set("category", auditCategory);
-      if (auditOutcome !== "all") params.set("outcome", auditOutcome);
+      if (nextQuery.trim()) params.set("q", nextQuery.trim());
+      if (nextCategory !== "all") params.set("category", nextCategory);
+      if (nextOutcome !== "all") params.set("outcome", nextOutcome);
+      if (overrides.actionCode) params.set("action_code", overrides.actionCode);
 
       const { payload } = await fetchJson(`${API_BASE_URL}/superadmin/audit?${params.toString()}`, {
         headers: getAuthHeaders(),
@@ -599,6 +661,54 @@ export default function SuperAdmin() {
       });
     } finally {
       setIsAuditLoading(false);
+    }
+  };
+
+  const applyAuditPreset = (overrides: AuditFilterOverrides) => {
+    const nextCategory = overrides.category ?? "all";
+    const nextOutcome = overrides.outcome ?? "all";
+    const nextQuery = overrides.query ?? "";
+    setAuditScope("all");
+    setSelectedEntity(null);
+    setEntitySearch("");
+    setAuditCategory(nextCategory);
+    setAuditOutcome(nextOutcome);
+    setAuditQuery(nextQuery);
+    setAuditPage(1);
+    void loadAudit("all", null, 1, overrides);
+  };
+
+  const openAuditEntry = async (entry: AuditEntry) => {
+    if (entry.source !== "audit") {
+      setSelectedAuditEntry(entry);
+      setAuditDialogOpen(true);
+      return;
+    }
+
+    try {
+      const { payload } = await fetchJson(
+        `${API_BASE_URL}/superadmin/audit/${encodeURIComponent(entry.id)}`,
+        { headers: getAuthHeaders() },
+      );
+      const detail = (payload as { data?: Record<string, unknown> }).data;
+      setSelectedAuditEntry({
+        ...entry,
+        metadata: detail?.metadata && typeof detail.metadata === "object"
+          ? detail.metadata as Record<string, unknown>
+          : entry.metadata,
+        request_id: typeof detail?.request_id === "string" ? detail.request_id : entry.request_id,
+        user_name: typeof detail?.actor_name_snapshot === "string" ? detail.actor_name_snapshot : entry.user_name,
+        user_role: typeof detail?.actor_role_snapshot === "string" ? detail.actor_role_snapshot : entry.user_role,
+        target_type: typeof detail?.target_type === "string" ? detail.target_type : entry.target_type,
+        target_id: typeof detail?.target_id === "string" ? detail.target_id : entry.target_id,
+      });
+      setAuditDialogOpen(true);
+    } catch (error) {
+      toast({
+        title: "Nie udało się pobrać szczegółów audytu",
+        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1380,6 +1490,38 @@ export default function SuperAdmin() {
         <TabsContent value="audit" className="space-y-4">
           <Card>
             <CardContent className="space-y-4 p-4 sm:p-5">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyAuditPreset({ category: "authentication", outcome: "failure", query: "auth.login" })}
+                  disabled={isAuditLoading}
+                >
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Nieudane logowania
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyAuditPreset({ category: "authentication", outcome: "blocked", actionCode: "auth.login.rate_limited" })}
+                  disabled={isAuditLoading}
+                >
+                  <Shield className="mr-2 h-4 w-4" />
+                  Blokady logowania
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyAuditPreset({ category: "authentication", query: "client_server_clock_skew_seconds" })}
+                  disabled={isAuditLoading}
+                >
+                  <Cloud className="mr-2 h-4 w-4" />
+                  Diagnostyka urządzeń
+                </Button>
+              </div>
               <div className="grid gap-3 lg:grid-cols-[11rem_11rem_11rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
                 <div className="space-y-2">
                   <Label>Zakres</Label>
@@ -1503,7 +1645,7 @@ export default function SuperAdmin() {
               </p>
             </CardHeader>
             <CardContent className="p-0">
-              <Table className="min-w-[1120px] table-fixed">
+              <Table className="min-w-[1200px] table-fixed">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[10rem]">Czas</TableHead>
@@ -1511,6 +1653,7 @@ export default function SuperAdmin() {
                     <TableHead className="w-[22rem]">Powiązania</TableHead>
                     <TableHead className="w-[13rem]">Operator</TableHead>
                     <TableHead className="w-[9rem]">Źródło</TableHead>
+                    <TableHead className="w-[5rem]">Akcje</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1524,6 +1667,7 @@ export default function SuperAdmin() {
                           {entry.changed_fields && entry.changed_fields.length > 0 && (
                             <p className="text-xs text-muted-foreground">{entry.changed_fields.join(", ")}</p>
                           )}
+                          <AuditMetadataSummary entry={entry} />
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1538,11 +1682,22 @@ export default function SuperAdmin() {
                           {entry.source === "participant_change" ? "zmiana" : entry.source === "audit" ? "audyt" : "aktywność"}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => void openAuditEntry(entry)}
+                          aria-label={`Szczegóły wpisu audytu ${entry.id}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {displayedAuditEntries.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                         Brak logów dla wybranego zakresu.
                       </TableCell>
                     </TableRow>
@@ -2074,6 +2229,51 @@ export default function SuperAdmin() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={auditDialogOpen} onOpenChange={setAuditDialogOpen}>
+        <DialogContent className="max-h-[85vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Szczegóły audytu</DialogTitle>
+          </DialogHeader>
+          {selectedAuditEntry && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">{formatDateTime(selectedAuditEntry.timestamp)}</Badge>
+                {selectedAuditEntry.action_code && <Badge variant="secondary">{selectedAuditEntry.action_code}</Badge>}
+                {selectedAuditEntry.outcome && <Badge variant={selectedAuditEntry.outcome === "success" ? "secondary" : "destructive"}>{selectedAuditEntry.outcome}</Badge>}
+                {selectedAuditEntry.request_id && <Badge variant="outline" className="font-mono">{selectedAuditEntry.request_id}</Badge>}
+              </div>
+              <div className="grid gap-3 text-sm md:grid-cols-2">
+                <div>
+                  <p className="text-xs uppercase text-muted-foreground">Akcja</p>
+                  <p className="font-medium">{selectedAuditEntry.action}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-muted-foreground">Operator</p>
+                  <p>{selectedAuditEntry.user_name || "-"} {selectedAuditEntry.user_role ? `(${selectedAuditEntry.user_role})` : ""}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-muted-foreground">Cel</p>
+                  <p className="font-mono text-xs">{[selectedAuditEntry.target_type, selectedAuditEntry.target_id].filter(Boolean).join(":") || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-muted-foreground">Powiązania</p>
+                  <RelatedAuditData entry={selectedAuditEntry} />
+                </div>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">Metadane diagnostyczne</p>
+                <pre className="max-h-[48vh] overflow-auto whitespace-pre-wrap break-words text-xs leading-5">
+                  {formatJson(selectedAuditEntry.metadata ?? {})}
+                </pre>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setAuditDialogOpen(false)}>Zamknij</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={serverLogDialogOpen} onOpenChange={setServerLogDialogOpen}>
         <DialogContent className="max-h-[85vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-3xl">
