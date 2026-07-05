@@ -54,6 +54,9 @@ import {
 import {
   buildParticipantFieldValues,
   getActiveParticipantMappings,
+  getParticipantFieldType,
+  getParticipantValidationRules,
+  validateParticipantFieldValue,
 } from "@/lib/participant-fields";
 import { formatBibNumber } from "@/lib/participants";
 import { ParticipantBibNumberConflictDialog } from "@/components/ParticipantBibNumberConflictDialog";
@@ -61,7 +64,7 @@ import {
   getParticipantStatusDefinition,
   PARTICIPANT_STATUS_DEFINITIONS,
 } from "@/lib/participant-status";
-import { validateEmail, validateRequired } from "@/lib/form-validation";
+import { validateEmail } from "@/lib/form-validation";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 import { PageHeader } from "@/components/PageHeader";
 import { PageBlockerOverlay } from "@/components/PageBlockerOverlay";
@@ -636,16 +639,10 @@ export default function ParticipantDetails() {
 
   const handleTransferSubmit = async () => {
     const fieldErrors = activeMappings
-      .filter(
-        (mapping) =>
-          mapping.is_required && mapping.field_role !== "bib_number",
-      )
+      .filter((mapping) => mapping.field_role !== "bib_number")
       .reduce<Record<string, string>>(
         (accumulator, mapping) => {
-          const error = validateRequired(
-            transferFields[mapping.alias] ?? "",
-            `Uzupełnij pole: ${mapping.alias}.`,
-          );
+          const error = validateParticipantFieldValue(mapping, transferFields[mapping.alias] ?? "");
           if (error) accumulator[mapping.alias] = error;
           return accumulator;
         },
@@ -1077,26 +1074,58 @@ export default function ParticipantDetails() {
               const errorId = `${fieldId}-error`;
               const descriptionId = `${fieldId}-description`;
               const fieldError = transferErrors.fields[mapping.alias];
+              const fieldType = getParticipantFieldType(mapping);
+              const rules = getParticipantValidationRules(mapping);
+              const fieldValue = transferFields[mapping.alias] ?? "";
 
               return (
                 <div key={`${mapping.alias}-${mapping.source_column_name}`}>
                   <Label htmlFor={fieldId}>{mapping.alias}</Label>
-                  <Input
-                    id={fieldId}
-                    value={transferFields[mapping.alias] ?? ""}
-                    onChange={(event) =>
-                      handleTransferFieldChange(
-                        mapping.alias,
-                        event.target.value,
-                      )
-                    }
-                    className="mt-2"
-                    required={mapping.is_required}
-                    aria-invalid={Boolean(fieldError)}
-                    aria-describedby={
-                      fieldError ? `${descriptionId} ${errorId}` : descriptionId
-                    }
-                  />
+                  {fieldType === "select" ? (
+                    <Select
+                      value={fieldValue || "__empty"}
+                      onValueChange={(value) => handleTransferFieldChange(mapping.alias, value === "__empty" ? "" : value)}
+                    >
+                      <SelectTrigger
+                        id={fieldId}
+                        className="mt-2"
+                        aria-invalid={Boolean(fieldError)}
+                        aria-describedby={
+                          fieldError ? `${descriptionId} ${errorId}` : descriptionId
+                        }
+                      >
+                        <SelectValue placeholder="Wybierz wartość" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {!mapping.is_required && <SelectItem value="__empty">Brak wartości</SelectItem>}
+                        {(rules.options ?? []).map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      id={fieldId}
+                      type={fieldType === "number" ? "number" : fieldType === "date" ? "date" : "text"}
+                      min={fieldType === "number" || fieldType === "date" ? rules.min : undefined}
+                      max={fieldType === "number" || fieldType === "date" ? rules.max : undefined}
+                      value={fieldValue}
+                      onChange={(event) =>
+                        handleTransferFieldChange(
+                          mapping.alias,
+                          event.target.value,
+                        )
+                      }
+                      className="mt-2"
+                      required={mapping.is_required}
+                      aria-invalid={Boolean(fieldError)}
+                      aria-describedby={
+                        fieldError ? `${descriptionId} ${errorId}` : descriptionId
+                      }
+                    />
+                  )}
                   <ParticipantFieldRoleHint
                     id={descriptionId}
                     role={mapping.field_role}

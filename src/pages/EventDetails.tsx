@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/ui/field-error";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -64,7 +65,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import DetailSkeleton from "@/components/skeletons/DetailSkeleton";
-import type { ParticipantFieldMapping, ParticipantFieldRole, User } from "@/types";
+import type { ParticipantFieldMapping, ParticipantFieldRole, ParticipantFieldType, ParticipantFieldValidationRules, User } from "@/types";
 import {
   formatEventOfficeEnd,
   formatEventOfficeStart,
@@ -81,7 +82,14 @@ import {
 } from "@/lib/events";
 import {
   buildEmptyParticipantFieldValues,
+  formatSelectOptions,
   getActiveParticipantMappings,
+  getParticipantFieldType,
+  getParticipantValidationRules,
+  isConfigurableParticipantMapping,
+  parseSelectOptions,
+  participantFieldTypeLabels,
+  validateParticipantFieldValue,
 } from "@/lib/participant-fields";
 import { participantCountsAsCheckedIn } from "@/lib/participant-status";
 import {
@@ -129,6 +137,40 @@ const mappingRoleLabels: Record<ParticipantFieldRole, string> = {
 
 function isEditableMappingRole(role: ParticipantFieldRole): role is EditableMappingRole {
   return role === "custom" || role === "important_custom";
+}
+
+function validateMappingValidationRules(mapping: MappingDraft): string {
+  if (!isConfigurableParticipantMapping(mapping)) return "";
+  const fieldType = getParticipantFieldType(mapping);
+  const rules = getParticipantValidationRules(mapping);
+
+  if (fieldType === "text") {
+    const minLength = rules.min_length;
+    const maxLength = rules.max_length;
+    if (typeof minLength === "number" && typeof maxLength === "number" && minLength > maxLength) {
+      return "Minimalna liczba znaków nie może być większa od maksymalnej.";
+    }
+  }
+
+  if (fieldType === "number") {
+    const min = typeof rules.min === "number" ? rules.min : Number(rules.min);
+    const max = typeof rules.max === "number" ? rules.max : Number(rules.max);
+    if (Number.isFinite(min) && Number.isFinite(max) && min > max) {
+      return "Minimalna wartość nie może być większa od maksymalnej.";
+    }
+  }
+
+  if (fieldType === "date") {
+    const min = typeof rules.min === "string" ? rules.min : "";
+    const max = typeof rules.max === "string" ? rules.max : "";
+    if (min && max && min > max) return "Data od nie może być późniejsza niż data do.";
+  }
+
+  if (fieldType === "select" && (rules.options ?? []).length === 0) {
+    return "Dodaj co najmniej jedną opcję listy wyboru.";
+  }
+
+  return "";
 }
 
 function buildEditFormFromEvent(event: {
@@ -612,11 +654,18 @@ export default function EventDetails() {
     patch: Partial<MappingDraft>,
   ) => {
     setMappingDrafts((current) =>
-      current.map((mapping) =>
-        mapping.source_column_name === sourceColumnName
-          ? { ...mapping, ...patch }
-          : mapping,
-      ),
+      current.map((mapping) => {
+        if (mapping.source_column_name !== sourceColumnName) return mapping;
+        const nextMapping = { ...mapping, ...patch };
+        if (!isConfigurableParticipantMapping(nextMapping)) {
+          return {
+            ...nextMapping,
+            field_type: "text",
+            validation_rules: {},
+          };
+        }
+        return nextMapping;
+      }),
     );
     setMappingErrors((current) => ({
       ...current,
@@ -668,6 +717,11 @@ export default function EventDetails() {
       const alias = mapping.alias.trim();
       if (!alias) {
         aliasErrors[mapping.source_column_name] = "Podaj etykietę pola.";
+      } else {
+        const validationRulesError = validateMappingValidationRules(mapping);
+        if (validationRulesError) {
+          aliasErrors[mapping.source_column_name] = validationRulesError;
+        }
       }
 
       if (mapping.is_active) {
@@ -704,6 +758,12 @@ export default function EventDetails() {
     const orderedMappings = mappingDrafts.map((mapping, index) => ({
       ...mapping,
       alias: mapping.alias.trim(),
+      field_type: isConfigurableParticipantMapping(mapping)
+        ? getParticipantFieldType(mapping)
+        : "text",
+      validation_rules: isConfigurableParticipantMapping(mapping)
+        ? getParticipantValidationRules(mapping)
+        : {},
       is_required:
         !mapping.is_active && mapping.field_role !== "email"
           ? false
@@ -735,6 +795,150 @@ export default function EventDetails() {
     setManualFields(buildEmptyParticipantFieldValues(result.mappings));
     setMappingDialogOpen(false);
     toast({ title: "Zapisano mapowanie kolumn" });
+  };
+
+  const renderMappingValidationControls = (mapping: MappingDraft, index: number) => {
+    if (!isConfigurableParticipantMapping(mapping)) return null;
+
+    const fieldType = getParticipantFieldType(mapping);
+    const rules = getParticipantValidationRules(mapping);
+    const updateRules = (patch: ParticipantFieldValidationRules) => {
+      updateMappingDraft(mapping.source_column_name, {
+        validation_rules: {
+          ...rules,
+          ...patch,
+        },
+      });
+    };
+    const updateFieldType = (fieldTypeValue: ParticipantFieldType) => {
+      updateMappingDraft(mapping.source_column_name, {
+        field_type: fieldTypeValue,
+        validation_rules: fieldTypeValue === "select" ? { options: rules.options ?? [] } : {},
+      });
+    };
+
+    return (
+      <Collapsible className="mt-3 rounded-md border border-border/60 bg-background/65 lg:col-span-4">
+        <CollapsibleTrigger asChild>
+          <Button type="button" variant="ghost" className="flex h-auto w-full justify-between rounded-md px-3 py-2 text-left">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">Walidacja i typ pola</span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {mapping.is_required ? "Wymagane" : "Opcjonalne"} · {participantFieldTypeLabels[fieldType]}
+              </span>
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-3 border-t px-3 py-3">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,14rem)_1fr]">
+            <div className="space-y-1.5">
+              <Label htmlFor={`event-mapping-field-type-${index}`}>Typ pola</Label>
+              <Select value={fieldType} onValueChange={(value) => updateFieldType(value as ParticipantFieldType)}>
+                <SelectTrigger id={`event-mapping-field-type-${index}`} className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text">{participantFieldTypeLabels.text}</SelectItem>
+                  <SelectItem value="number">{participantFieldTypeLabels.number}</SelectItem>
+                  <SelectItem value="date">{participantFieldTypeLabels.date}</SelectItem>
+                  <SelectItem value="select">{participantFieldTypeLabels.select}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {fieldType === "text" && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`event-mapping-text-min-${index}`}>Min. znaków</Label>
+                  <Input
+                    id={`event-mapping-text-min-${index}`}
+                    type="number"
+                    min={0}
+                    value={rules.min_length ?? ""}
+                    onChange={(eventValue) => updateRules({ min_length: eventValue.target.value === "" ? undefined : Number(eventValue.target.value) })}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`event-mapping-text-max-${index}`}>Max. znaków</Label>
+                  <Input
+                    id={`event-mapping-text-max-${index}`}
+                    type="number"
+                    min={0}
+                    value={rules.max_length ?? ""}
+                    onChange={(eventValue) => updateRules({ max_length: eventValue.target.value === "" ? undefined : Number(eventValue.target.value) })}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+            )}
+
+            {fieldType === "number" && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`event-mapping-number-min-${index}`}>Min. wartość</Label>
+                  <Input
+                    id={`event-mapping-number-min-${index}`}
+                    type="number"
+                    value={rules.min ?? ""}
+                    onChange={(eventValue) => updateRules({ min: eventValue.target.value === "" ? undefined : Number(eventValue.target.value) })}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`event-mapping-number-max-${index}`}>Max. wartość</Label>
+                  <Input
+                    id={`event-mapping-number-max-${index}`}
+                    type="number"
+                    value={rules.max ?? ""}
+                    onChange={(eventValue) => updateRules({ max: eventValue.target.value === "" ? undefined : Number(eventValue.target.value) })}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+            )}
+
+            {fieldType === "date" && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`event-mapping-date-min-${index}`}>Data od</Label>
+                  <Input
+                    id={`event-mapping-date-min-${index}`}
+                    type="date"
+                    value={typeof rules.min === "string" ? rules.min : ""}
+                    onChange={(eventValue) => updateRules({ min: eventValue.target.value || undefined })}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`event-mapping-date-max-${index}`}>Data do</Label>
+                  <Input
+                    id={`event-mapping-date-max-${index}`}
+                    type="date"
+                    value={typeof rules.max === "string" ? rules.max : ""}
+                    onChange={(eventValue) => updateRules({ max: eventValue.target.value || undefined })}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {fieldType === "select" && (
+            <div className="space-y-2">
+              <Label htmlFor={`event-mapping-select-options-${index}`}>Opcje listy, po jednej w linii</Label>
+              <Textarea
+                id={`event-mapping-select-options-${index}`}
+                value={formatSelectOptions(rules.options)}
+                onChange={(eventValue) => updateRules({ options: parseSelectOptions(eventValue.target.value) })}
+                rows={4}
+              />
+            </div>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+    );
   };
 
   const openReopenOfficeDialog = () => {
@@ -952,22 +1156,18 @@ export default function EventDetails() {
   const handleManualSubmit = async () => {
     const fieldErrors = activeMappings.reduce<Record<string, string>>(
       (accumulator, mapping) => {
-        const error = validateRequired(
-          manualFields[mapping.alias] ?? "",
-          `Uzupełnij pole: ${mapping.alias}.`,
-        );
+        const error = validateParticipantFieldValue(mapping, manualFields[mapping.alias] ?? "");
         if (error) accumulator[mapping.alias] = error;
         return accumulator;
       },
       {},
     );
-    void fieldErrors;
     const nextErrors = {
       email: validateEmail(manualEmail),
-      fields: {},
+      fields: fieldErrors,
     };
 
-    if (nextErrors.email) {
+    if (nextErrors.email || Object.keys(fieldErrors).length > 0) {
       setManualErrors(nextErrors);
       return;
     }
@@ -1956,6 +2156,7 @@ export default function EventDetails() {
                         Wymagane
                       </label>
                     </div>
+                    {renderMappingValidationControls(mapping, index)}
                   </div>
                 );
               })}
@@ -2026,23 +2227,53 @@ export default function EventDetails() {
               const fieldId = `event-manual-participant-field-${index}`;
               const errorId = `${fieldId}-error`;
               const fieldError = manualErrors.fields[mapping.alias];
+              const fieldType = getParticipantFieldType(mapping);
+              const rules = getParticipantValidationRules(mapping);
+              const fieldValue = manualFields[mapping.alias] ?? "";
 
               return (
                 <div key={`${mapping.alias}-${mapping.source_column_name}`}>
                   <Label htmlFor={fieldId}>{mapping.alias}</Label>
-                  <Input
-                    id={fieldId}
-                    value={manualFields[mapping.alias] ?? ""}
-                    onChange={(eventValue) =>
-                      handleManualFieldChange(
-                        mapping.alias,
-                        eventValue.target.value,
-                      )
-                    }
-                    className="mt-2"
-                    aria-invalid={Boolean(fieldError)}
-                    aria-describedby={fieldError ? errorId : undefined}
-                  />
+                  {fieldType === "select" ? (
+                    <Select
+                      value={fieldValue || "__empty"}
+                      onValueChange={(value) => handleManualFieldChange(mapping.alias, value === "__empty" ? "" : value)}
+                    >
+                      <SelectTrigger
+                        id={fieldId}
+                        className="mt-2"
+                        aria-invalid={Boolean(fieldError)}
+                        aria-describedby={fieldError ? errorId : undefined}
+                      >
+                        <SelectValue placeholder="Wybierz wartość" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {!mapping.is_required && <SelectItem value="__empty">Brak wartości</SelectItem>}
+                        {(rules.options ?? []).map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      id={fieldId}
+                      type={fieldType === "number" ? "number" : fieldType === "date" ? "date" : "text"}
+                      min={fieldType === "number" || fieldType === "date" ? rules.min : undefined}
+                      max={fieldType === "number" || fieldType === "date" ? rules.max : undefined}
+                      value={fieldValue}
+                      onChange={(eventValue) =>
+                        handleManualFieldChange(
+                          mapping.alias,
+                          eventValue.target.value,
+                        )
+                      }
+                      className="mt-2"
+                      aria-invalid={Boolean(fieldError)}
+                      aria-describedby={fieldError ? errorId : undefined}
+                    />
+                  )}
                   <FieldError id={errorId} className="mt-2">
                     {fieldError}
                   </FieldError>

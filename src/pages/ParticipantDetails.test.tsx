@@ -31,15 +31,20 @@ vi.mock("@/components/ParticipantBibNumberConflictDialog", () => ({
 function renderPage(options: {
   sendParticipantQrEmail?: ReturnType<typeof vi.fn>;
   deleteParticipant?: ReturnType<typeof vi.fn>;
+  updateParticipantDetails?: ReturnType<typeof vi.fn>;
+  mappings?: ReturnType<typeof createTestParticipantMapping>[];
+  customFields?: Record<string, string>;
 } = {}) {
   const participant = createTestParticipant({
     custom_fields: {
       Miasto: "Warszawa",
+      ...(options.customFields ?? {}),
     },
   });
   const event = createTestEvent();
   const sendParticipantQrEmail = options.sendParticipantQrEmail ?? vi.fn(async () => ({ ok: true }));
   const deleteParticipant = options.deleteParticipant ?? vi.fn(async () => ({ ok: true }));
+  const updateParticipantDetails = options.updateParticipantDetails ?? vi.fn(async () => ({ ok: true }));
 
   useDataMock.mockReturnValue({
     participants: [participant],
@@ -48,9 +53,9 @@ function renderPage(options: {
     currentRole: "admin",
     updateParticipantStatus: vi.fn(async () => ({ ok: true })),
     updateParticipantBibNumber: vi.fn(async () => ({ ok: true })),
-    updateParticipantDetails: vi.fn(async () => ({ ok: true })),
+    updateParticipantDetails,
     getParticipantFieldMappings: vi.fn(async () => [
-      createTestParticipantMapping({ alias: "Miasto" }),
+      ...(options.mappings ?? [createTestParticipantMapping({ alias: "Miasto" })]),
     ]),
     sendParticipantQrEmail,
     deleteParticipant,
@@ -73,7 +78,7 @@ function renderPage(options: {
     </MemoryRouter>,
   );
 
-  return { sendParticipantQrEmail, deleteParticipant };
+  return { sendParticipantQrEmail, deleteParticipant, updateParticipantDetails };
 }
 
 describe("ParticipantDetails page", () => {
@@ -129,5 +134,54 @@ describe("ParticipantDetails page", () => {
 
     expect(await screen.findByTestId("participants-route")).toBeInTheDocument();
     confirmSpy.mockRestore();
+  });
+
+  it("renders typed edit fields and validates configured rules before submit", async () => {
+    const updateParticipantDetails = vi.fn(async () => ({ ok: true }));
+    renderPage({
+      updateParticipantDetails,
+      customFields: {
+        Dystans: "5K",
+        Wiek: "20",
+      },
+      mappings: [
+        createTestParticipantMapping({
+          source_column_name: "distance",
+          alias: "Dystans",
+          field_type: "select",
+          validation_rules: { options: ["5K", "10K"] },
+        }),
+        createTestParticipantMapping({
+          source_column_name: "age",
+          alias: "Wiek",
+          field_type: "number",
+          validation_rules: { min: 18, max: 80 },
+          is_required: true,
+        }),
+      ],
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edytuj dane uczestnika" }));
+
+    const ageInput = screen.getByLabelText("Wiek") as HTMLInputElement;
+    expect(ageInput.type).toBe("number");
+
+    fireEvent.change(ageInput, { target: { value: "17" } });
+    fireEvent.click(screen.getByRole("button", { name: "Zapisz zmiany" }));
+
+    expect(await screen.findByText("Pole Wiek musi mieć wartość nie mniejszą niż 18.")).toBeInTheDocument();
+    expect(updateParticipantDetails).not.toHaveBeenCalled();
+
+    fireEvent.change(ageInput, { target: { value: "21" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "Dystans" }));
+    fireEvent.click(await screen.findByRole("option", { name: "10K" }));
+    fireEvent.click(screen.getByRole("button", { name: "Zapisz zmiany" }));
+
+    await waitFor(() => {
+      expect(updateParticipantDetails).toHaveBeenCalledWith("p-1", "anna@example.com", expect.objectContaining({
+        Dystans: "10K",
+        Wiek: "21",
+      }));
+    });
   });
 });
