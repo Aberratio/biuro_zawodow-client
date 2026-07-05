@@ -278,7 +278,43 @@ jobs:
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
         run: |
           set -Eeuo pipefail
-          curl --fail --show-error --location "$FRONTEND_URL"
+          if [ -z "$FRONTEND_URL" ]; then
+            echo "FRONTEND_URL is required in the selected GitHub Environment secrets."
+            exit 40
+          fi
+
+          separator="?"
+          case "$FRONTEND_URL" in
+            *\?*) separator="&" ;;
+          esac
+          HEALTH_URL="${FRONTEND_URL}${separator}deploy=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          RESPONSE_FILE="$(mktemp)"
+          for attempt in $(seq 1 12); do
+            status_code="$(
+              curl --silent --show-error --location \
+                --connect-timeout 10 \
+                --max-time 20 \
+                --header 'Cache-Control: no-cache' \
+                --output "$RESPONSE_FILE" \
+                --write-out '%{http_code}' \
+                "$HEALTH_URL" || true
+            )"
+
+            if [ "$status_code" = "200" ]; then
+              echo "Frontend health check passed."
+              exit 0
+            fi
+
+            echo "Health check attempt ${attempt}/12 failed with HTTP ${status_code:-000}."
+            if [ -s "$RESPONSE_FILE" ]; then
+              head -c 1000 "$RESPONSE_FILE"
+              echo
+            fi
+            sleep 5
+          done
+
+          echo "Frontend health check did not become healthy in time: $HEALTH_URL"
+          exit 41
 
   deploy-production:
     name: Deploy frontend production
@@ -515,4 +551,40 @@ jobs:
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
         run: |
           set -Eeuo pipefail
-          curl --fail --show-error --location "$FRONTEND_URL"
+          if [ -z "$FRONTEND_URL" ]; then
+            echo "FRONTEND_URL is required in the selected GitHub Environment secrets."
+            exit 40
+          fi
+
+          separator="?"
+          case "$FRONTEND_URL" in
+            *\?*) separator="&" ;;
+          esac
+          HEALTH_URL="${FRONTEND_URL}${separator}deploy=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          RESPONSE_FILE="$(mktemp)"
+          for attempt in $(seq 1 12); do
+            status_code="$(
+              curl --silent --show-error --location \
+                --connect-timeout 10 \
+                --max-time 20 \
+                --header 'Cache-Control: no-cache' \
+                --output "$RESPONSE_FILE" \
+                --write-out '%{http_code}' \
+                "$HEALTH_URL" || true
+            )"
+
+            if [ "$status_code" = "200" ]; then
+              echo "Frontend health check passed."
+              exit 0
+            fi
+
+            echo "Health check attempt ${attempt}/12 failed with HTTP ${status_code:-000}."
+            if [ -s "$RESPONSE_FILE" ]; then
+              head -c 1000 "$RESPONSE_FILE"
+              echo
+            fi
+            sleep 5
+          done
+
+          echo "Frontend health check did not become healthy in time: $HEALTH_URL"
+          exit 41
