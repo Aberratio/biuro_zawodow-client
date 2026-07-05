@@ -70,6 +70,8 @@ export function createTestParticipantMapping(
     source_column_name: "city",
     alias: "Miasto",
     field_role: "custom",
+    field_type: "text",
+    validation_rules: {},
     display_order: 1,
     is_required: false,
     is_active: true,

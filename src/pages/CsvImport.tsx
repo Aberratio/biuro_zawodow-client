@@ -22,6 +22,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import { AlertTriangle, ArrowLeft, Check, ChevronDown, FileUp, Info, Loader2, RefreshCcw, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
@@ -31,6 +33,16 @@ import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 import { buildEventImportSummaryPath, buildEventPath } from '@/lib/routes';
 import { PageHeader } from '@/components/PageHeader';
 import { formatParticipantCount } from '@/lib/participants';
+import {
+  formatSelectOptions,
+  getParticipantFieldType,
+  getParticipantValidationRules,
+  isConfigurableParticipantMapping,
+  parseSelectOptions,
+  participantFieldTypeLabels,
+  suggestSelectOptionsFromRows,
+} from '@/lib/participant-fields';
+import type { ParticipantFieldType, ParticipantFieldValidationRules } from '@/types';
 
 type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom' | 'important_custom';
 
@@ -38,6 +50,9 @@ interface MappingDraft {
   source_column_name: string;
   alias: string;
   field_role: EditableFieldRole;
+  field_type: ParticipantFieldType;
+  validation_rules: ParticipantFieldValidationRules;
+  is_required: boolean;
 }
 
 interface MappingPreviewField {
@@ -48,6 +63,53 @@ interface MappingPreviewField {
 }
 
 const IMPORTANT_FIELDS_WARNING_LIMIT = 5;
+
+const emptyValidationRules: ParticipantFieldValidationRules = {};
+
+function normalizeDraftForRole(draft: MappingDraft, role: EditableFieldRole): MappingDraft {
+  const configurable = role === 'custom' || role === 'important_custom';
+  return {
+    ...draft,
+    field_role: role,
+    field_type: configurable ? draft.field_type : 'text',
+    validation_rules: configurable ? draft.validation_rules : emptyValidationRules,
+    is_required: role === 'display_name_part' ? true : configurable ? draft.is_required : false,
+  };
+}
+
+function validateMappingValidationRules(field: MappingDraft): string {
+  if (!isConfigurableParticipantMapping(field) || field.field_role === 'ignore') return '';
+  const rules = getParticipantValidationRules(field);
+  const fieldType = getParticipantFieldType(field);
+
+  if (fieldType === 'text') {
+    const minLength = rules.min_length;
+    const maxLength = rules.max_length;
+    if (typeof minLength === 'number' && typeof maxLength === 'number' && minLength > maxLength) {
+      return 'Minimalna liczba znaków nie może być większa od maksymalnej.';
+    }
+  }
+
+  if (fieldType === 'number') {
+    const min = typeof rules.min === 'number' ? rules.min : Number(rules.min);
+    const max = typeof rules.max === 'number' ? rules.max : Number(rules.max);
+    if (Number.isFinite(min) && Number.isFinite(max) && min > max) {
+      return 'Minimalna wartość nie może być większa od maksymalnej.';
+    }
+  }
+
+  if (fieldType === 'date') {
+    const min = typeof rules.min === 'string' ? rules.min : '';
+    const max = typeof rules.max === 'string' ? rules.max : '';
+    if (min && max && min > max) return 'Data od nie może być późniejsza niż data do.';
+  }
+
+  if (fieldType === 'select' && (rules.options ?? []).length === 0) {
+    return 'Dodaj co najmniej jedną opcję listy wyboru.';
+  }
+
+  return '';
+}
 
 function getSampleCellValue(sampleRow: Record<string, string> | undefined, columnName: string): string {
   return sampleRow?.[columnName]?.trim() || 'Brak danych w podglądzie';
@@ -252,6 +314,9 @@ export default function CsvImport() {
             source_column_name: header,
             alias: savedMapping?.alias ?? header,
             field_role: (savedMapping?.field_role as EditableFieldRole | undefined) ?? 'custom',
+            field_type: savedMapping?.field_type ?? 'text',
+            validation_rules: savedMapping?.validation_rules ?? {},
+            is_required: Boolean(savedMapping?.is_required),
           };
         }),
     );
@@ -274,6 +339,10 @@ export default function CsvImport() {
   const activeDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role !== 'ignore'), [mappingDrafts]);
   const highlightedDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role === 'important_custom'), [mappingDrafts]);
   const samplePreviewRow = analysis?.sample_rows[0];
+  const csvRowsForSuggestions = useMemo(
+    () => analysis ? parseCsvRows(csvContent, analysis.headers) : [],
+    [analysis, csvContent],
+  );
   const verificationPreviewFields = useMemo<MappingPreviewField[]>(() => {
     if (!analysis) return [];
 
@@ -378,7 +447,11 @@ export default function CsvImport() {
   };
 
   const handleFieldChange = (sourceColumnName: string, patch: Partial<MappingDraft>) => {
-    setMappingDrafts(prev => prev.map(field => field.source_column_name === sourceColumnName ? { ...field, ...patch } : field));
+    setMappingDrafts(prev => prev.map(field => {
+      if (field.source_column_name !== sourceColumnName) return field;
+      const nextField = { ...field, ...patch };
+      return patch.field_role ? normalizeDraftForRole(nextField, patch.field_role) : nextField;
+    }));
     setMappingErrors(prev => ({
       ...prev,
       aliases: { ...prev.aliases, [sourceColumnName]: '' },
@@ -478,6 +551,173 @@ export default function CsvImport() {
     );
   };
 
+  const renderValidationControls = (field: MappingDraft, index: number) => {
+    if (!isConfigurableParticipantMapping(field) || field.field_role === 'ignore') return null;
+
+    const fieldType = getParticipantFieldType(field);
+    const rules = getParticipantValidationRules(field);
+    const updateRules = (patch: ParticipantFieldValidationRules) => {
+      handleFieldChange(field.source_column_name, {
+        validation_rules: {
+          ...rules,
+          ...patch,
+        },
+      });
+    };
+    const setFieldType = (fieldTypeValue: ParticipantFieldType) => {
+      handleFieldChange(field.source_column_name, {
+        field_type: fieldTypeValue,
+        validation_rules: fieldTypeValue === 'select' ? { options: rules.options ?? [] } : {},
+      });
+    };
+    const suggestedOptions = () => {
+      const options = suggestSelectOptionsFromRows(csvRowsForSuggestions, field.source_column_name);
+      handleFieldChange(field.source_column_name, {
+        validation_rules: { options },
+      });
+      toast({
+        title: options.length > 0 ? 'UzupeĹ‚niono opcje listy' : 'Nie znaleziono wartoĹ›ci do sugestii',
+        description: options.length > 0 ? `${options.length} unikalnych wartoĹ›ci z kolumny ${field.source_column_name}` : undefined,
+      });
+    };
+
+    return (
+      <Collapsible className="mt-3 rounded-md border border-border/60 bg-background/65">
+        <CollapsibleTrigger asChild>
+          <Button type="button" variant="ghost" className="flex h-auto w-full justify-between rounded-md px-3 py-2 text-left">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">Walidacja i typ pola</span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {field.is_required ? 'Wymagane' : 'Opcjonalne'} · {participantFieldTypeLabels[fieldType]}
+              </span>
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-3 border-t px-3 py-3">
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={field.is_required}
+              onCheckedChange={checked => handleFieldChange(field.source_column_name, { is_required: checked === true })}
+            />
+            Pole obligatoryjne
+          </label>
+          <div className="grid gap-3 md:grid-cols-[minmax(0,14rem)_1fr]">
+            <div className="space-y-1.5">
+              <Label htmlFor={`csv-field-type-${index}`}>Typ pola</Label>
+              <Select value={fieldType} onValueChange={value => setFieldType(value as ParticipantFieldType)}>
+                <SelectTrigger id={`csv-field-type-${index}`} className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text">{participantFieldTypeLabels.text}</SelectItem>
+                  <SelectItem value="number">{participantFieldTypeLabels.number}</SelectItem>
+                  <SelectItem value="date">{participantFieldTypeLabels.date}</SelectItem>
+                  <SelectItem value="select">{participantFieldTypeLabels.select}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {fieldType === 'text' && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`csv-text-min-${index}`}>Min. znakĂłw</Label>
+                  <Input
+                    id={`csv-text-min-${index}`}
+                    type="number"
+                    min={0}
+                    value={rules.min_length ?? ''}
+                    onChange={eventValue => updateRules({ min_length: eventValue.target.value === '' ? undefined : Number(eventValue.target.value) })}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`csv-text-max-${index}`}>Max. znakĂłw</Label>
+                  <Input
+                    id={`csv-text-max-${index}`}
+                    type="number"
+                    min={0}
+                    value={rules.max_length ?? ''}
+                    onChange={eventValue => updateRules({ max_length: eventValue.target.value === '' ? undefined : Number(eventValue.target.value) })}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+            )}
+
+            {fieldType === 'number' && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`csv-number-min-${index}`}>Min. wartoĹ›Ä‡</Label>
+                  <Input
+                    id={`csv-number-min-${index}`}
+                    type="number"
+                    value={rules.min ?? ''}
+                    onChange={eventValue => updateRules({ min: eventValue.target.value === '' ? undefined : Number(eventValue.target.value) })}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`csv-number-max-${index}`}>Max. wartoĹ›Ä‡</Label>
+                  <Input
+                    id={`csv-number-max-${index}`}
+                    type="number"
+                    value={rules.max ?? ''}
+                    onChange={eventValue => updateRules({ max: eventValue.target.value === '' ? undefined : Number(eventValue.target.value) })}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+            )}
+
+            {fieldType === 'date' && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`csv-date-min-${index}`}>Data od</Label>
+                  <Input
+                    id={`csv-date-min-${index}`}
+                    type="date"
+                    value={typeof rules.min === 'string' ? rules.min : ''}
+                    onChange={eventValue => updateRules({ min: eventValue.target.value || undefined })}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`csv-date-max-${index}`}>Data do</Label>
+                  <Input
+                    id={`csv-date-max-${index}`}
+                    type="date"
+                    value={typeof rules.max === 'string' ? rules.max : ''}
+                    onChange={eventValue => updateRules({ max: eventValue.target.value || undefined })}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {fieldType === 'select' && (
+            <div className="space-y-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <Label htmlFor={`csv-select-options-${index}`}>Opcje listy, po jednej w linii</Label>
+                <Button type="button" variant="outline" size="sm" onClick={suggestedOptions}>
+                  <Sparkles className="mr-1 h-4 w-4" />
+                  Zasugeruj z kolumny
+                </Button>
+              </div>
+              <Textarea
+                id={`csv-select-options-${index}`}
+                value={formatSelectOptions(rules.options)}
+                onChange={eventValue => updateRules({ options: parseSelectOptions(eventValue.target.value) })}
+                rows={4}
+              />
+            </div>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  };
+
   const buildMappingPayload = () => {
     if (!analysis) return null;
 
@@ -488,6 +728,9 @@ export default function CsvImport() {
         source_column_name: field.source_column_name,
         alias: field.alias.trim(),
         field_role: field.field_role as Exclude<EditableFieldRole, 'ignore'>,
+        field_type: getParticipantFieldType(field),
+        validation_rules: getParticipantValidationRules(field),
+        is_required: field.field_role === 'display_name_part' ? true : field.is_required,
         is_active: true,
       })),
     };
@@ -525,7 +768,7 @@ export default function CsvImport() {
       return;
     }
     const aliasErrors = activeDrafts.reduce<Record<string, string>>((accumulator, field) => {
-      const error = validateRequired(field.alias, 'Alias jest wymagany.');
+      const error = validateRequired(field.alias, 'Alias jest wymagany.') || validateMappingValidationRules(field);
       if (error) accumulator[field.source_column_name] = error;
       return accumulator;
     }, {});
@@ -863,6 +1106,7 @@ export default function CsvImport() {
                           </Select>
                         </div>
                       </div>
+                      {renderValidationControls(field, index)}
                     </div>
                   ))}
                 </div>

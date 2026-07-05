@@ -58,11 +58,22 @@ export interface ParticipantScanResult {
 }
 
 export type ParticipantFieldRole = 'email' | 'display_name_part' | 'bib_number' | 'custom' | 'important_custom';
+export type ParticipantFieldType = 'text' | 'number' | 'date' | 'select';
+
+export interface ParticipantFieldValidationRules {
+  min_length?: number;
+  max_length?: number;
+  min?: number | string;
+  max?: number | string;
+  options?: string[];
+}
 
 export interface ParticipantFieldMapping {
   source_column_name: string;
   alias: string;
   field_role: ParticipantFieldRole;
+  field_type?: ParticipantFieldType;
+  validation_rules?: ParticipantFieldValidationRules;
   display_order: number;
   is_required: boolean;
   is_active: boolean;

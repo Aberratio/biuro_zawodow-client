@@ -505,6 +505,99 @@ describe('CsvImport page', () => {
     expect(runParticipantImport).toHaveBeenCalledWith('event-1', 'Email,Imie,Uwagi\nanna@example.com,Anna,VIP');
   });
 
+  it('configures required select validation and suggests options from CSV values', async () => {
+    const confirmParticipantImportMapping = vi.fn(async () => []);
+    const runParticipantImport = vi.fn(async () => ({
+      created_count: 2,
+      duplicate_count: 0,
+      invalid_count: 0,
+      invalid_rows: [],
+      participants: [],
+    }));
+
+    useDataMock.mockReturnValue({
+      events: [createEvent()],
+      selectedEventId: 'event-1',
+      analyzeParticipantImport: vi.fn(async () => ({
+        headers: ['Email', 'Imie', 'Dystans'],
+        sample_rows: [
+          { Email: 'anna@example.com', Imie: 'Anna', Dystans: '5K' },
+          { Email: 'jan@example.com', Imie: 'Jan', Dystans: '10K' },
+        ],
+        email_candidates: [{ column: 'Email', matched_count: 2 }],
+        has_mapping: false,
+        has_baseline_import: false,
+        mappings: [
+          {
+            source_column_name: 'Imie',
+            alias: 'ImiÄ™',
+            field_role: 'display_name_part',
+            display_order: 1,
+            is_required: true,
+            is_active: true,
+          },
+        ],
+        missing_required_columns: [],
+        row_count: 2,
+        existing_participant_count: 0,
+        sent_qr_email_count: 0,
+        list_difference: {
+          columns_differ: false,
+          missing_columns: [],
+          extra_columns: [],
+          participant_difference_ratio: 0,
+          should_offer_replacement: false,
+        },
+      })),
+      confirmParticipantImportMapping,
+      runParticipantImport,
+      replaceParticipantImport: vi.fn(),
+      isLoading: false,
+      connectionState: 'online',
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={['/events/event-1/import']}>
+        <Routes>
+          <Route path="/events/:id/import" element={<CsvImport />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
+    expect(fileInput).not.toBeNull();
+
+    const file = createCsvFile('Email,Imie,Dystans\nanna@example.com,Anna,5K\njan@example.com,Jan,10K', 'uczestnicy.csv');
+    fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
+
+    await screen.findByText('Mapowanie kolumn');
+    fireEvent.click(screen.getByRole('button', { name: /Walidacja i typ pola/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Pole obligatoryjne' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Typ pola' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Lista wyboru' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Zasugeruj z kolumny' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Opcje listy, po jednej w linii')).toHaveValue('10K\n5K');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz mapowanie i importuj' }));
+
+    await waitFor(() => {
+      expect(confirmParticipantImportMapping).toHaveBeenCalledWith('event-1', expect.objectContaining({
+        fields: expect.arrayContaining([
+          expect.objectContaining({
+            source_column_name: 'Dystans',
+            field_role: 'custom',
+            field_type: 'select',
+            is_required: true,
+            validation_rules: { options: ['10K', '5K'] },
+          }),
+        ]),
+      }));
+    });
+  });
+
   it('offers replacing the saved list when analysis detects a different CSV', async () => {
     const replaceParticipantImport = vi.fn(async () => ({
       created_count: 1,
