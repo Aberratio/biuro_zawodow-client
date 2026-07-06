@@ -257,31 +257,51 @@ function parseCsvLine(line: string, delimiter: string): string[] {
 }
 
 function detectCsvDelimiter(lines: string[]): string {
-  const candidates = [';', ',', '\t'];
-  const sampleLines = lines.slice(0, 10);
+  const candidates = [',', ';', '\t', '|'];
+  const headerLine = lines[0] ?? '';
 
   return candidates
     .map(delimiter => ({
       delimiter,
-      score: sampleLines.reduce((sum, line) => sum + Math.max(0, parseCsvLine(line, delimiter).length - 1), 0),
+      score: parseCsvLine(headerLine, delimiter).length,
     }))
-    .sort((left, right) => right.score - left.score)[0]?.delimiter ?? ';';
+    .sort((left, right) => right.score - left.score)[0]?.delimiter ?? ',';
 }
 
-function parseCsvRows(csvContent: string, headers: string[]): Record<string, string>[] {
+function normalizeCsvHeader(header: string): string {
+  return header.replace(/^\uFEFF/, '').trim();
+}
+
+function parseCsvRows(csvContent: string, expectedHeaders: string[] = []): Record<string, string>[] {
   const lines = csvContent
     .replace(/^\uFEFF/, '')
     .split(/\r\n|\n|\r/)
     .filter(line => line.trim() !== '');
 
-  if (lines.length < 2 || headers.length === 0) return [];
+  if (lines.length < 2) return [];
 
   const delimiter = detectCsvDelimiter(lines);
+  const rawHeaders = parseCsvLine(lines[0], delimiter).map(normalizeCsvHeader);
+  const headerCount = rawHeaders.length;
+  if (headerCount === 0) return [];
 
-  return lines.slice(1).map(line => {
+  const rows = lines.slice(1).map(line => {
     const values = parseCsvLine(line, delimiter);
-    return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? '']));
+    const normalizedValues = values.length < headerCount
+      ? [...values, ...Array.from({ length: headerCount - values.length }, () => '')]
+      : values.slice(0, headerCount);
+
+    return rawHeaders.reduce<Record<string, string>>((row, header, index) => {
+      row[header] = (normalizedValues[index] ?? '').trim();
+      return row;
+    }, {});
   });
+
+  const headers = expectedHeaders.length > 0
+    ? expectedHeaders
+    : rawHeaders.filter(header => header !== '' && rows.some(row => (row[header] ?? '').trim() !== ''));
+
+  return rows.map(row => Object.fromEntries(headers.map(header => [header, row[header] ?? ''])));
 }
 
 export default function CsvImport() {
@@ -762,9 +782,15 @@ export default function CsvImport() {
                     <Plus className="mr-1 h-4 w-4" />
                     Dodaj opcję
                   </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={suggestedOptions}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={suggestedOptions}
+                    aria-label={`Zasugeruj opcje z kolumny ${field.source_column_name}`}
+                  >
                     <Sparkles className="mr-1 h-4 w-4" />
-                    Zasugeruj z kolumny
+                    Zasugeruj z: {field.source_column_name}
                   </Button>
                 </div>
               </div>

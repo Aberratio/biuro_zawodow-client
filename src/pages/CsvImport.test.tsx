@@ -580,7 +580,7 @@ describe('CsvImport page', () => {
     fireEvent.click(await screen.findByRole('option', { name: 'Lista wyboru' }));
     expect(screen.getByRole('button', { name: 'Dodaj opcję' })).toBeInTheDocument();
     expect(screen.getByLabelText('Opcja 1')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Zasugeruj z kolumny' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Zasugeruj opcje z kolumny Dystans' }));
 
     await waitFor(() => {
       expect(screen.getByLabelText('Opcja 1')).toHaveValue('10K');
@@ -601,6 +601,84 @@ describe('CsvImport page', () => {
           }),
         ]),
       }));
+    });
+  });
+
+  it('suggests select options from the selected CSV column after empty columns are removed by analysis', async () => {
+    const confirmParticipantImportMapping = vi.fn(async () => []);
+    const runParticipantImport = vi.fn(async () => ({
+      created_count: 2,
+      duplicate_count: 0,
+      invalid_count: 0,
+      invalid_rows: [],
+      participants: [],
+    }));
+
+    useDataMock.mockReturnValue({
+      events: [createEvent()],
+      selectedEventId: 'event-1',
+      analyzeParticipantImport: vi.fn(async () => ({
+        headers: ['Email', 'Imie', 'Dystans'],
+        sample_rows: [
+          { Email: 'anna@example.com', Imie: 'Anna', Dystans: '5K' },
+          { Email: 'jan@example.com', Imie: 'Jan', Dystans: '10K' },
+        ],
+        email_candidates: [{ column: 'Email', matched_count: 2 }],
+        has_mapping: false,
+        has_baseline_import: false,
+        mappings: [
+          {
+            source_column_name: 'Imie',
+            alias: 'Imię',
+            field_role: 'display_name_part',
+            display_order: 1,
+            is_required: true,
+            is_active: true,
+          },
+        ],
+        missing_required_columns: [],
+        row_count: 2,
+        existing_participant_count: 0,
+        sent_qr_email_count: 0,
+        list_difference: {
+          columns_differ: false,
+          missing_columns: [],
+          extra_columns: [],
+          participant_difference_ratio: 0,
+          should_offer_replacement: false,
+        },
+      })),
+      confirmParticipantImportMapping,
+      runParticipantImport,
+      replaceParticipantImport: vi.fn(),
+      isLoading: false,
+      connectionState: 'online',
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={['/events/event-1/import']}>
+        <Routes>
+          <Route path="/events/:id/import" element={<CsvImport />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
+    expect(fileInput).not.toBeNull();
+
+    const file = createCsvFile('Email,Pusta,Imie,Dystans\nanna@example.com,,Anna,5K\njan@example.com,,Jan,10K', 'uczestnicy.csv');
+    fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
+
+    await screen.findByText('Mapowanie kolumn');
+    fireEvent.click(screen.getByRole('button', { name: 'Pokaż walidację pól' }));
+    const typeSelects = screen.getAllByRole('combobox', { name: 'Typ pola' });
+    fireEvent.click(typeSelects[typeSelects.length - 1]);
+    fireEvent.click(await screen.findByRole('option', { name: 'Lista wyboru' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Zasugeruj opcje z kolumny Dystans' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Opcja 1')).toHaveValue('10K');
+      expect(screen.getByLabelText('Opcja 2')).toHaveValue('5K');
     });
   });
 
