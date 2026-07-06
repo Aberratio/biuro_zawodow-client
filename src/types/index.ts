@@ -75,6 +75,7 @@ export interface ParticipantFieldValidationRules {
   max_length?: number;
   min?: number | string;
   max?: number | string;
+  date_format?: 'dmy' | 'mdy' | 'ymd';
   options?: string[];
 }
 

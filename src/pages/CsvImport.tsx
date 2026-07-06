@@ -748,7 +748,24 @@ export default function CsvImport() {
             )}
 
             {fieldType === 'date' && (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`csv-date-format-${index}`}>Format w CSV</Label>
+                  <Select
+                    value={rules.date_format ?? 'auto'}
+                    onValueChange={value => updateRules({ date_format: value === 'auto' ? undefined : value as ParticipantFieldValidationRules['date_format'] })}
+                  >
+                    <SelectTrigger id={`csv-date-format-${index}`} className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto</SelectItem>
+                      <SelectItem value="dmy">DD/MM/RRRR</SelectItem>
+                      <SelectItem value="mdy">MM/DD/RRRR</SelectItem>
+                      <SelectItem value="ymd">RRRR/MM/DD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-1.5">
                   <Label htmlFor={`csv-date-min-${index}`}>Data od</Label>
                   <Input
