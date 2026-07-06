@@ -22,6 +22,11 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
 
     void navigator.serviceWorker
       .register(serviceWorkerUrl, { scope: baseUrl })
-      .catch(() => undefined);
+      .then(() => {
+        window.dispatchEvent(new Event("biuro-zawodow:service-worker-ready"));
+      })
+      .catch(() => {
+        window.dispatchEvent(new Event("biuro-zawodow:service-worker-unavailable"));
+      });
   });
 }

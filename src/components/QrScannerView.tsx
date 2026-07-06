@@ -6,7 +6,7 @@ import {
   type Html5QrcodeCameraScanConfig,
   type Html5QrcodeFullConfig,
 } from 'html5-qrcode';
-import { Camera, CameraOff, Loader2, Upload } from 'lucide-react';
+import { Camera, CameraOff, Loader2, RotateCcw, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type CameraState = 'requesting' | 'active' | 'denied' | 'error';
@@ -78,6 +78,11 @@ function isAppleMobileBrowser() {
 
   return /iPad|iPhone|iPod/i.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function isCameraPermissionError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return message.includes('NotAllowedError') || message.includes('Permission') || message.includes('permission denied');
 }
 
 function canUseNativeBarcodeDetector() {
@@ -267,6 +272,32 @@ function getQrScannerResultText(result: QrScannerScanResult) {
   return typeof result === 'string' ? result : result.data;
 }
 
+function CameraProblemOverlay({
+  cameraState,
+  onRetry,
+}: {
+  cameraState: Exclude<CameraState, 'requesting' | 'active'>;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted gap-3 p-6">
+      <CameraOff className="h-10 w-10 text-muted-foreground/50" />
+      <p className="text-sm font-semibold text-muted-foreground">
+        {cameraState === 'denied' ? 'Brak dostępu do kamery' : 'Nie można uruchomić kamery'}
+      </p>
+      <p className="max-w-xs text-center text-xs leading-5 text-muted-foreground/75">
+        {cameraState === 'denied'
+          ? 'Zezwól na kamerę w ustawieniach strony lub aplikacji, a potem sprawdź ponownie.'
+          : 'Sprawdź, czy kamera nie jest używana przez inną aplikację, albo zeskanuj kod ze zdjęcia.'}
+      </p>
+      <Button type="button" size="sm" variant="outline" className="bg-background/95" onClick={onRetry}>
+        <RotateCcw className="mr-2 h-4 w-4" />
+        Sprawdź ponownie
+      </Button>
+    </div>
+  );
+}
+
 function createAppleScanRegion(video: HTMLVideoElement) {
   const videoWidth = video.videoWidth || 1000;
   const videoHeight = video.videoHeight || 750;
@@ -290,6 +321,7 @@ function AppleQrScannerView({ onScan, paused }: QrScannerViewProps) {
   const scannerClassRef = useRef<QrScannerConstructor | null>(null);
   const [cameraState, setCameraState] = useState<CameraState>('requesting');
   const [isFileScanning, setIsFileScanning] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const onScanRef = useRef(onScan);
   const scanInProgressRef = useRef(false);
   onScanRef.current = onScan;
@@ -388,8 +420,7 @@ function AppleQrScannerView({ onScan, paused }: QrScannerViewProps) {
         }
       } catch (err: unknown) {
         if (!mounted) return;
-        const msg = err instanceof Error ? err.message : String(err || '');
-        if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
+        if (isCameraPermissionError(err)) {
           setCameraState('denied');
         } else {
           setCameraState('error');
@@ -409,7 +440,7 @@ function AppleQrScannerView({ onScan, paused }: QrScannerViewProps) {
         stopContainerVideoTracks(video.parentElement instanceof HTMLDivElement ? video.parentElement : null);
       }
     };
-  }, [emitScan, paused]);
+  }, [emitScan, paused, retryNonce]);
 
   if (paused) {
     return (
@@ -433,15 +464,7 @@ function AppleQrScannerView({ onScan, paused }: QrScannerViewProps) {
       )}
 
       {(cameraState === 'denied' || cameraState === 'error') && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted gap-3 p-6">
-          <CameraOff className="h-10 w-10 text-muted-foreground/50" />
-          <p className="text-sm font-semibold text-muted-foreground">
-            {cameraState === 'denied' ? 'Brak dostępu do kamery' : 'Nie można uruchomić kamery'}
-          </p>
-          <p className="text-xs text-muted-foreground/70 text-center">
-            Użyj wyszukiwania ręcznego powyżej
-          </p>
-        </div>
+        <CameraProblemOverlay cameraState={cameraState} onRetry={() => setRetryNonce(previous => previous + 1)} />
       )}
 
       <div className="absolute inset-x-3 bottom-3 z-10 flex justify-center">
@@ -482,12 +505,44 @@ function AppleQrScannerView({ onScan, paused }: QrScannerViewProps) {
 
 function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerRegionRef = useRef<HTMLDivElement | null>(null);
   const [cameraState, setCameraState] = useState<CameraState>('requesting');
+  const [isFileScanning, setIsFileScanning] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const onScanRef = useRef(onScan);
   const scanInProgressRef = useRef(false);
   onScanRef.current = onScan;
+
+  const handleFileScan = useCallback(async (file: File | undefined) => {
+    if (!file || scanInProgressRef.current) {
+      return;
+    }
+
+    setIsFileScanning(true);
+    scanInProgressRef.current = true;
+
+    try {
+      const QrScanner = await loadQrScanner();
+      const result = await QrScanner.scanImage(file, {
+        alsoTryWithoutScanRegion: true,
+        returnDetailedScanResult: true,
+      });
+      await Promise.resolve(onScanRef.current(getQrScannerResultText(result)));
+    } catch {
+      setCameraState(previousState => (previousState === 'active' ? previousState : 'error'));
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
+      window.setTimeout(() => {
+        scanInProgressRef.current = false;
+      }, SCAN_LOCK_RELEASE_DELAY_MS);
+      setIsFileScanning(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (paused) return;
@@ -605,8 +660,7 @@ function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
         throw lastError ?? new Error('Unable to start the QR scanner.');
       } catch (err: unknown) {
         if (!mounted) return;
-        const msg = err instanceof Error ? err.message : String(err || '');
-        if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
+        if (isCameraPermissionError(err)) {
           setCameraState('denied');
         } else {
           setCameraState('error');
@@ -629,7 +683,7 @@ function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
       }
       removeScannerRegion(scannerRegion);
     };
-  }, [paused]);
+  }, [paused, retryNonce]);
 
   if (paused) {
     return (
@@ -653,16 +707,30 @@ function Html5QrcodeScannerView({ onScan, paused }: QrScannerViewProps) {
       )}
 
       {(cameraState === 'denied' || cameraState === 'error') && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted gap-3 p-6">
-          <CameraOff className="h-10 w-10 text-muted-foreground/50" />
-          <p className="text-sm font-semibold text-muted-foreground">
-            {cameraState === 'denied' ? 'Brak dostępu do kamery' : 'Nie można uruchomić kamery'}
-          </p>
-          <p className="text-xs text-muted-foreground/70 text-center">
-            Użyj wyszukiwania ręcznego powyżej
-          </p>
-        </div>
+        <CameraProblemOverlay cameraState={cameraState} onRetry={() => setRetryNonce(previous => previous + 1)} />
       )}
+
+      <div className="absolute inset-x-3 bottom-3 z-10 flex justify-center">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          onChange={event => void handleFileScan(event.target.files?.[0])}
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="bg-background/95 shadow"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isFileScanning}
+        >
+          {isFileScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+          Skanuj ze zdjęcia
+        </Button>
+      </div>
 
       {/* Corner markers overlay when active */}
       {cameraState === 'active' && (

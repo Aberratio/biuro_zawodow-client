@@ -7,6 +7,16 @@ export type ConnectionState = 'online' | 'degraded' | 'offline';
 export type SnapshotSource = 'network' | 'cache' | 'none';
 export type ScannerMode = 'online' | 'offline_queue' | 'read_only';
 export type SessionState = 'online' | 'offline_cached' | 'expired';
+export type ServiceWorkerState = 'unsupported' | 'checking' | 'ready' | 'unavailable';
+
+export interface AppDiagnostics {
+  sessionStorageAvailable: boolean;
+  localStorageAvailable: boolean;
+  indexedDbAvailable: boolean;
+  canPersistSession: boolean;
+  serviceWorkerState: ServiceWorkerState;
+  warnings: string[];
+}
 
 export interface Organization {
   id: string;
