@@ -1,4 +1,4 @@
-import type { Participant, ParticipantFieldMapping } from '@/types';
+import type { Participant, ParticipantFieldMapping, ParticipantFieldValidationRules } from '@/types';
 
 export const participantFieldTypeLabels = {
   text: 'Tekst',
@@ -53,6 +53,56 @@ export function suggestSelectOptionsFromRows(
   return [...seen].sort((left, right) => left.localeCompare(right, 'pl-PL'));
 }
 
+function formatParticipantDate(year: number, month: number, day: number): string | null {
+  if (year < 1900 || year > 2100) return null;
+  const date = new Date(year, month - 1, day);
+  if (
+    Number.isNaN(date.getTime())
+    || date.getFullYear() !== year
+    || date.getMonth() !== month - 1
+    || date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+export function normalizeParticipantDateValue(value: string, preferredFormat: ParticipantFieldValidationRules['date_format'] | 'auto' = 'auto'): string | null {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return null;
+  const format = preferredFormat ?? 'auto';
+
+  if (/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(trimmedValue)) {
+    const [year, month, day] = trimmedValue.split(/[-/.]/).map(Number);
+    return formatParticipantDate(year, month, day);
+  }
+
+  if (/^\d{1,2}[.-]\d{1,2}[.-]\d{4}$/.test(trimmedValue)) {
+    const [first, second, year] = trimmedValue.split(/[.-]/).map(Number);
+    const [day, month] = format === 'mdy' ? [second, first] : [first, second];
+    return formatParticipantDate(year, month, day);
+  }
+
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmedValue)) {
+    const [first, second, year] = trimmedValue.split('/').map(Number);
+    if (format === 'dmy') return formatParticipantDate(year, second, first);
+    if (format === 'mdy') return formatParticipantDate(year, first, second);
+    if (first <= 12 && second <= 12) return null;
+    return first > 12
+      ? formatParticipantDate(year, second, first)
+      : formatParticipantDate(year, first, second);
+  }
+
+  if (/^\d{4,5}(?:\.0+)?$/.test(trimmedValue)) {
+    const serial = Number.parseInt(trimmedValue, 10);
+    const date = new Date(Date.UTC(1899, 11, 30 + serial));
+    return formatParticipantDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+  }
+
+  return null;
+}
+
 export function validateParticipantFieldValue(mapping: ParticipantFieldMapping, value: string): string {
   const alias = mapping.alias.trim() || mapping.source_column_name;
   const trimmedValue = value.trim();
@@ -82,11 +132,12 @@ export function validateParticipantFieldValue(mapping: ParticipantFieldMapping, 
   }
 
   if (fieldType === 'date') {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedValue) || Number.isNaN(new Date(`${trimmedValue}T00:00:00`).getTime())) {
-      return `Pole ${alias} musi być datą.`;
+    const normalizedDate = normalizeParticipantDateValue(trimmedValue, rules.date_format ?? 'auto');
+    if (!normalizedDate) {
+      return `Pole ${alias} musi być poprawną datą.`;
     }
-    if (typeof rules.min === 'string' && rules.min && trimmedValue < rules.min) return `Pole ${alias} nie może być wcześniejsze niż ${rules.min}.`;
-    if (typeof rules.max === 'string' && rules.max && trimmedValue > rules.max) return `Pole ${alias} nie może być późniejsze niż ${rules.max}.`;
+    if (typeof rules.min === 'string' && rules.min && normalizedDate < rules.min) return `Pole ${alias} nie może być wcześniejsze niż ${rules.min}.`;
+    if (typeof rules.max === 'string' && rules.max && normalizedDate > rules.max) return `Pole ${alias} nie może być późniejsze niż ${rules.max}.`;
   }
 
   if (fieldType === 'select') {

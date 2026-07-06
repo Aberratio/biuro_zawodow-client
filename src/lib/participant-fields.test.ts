@@ -6,6 +6,7 @@ import {
   getActiveParticipantMappings,
   getParticipantFieldType,
   getParticipantValidationRules,
+  normalizeParticipantDateValue,
   parseSelectOptions,
   suggestSelectOptionsFromRows,
   validateParticipantFieldValue,
@@ -125,5 +126,22 @@ describe('participant field helpers', () => {
       { Dystans: '10K' },
       { Dystans: '' },
     ], 'Dystans')).toEqual(['10K', '5K'].sort((left, right) => left.localeCompare(right, 'pl-PL')));
+  });
+
+  it('normalizes participant date values from common CSV formats', () => {
+    expect(normalizeParticipantDateValue('2026-7-6')).toBe('2026-07-06');
+    expect(normalizeParticipantDateValue('06.07.2026')).toBe('2026-07-06');
+    expect(normalizeParticipantDateValue('6-7-2026')).toBe('2026-07-06');
+    expect(normalizeParticipantDateValue('13/07/2026')).toBe('2026-07-13');
+    expect(normalizeParticipantDateValue('07/13/2026')).toBe('2026-07-13');
+    expect(normalizeParticipantDateValue('06/07/2026', 'dmy')).toBe('2026-07-06');
+    expect(normalizeParticipantDateValue('06/07/2026', 'mdy')).toBe('2026-06-07');
+    expect(normalizeParticipantDateValue('46109')).toBe('2026-03-28');
+    expect(normalizeParticipantDateValue('06/07/2026')).toBeNull();
+    expect(validateParticipantFieldValue({
+      ...mappings[4],
+      field_type: 'date',
+      validation_rules: { min: '2026-01-01', max: '2026-12-31' },
+    }, '06.07.2026')).toBe('');
   });
 });
