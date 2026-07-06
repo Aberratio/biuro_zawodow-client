@@ -157,6 +157,7 @@ function IssueTable({
   editableEmailColumn,
   emailErrors = {},
   onEmailChange,
+  onFieldChange,
   onSaveIssue,
   savingRowNumbers = {},
   saveDisabled = false,
@@ -169,6 +170,7 @@ function IssueTable({
   editableEmailColumn?: string;
   emailErrors?: Record<number, string>;
   onEmailChange?: (rowNumber: number, value: string) => void;
+  onFieldChange?: (rowNumber: number, header: string, value: string) => void;
   onSaveIssue?: (issue: ImportRowIssue) => void;
   savingRowNumbers?: Record<number, boolean>;
   saveDisabled?: boolean;
@@ -248,8 +250,16 @@ function IssueTable({
                     </div>
                   </TableCell>
                   {visibleHeaders.map(header => (
-                    <TableCell key={`${issue.row_number}-${header}`} className="max-w-[18rem]">
-                      <span className="block truncate">{issue.row?.[header] || <span className="text-muted-foreground">-</span>}</span>
+                    <TableCell key={`${issue.row_number}-${header}`} className="max-w-[18rem] align-top">
+                      {isEditable && onFieldChange ? (
+                        <Input
+                          value={issue.row?.[header] ?? ''}
+                          onChange={event => onFieldChange(issue.row_number, header, event.target.value)}
+                          className="h-9 min-w-[10rem]"
+                        />
+                      ) : (
+                        <span className="block truncate">{issue.row?.[header] || <span className="text-muted-foreground">-</span>}</span>
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -323,13 +333,15 @@ export default function CsvImportSummary() {
     setImportedFixedCount(0);
   }, [invalidIssues]);
 
-  const handleEmailChange = (rowNumber: number, value: string) => {
+  const handleFieldChange = (rowNumber: number, header: string, value: string) => {
     setEditableInvalidIssues(prev => prev.map(issue => (
       issue.row_number === rowNumber
-        ? { ...issue, row: { ...issue.row, [emailColumn]: value } }
+        ? { ...issue, row: { ...issue.row, [header]: value } }
         : issue
     )));
-    setEmailErrors(prev => ({ ...prev, [rowNumber]: '' }));
+    if (header === emailColumn) {
+      setEmailErrors(prev => ({ ...prev, [rowNumber]: '' }));
+    }
   };
 
   const validateIssueEmail = (issue: ImportRowIssue): string => {
@@ -536,7 +548,7 @@ export default function CsvImportSummary() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Wymagane sprawdzenie danych</AlertTitle>
             <AlertDescription>
-              {currentInvalidCount > 0 ? 'Błędne adresy e-mail można poprawić w tabeli poniżej i od razu dopisać zawodnika do bazy. ' : ''}
+              {currentInvalidCount > 0 ? 'Błędne dane można poprawić w tabeli poniżej i od razu dopisać zawodnika do bazy. ' : ''}
               {summary.duplicate_count > 0 ? 'Duplikaty pominięto, bo pasują do uczestników już zapisanych w wydarzeniu.' : ''}
             </AlertDescription>
           </Alert>
@@ -563,10 +575,10 @@ export default function CsvImportSummary() {
         <Card>
           <CardContent className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-medium">Poprawianie adresów e-mail w UI</p>
+              <p className="text-sm font-medium">Poprawianie danych w UI</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Edytowana kolumna: <span className="font-medium text-foreground">{emailColumn}</span>.
-                {changedEmailCount > 0 ? ` Zmieniono ${changedEmailCount} adresów.` : ' Wprowadź poprawki w tabeli poniżej.'}
+                Możesz poprawić dowolną kolumnę w tabeli poniżej, w tym e-mail (<span className="font-medium text-foreground">{emailColumn}</span>).
+                {changedEmailCount > 0 ? ` Zmieniono ${changedEmailCount} adresów e-mail.` : ' Wprowadź poprawki w tabeli poniżej.'}
               </p>
             </div>
             <Button onClick={handleRetryEditedRows} disabled={!canRetryEditedRows || retryingImport}>
@@ -585,7 +597,8 @@ export default function CsvImportSummary() {
         badgeLabel={`${editableInvalidIssues.length} wierszy`}
         editableEmailColumn={emailColumn}
         emailErrors={emailErrors}
-        onEmailChange={handleEmailChange}
+        onEmailChange={(rowNumber, value) => handleFieldChange(rowNumber, emailColumn, value)}
+        onFieldChange={handleFieldChange}
         onSaveIssue={handleSaveIssue}
         savingRowNumbers={savingRowNumbers}
         saveDisabled={connectionState !== 'online'}

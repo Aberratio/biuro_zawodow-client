@@ -110,8 +110,8 @@ describe('CsvImportSummary page', () => {
     });
 
     expect(screen.getByDisplayValue('bad-email')).toBeInTheDocument();
-    expect(screen.getByText('Jan')).toBeInTheDocument();
-    expect(screen.getByText('ABC')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Jan')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('ABC')).toBeInTheDocument();
   });
 
   it('uses the full source row when saving an invalid row with a corrected email', async () => {
@@ -134,9 +134,9 @@ describe('CsvImportSummary page', () => {
       mode: 'append',
     });
 
-    expect(screen.getByText('Jan')).toBeInTheDocument();
-    expect(screen.getByText('Kowalski')).toBeInTheDocument();
-    expect(screen.getByText('ABC')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Jan')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Kowalski')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('ABC')).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText('email@example.com'), {
       target: { value: 'jan@example.com' },
@@ -147,6 +147,40 @@ describe('CsvImportSummary page', () => {
     expect(runParticipantImport).toHaveBeenCalledWith(
       'event-1',
       'Email;Imie;Nazwisko;Klub\r\njan@example.com;Jan;Kowalski;ABC',
+    );
+  });
+
+  it('lets a non-email column be corrected when the email was already valid', async () => {
+    const { runParticipantImport } = renderSummaryState({
+      summary: {
+        created_count: 0,
+        duplicate_count: 0,
+        invalid_count: 1,
+        invalid_rows: [2],
+        invalid_row_details: [{
+          row_number: 2,
+          reasons: ['Pole "Klub" jest wymagane.'],
+          row: { Email: 'jan@example.com', Imie: 'Jan', Nazwisko: 'Kowalski', Klub: '' },
+        }],
+      },
+      headers: ['Email', 'Imie', 'Nazwisko', 'Klub'],
+      sourceRows: [{ Email: 'jan@example.com', Imie: 'Jan', Nazwisko: 'Kowalski', Klub: '' }],
+      emailColumn: 'Email',
+      fileName: 'uczestnicy.csv',
+      mode: 'append',
+    });
+
+    expect(screen.getByDisplayValue('jan@example.com')).toBeInTheDocument();
+
+    const klubInput = screen.getAllByRole('textbox').find(input => (input as HTMLInputElement).value === '');
+    expect(klubInput).toBeDefined();
+    fireEvent.change(klubInput!, { target: { value: 'AZS' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Dopisz$/ }));
+
+    await waitFor(() => expect(runParticipantImport).toHaveBeenCalled());
+    expect(runParticipantImport).toHaveBeenCalledWith(
+      'event-1',
+      'Email;Imie;Nazwisko;Klub\r\njan@example.com;Jan;Kowalski;AZS',
     );
   });
 });
