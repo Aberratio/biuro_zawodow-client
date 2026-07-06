@@ -8,6 +8,10 @@ export function isScannerRole(role: Role): boolean {
   return role === 'scanner' || role === 'scanner_plus';
 }
 
+export function hasGlobalOrganizationScope(role: Role): boolean {
+  return role === 'admin' || role === 'superadmin';
+}
+
 export function canManageParticipantData(role: Role): boolean {
   return PARTICIPANT_DATA_EDITOR_ROLES.includes(role);
 }

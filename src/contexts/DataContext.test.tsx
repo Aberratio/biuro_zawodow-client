@@ -391,6 +391,45 @@ describe('DataProvider bootstrap loading', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('remembers selected organization for superadmin and scopes selected event to it', async () => {
+    const superadminUser: User = {
+      id: 'superadmin-1',
+      name: 'Super Admin',
+      email: 'superadmin@example.com',
+      password: '',
+      role: 'superadmin',
+      assigned_events: [],
+    };
+
+    authState.user = superadminUser;
+    window.localStorage.setItem('selected_organization_context:superadmin-1', 'org-2');
+    window.localStorage.setItem('selected_event_context:superadmin-1', 'event-2');
+
+    const organizations = [createOrganization('org-1'), createOrganization('org-2')];
+    const fetchMock = vi.fn(async () => createBootstrapResponse(superadminUser, [createEvent('event-1', 'org-1'), createEvent('event-2', 'org-2')], organizations));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <TestConsumer />
+      </DataProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('selected-organization').textContent).toBe('org-2'));
+    await waitFor(() => expect(screen.getByTestId('selected-event').textContent).toBe('event-2'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'select-org-1' }));
+    await flushEffects();
+
+    expect(screen.getByTestId('selected-organization').textContent).toBe('org-1');
+    expect(screen.getByTestId('selected-event').textContent).toBe('event-1');
+    expect(window.sessionStorage.getItem('selected_organization_context:superadmin-1')).toBe('org-1');
+    expect(window.sessionStorage.getItem('selected_event_context:superadmin-1')).toBe('event-1');
+    expect(window.localStorage.getItem('selected_organization_context:superadmin-1')).toBeNull();
+    expect(window.localStorage.getItem('selected_event_context:superadmin-1')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('clears selected event when admin selects organization without events', async () => {
     const adminUser: User = {
       id: 'admin-1',

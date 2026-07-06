@@ -406,6 +406,7 @@ describe('CsvImport page', () => {
     fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
 
     await screen.findByText('Dopasowanie mapowania do pliku');
+    expect(screen.getByText('Walidacja jest zapisana w mapowaniu')).toBeInTheDocument();
     expect(screen.getByText('Nie wybrano pola „Numer startowy”')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Importuj z zapisanym mapowaniem' }));
@@ -530,7 +531,7 @@ describe('CsvImport page', () => {
         mappings: [
           {
             source_column_name: 'Imie',
-            alias: 'ImiÄ™',
+            alias: 'Imię',
             field_role: 'display_name_part',
             display_order: 1,
             is_required: true,
@@ -571,14 +572,19 @@ describe('CsvImport page', () => {
     fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
 
     await screen.findByText('Mapowanie kolumn');
+    expect(screen.getByText('Walidacja pól dodatkowych')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Pokaż walidację pól' }));
     fireEvent.click(screen.getByRole('button', { name: /Walidacja i typ pola/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Pole obligatoryjne' }));
     fireEvent.click(screen.getByRole('combobox', { name: 'Typ pola' }));
     fireEvent.click(await screen.findByRole('option', { name: 'Lista wyboru' }));
+    expect(screen.getByRole('button', { name: 'Dodaj opcję' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Opcja 1')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Zasugeruj z kolumny' }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Opcje listy, po jednej w linii')).toHaveValue('10K\n5K');
+      expect(screen.getByLabelText('Opcja 1')).toHaveValue('10K');
+      expect(screen.getByLabelText('Opcja 2')).toHaveValue('5K');
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Zapisz mapowanie i importuj' }));

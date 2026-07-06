@@ -5,6 +5,7 @@ import { API_BASE_URL, fetchJson, getApiErrorCode, isApiResponseError, isNetwork
 import { type ApiEvent, type ApiOrganization, type ApiParticipant, type ApiUser, type BootstrapResponse, type ParticipantQrPreviewResponse, type ParticipantScanApiResponse, OFFLINE_ACTION_MESSAGE, applyPendingMutations, buildOfflineSnapshot, createBootstrapSnapshotVersion, createClientMutationId, extractConflictParticipant, getDefaultCurrentUser, getDeviceId, getInitialConnectionState, getSelectableOrganizationsForUser, getVisibleEventsForUser, mapApiOrganizationToUi, mapApiParticipantToUi, mapApiUserToUi, participantUiIdToApiId, persistStoredSelectedEventId, persistStoredSelectedOrganizationId, readStoredSelectedEventId, readStoredSelectedOrganizationId, resolveSelectedEventId, resolveSelectedOrganizationId } from '@/lib/data-context-helpers';
 import { deletePendingMutation, loadBootstrapSnapshot, loadPendingMutations, loadSyncMeta, saveBootstrapSnapshot, savePendingMutation, saveSyncMeta, updatePendingMutation, type OfflineBootstrapSnapshot, type PendingParticipantMutation } from '@/lib/offline-store';
 import { getEventOfficeCloseAt, isEventOfficeOpen } from '@/lib/events';
+import { hasGlobalOrganizationScope } from '@/lib/roles';
 
 type UserCreateInput = Omit<User, 'id' | 'password'> & { password?: string };
 type EventMutationInput = Omit<Event, 'id' | 'archived_at' | 'deleted_at'>;
@@ -170,9 +171,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const participants = useMemo(() => applyPendingMutations(participantRecords, pendingMutations), [participantRecords, pendingMutations]);
   const currentUser = useMemo(() => !authUser ? getDefaultCurrentUser() : users.find(user => user.id === authUser.id) || authUser, [users, authUser]);
   const currentRole = currentUser.role;
+  const usesOrganizationContext = hasGlobalOrganizationScope(currentRole);
   const visibleEvents = useMemo(() => getVisibleEventsForUser(events, currentUser, new Date(nowTimestamp)), [events, currentUser, nowTimestamp]);
   const selectableOrganizations = useMemo(() => getSelectableOrganizationsForUser(organizations, currentUser), [organizations, currentUser]);
-  const eventSelectionScope = useMemo(() => currentRole !== 'admin' ? visibleEvents : selectedOrganizationId ? visibleEvents.filter(event => event.organization_id === selectedOrganizationId) : [], [currentRole, selectedOrganizationId, visibleEvents]);
+  const eventSelectionScope = useMemo(() => usesOrganizationContext && selectedOrganizationId ? visibleEvents.filter(event => event.organization_id === selectedOrganizationId) : visibleEvents, [selectedOrganizationId, usesOrganizationContext, visibleEvents]);
   const pendingMutationCount = useMemo(() => pendingMutations.filter(mutation => mutation.state === 'queued').length, [pendingMutations]);
   const offlineDurationMs = useMemo(() => !offlineSinceAt ? 0 : Math.max(0, nowTimestamp - new Date(offlineSinceAt).getTime()), [nowTimestamp, offlineSinceAt]);
   const scannerMode = useMemo<ScannerMode>(() => connectionState === 'online' ? 'online' : (offlineDurationMs > OFFLINE_MUTATION_WINDOW_MS || pendingMutationCount > OFFLINE_MUTATION_LIMIT ? 'read_only' : 'offline_queue'), [connectionState, offlineDurationMs, pendingMutationCount]);
@@ -201,7 +203,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const nextEventId = eventId.trim();
     const nextEvent = visibleEvents.find(event => event.id === nextEventId) ?? events.find(event => event.id === nextEventId);
 
-    if (currentRole === 'admin') {
+    if (hasGlobalOrganizationScope(currentRole)) {
       const nextOrganizationId = nextEvent?.organization_id ?? '';
       if (nextOrganizationId !== selectedOrganizationId) {
         setSelectedOrganizationIdState(nextOrganizationId);
@@ -307,8 +309,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const nextVisibleEvents = getVisibleEventsForUser(nextEvents, nextCurrentUser);
     const nextSelectableOrganizations = getSelectableOrganizationsForUser(nextOrganizations, nextCurrentUser);
     const preferredOrg = readStoredSelectedOrganizationId(authUser.id) || preferredOrganizationId;
-    const nextSelectedOrganization = nextCurrentUser.role === 'admin' ? resolveSelectedOrganizationId(nextSelectableOrganizations, preferredOrg) : '';
-    const scopedEvents = nextCurrentUser.role === 'admin' ? nextVisibleEvents.filter(event => event.organization_id === nextSelectedOrganization) : nextVisibleEvents;
+    const nextUsesOrganizationContext = hasGlobalOrganizationScope(nextCurrentUser.role);
+    const nextSelectedOrganization = nextUsesOrganizationContext ? resolveSelectedOrganizationId(nextSelectableOrganizations, preferredOrg) : '';
+    const scopedEvents = nextUsesOrganizationContext && nextSelectedOrganization ? nextVisibleEvents.filter(event => event.organization_id === nextSelectedOrganization) : nextVisibleEvents;
     const preferredEvt = readStoredSelectedEventId(authUser.id) || preferredEventId;
     const nextSelectedEvent = resolveSelectedEventId(scopedEvents, preferredEvt);
     const nextParticipants = (responseData.participants ?? []).map(participant => mapApiParticipantToUi(participant, ''));
@@ -382,7 +385,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [authUser?.id, connectionState, loadBootstrap, token]);
   useEffect(() => { if (authUser?.id) void updateSyncMeta(authUser.id, lastSyncAt, offlineSinceAt); }, [authUser?.id, lastSyncAt, offlineSinceAt, updateSyncMeta]);
   useEffect(() => {
-    if (currentRole !== 'admin') {
+    if (!usesOrganizationContext) {
       if (selectedOrganizationId !== '') setSelectedOrganizationId('');
       return;
     }
@@ -391,7 +394,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     const nextSelectedOrganizationId = resolveSelectedOrganizationId(selectableOrganizations, selectedOrganizationId);
     if (nextSelectedOrganizationId !== selectedOrganizationId) setSelectedOrganizationId(nextSelectedOrganizationId);
-  }, [currentRole, isLoading, selectableOrganizations, selectedOrganizationId, setSelectedOrganizationId]);
+  }, [isLoading, selectableOrganizations, selectedOrganizationId, setSelectedOrganizationId, usesOrganizationContext]);
   useEffect(() => {
     if (isLoading) return;
 
