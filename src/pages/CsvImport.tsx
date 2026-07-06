@@ -39,7 +39,7 @@ import {
   participantFieldTypeLabels,
   suggestSelectOptionsFromRows,
 } from '@/lib/participant-fields';
-import type { ParticipantFieldType, ParticipantFieldValidationRules } from '@/types';
+import type { ParticipantFieldMapping, ParticipantFieldType, ParticipantFieldValidationRules } from '@/types';
 
 type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom' | 'important_custom';
 
@@ -864,6 +864,35 @@ export default function CsvImport() {
     };
   };
 
+  const buildImportSummaryMappings = (): ParticipantFieldMapping[] => {
+    if (!analysis) return [];
+    if (analysis.has_mapping && !replacementMode) return analysis.mappings;
+
+    const mappingPayload = buildMappingPayload();
+    if (!mappingPayload) return analysis.mappings;
+
+    return [
+      {
+        source_column_name: mappingPayload.email_column,
+        alias: 'Email',
+        field_role: 'email',
+        display_order: 1,
+        is_required: true,
+        is_active: true,
+      },
+      ...mappingPayload.fields.map((field, index) => ({
+        source_column_name: field.source_column_name,
+        alias: field.alias,
+        field_role: field.field_role,
+        field_type: field.field_type,
+        validation_rules: field.validation_rules,
+        display_order: index + 2,
+        is_required: field.is_required ?? false,
+        is_active: field.is_active,
+      })),
+    ];
+  };
+
   const navigateToImportSummary = (
     result: Awaited<ReturnType<typeof runParticipantImport>>,
     mode: 'append' | 'replace',
@@ -875,6 +904,7 @@ export default function CsvImport() {
         summary: result,
         headers: analysis?.headers ?? [],
         sourceRows: analysis ? parseCsvRows(csvContent, analysis.headers) : [],
+        mappings: buildImportSummaryMappings(),
         emailColumn,
         fileName,
         importedAt: new Date().toISOString(),

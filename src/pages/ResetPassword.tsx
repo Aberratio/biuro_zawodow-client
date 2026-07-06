@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff, Loader2, RefreshCw } from 'lucide-react';
+import { Copy, Eye, EyeOff, Loader2, RefreshCw } from 'lucide-react';
 import { PasswordRequirements } from '@/components/PasswordRequirements';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,17 @@ export default function ResetPassword() {
     setShowPassword(true);
     setShowPasswordConfirmation(true);
     setErrors({});
+  };
+
+  const handleCopyPassword = async () => {
+    if (password === '') return;
+
+    try {
+      await navigator.clipboard.writeText(password);
+      toast({ title: 'Skopiowano hasło' });
+    } catch {
+      toast({ title: 'Nie udało się skopiować hasła', variant: 'destructive' });
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -99,8 +110,17 @@ export default function ResetPassword() {
                       minLength={10}
                       aria-invalid={Boolean(errors.password || errors.form)}
                       aria-describedby={errors.password ? 'reset-password-error' : undefined}
-                      className="pr-10"
+                      className="pr-20"
                     />
+                    <button
+                      type="button"
+                      onClick={handleCopyPassword}
+                      disabled={password === ''}
+                      className="absolute right-10 top-1/2 -translate-y-1/2 text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label="Kopiuj hasło"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => setShowPassword(previousValue => !previousValue)}

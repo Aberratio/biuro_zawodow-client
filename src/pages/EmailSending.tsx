@@ -24,7 +24,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { PageBlockerOverlay } from '@/components/PageBlockerOverlay';
 import { formatEventOfficeWindow, isEventCurrentOrUpcoming, isEventOfficeOpen } from '@/lib/events';
 import { buildEventPath } from '@/lib/routes';
-import type { ActivityLog } from '@/types';
+import type { ActivityLog, Participant } from '@/types';
 
 type PendingEmailAction =
   | { kind: 'send-missing'; count: number }
@@ -76,6 +76,9 @@ const formatQrActivityAction = (log: ActivityLog) => {
     : log.action;
 };
 
+const compareParticipantsByStableListOrder = (first: Participant, second: Participant) =>
+  first.id.localeCompare(second.id, 'pl', { numeric: true, sensitivity: 'base' });
+
 export default function EmailSending() {
   const navigate = useNavigate();
   const { id: routeEventId = '' } = useParams<{ id: string }>();
@@ -98,7 +101,9 @@ export default function EmailSending() {
   useRouteEventContext(routeEventId);
 
   const eventParticipants = useMemo(
-    () => participants.filter(participant => participant.event_id === activeEventId),
+    () => participants
+      .filter(participant => participant.event_id === activeEventId)
+      .sort(compareParticipantsByStableListOrder),
     [activeEventId, participants],
   );
   const selectedEvent = events.find(event => event.id === activeEventId);

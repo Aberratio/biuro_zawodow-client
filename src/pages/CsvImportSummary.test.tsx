@@ -109,6 +109,8 @@ describe('CsvImportSummary page', () => {
       mode: 'append',
     });
 
+    fireEvent.click(screen.getByRole('button', { name: /^Edytuj$/ }));
+
     expect(screen.getByDisplayValue('bad-email')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Jan')).toBeInTheDocument();
     expect(screen.getByDisplayValue('ABC')).toBeInTheDocument();
@@ -133,6 +135,8 @@ describe('CsvImportSummary page', () => {
       fileName: 'uczestnicy.csv',
       mode: 'append',
     });
+
+    fireEvent.click(screen.getByRole('button', { name: /^Edytuj$/ }));
 
     expect(screen.getByDisplayValue('Jan')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Kowalski')).toBeInTheDocument();
@@ -170,6 +174,8 @@ describe('CsvImportSummary page', () => {
       mode: 'append',
     });
 
+    fireEvent.click(screen.getByRole('button', { name: /^Edytuj$/ }));
+
     expect(screen.getByDisplayValue('jan@example.com')).toBeInTheDocument();
 
     const klubInput = screen.getAllByRole('textbox').find(input => (input as HTMLInputElement).value === '');
@@ -182,5 +188,37 @@ describe('CsvImportSummary page', () => {
       'event-1',
       'Email;Imie;Nazwisko;Klub\r\njan@example.com;Jan;Kowalski;AZS',
     );
+  });
+
+  it('validates mapped participant fields in the edit modal before saving', () => {
+    const { runParticipantImport } = renderSummaryState({
+      summary: {
+        created_count: 0,
+        duplicate_count: 0,
+        invalid_count: 1,
+        invalid_rows: [2],
+        invalid_row_details: [{
+          row_number: 2,
+          reasons: ['Pole "Category" jest wymagane.'],
+          row: { Email: 'jan@example.com', Category: '' },
+        }],
+      },
+      headers: ['Email', 'Category'],
+      sourceRows: [{ Email: 'jan@example.com', Category: '' }],
+      mappings: [
+        { source_column_name: 'Email', alias: 'Email', field_role: 'email', display_order: 1, is_required: true, is_active: true },
+        { source_column_name: 'Category', alias: 'Category', field_role: 'custom', display_order: 2, is_required: true, is_active: true, field_type: 'text', validation_rules: {} },
+      ],
+      emailColumn: 'Email',
+      fileName: 'uczestnicy.csv',
+      mode: 'append',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^Edytuj$/ }));
+
+    expect(screen.getByText(/Category\./)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Dopisz$/ }));
+
+    expect(runParticipantImport).not.toHaveBeenCalled();
   });
 });

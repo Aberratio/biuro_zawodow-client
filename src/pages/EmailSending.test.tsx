@@ -105,4 +105,40 @@ describe("EmailSending page", () => {
     expect(findButtonByText("wszystkich")).toBeDisabled();
     expect(findButtonByText("Wy")).toBeDisabled();
   });
+
+  it("keeps participants in stable list order regardless of refreshed payload order", () => {
+    renderPage({
+      participants: [
+        createTestParticipant({
+          id: "p-3",
+          name: "Celina Trzecia",
+          email: "celina@example.com",
+          email_status: "not_sent",
+        }),
+        createTestParticipant({
+          id: "p-1",
+          name: "Anna Pierwsza",
+          email: "anna@example.com",
+          email_status: "sent",
+        }),
+        createTestParticipant({
+          id: "p-2",
+          name: "Bartek Drugi",
+          email: "bartek@example.com",
+          email_status: "not_sent",
+        }),
+      ],
+    });
+
+    const participantNames = screen
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => row.querySelector("td")?.textContent ?? "");
+
+    expect(participantNames).toEqual([
+      expect.stringContaining("Anna Pierwsza"),
+      expect.stringContaining("Bartek Drugi"),
+      expect.stringContaining("Celina Trzecia"),
+    ]);
+  });
 });
