@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useData } from '@/contexts/DataContext';
+import { hasGlobalOrganizationScope } from '@/lib/roles';
 
 export function useRouteOrganizationContext(routeOrganizationId: string) {
   const {
@@ -10,7 +11,7 @@ export function useRouteOrganizationContext(routeOrganizationId: string) {
   } = useData();
 
   useEffect(() => {
-    if (currentRole !== 'admin' || !routeOrganizationId) {
+    if (!hasGlobalOrganizationScope(currentRole) || !routeOrganizationId) {
       return;
     }
 

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useData } from '@/contexts/DataContext';
+import { hasGlobalOrganizationScope } from '@/lib/roles';
 
 export function useRouteEventContext(routeEventId: string) {
   const {
@@ -20,7 +21,7 @@ export function useRouteEventContext(routeEventId: string) {
       return;
     }
 
-    const requiresOrganizationSync = currentRole === 'admin' && routeEvent.organization_id !== selectedOrganizationId;
+    const requiresOrganizationSync = hasGlobalOrganizationScope(currentRole) && routeEvent.organization_id !== selectedOrganizationId;
     if (routeEventId !== selectedEventId || requiresOrganizationSync) {
       selectEventContext(routeEventId);
     }

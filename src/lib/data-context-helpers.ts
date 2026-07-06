@@ -3,6 +3,7 @@ import { createSnapshotVersion, type OfflineBootstrapSnapshot, type PendingParti
 import { API_BASE_URL } from '@/lib/api';
 import { normalizeParticipantStatus } from '@/lib/participant-status';
 import { isEventOfficeOpen } from '@/lib/events';
+import { hasGlobalOrganizationScope } from '@/lib/roles';
 
 export const SELECTED_ORGANIZATION_STORAGE_KEY_PREFIX = 'selected_organization_context';
 export const SELECTED_EVENT_STORAGE_KEY_PREFIX = 'selected_event_context';
@@ -239,7 +240,7 @@ export function getDefaultCurrentUser(): User {
 }
 
 export function getSelectableOrganizationsForUser(allOrganizations: Organization[], user: User): Organization[] {
-  if (user.role !== 'admin') return [];
+  if (!hasGlobalOrganizationScope(user.role)) return [];
   return allOrganizations;
 }
 

@@ -23,8 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, ArrowLeft, Check, ChevronDown, FileUp, Info, Loader2, RefreshCcw, Sparkles } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ChevronDown, FileUp, Info, Loader2, Plus, RefreshCcw, Sparkles, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { formatEventOfficeWindow } from '@/lib/events';
@@ -34,11 +33,9 @@ import { buildEventImportSummaryPath, buildEventPath } from '@/lib/routes';
 import { PageHeader } from '@/components/PageHeader';
 import { formatParticipantCount } from '@/lib/participants';
 import {
-  formatSelectOptions,
   getParticipantFieldType,
   getParticipantValidationRules,
   isConfigurableParticipantMapping,
-  parseSelectOptions,
   participantFieldTypeLabels,
   suggestSelectOptionsFromRows,
 } from '@/lib/participant-fields';
@@ -65,6 +62,31 @@ interface MappingPreviewField {
 const IMPORTANT_FIELDS_WARNING_LIMIT = 5;
 
 const emptyValidationRules: ParticipantFieldValidationRules = {};
+
+function normalizeSelectOptionList(options: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const normalizedOptions: string[] = [];
+
+  for (const option of options ?? []) {
+    const normalizedOption = option.trim();
+    if (!normalizedOption || seen.has(normalizedOption)) continue;
+    seen.add(normalizedOption);
+    normalizedOptions.push(normalizedOption);
+  }
+
+  return normalizedOptions;
+}
+
+function normalizeValidationRulesForField(field: MappingDraft): ParticipantFieldValidationRules {
+  const fieldType = getParticipantFieldType(field);
+  const rules = getParticipantValidationRules(field);
+  if (fieldType !== 'select') return rules;
+
+  return {
+    ...rules,
+    options: normalizeSelectOptionList(rules.options),
+  };
+}
 
 function normalizeDraftForRole(draft: MappingDraft, role: EditableFieldRole): MappingDraft {
   const configurable = role === 'custom' || role === 'important_custom';
@@ -104,7 +126,7 @@ function validateMappingValidationRules(field: MappingDraft): string {
     if (min && max && min > max) return 'Data od nie może być późniejsza niż data do.';
   }
 
-  if (fieldType === 'select' && (rules.options ?? []).length === 0) {
+  if (fieldType === 'select' && normalizeSelectOptionList(rules.options).length === 0) {
     return 'Dodaj co najmniej jedną opcję listy wyboru.';
   }
 
@@ -288,6 +310,8 @@ export default function CsvImport() {
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof runParticipantImport>> | null>(null);
   const [replacementPromptOpen, setReplacementPromptOpen] = useState(false);
   const [replacementMode, setReplacementMode] = useState(false);
+  const [validationPanelsOpen, setValidationPanelsOpen] = useState(false);
+  const [openValidationPanels, setOpenValidationPanels] = useState<Record<string, boolean>>({});
   const [mappingErrors, setMappingErrors] = useState<{ emailColumn?: string; aliases: Record<string, string>; form?: string }>({ aliases: {} });
   const isOnline = connectionState === 'online';
 
@@ -338,6 +362,10 @@ export default function CsvImport() {
 
   const activeDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role !== 'ignore'), [mappingDrafts]);
   const highlightedDrafts = useMemo(() => mappingDrafts.filter(field => field.field_role === 'important_custom'), [mappingDrafts]);
+  const configurableDraftsCount = useMemo(
+    () => mappingDrafts.filter(field => isConfigurableParticipantMapping(field) && field.field_role !== 'ignore').length,
+    [mappingDrafts],
+  );
   const samplePreviewRow = analysis?.sample_rows[0];
   const csvRowsForSuggestions = useMemo(
     () => analysis ? parseCsvRows(csvContent, analysis.headers) : [],
@@ -427,6 +455,8 @@ export default function CsvImport() {
     setSelectedEmailColumn('');
     setReplacementMode(false);
     setReplacementPromptOpen(false);
+    setValidationPanelsOpen(false);
+    setOpenValidationPanels({});
 
     try {
       setRunningAction('analyze');
@@ -556,6 +586,8 @@ export default function CsvImport() {
 
     const fieldType = getParticipantFieldType(field);
     const rules = getParticipantValidationRules(field);
+    const selectOptions = rules.options ?? [];
+    const isValidationPanelOpen = validationPanelsOpen || Boolean(openValidationPanels[field.source_column_name]);
     const updateRules = (patch: ParticipantFieldValidationRules) => {
       handleFieldChange(field.source_column_name, {
         validation_rules: {
@@ -564,25 +596,50 @@ export default function CsvImport() {
         },
       });
     };
+    const addSelectOption = () => {
+      updateRules({ options: [...selectOptions, ''] });
+    };
+    const updateSelectOption = (optionIndex: number, value: string) => {
+      updateRules({
+        options: selectOptions.map((option, currentIndex) => (currentIndex === optionIndex ? value : option)),
+      });
+    };
+    const removeSelectOption = (optionIndex: number) => {
+      updateRules({
+        options: selectOptions.filter((_, currentIndex) => currentIndex !== optionIndex),
+      });
+    };
     const setFieldType = (fieldTypeValue: ParticipantFieldType) => {
       handleFieldChange(field.source_column_name, {
         field_type: fieldTypeValue,
-        validation_rules: fieldTypeValue === 'select' ? { options: rules.options ?? [] } : {},
+        validation_rules: fieldTypeValue === 'select' ? { options: rules.options?.length ? rules.options : [''] } : {},
       });
     };
     const suggestedOptions = () => {
-      const options = suggestSelectOptionsFromRows(csvRowsForSuggestions, field.source_column_name);
+      const suggestionRows = csvRowsForSuggestions.length > 0 ? csvRowsForSuggestions : (analysis?.sample_rows ?? []);
+      const options = suggestSelectOptionsFromRows(suggestionRows, field.source_column_name);
+      if (options.length === 0) {
+        toast({ title: 'Nie znaleziono wartości do sugestii' });
+        return;
+      }
+
       handleFieldChange(field.source_column_name, {
         validation_rules: { options },
       });
       toast({
-        title: options.length > 0 ? 'UzupeĹ‚niono opcje listy' : 'Nie znaleziono wartoĹ›ci do sugestii',
-        description: options.length > 0 ? `${options.length} unikalnych wartoĹ›ci z kolumny ${field.source_column_name}` : undefined,
+        title: 'Uzupełniono opcje listy',
+        description: `${options.length} unikalnych wartości z kolumny ${field.source_column_name}`,
       });
     };
 
     return (
-      <Collapsible className="mt-3 rounded-md border border-border/60 bg-background/65">
+      <Collapsible
+        open={isValidationPanelOpen}
+        onOpenChange={open => {
+          setOpenValidationPanels(prev => ({ ...prev, [field.source_column_name]: open }));
+        }}
+        className="mt-3 rounded-md border border-border/60 bg-background/65"
+      >
         <CollapsibleTrigger asChild>
           <Button type="button" variant="ghost" className="flex h-auto w-full justify-between rounded-md px-3 py-2 text-left">
             <span className="min-w-0">
@@ -621,7 +678,7 @@ export default function CsvImport() {
             {fieldType === 'text' && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor={`csv-text-min-${index}`}>Min. znakĂłw</Label>
+                  <Label htmlFor={`csv-text-min-${index}`}>Min. znaków</Label>
                   <Input
                     id={`csv-text-min-${index}`}
                     type="number"
@@ -632,7 +689,7 @@ export default function CsvImport() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor={`csv-text-max-${index}`}>Max. znakĂłw</Label>
+                  <Label htmlFor={`csv-text-max-${index}`}>Max. znaków</Label>
                   <Input
                     id={`csv-text-max-${index}`}
                     type="number"
@@ -648,7 +705,7 @@ export default function CsvImport() {
             {fieldType === 'number' && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor={`csv-number-min-${index}`}>Min. wartoĹ›Ä‡</Label>
+                  <Label htmlFor={`csv-number-min-${index}`}>Min. wartość</Label>
                   <Input
                     id={`csv-number-min-${index}`}
                     type="number"
@@ -658,7 +715,7 @@ export default function CsvImport() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor={`csv-number-max-${index}`}>Max. wartoĹ›Ä‡</Label>
+                  <Label htmlFor={`csv-number-max-${index}`}>Max. wartość</Label>
                   <Input
                     id={`csv-number-max-${index}`}
                     type="number"
@@ -697,20 +754,48 @@ export default function CsvImport() {
           </div>
 
           {fieldType === 'select' && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <Label htmlFor={`csv-select-options-${index}`}>Opcje listy, po jednej w linii</Label>
-                <Button type="button" variant="outline" size="sm" onClick={suggestedOptions}>
-                  <Sparkles className="mr-1 h-4 w-4" />
-                  Zasugeruj z kolumny
-                </Button>
+                <Label>Opcje listy wyboru</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={addSelectOption}>
+                    <Plus className="mr-1 h-4 w-4" />
+                    Dodaj opcję
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={suggestedOptions}>
+                    <Sparkles className="mr-1 h-4 w-4" />
+                    Zasugeruj z kolumny
+                  </Button>
+                </div>
               </div>
-              <Textarea
-                id={`csv-select-options-${index}`}
-                value={formatSelectOptions(rules.options)}
-                onChange={eventValue => updateRules({ options: parseSelectOptions(eventValue.target.value) })}
-                rows={4}
-              />
+              <div className="space-y-2">
+                {selectOptions.length === 0 && (
+                  <p className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                    Dodaj co najmniej jedną opcję albo użyj sugestii z kolumny CSV.
+                  </p>
+                )}
+                {selectOptions.map((option, optionIndex) => (
+                  <div key={`${field.source_column_name}-option-${optionIndex}`} className="flex items-center gap-2">
+                    <Input
+                      value={option}
+                      onChange={eventValue => updateSelectOption(optionIndex, eventValue.target.value)}
+                      placeholder={`Opcja ${optionIndex + 1}`}
+                      aria-label={`Opcja ${optionIndex + 1}`}
+                      className="h-9"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 shrink-0"
+                      aria-label={`Usuń opcję ${optionIndex + 1}`}
+                      onClick={() => removeSelectOption(optionIndex)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </CollapsibleContent>
@@ -729,7 +814,7 @@ export default function CsvImport() {
         alias: field.alias.trim(),
         field_role: field.field_role as Exclude<EditableFieldRole, 'ignore'>,
         field_type: getParticipantFieldType(field),
-        validation_rules: getParticipantValidationRules(field),
+        validation_rules: normalizeValidationRulesForField(field),
         is_required: field.field_role === 'display_name_part' ? true : field.is_required,
         is_active: true,
       })),
@@ -979,6 +1064,28 @@ export default function CsvImport() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
+                {configurableDraftsCount > 0 && (
+                  <Alert className="border-primary/25 bg-primary/5">
+                    <Info className="h-4 w-4" />
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <AlertTitle>Walidacja pól dodatkowych</AlertTitle>
+                        <AlertDescription>
+                          Dla pól własnych i wyróżnionych możesz ustawić wymaganie, typ danych, zakresy albo listę wyboru.
+                        </AlertDescription>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => setValidationPanelsOpen(prev => !prev)}
+                      >
+                        {validationPanelsOpen ? 'Ukryj walidację pól' : 'Pokaż walidację pól'}
+                      </Button>
+                    </div>
+                  </Alert>
+                )}
                 <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium">Legenda ról</p>
@@ -1185,6 +1292,13 @@ export default function CsvImport() {
                 <CardTitle className="text-base">Dopasowanie mapowania do pliku</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                <Alert className="border-primary/25 bg-primary/5">
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>Walidacja jest zapisana w mapowaniu</AlertTitle>
+                  <AlertDescription>
+                    Typy pól, zakresy i listy wyboru są używane z zapisanego mapowania wydarzenia. Zmienisz je w edycji mapowania wydarzenia albo podczas podmiany listy z nowym mapowaniem.
+                  </AlertDescription>
+                </Alert>
                 {analysis.missing_required_columns.length > 0 ? (
                   <p className="text-sm text-destructive">
                     Plik nie zawiera wymaganych kolumn z zapisanego mapowania: {analysis.missing_required_columns.join(', ')}.

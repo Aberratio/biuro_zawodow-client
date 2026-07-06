@@ -52,7 +52,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Role } from "@/types";
 import { isEventCurrentOrUpcoming, isEventOfficeOpen } from "@/lib/events";
-import { isScannerRole } from "@/lib/roles";
+import { hasGlobalOrganizationScope, isScannerRole } from "@/lib/roles";
 import {
   buildEventEmailsPath,
   buildEventImportPath,
@@ -272,13 +272,14 @@ export function AppSidebar() {
     );
 
   const generalItems = items.filter((item) => !eventScopedUrls.has(item.url));
-  const adminOrganizations = currentRole === "admin" ? organizations : [];
+  const usesOrganizationContext = hasGlobalOrganizationScope(currentRole);
+  const contextOrganizations = usesOrganizationContext ? organizations : [];
   const selectedOrganization =
-    adminOrganizations.find(
+    contextOrganizations.find(
       (organization) => organization.id === selectedOrganizationId,
     ) ?? null;
   const scopedVisibleEvents =
-    currentRole === "admin"
+    usesOrganizationContext && selectedOrganizationId
       ? visibleEvents.filter(
           (event) => event.organization_id === selectedOrganizationId,
         )
@@ -294,7 +295,7 @@ export function AppSidebar() {
     .filter((item) => item.url !== "/import")
     .filter((item) => item.url !== "/scanner" || selectedEventOfficeOpen)
     .filter((item) => item.url !== "/emails" || selectedEventCanSendQr);
-  const showOrganizationSelectControl = adminOrganizations.length > 1;
+  const showOrganizationSelectControl = contextOrganizations.length > 1;
   const showEventSelectControl =
     scopedVisibleEvents.length > 1 || !isScannerRole(currentRole);
   const showEventWorkspaceSkeleton = !collapsed && isLoading;
@@ -302,8 +303,8 @@ export function AppSidebar() {
     showEventWorkspaceSkeleton ||
     (!collapsed &&
       eventScopedItems.length > 0 &&
-      (currentRole === "admin"
-        ? adminOrganizations.length > 0
+      (usesOrganizationContext
+        ? contextOrganizations.length > 0
         : visibleEvents.length > 0));
   const organizationSelectContent = showOrganizationSelectControl ? (
     <div className="mt-3">
@@ -315,7 +316,7 @@ export function AppSidebar() {
           <SelectValue placeholder="Wybierz organizację" />
         </SelectTrigger>
         <SelectContent>
-          {adminOrganizations.map((organization) => (
+          {contextOrganizations.map((organization) => (
             <SelectItem
               key={organization.id}
               value={organization.id}
@@ -508,9 +509,9 @@ export function AppSidebar() {
                 <SidebarGroupContent>
                   {showEventWorkspaceSkeleton ? (
                     <EventWorkspaceSkeleton
-                      showOrganizationSection={currentRole === "admin"}
+                      showOrganizationSection={usesOrganizationContext}
                     />
-                  ) : currentRole === "admin" ? (
+                  ) : usesOrganizationContext ? (
                     <div className="space-y-4 rounded-[0.95rem] bg-[hsl(220_7%_13%/0.68)] p-3.5">
                       <p className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-sidebar-foreground/56">
                         Wybrana organizacja
