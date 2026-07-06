@@ -1112,6 +1112,17 @@ export default function SuperAdmin() {
     setPasswordErrors({});
   };
 
+  const copyPasswordDraft = async () => {
+    if (passwordDraft === "") return;
+
+    try {
+      await navigator.clipboard.writeText(passwordDraft);
+      toast({ title: "Skopiowano hasło" });
+    } catch {
+      toast({ title: "Nie udało się skopiować hasła", variant: "destructive" });
+    }
+  };
+
   const openPasswordDialog = (user: User) => {
     setSelectedActionUser(user);
     setPasswordDraft(generateStrongPassword());
@@ -2544,8 +2555,19 @@ export default function SuperAdmin() {
                       setPasswordErrors({});
                     }}
                     autoComplete="new-password"
-                    className="pr-10"
+                    className="pr-20"
                   />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-9 top-1/2 h-8 w-8 -translate-y-1/2"
+                    onClick={copyPasswordDraft}
+                    disabled={passwordDraft === ""}
+                    aria-label="Kopiuj hasło"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"

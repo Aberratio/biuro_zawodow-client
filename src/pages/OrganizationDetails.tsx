@@ -83,6 +83,7 @@ import {
   Building2,
   CalendarCheck,
   ChevronDown,
+  Copy,
   Eye,
   EyeOff,
   KeyRound,
@@ -492,6 +493,28 @@ export default function OrganizationDetails() {
     setPasswordDraft(generateStrongPassword());
     setShowPasswordDraft(true);
     setPasswordErrors({});
+  };
+
+  const copyPasswordDraft = async () => {
+    if (passwordDraft === "") return;
+
+    try {
+      await navigator.clipboard.writeText(passwordDraft);
+      toast({ title: "Skopiowano hasło" });
+    } catch {
+      toast({ title: "Nie udało się skopiować hasła", variant: "destructive" });
+    }
+  };
+
+  const copyMemberPassword = async () => {
+    if (memberForm.password === "") return;
+
+    try {
+      await navigator.clipboard.writeText(memberForm.password);
+      toast({ title: "Skopiowano hasło" });
+    } catch {
+      toast({ title: "Nie udało się skopiować hasła", variant: "destructive" });
+    }
   };
 
   const toggleScannerEvent = (eventId: string, checked: boolean) => {
@@ -1846,7 +1869,7 @@ export default function OrganizationDetails() {
                       }));
                     }}
                     autoComplete="new-password"
-                    className="pr-10"
+                    className="pr-20"
                     aria-invalid={Boolean(passwordErrors.password || passwordErrors.form)}
                     aria-describedby={
                       passwordErrors.password
@@ -1854,6 +1877,17 @@ export default function OrganizationDetails() {
                         : undefined
                     }
                   />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-9 top-1/2 h-8 w-8 -translate-y-1/2"
+                    onClick={copyPasswordDraft}
+                    disabled={passwordDraft === ""}
+                    aria-label="Kopiuj hasło"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"
@@ -2297,7 +2331,7 @@ export default function OrganizationDetails() {
                           }));
                         }}
                         autoComplete="new-password"
-                        className="pr-10"
+                        className="pr-20"
                         aria-invalid={Boolean(memberErrors.password)}
                         aria-describedby={
                           memberErrors.password
@@ -2305,6 +2339,17 @@ export default function OrganizationDetails() {
                             : undefined
                         }
                       />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-9 top-1/2 h-8 w-8 -translate-y-1/2"
+                        onClick={copyMemberPassword}
+                        disabled={memberForm.password === ""}
+                        aria-label="Kopiuj hasło"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
                       <Button
                         type="button"
                         variant="ghost"

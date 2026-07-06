@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { Eye, EyeOff, Loader2, RefreshCw } from 'lucide-react';
+import { Copy, Eye, EyeOff, Loader2, RefreshCw } from 'lucide-react';
 import { PasswordRequirements } from '@/components/PasswordRequirements';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -53,6 +53,17 @@ export default function Profile() {
     setShowNewPassword(true);
     setShowNewPasswordConfirmation(true);
     setErrors(previous => ({ ...previous, newPassword: undefined, newPasswordConfirmation: undefined, form: undefined }));
+  };
+
+  const handleCopyPassword = async () => {
+    if (newPassword === '') return;
+
+    try {
+      await navigator.clipboard.writeText(newPassword);
+      toast({ title: 'Skopiowano hasło' });
+    } catch {
+      toast({ title: 'Nie udało się skopiować hasła', variant: 'destructive' });
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -178,8 +189,17 @@ export default function Profile() {
                     minLength={10}
                     aria-invalid={Boolean(errors.newPassword || errors.form)}
                     aria-describedby={errors.newPassword ? 'profile-new-password-error' : undefined}
-                    className="pr-10"
+                    className="pr-20"
                   />
+                  <button
+                    type="button"
+                    onClick={handleCopyPassword}
+                    disabled={newPassword === ''}
+                    className="absolute right-10 top-1/2 -translate-y-1/2 text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="Kopiuj hasło"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(previousValue => !previousValue)}
