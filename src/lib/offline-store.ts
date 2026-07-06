@@ -95,12 +95,8 @@ function transactionToPromise(transaction: IDBTransaction): Promise<void> {
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
-function getDb(): Promise<IDBDatabase> {
-  if (dbPromise) {
-    return dbPromise;
-  }
-
-  dbPromise = new Promise((resolve, reject) => {
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = () => {
@@ -120,11 +116,48 @@ function getDb(): Promise<IDBDatabase> {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      // The browser may close the connection on its own (storage pressure, cleared
+      // site data, a version change from another tab). Drop the cached promise so the
+      // next operation reopens the database instead of failing with
+      // "Failed to execute 'transaction' on 'IDBDatabase'".
+      db.onclose = () => forgetDb(db);
+      db.onversionchange = () => {
+        forgetDb(db);
+        db.close();
+      };
+      resolve(db);
+    };
     request.onerror = () => reject(request.error);
   });
+}
 
-  return dbPromise;
+function forgetDb(staleDb: IDBDatabase | Promise<IDBDatabase>): void {
+  const current = dbPromise;
+  if (!current) {
+    return;
+  }
+  if (current === staleDb) {
+    dbPromise = null;
+    return;
+  }
+  void current.then(db => {
+    if (db === staleDb && dbPromise === current) {
+      dbPromise = null;
+    }
+  }).catch(() => undefined);
+}
+
+function getDb(): Promise<IDBDatabase> {
+  if (dbPromise) {
+    return dbPromise;
+  }
+
+  const opened = openDb();
+  dbPromise = opened;
+  opened.catch(() => forgetDb(opened));
+  return opened;
 }
 
 async function withStore<T>(storeName: StoreName, mode: IDBTransactionMode, action: (store: IDBObjectStore) => Promise<T>): Promise<T> {
@@ -142,7 +175,16 @@ async function withStore<T>(storeName: StoreName, mode: IDBTransactionMode, acti
   }
 
   const db = await getDb();
-  const transaction = db.transaction(storeName, mode);
+  let transaction: IDBTransaction;
+  try {
+    transaction = db.transaction(storeName, mode);
+  } catch {
+    // A cached connection can go stale between operations; retry once on a
+    // freshly opened connection before giving up.
+    forgetDb(db);
+    const freshDb = await getDb();
+    transaction = freshDb.transaction(storeName, mode);
+  }
   const store = transaction.objectStore(storeName);
   const result = await action(store);
   await transactionToPromise(transaction);

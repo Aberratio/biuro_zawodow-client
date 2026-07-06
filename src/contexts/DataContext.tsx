@@ -287,7 +287,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addLog = useCallback((action: string, participantName?: string) => setActivityLog(previous => [{ id: `log-${Date.now()}`, timestamp: new Date().toISOString(), action, participant_name: participantName, user_name: currentUser.name }, ...previous]), [currentUser.name]);
 
   const updateSyncMeta = useCallback(async (userId: string, nextLastSyncAt: string | null, nextOfflineSinceAt: string | null) => {
-    await saveSyncMeta({ key: `${API_BASE_URL}::${userId}`, apiBaseUrl: API_BASE_URL, userId, lastSyncAt: nextLastSyncAt, offlineSinceAt: nextOfflineSinceAt });
+    try {
+      await saveSyncMeta({ key: `${API_BASE_URL}::${userId}`, apiBaseUrl: API_BASE_URL, userId, lastSyncAt: nextLastSyncAt, offlineSinceAt: nextOfflineSinceAt });
+    } catch {
+      // Sync metadata is a best-effort cache; storage failures must not break callers.
+    }
   }, []);
 
   const applyOnlineOnly = useCallback(async <T,>(executor: () => Promise<T>, offlineMessage?: string) => {
@@ -357,8 +361,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const snapshotVersion = response.snapshot_version ?? createBootstrapSnapshotVersion(response.data);
       hydrateData(response.data, 'network', generatedAt);
       markConnectionHealthy();
-      await saveBootstrapSnapshot(buildOfflineSnapshot({ userId: authUser.id, selectedOrganizationId: readStoredSelectedOrganizationId(authUser.id), selectedEventId: readStoredSelectedEventId(authUser.id), organizations: Array.isArray(response.data.organizations) ? response.data.organizations.map(mapApiOrganizationToUi) : [], events: Array.isArray(response.data.events) ? response.data.events : [], archivedEvents: Array.isArray(response.data.archivedEvents) ? response.data.archivedEvents : [], users: (response.data.users ?? []).map(mapApiUserToUi), participants: (response.data.participants ?? []).map(participant => mapApiParticipantToUi(participant, '')), activityLog: Array.isArray(response.data.activityLog) ? response.data.activityLog : [], generatedAt, snapshotVersion }));
-      await updateSyncMeta(authUser.id, generatedAt, null);
+      try {
+        await saveBootstrapSnapshot(buildOfflineSnapshot({ userId: authUser.id, selectedOrganizationId: readStoredSelectedOrganizationId(authUser.id), selectedEventId: readStoredSelectedEventId(authUser.id), organizations: Array.isArray(response.data.organizations) ? response.data.organizations.map(mapApiOrganizationToUi) : [], events: Array.isArray(response.data.events) ? response.data.events : [], archivedEvents: Array.isArray(response.data.archivedEvents) ? response.data.archivedEvents : [], users: (response.data.users ?? []).map(mapApiUserToUi), participants: (response.data.participants ?? []).map(participant => mapApiParticipantToUi(participant, '')), activityLog: Array.isArray(response.data.activityLog) ? response.data.activityLog : [], generatedAt, snapshotVersion }));
+        await updateSyncMeta(authUser.id, generatedAt, null);
+      } catch {
+        // The bootstrap itself succeeded; a failed offline-cache write must not push the app into degraded mode.
+      }
     } catch (error) {
       if (requestRevision !== localDataRevisionRef.current) return;
       if (isApiResponseError(error) && error.status === 401) {
