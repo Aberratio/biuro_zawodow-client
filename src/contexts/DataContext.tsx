@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { ActivityLog, ConnectionState, Event, Organization, Participant, ParticipantFieldMapping, ParticipantQrPreview, ParticipantScanResult, ParticipantStatus, Role, ScannerMode, SnapshotSource, User } from '@/types';
+import type { ActivityLog, AppDiagnostics, ConnectionState, Event, Organization, Participant, ParticipantFieldMapping, ParticipantQrPreview, ParticipantScanResult, ParticipantStatus, Role, ScannerMode, ServiceWorkerState, SnapshotSource, User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { API_BASE_URL, fetchJson, getApiErrorCode, isApiResponseError, isNetworkRequestError } from '@/lib/api';
 import { type ApiEvent, type ApiOrganization, type ApiParticipant, type ApiUser, type BootstrapResponse, type ParticipantQrPreviewResponse, type ParticipantScanApiResponse, OFFLINE_ACTION_MESSAGE, applyPendingMutations, buildOfflineSnapshot, createBootstrapSnapshotVersion, createClientMutationId, extractConflictParticipant, getDefaultCurrentUser, getDeviceId, getInitialConnectionState, getSelectableOrganizationsForUser, getVisibleEventsForUser, mapApiOrganizationToUi, mapApiParticipantToUi, mapApiUserToUi, participantUiIdToApiId, persistStoredSelectedEventId, persistStoredSelectedOrganizationId, readStoredSelectedEventId, readStoredSelectedOrganizationId, resolveSelectedEventId, resolveSelectedOrganizationId } from '@/lib/data-context-helpers';
 import { deletePendingMutation, loadBootstrapSnapshot, loadPendingMutations, loadSyncMeta, saveBootstrapSnapshot, savePendingMutation, saveSyncMeta, updatePendingMutation, type OfflineBootstrapSnapshot, type PendingParticipantMutation } from '@/lib/offline-store';
 import { getEventOfficeCloseAt, isEventOfficeOpen } from '@/lib/events';
 import { hasGlobalOrganizationScope } from '@/lib/roles';
+import { checkBrowserStorage } from '@/lib/browser-storage';
 
 type UserCreateInput = Omit<User, 'id' | 'password'> & { password?: string };
 type EventMutationInput = Omit<Event, 'id' | 'archived_at' | 'deleted_at'>;
@@ -95,6 +96,7 @@ interface DataContextType {
   snapshotSource: SnapshotSource;
   pendingMutationCount: number;
   scannerMode: ScannerMode;
+  diagnostics: AppDiagnostics;
   refreshData: () => Promise<void>;
 }
 
@@ -105,6 +107,14 @@ const CONNECTION_RECOVERY_INTERVAL_MS = 15_000;
 const NETWORK_FAILURE_THRESHOLD = 2;
 const PARTICIPANT_FIELD_MAPPINGS_CACHE_TTL_MS = 60_000;
 const PARTICIPANT_FIELD_MAPPINGS_FAILURE_COOLDOWN_MS = 10_000;
+const INITIAL_DIAGNOSTICS: AppDiagnostics = {
+  sessionStorageAvailable: true,
+  localStorageAvailable: true,
+  indexedDbAvailable: true,
+  canPersistSession: true,
+  serviceWorkerState: 'checking',
+  warnings: [],
+};
 
 interface ParticipantUpdatePayload {
   status?: ParticipantStatus;
@@ -159,6 +169,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [offlineSinceAt, setOfflineSinceAt] = useState<string | null>(() => getInitialConnectionState() === 'offline' ? new Date().toISOString() : null);
   const [pendingMutations, setPendingMutations] = useState<PendingParticipantMutation[]>([]);
+  const [diagnostics, setDiagnostics] = useState<AppDiagnostics>(INITIAL_DIAGNOSTICS);
   const syncRef = useRef(false);
   const networkFailureCountRef = useRef(0);
   const participantFieldMappingsCacheRef = useRef(new Map<string, { fetchedAt: number; mappings: ParticipantFieldMapping[] }>());
@@ -177,7 +188,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const eventSelectionScope = useMemo(() => usesOrganizationContext && selectedOrganizationId ? visibleEvents.filter(event => event.organization_id === selectedOrganizationId) : visibleEvents, [selectedOrganizationId, usesOrganizationContext, visibleEvents]);
   const pendingMutationCount = useMemo(() => pendingMutations.filter(mutation => mutation.state === 'queued').length, [pendingMutations]);
   const offlineDurationMs = useMemo(() => !offlineSinceAt ? 0 : Math.max(0, nowTimestamp - new Date(offlineSinceAt).getTime()), [nowTimestamp, offlineSinceAt]);
-  const scannerMode = useMemo<ScannerMode>(() => connectionState === 'online' ? 'online' : (offlineDurationMs > OFFLINE_MUTATION_WINDOW_MS || pendingMutationCount > OFFLINE_MUTATION_LIMIT ? 'read_only' : 'offline_queue'), [connectionState, offlineDurationMs, pendingMutationCount]);
+  const scannerMode = useMemo<ScannerMode>(() => {
+    if (connectionState === 'online') return 'online';
+    if (!diagnostics.indexedDbAvailable) return 'read_only';
+    return offlineDurationMs > OFFLINE_MUTATION_WINDOW_MS || pendingMutationCount > OFFLINE_MUTATION_LIMIT ? 'read_only' : 'offline_queue';
+  }, [connectionState, diagnostics.indexedDbAvailable, offlineDurationMs, pendingMutationCount]);
 
   const persistSelectedOrganizationId = useCallback((organizationId: string, userId?: string | null) => {
     if (!userId) return;
@@ -365,6 +380,80 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { void loadBootstrap(); }, [loadBootstrap]);
   useEffect(() => {
+    let mounted = true;
+
+    const refreshStorageDiagnostics = async () => {
+      try {
+        const storage = await checkBrowserStorage();
+        if (!mounted) return;
+        setDiagnostics(previous => ({
+          ...previous,
+          sessionStorageAvailable: storage.sessionStorageAvailable,
+          localStorageAvailable: storage.localStorageAvailable,
+          indexedDbAvailable: storage.indexedDbAvailable,
+          canPersistSession: storage.canPersistSession,
+          warnings: storage.warnings,
+        }));
+      } catch {
+        if (!mounted) return;
+        setDiagnostics(previous => ({
+          ...previous,
+          indexedDbAvailable: false,
+          warnings: Array.from(new Set([...previous.warnings, 'Nie udało się sprawdzić pamięci offline aplikacji. Tryb offline może być niedostępny.'])),
+        }));
+      }
+    };
+
+    void refreshStorageDiagnostics();
+    window.addEventListener('focus', refreshStorageDiagnostics);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('focus', refreshStorageDiagnostics);
+    };
+  }, []);
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) {
+      setDiagnostics(previous => ({ ...previous, serviceWorkerState: 'unsupported' }));
+      return undefined;
+    }
+
+    let mounted = true;
+
+    const setServiceWorkerState = (serviceWorkerState: ServiceWorkerState) => {
+      if (mounted) {
+        setDiagnostics(previous => ({ ...previous, serviceWorkerState }));
+      }
+    };
+
+    const refreshServiceWorkerState = async () => {
+      if (!import.meta.env.PROD) {
+        setServiceWorkerState('ready');
+        return;
+      }
+
+      try {
+        const registration = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL);
+        setServiceWorkerState(registration ? 'ready' : 'unavailable');
+      } catch {
+        setServiceWorkerState('unavailable');
+      }
+    };
+
+    const handleReady = () => setServiceWorkerState('ready');
+    const handleUnavailable = () => setServiceWorkerState('unavailable');
+
+    window.addEventListener('biuro-zawodow:service-worker-ready', handleReady);
+    window.addEventListener('biuro-zawodow:service-worker-unavailable', handleUnavailable);
+    void refreshServiceWorkerState();
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('biuro-zawodow:service-worker-ready', handleReady);
+      window.removeEventListener('biuro-zawodow:service-worker-unavailable', handleUnavailable);
+    };
+  }, []);
+  useEffect(() => {
     if (!authUser?.id) { setPendingMutations([]); setSnapshotSource('none'); setLastSyncAt(null); return; }
     setSelectedOrganizationIdState(readStoredSelectedOrganizationId(authUser.id));
     setSelectedEventIdState(readStoredSelectedEventId(authUser.id));
@@ -474,7 +563,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   ): Promise<MutationResult> => {
     const participant = participants.find(item => item.id === participantId);
     if (!participant) return { ok: false, error: 'Nie znaleziono uczestnika.' };
-    if (scannerMode === 'read_only' && connectionState !== 'online') return { ok: false, error: 'Skaner jest teraz tylko do odczytu, bo dane są zbyt stare albo kolejka zmian jest zbyt długa.' };
+    if (scannerMode === 'read_only' && connectionState !== 'online') {
+      const reason = diagnostics.indexedDbAvailable
+        ? 'dane są zbyt stare albo kolejka zmian jest zbyt długa'
+        : 'przeglądarka blokuje trwałą pamięć offline';
+      return { ok: false, error: `Skaner jest teraz tylko do odczytu, bo ${reason}.` };
+    }
     const mutation: PendingParticipantMutation = { id: createClientMutationId(), apiBaseUrl: API_BASE_URL, userId: authUser?.id ?? 'unknown', participantId: participant.id, participantApiId: participantUiIdToApiId(participant.id), eventId: participant.event_id, nextStatus: status, baseStatus: participant.status, queuedAt: new Date().toISOString(), deviceId: getDeviceId(), state: 'queued', attempts: 0 };
     await savePendingMutation(mutation);
     setPendingMutations(previous => [...previous, mutation]);
@@ -485,7 +579,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setDegradedState();
     }
     return { ok: true, queued: true };
-  }, [addLog, authUser?.id, connectionState, participants, scannerMode, setDegradedState, syncPendingMutations]);
+  }, [addLog, authUser?.id, connectionState, diagnostics.indexedDbAvailable, participants, scannerMode, setDegradedState, syncPendingMutations]);
 
   const queueStatusUpdate = useCallback(async (participantId: string, status: ParticipantStatus): Promise<MutationResult> => (
     enqueueStatusUpdate(participantId, status, { syncImmediately: connectionState === 'online' })
@@ -1076,7 +1170,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [buildExportFallbackName, downloadCsvResponse, ensureOnline, getAuthHeaders, handleNetworkFailure]);
 
   return (
-    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, replaceParticipantImport, resetEventParticipantList, getParticipantFieldMappingsState, getParticipantFieldMappings, updateParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, setUserPassword, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, exportEventParticipantChangesCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, refreshData }}>
+    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, replaceParticipantImport, resetEventParticipantList, getParticipantFieldMappingsState, getParticipantFieldMappings, updateParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, setUserPassword, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, exportEventParticipantChangesCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, diagnostics, refreshData }}>
       {children}
     </DataContext.Provider>
   );

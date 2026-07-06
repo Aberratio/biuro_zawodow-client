@@ -2,6 +2,7 @@ import * as React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider, useData } from '@/contexts/DataContext';
+import { checkBrowserStorage } from '@/lib/browser-storage';
 import { clearOfflineData, saveBootstrapSnapshot } from '@/lib/offline-store';
 import type { User } from '@/types';
 
@@ -28,6 +29,16 @@ vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => authState,
 }));
 
+vi.mock('@/lib/browser-storage', () => ({
+  checkBrowserStorage: vi.fn(async () => ({
+    canPersistSession: true,
+    sessionStorageAvailable: true,
+    localStorageAvailable: true,
+    indexedDbAvailable: true,
+    warnings: [],
+  })),
+}));
+
 function createJsonResponse(status: number, payload: unknown) {
   return {
     ok: status >= 200 && status < 300,
@@ -40,11 +51,13 @@ function createJsonResponse(status: number, payload: unknown) {
 }
 
 function OfflineConsumer() {
+  const [mutationError, setMutationError] = React.useState('');
   const {
     participants,
     snapshotSource,
     connectionState,
     pendingMutationCount,
+    scannerMode,
     updateParticipantStatus,
   } = useData();
 
@@ -55,6 +68,8 @@ function OfflineConsumer() {
       <div data-testid="snapshot-source">{snapshotSource}</div>
       <div data-testid="connection-state">{connectionState}</div>
       <div data-testid="pending-count">{pendingMutationCount}</div>
+      <div data-testid="scanner-mode">{scannerMode}</div>
+      <div data-testid="mutation-error">{mutationError}</div>
       <div data-testid="participant-name">{participant?.name ?? ''}</div>
       <div data-testid="participant-status">{participant?.status ?? ''}</div>
       <div data-testid="participant-sync">{participant?.sync_state ?? ''}</div>
@@ -64,7 +79,9 @@ function OfflineConsumer() {
           if (!participant) {
             return;
           }
-          void updateParticipantStatus(participant.id, 'checked_in', { allowOfflineQueue: true });
+          void updateParticipantStatus(participant.id, 'checked_in', { allowOfflineQueue: true }).then(result => {
+            setMutationError(result.error ?? '');
+          });
         }}
       >
         queue-status
@@ -114,6 +131,13 @@ function ScanConsumer() {
 
 describe('DataProvider offline cache and queue', () => {
   beforeEach(async () => {
+    vi.mocked(checkBrowserStorage).mockResolvedValue({
+      canPersistSession: true,
+      sessionStorageAvailable: true,
+      localStorageAvailable: true,
+      indexedDbAvailable: true,
+      warnings: [],
+    });
     window.localStorage.clear();
     window.sessionStorage.clear();
     await clearOfflineData('http://localhost:8080', 'admin-1');
@@ -247,6 +271,73 @@ describe('DataProvider offline cache and queue', () => {
     await waitFor(() => expect(screen.getByTestId('pending-count').textContent).toBe('1'));
     expect(screen.getByTestId('participant-status').textContent).toBe('checked_in');
     expect(screen.getByTestId('participant-sync').textContent).toBe('pending_sync');
+  });
+
+  it('keeps the offline scanner read-only when IndexedDB is unavailable', async () => {
+    vi.mocked(checkBrowserStorage).mockResolvedValue({
+      canPersistSession: true,
+      sessionStorageAvailable: true,
+      localStorageAvailable: true,
+      indexedDbAvailable: false,
+      warnings: ['IndexedDB unavailable'],
+    });
+
+    await saveBootstrapSnapshot({
+      key: 'http://localhost:8080::admin-1',
+      apiBaseUrl: 'http://localhost:8080',
+      userId: 'admin-1',
+      savedAt: '2099-04-12T07:00:00.000Z',
+      generatedAt: '2099-04-12T07:00:00.000Z',
+      snapshotVersion: 'snapshot-no-idb',
+      selectedOrganizationId: 'org-1',
+      selectedEventId: 'event-1',
+      data: {
+        organizations: [{ id: 'org-1', name: 'Org 1', event_limit: 5 }],
+        events: [{
+          id: 'event-1',
+          name: 'Event 1',
+          location: 'Warsaw',
+          organization_id: 'org-1',
+          office_open_at: '2099-04-12T07:00:00',
+          office_close_at: '2099-04-12T15:00:00',
+        }],
+        archivedEvents: [],
+        users: [authState.user!],
+        participants: [{
+          id: 'p-1',
+          event_id: 'event-1',
+          name: 'Anna Test',
+          email: 'anna@example.com',
+          bib_number: '101',
+          qr_code: 'QR-101',
+          status: 'not_checked_in',
+          email_status: 'not_sent',
+          custom_fields: {},
+          sync_state: 'synced',
+        }],
+        activityLog: [],
+      },
+    });
+
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('Network down');
+    }));
+
+    render(
+      <DataProvider>
+        <OfflineConsumer />
+      </DataProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('scanner-mode').textContent).toBe('read_only'));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'queue-status' }));
+    });
+
+    await waitFor(() => expect(screen.getByTestId('mutation-error').textContent).toContain('przeglądarka blokuje trwałą pamięć offline'));
+    expect(screen.getByTestId('pending-count').textContent).toBe('0');
+    expect(screen.getByTestId('participant-status').textContent).toBe('not_checked_in');
   });
 
   it('updates participant status directly in API when scanner is online', async () => {
