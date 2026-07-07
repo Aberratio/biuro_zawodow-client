@@ -1,9 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Download, FileWarning, Loader2, Pencil, RotateCcw, UploadCloud } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Download, FileWarning, Loader2, Pencil, RotateCcw, Trash2, UploadCloud } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { useRouteEventContext } from '@/hooks/use-route-event-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +34,8 @@ import { buildEventImportPath, buildEventPath } from '@/lib/routes';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { toast } from '@/hooks/use-toast';
 import { formatParticipantCount } from '@/lib/participants';
-import { validateParticipantFieldValue } from '@/lib/participant-fields';
+import { PARTICIPANT_EMAIL_MAX_LENGTH, validateParticipantFieldValue } from '@/lib/participant-fields';
+import { isValidEmailAddress } from '@/lib/form-validation';
 import type { ParticipantFieldMapping } from '@/types';
 
 interface ImportRowIssue {
@@ -47,6 +58,26 @@ interface ImportSummaryState {
   headers?: string[];
   sourceRows?: Record<string, string>[];
   mappings?: ParticipantFieldMapping[];
+  analysis?: {
+    headers: string[];
+    sample_rows: Record<string, string>[];
+    email_candidates: { column: string; matched_count: number }[];
+    has_mapping: boolean;
+    has_baseline_import: boolean;
+    mappings: ParticipantFieldMapping[];
+    missing_required_columns: string[];
+    row_count: number;
+    existing_participant_count: number;
+    sent_qr_email_count: number;
+    list_difference: {
+      columns_differ: boolean;
+      missing_columns: string[];
+      extra_columns: string[];
+      participant_difference_ratio: number;
+      should_offer_replacement: boolean;
+    };
+  };
+  csvContent?: string;
   emailColumn?: string;
   fileName?: string;
   importedAt?: string;
@@ -128,10 +159,6 @@ function resolveEmailColumn(explicitColumn: string | undefined, headers: string[
   return headers.find(header => issues.some(issue => (issue.row?.[header] ?? '').includes('@'))) ?? '';
 }
 
-function isValidEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
-
 function buildImportSuccessDescription(createdCount: number, mode: ImportSummaryState['mode']): string {
   const createdSentence = createdCount === 0
     ? 'Nie dodano żadnych uczestników.'
@@ -164,7 +191,9 @@ function getIssueFieldErrors(
     const email = (issue.row?.[emailColumn] ?? '').trim();
     if (!email) {
       errors[emailColumn] = 'Podaj adres e-mail.';
-    } else if (!isValidEmail(email)) {
+    } else if (email.length > PARTICIPANT_EMAIL_MAX_LENGTH) {
+      errors[emailColumn] = `Adres e-mail może mieć maksymalnie ${PARTICIPANT_EMAIL_MAX_LENGTH} znaków.`;
+    } else if (!isValidEmailAddress(email)) {
       errors[emailColumn] = 'Podaj poprawny adres e-mail.';
     }
   }
@@ -585,7 +614,7 @@ export default function CsvImportSummary() {
   const { id: routeEventId = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { events, selectedEventId, isLoading, runParticipantImport, connectionState } = useData();
+  const { events, selectedEventId, isLoading, runParticipantImport, resetEventParticipantList, connectionState } = useData();
   const eventId = routeEventId || selectedEventId;
   const event = events.find(item => item.id === eventId);
   const state = (location.state ?? {}) as ImportSummaryState;
@@ -595,6 +624,9 @@ export default function CsvImportSummary() {
   const [savingRowNumbers, setSavingRowNumbers] = useState<Record<number, boolean>>({});
   const [importedFixedCount, setImportedFixedCount] = useState(0);
   const [editingRowNumber, setEditingRowNumber] = useState<number | null>(null);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetRequiresQrConfirm, setResetRequiresQrConfirm] = useState(false);
+  const [resetSaving, setResetSaving] = useState(false);
 
   useRouteEventContext(routeEventId);
 
@@ -774,6 +806,73 @@ export default function CsvImportSummary() {
     }
   };
 
+  const handleReturnToValidationSettings = () => {
+    const restoredAnalysis = state.analysis ?? {
+      headers: state.headers ?? [],
+      sample_rows: (state.sourceRows ?? []).slice(0, 5),
+      email_candidates: state.emailColumn ? [{ column: state.emailColumn, matched_count: state.sourceRows?.length ?? 0 }] : [],
+      has_mapping: false,
+      has_baseline_import: false,
+      mappings: state.mappings ?? [],
+      missing_required_columns: [],
+      row_count: state.sourceRows?.length ?? 0,
+      existing_participant_count: 0,
+      sent_qr_email_count: 0,
+      list_difference: {
+        columns_differ: false,
+        missing_columns: [],
+        extra_columns: [],
+        participant_difference_ratio: 0,
+        should_offer_replacement: false,
+      },
+    };
+
+    navigate(buildEventImportPath(eventId), {
+      state: {
+        restoreImport: true,
+        csvContent: state.csvContent,
+        fileName: state.fileName,
+        analysis: restoredAnalysis,
+        selectedEmailColumn: state.emailColumn,
+        replacementMode: state.mode === 'replace',
+        validationPanelsOpen: true,
+      },
+    });
+  };
+
+  const handleResetParticipantList = async () => {
+    setResetSaving(true);
+    const result = await resetEventParticipantList(eventId, resetRequiresQrConfirm);
+    setResetSaving(false);
+
+    if (!result.ok) {
+      if (result.qrEmailsSent) {
+        setResetRequiresQrConfirm(true);
+        toast({
+          title: 'Potwierdź usunięcie po wysyłce QR',
+          description: 'Dla tego wydarzenia wysłano już maile z kodami QR. Potwierdź operację ponownie w oknie.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Nie udało się usunąć listy',
+        description: result.error,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setResetDialogOpen(false);
+    setResetRequiresQrConfirm(false);
+    toast({
+      title: 'Usunięto listę uczestników',
+      description: `Usunięto ${result.deleted_participant_count} uczestników i ${result.deleted_mapping_count} mapowań.`,
+    });
+    navigate(buildEventPath(eventId));
+  };
+
   if (isLoading) return <TableSkeleton rows={5} cols={4} subtitle="" />;
   if (!event) return <div className="py-12 text-center text-muted-foreground">Nie znaleziono wydarzenia</div>;
 
@@ -811,8 +910,16 @@ export default function CsvImportSummary() {
             </>
           }
           actions={
-            editableInvalidIssues.length > 0 ? (
-              <>
+            <>
+              <Button
+                variant="outline"
+                onClick={handleReturnToValidationSettings}
+                className="w-full justify-center sm:w-auto"
+              >
+                <RotateCcw className="mr-1 h-4 w-4" /> Wróć do ustawień walidacji
+              </Button>
+              {editableInvalidIssues.length > 0 && (
+                <>
                 <Button
                   onClick={handleRetryEditedRows}
                   disabled={!canRetryEditedRows || retryingImport}
@@ -828,8 +935,20 @@ export default function CsvImportSummary() {
                 >
                   <Download className="mr-1 h-4 w-4" /> Pobierz CSV do poprawy
                 </Button>
-              </>
-            ) : null
+                </>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setResetRequiresQrConfirm(false);
+                  setResetDialogOpen(true);
+                }}
+                disabled={connectionState !== 'online' || resetSaving}
+                className="w-full justify-center border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto"
+              >
+                <Trash2 className="mr-1 h-4 w-4" /> Usuń całą listę
+              </Button>
+            </>
           }
         />
       </div>
@@ -932,6 +1051,38 @@ export default function CsvImportSummary() {
         badgeLabel={`${duplicateIssues.length} wierszy`}
         emailColumn={emailColumn}
       />
+
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usunąć całą listę uczestników?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                Ta operacja usunie wszystkich uczestników tego wydarzenia razem z mapowaniem CSV, bazą importu i logami zmian uczestników.
+              </span>
+              {resetRequiresQrConfirm && (
+                <span className="block font-medium text-destructive">
+                  Serwer wymaga dodatkowego potwierdzenia. Kliknij przycisk usunięcia jeszcze raz, jeśli na pewno chcesz kontynuować.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetSaving}>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={resetSaving}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleResetParticipantList();
+              }}
+            >
+              {resetSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1 h-4 w-4" />}
+              Usuń listę i mapowanie
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="flex flex-wrap gap-3">
         <Button variant="outline" onClick={() => navigate(buildEventImportPath(eventId))}>

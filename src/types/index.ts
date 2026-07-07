@@ -32,6 +32,7 @@ export interface Event {
   organization_id: string;
   office_open_at: string;
   office_close_at: string;
+  is_test: boolean;
   archived_at?: string | null;
   deleted_at?: string | null;
 }

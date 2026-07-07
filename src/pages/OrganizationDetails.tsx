@@ -321,7 +321,9 @@ export default function OrganizationDetails() {
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
     [archivedEvents, organization?.id],
   );
-  const totalOrganizationEvents = orgEvents.length + orgArchivedEvents.length;
+  const totalOrganizationEvents =
+    orgEvents.filter((event) => !event.is_test).length +
+    orgArchivedEvents.filter((event) => !event.is_test).length;
   const archivedEventsSummaryLabel =
     orgArchivedEvents.length === 1 ? "wydarzenie" : "wydarzeń";
   const organizers = useMemo(

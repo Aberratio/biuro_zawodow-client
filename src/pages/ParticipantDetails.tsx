@@ -56,6 +56,8 @@ import {
   getActiveParticipantMappings,
   getParticipantFieldType,
   getParticipantValidationRules,
+  PARTICIPANT_BIB_NUMBER_MAX_LENGTH,
+  PARTICIPANT_EMAIL_MAX_LENGTH,
   validateParticipantFieldValue,
 } from "@/lib/participant-fields";
 import { formatBibNumber } from "@/lib/participants";
@@ -544,8 +546,8 @@ export default function ParticipantDetails() {
       return;
     }
 
-    if (normalizedBibNumber.length > 32) {
-      setBibNumberError("Numer startowy może mieć maksymalnie 32 znaki.");
+    if (normalizedBibNumber.length > PARTICIPANT_BIB_NUMBER_MAX_LENGTH) {
+      setBibNumberError(`Numer startowy może mieć maksymalnie ${PARTICIPANT_BIB_NUMBER_MAX_LENGTH} znaki.`);
       return;
     }
 
@@ -649,7 +651,7 @@ export default function ParticipantDetails() {
         {},
       );
     const nextErrors = {
-      email: validateEmail(transferEmail),
+      email: validateEmail(transferEmail, undefined, PARTICIPANT_EMAIL_MAX_LENGTH),
       fields: fieldErrors,
     };
 

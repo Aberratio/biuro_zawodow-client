@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ListFilter, Loader2, Plus } from "lucide-react";
+import { FlaskConical, ListFilter, Loader2, Plus } from "lucide-react";
 import { useData } from "@/contexts/DataContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,7 @@ import { PageHeader } from "@/components/PageHeader";
 const EVENTS_PAGE_SIZE = 20;
 
 type EventStatusFilter = "all" | "active" | "upcoming" | "finished";
+type EventTestFilter = "all" | "production" | "test";
 type EventTimingStatus = Exclude<EventStatusFilter, "all">;
 
 function getEventTimingStatus(
@@ -168,10 +169,12 @@ function formatEventCount(value: number) {
 
 export default function Events() {
   const {
+    events,
     visibleEvents,
     archivedEvents,
     organizations,
     createEvent,
+    createTestEvent,
     currentUser,
     currentRole,
     selectedOrganizationId,
@@ -186,8 +189,10 @@ export default function Events() {
     name: string;
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingTestEvent, setIsCreatingTestEvent] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<EventStatusFilter>("all");
+  const [testFilter, setTestFilter] = useState<EventTestFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const adminOrganizationIds = useMemo(
     () => organizations.map((organization) => organization.id),
@@ -273,7 +278,7 @@ export default function Events() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedOrganizationId, statusFilter]);
+  }, [searchQuery, selectedOrganizationId, statusFilter, testFilter]);
   const scopedEvents = useMemo(
     () =>
       currentRole === "admin"
@@ -310,8 +315,11 @@ export default function Events() {
         event.organizationName.toLowerCase().includes(normalizedQuery);
       const matchesStatus =
         statusFilter === "all" || event.timingStatus === statusFilter;
+      const matchesTestFilter =
+        testFilter === "all" ||
+        (testFilter === "test" ? event.is_test : !event.is_test);
 
-      return matchesQuery && matchesStatus;
+      return matchesQuery && matchesStatus && matchesTestFilter;
     });
 
     return [...filtered].sort(
@@ -319,7 +327,7 @@ export default function Events() {
         left.officeOpenAtTimestamp - right.officeOpenAtTimestamp ||
         left.name.localeCompare(right.name, "pl"),
     );
-  }, [eventRows, searchQuery, statusFilter]);
+  }, [eventRows, searchQuery, statusFilter, testFilter]);
   const totalPages = Math.max(
     1,
     Math.ceil(processedRows.length / EVENTS_PAGE_SIZE),
@@ -355,7 +363,9 @@ export default function Events() {
     () =>
       [...visibleEvents, ...archivedEvents].reduce<Record<string, number>>(
         (counts, event) => {
-          counts[event.organization_id] = (counts[event.organization_id] ?? 0) + 1;
+          if (!event.is_test) {
+            counts[event.organization_id] = (counts[event.organization_id] ?? 0) + 1;
+          }
           return counts;
         },
         {},
@@ -370,6 +380,13 @@ export default function Events() {
     [accessibleOrganizations, totalEventsByOrganizationId],
   );
   const canCreateForAnyOrganization = creatableOrganizations.length > 0;
+  const canCreateTestForAnyOrganization = accessibleOrganizations.length > 0;
+  const testEventOrganizationId =
+    (currentRole === "admin" && selectedOrganizationId) ||
+    form.organization_id ||
+    currentUser.organization_id ||
+    accessibleOrganizations[0]?.id ||
+    "";
   const formOrganizationUsedSlots = useMemo(
     () => totalEventsByOrganizationId[form.organization_id] ?? 0,
     [form.organization_id, totalEventsByOrganizationId],
@@ -378,7 +395,7 @@ export default function Events() {
     ? formOrganizationUsedSlots >= formOrganization.event_limit
     : false;
   const hasActiveFilters =
-    searchQuery.trim().length > 0 || statusFilter !== "all";
+    searchQuery.trim().length > 0 || statusFilter !== "all" || testFilter !== "all";
   const paginationModel = useMemo(
     () => buildPaginationModel(currentPage, totalPages),
     [currentPage, totalPages],
@@ -573,24 +590,74 @@ export default function Events() {
     }
   };
 
+  const handleCreateTestEvent = async () => {
+    if (!testEventOrganizationId) {
+      toast({
+        title: "Nie udało się utworzyć wydarzenia testowego",
+        description: "Brak organizacji, dla której można utworzyć sandbox.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreatingTestEvent(true);
+    const result = await createTestEvent(testEventOrganizationId);
+    setIsCreatingTestEvent(false);
+
+    if (!result.ok) {
+      toast({
+        title: "Nie udało się utworzyć wydarzenia testowego",
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (result.entityId) {
+      const createdEvent =
+        visibleEvents.find((event) => event.id === result.entityId) ??
+        events.find((event) => event.id === result.entityId);
+      setCreatedEventSuccess({
+        id: result.entityId,
+        name: createdEvent?.name ?? "Wydarzenie testowe",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <PageHeader className="contents" title="Wydarzenia" />
         {canCreateEvent && (
-          <Button
-            onClick={() => setOpen(true)}
-            size="sm"
-            className="w-full sm:w-auto sm:self-auto"
-            disabled={!isOnline || !canCreateForAnyOrganization}
-            title={
-              !canCreateForAnyOrganization
-                ? "Wszystkie dostępne organizacje osiągnęły już limit wydarzeń."
-                : undefined
-            }
-          >
-            <Plus className="mr-1 h-4 w-4" /> Nowe wydarzenie
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:self-auto">
+            <Button
+              onClick={() => void handleCreateTestEvent()}
+              size="sm"
+              variant="outline"
+              className="w-full sm:w-auto"
+              disabled={!isOnline || !canCreateTestForAnyOrganization || isCreatingTestEvent}
+            >
+              {isCreatingTestEvent ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <FlaskConical className="mr-1 h-4 w-4" />
+              )}
+              Wydarzenie testowe
+            </Button>
+            <Button
+              onClick={() => setOpen(true)}
+              size="sm"
+              className="w-full sm:w-auto"
+              disabled={!isOnline || !canCreateForAnyOrganization}
+              title={
+                !canCreateForAnyOrganization
+                  ? "Wszystkie dostępne organizacje osiągnęły już limit wydarzeń."
+                  : undefined
+              }
+            >
+              <Plus className="mr-1 h-4 w-4" /> Nowe wydarzenie
+            </Button>
+          </div>
         )}
       </div>
 
@@ -662,6 +729,23 @@ export default function Events() {
                 <SelectItem value="active">Biuro otwarte teraz</SelectItem>
                 <SelectItem value="upcoming">Nadchodzące</SelectItem>
                 <SelectItem value="finished">Zakończone</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="min-w-[12rem] space-y-2">
+            <Label htmlFor="events-test-filter">Typ</Label>
+            <Select
+              value={testFilter}
+              onValueChange={(value) => setTestFilter(value as EventTestFilter)}
+            >
+              <SelectTrigger id="events-test-filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Wszystkie typy</SelectItem>
+                <SelectItem value="production">Tylko realne</SelectItem>
+                <SelectItem value="test">Tylko testowe</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -748,6 +832,14 @@ export default function Events() {
                           >
                             {status.label}
                           </Badge>
+                          {event.is_test && (
+                            <Badge
+                              variant="outline"
+                              className="rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium shadow-none"
+                            >
+                              Testowe
+                            </Badge>
+                          )}
                         </div>
                         <span className="block truncate text-xs text-muted-foreground md:hidden">
                           {event.location}

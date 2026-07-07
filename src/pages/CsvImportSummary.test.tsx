@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import CsvImportSummary from '@/pages/CsvImportSummary';
 import type { Event } from '@/types';
@@ -36,11 +36,20 @@ function renderSummaryState(state: Record<string, unknown>) {
     participants: [],
   });
 
+  const resetEventParticipantList = vi.fn(async () => ({
+    ok: true,
+    deleted_participant_count: 0,
+    deleted_mapping_count: 1,
+    deleted_baseline_record_count: 0,
+    deleted_change_log_count: 0,
+  }));
+
   useDataMock.mockReturnValue({
     events: [createEvent()],
     selectedEventId: 'event-1',
     isLoading: false,
     runParticipantImport,
+    resetEventParticipantList,
     connectionState: 'online',
   });
 
@@ -53,11 +62,22 @@ function renderSummaryState(state: Record<string, unknown>) {
     >
       <Routes>
         <Route path="/events/:id/import/summary" element={<CsvImportSummary />} />
+        <Route path="/events/:id" element={<div>Event route reached</div>} />
       </Routes>
     </MemoryRouter>,
   );
 
-  return { runParticipantImport };
+  return { runParticipantImport, resetEventParticipantList };
+}
+
+function ImportRouteProbe() {
+  const location = useLocation();
+  return (
+    <div>
+      <p>Import route reached</p>
+      <p>{((location.state as { restoreImport?: boolean } | null)?.restoreImport) ? 'restore enabled' : 'restore missing'}</p>
+    </div>
+  );
 }
 
 function renderSummary(createdCount: number, mode: 'append' | 'replace' = 'append') {
@@ -220,5 +240,93 @@ describe('CsvImportSummary page', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Dopisz$/ }));
 
     expect(runParticipantImport).not.toHaveBeenCalled();
+  });
+
+  it('returns to CSV validation settings with restore state', async () => {
+    useDataMock.mockReturnValue({
+      events: [createEvent()],
+      selectedEventId: 'event-1',
+      isLoading: false,
+      runParticipantImport: vi.fn(),
+      resetEventParticipantList: vi.fn(),
+      connectionState: 'online',
+    });
+
+    render(
+      <MemoryRouter
+        initialEntries={[{
+          pathname: '/events/event-1/import/summary',
+          state: {
+            summary: {
+              created_count: 0,
+              duplicate_count: 0,
+              invalid_count: 1,
+              invalid_rows: [2],
+            },
+            headers: ['Email', 'Category'],
+            sourceRows: [{ Email: 'jan@example.com', Category: '' }],
+            mappings: [
+              { source_column_name: 'Email', alias: 'Email', field_role: 'email', display_order: 1, is_required: true, is_active: true },
+              { source_column_name: 'Category', alias: 'Category', field_role: 'custom', display_order: 2, is_required: true, is_active: true, field_type: 'text', validation_rules: {} },
+            ],
+            analysis: {
+              headers: ['Email', 'Category'],
+              sample_rows: [{ Email: 'jan@example.com', Category: '' }],
+              email_candidates: [{ column: 'Email', matched_count: 1 }],
+              has_mapping: false,
+              has_baseline_import: false,
+              mappings: [],
+              missing_required_columns: [],
+              row_count: 1,
+              existing_participant_count: 0,
+              sent_qr_email_count: 0,
+              list_difference: {
+                columns_differ: false,
+                missing_columns: [],
+                extra_columns: [],
+                participant_difference_ratio: 0,
+                should_offer_replacement: false,
+              },
+            },
+            csvContent: 'Email,Category\njan@example.com,',
+            emailColumn: 'Email',
+            fileName: 'uczestnicy.csv',
+            mode: 'append',
+          },
+        }]}
+      >
+        <Routes>
+          <Route path="/events/:id/import/summary" element={<CsvImportSummary />} />
+          <Route path="/events/:id/import" element={<ImportRouteProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Wróć do ustawień walidacji/i }));
+
+    expect(await screen.findByText('Import route reached')).toBeInTheDocument();
+    expect(screen.getByText('restore enabled')).toBeInTheDocument();
+  });
+
+  it('can remove the whole participant list from the import summary', async () => {
+    const { resetEventParticipantList } = renderSummaryState({
+      summary: {
+        created_count: 0,
+        duplicate_count: 0,
+        invalid_count: 1,
+        invalid_rows: [2],
+      },
+      headers: ['Email'],
+      emailColumn: 'Email',
+      fileName: 'uczestnicy.csv',
+      mode: 'append',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Usuń całą listę/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Usuń listę i mapowanie/i }));
+
+    await waitFor(() => {
+      expect(resetEventParticipantList).toHaveBeenCalledWith('event-1', false);
+    });
   });
 });

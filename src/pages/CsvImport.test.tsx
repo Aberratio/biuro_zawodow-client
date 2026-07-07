@@ -766,4 +766,79 @@ describe('CsvImport page', () => {
       );
     });
   });
+
+  it('restores validation settings from route state after returning from the import summary', async () => {
+    useDataMock.mockReturnValue({
+      events: [createEvent()],
+      selectedEventId: 'event-1',
+      analyzeParticipantImport: vi.fn(),
+      confirmParticipantImportMapping: vi.fn(),
+      runParticipantImport: vi.fn(),
+      replaceParticipantImport: vi.fn(),
+      isLoading: false,
+      connectionState: 'online',
+    });
+
+    render(
+      <MemoryRouter
+        initialEntries={[{
+          pathname: '/events/event-1/import',
+          state: {
+            restoreImport: true,
+            csvContent: 'Email,Imie,Dystans\nanna@example.com,Anna,5K',
+            fileName: 'uczestnicy.csv',
+            selectedEmailColumn: 'Email',
+            validationPanelsOpen: true,
+            analysis: {
+              headers: ['Email', 'Imie', 'Dystans'],
+              sample_rows: [{ Email: 'anna@example.com', Imie: 'Anna', Dystans: '5K' }],
+              email_candidates: [{ column: 'Email', matched_count: 1 }],
+              has_mapping: false,
+              has_baseline_import: false,
+              mappings: [
+                {
+                  source_column_name: 'Imie',
+                  alias: 'Imię',
+                  field_role: 'display_name_part',
+                  display_order: 1,
+                  is_required: true,
+                  is_active: true,
+                },
+                {
+                  source_column_name: 'Dystans',
+                  alias: 'Dystans',
+                  field_role: 'custom',
+                  field_type: 'select',
+                  validation_rules: { options: ['5K', '10K'] },
+                  display_order: 2,
+                  is_required: true,
+                  is_active: true,
+                },
+              ],
+              missing_required_columns: [],
+              row_count: 1,
+              existing_participant_count: 0,
+              sent_qr_email_count: 0,
+              list_difference: {
+                columns_differ: false,
+                missing_columns: [],
+                extra_columns: [],
+                participant_difference_ratio: 0,
+                should_offer_replacement: false,
+              },
+            },
+          },
+        }]}
+      >
+        <Routes>
+          <Route path="/events/:id/import" element={<CsvImport />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Mapowanie kolumn')).toBeInTheDocument();
+    expect(screen.getByText('uczestnicy.csv')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Walidacja i typ pola/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zapisz mapowanie i importuj' })).toBeInTheDocument();
+  });
 });

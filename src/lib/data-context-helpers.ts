@@ -36,7 +36,7 @@ export interface ApiUser {
   assigned_events: string[];
 }
 
-export type ApiEvent = Event;
+export type ApiEvent = Omit<Event, 'is_test'> & { is_test?: boolean | number | string | null };
 export type ApiOrganization = Organization;
 
 export interface BootstrapResponse {
@@ -54,6 +54,13 @@ export interface BootstrapResponse {
 
 export function mapApiOrganizationToUi(organization: ApiOrganization): Organization {
   return { ...organization };
+}
+
+export function mapApiEventToUi(event: ApiEvent): Event {
+  return {
+    ...event,
+    is_test: event.is_test === true || event.is_test === 1 || event.is_test === '1',
+  };
 }
 
 export interface ParticipantQrPreviewResponse {
@@ -338,8 +345,8 @@ export function buildOfflineSnapshot(args: {
     selectedEventId: args.selectedEventId,
     data: {
       organizations: args.organizations.map(mapApiOrganizationToUi),
-      events: args.events,
-      archivedEvents: args.archivedEvents,
+      events: args.events.map(mapApiEventToUi),
+      archivedEvents: args.archivedEvents.map(mapApiEventToUi),
       users: args.users,
       participants: args.participants.map(participant => ({ ...participant, sync_state: 'synced', sync_error: undefined })),
       activityLog: args.activityLog,
@@ -350,8 +357,8 @@ export function buildOfflineSnapshot(args: {
 export function createBootstrapSnapshotVersion(response: BootstrapResponse['data']): string {
   return createSnapshotVersion({
     organizations: (response.organizations ?? []).map(mapApiOrganizationToUi),
-    events: response.events ?? [],
-    archivedEvents: response.archivedEvents ?? [],
+    events: (response.events ?? []).map(mapApiEventToUi),
+    archivedEvents: (response.archivedEvents ?? []).map(mapApiEventToUi),
     users: (response.users ?? []).map(mapApiUserToUi),
     participants: (response.participants ?? []).map(participant => mapApiParticipantToUi(participant, '')),
     activityLog: Array.isArray(response.activityLog) ? response.activityLog : [],

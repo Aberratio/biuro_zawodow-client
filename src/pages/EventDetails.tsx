@@ -59,6 +59,7 @@ import {
   MapPin,
   Pencil,
   Plus,
+  RefreshCcw,
   ScanLine,
   Trash2,
   Users,
@@ -86,9 +87,11 @@ import {
   getActiveParticipantMappings,
   getParticipantFieldType,
   getParticipantValidationRules,
+  hasParticipantValidationRules,
   isConfigurableParticipantMapping,
   parseSelectOptions,
   participantFieldTypeLabels,
+  PARTICIPANT_EMAIL_MAX_LENGTH,
   validateParticipantFieldValue,
 } from "@/lib/participant-fields";
 import { participantCountsAsCheckedIn } from "@/lib/participant-status";
@@ -388,6 +391,7 @@ export default function EventDetails() {
     addUser,
     assignScannerEvents,
     updateEvent,
+    resetTestEvent,
     archiveEvent,
     deleteEvent,
     exportEventCsv,
@@ -455,6 +459,8 @@ export default function EventDetails() {
   const [isArchivingEvent, setIsArchivingEvent] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeletingEvent, setIsDeletingEvent] = useState(false);
+  const [resetTestConfirmOpen, setResetTestConfirmOpen] = useState(false);
+  const [isResettingTestEvent, setIsResettingTestEvent] = useState(false);
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
   const [editForm, setEditForm] = useState({
     name: "",
@@ -613,7 +619,7 @@ export default function EventDetails() {
   const isFinishedEvent = officeCloseAt !== null && now > officeCloseAt;
   const canArchiveEvent = canManageEventLifecycle && isFinishedEvent;
   const canDeleteEvent = canManageEventLifecycle;
-  const canDeleteEventNow = canDeleteEvent && !isFinishedEvent;
+  const canDeleteEventNow = canDeleteEvent && (!isFinishedEvent || Boolean(event.is_test));
   const canReopenEvent = canEditEvent && !isArchivedEvent && isFinishedEvent;
   const canSendQrForEvent =
     !isArchivedEvent &&
@@ -802,6 +808,7 @@ export default function EventDetails() {
 
     const fieldType = getParticipantFieldType(mapping);
     const rules = getParticipantValidationRules(mapping);
+    const hasColumnValidation = mapping.is_required || fieldType !== "text" || hasParticipantValidationRules(rules);
     const updateRules = (patch: ParticipantFieldValidationRules) => {
       updateMappingDraft(mapping.source_column_name, {
         validation_rules: {
@@ -814,6 +821,13 @@ export default function EventDetails() {
       updateMappingDraft(mapping.source_column_name, {
         field_type: fieldTypeValue,
         validation_rules: fieldTypeValue === "select" ? { options: rules.options ?? [] } : {},
+      });
+    };
+    const clearValidation = () => {
+      updateMappingDraft(mapping.source_column_name, {
+        field_type: "text",
+        validation_rules: {},
+        is_required: false,
       });
     };
 
@@ -831,6 +845,21 @@ export default function EventDetails() {
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-3 border-t px-3 py-3">
+          <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              {hasColumnValidation ? "Kolumna ma ustawioną walidację." : "Kolumna nie ma dodatkowej walidacji."}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={clearValidation}
+              disabled={!hasColumnValidation}
+            >
+              <Trash2 className="mr-1 h-4 w-4" />
+              Usuń walidację
+            </Button>
+          </div>
           <div className="grid gap-3 md:grid-cols-[minmax(0,14rem)_1fr]">
             <div className="space-y-1.5">
               <Label htmlFor={`event-mapping-field-type-${index}`}>Typ pola</Label>
@@ -1180,7 +1209,7 @@ export default function EventDetails() {
       {},
     );
     const nextErrors = {
-      email: validateEmail(manualEmail),
+      email: validateEmail(manualEmail, undefined, PARTICIPANT_EMAIL_MAX_LENGTH),
       fields: fieldErrors,
     };
 
@@ -1418,6 +1447,24 @@ export default function EventDetails() {
     navigate("/events");
   };
 
+  const handleResetTestEvent = async () => {
+    setIsResettingTestEvent(true);
+    const result = await resetTestEvent(event.id);
+    setIsResettingTestEvent(false);
+
+    if (!result.ok) {
+      toast({
+        title: "Nie udało się zresetować danych testowych",
+        description: result.error ?? "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setResetTestConfirmOpen(false);
+    toast({ title: "Dane testowe zostały odtworzone" });
+  };
+
   const backTo =
     location.state?.backTo ??
     (isArchivedEvent
@@ -1454,6 +1501,22 @@ export default function EventDetails() {
               <p className="archive-notice-copy mt-1">
                 Jest ukryte z aktywnych list i przypisań. Dane są dostępne do
                 podglądu, a zmiany w archiwum może wykonywać tylko superadmin.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {event.is_test && (
+        <div className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sky-300/30">
+              <RefreshCcw className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="font-semibold">Tryb testowy</p>
+              <p className="mt-1 text-sky-100/80">
+                To wydarzenie służy do sprawdzania działania biura zawodów. Nie wlicza się do limitu realnych wydarzeń, a wysyłka QR jest symulowana.
               </p>
             </div>
           </div>
@@ -1787,6 +1850,21 @@ export default function EventDetails() {
           {canDeleteEvent && (
             <CollapsibleSection title="Administracja" defaultOpen={false}>
               <div className="flex flex-col gap-2">
+                {event.is_test && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setResetTestConfirmOpen(true)}
+                    className="event-detail-operation-button h-11 justify-start"
+                    disabled={!isOnline || isResettingTestEvent}
+                  >
+                    {isResettingTestEvent ? (
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCcw className="mr-1 h-4 w-4" />
+                    )}
+                    Resetuj dane testowe
+                  </Button>
+                )}
                 <Button
                   variant="destructive"
                   onClick={() => setDeleteConfirmOpen(true)}
@@ -1838,14 +1916,46 @@ export default function EventDetails() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={resetTestConfirmOpen}
+        onOpenChange={setResetTestConfirmOpen}
+      >
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resetować dane testowe?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Lista uczestników, mapowanie pól i godziny biura w wydarzeniu{" "}
+              <span className="font-medium text-foreground">{event.name}</span>{" "}
+              zostaną odtworzone do przykładowego zestawu sandboxu.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleResetTestEvent()}
+              disabled={isResettingTestEvent || !isOnline}
+            >
+              {isResettingTestEvent && (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              )}
+              Resetuj dane
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Usunąć wydarzenie?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {event.is_test ? "Usunąć wydarzenie testowe?" : "Usunąć wydarzenie?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Wydarzenie{" "}
               <span className="font-medium text-foreground">{event.name}</span>{" "}
-              zniknie na zawszei przestanie wliczać się do limitu wydarzeń.
+              {event.is_test
+                ? "zniknie z listy sandboxów i nie będzie widoczne dla organizatora."
+                : "zniknie na zawszei przestanie wliczać się do limitu wydarzeń."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1858,7 +1968,7 @@ export default function EventDetails() {
               {isDeletingEvent && (
                 <Loader2 className="mr-1 h-4 w-4 animate-spin" />
               )}
-              Usuń wydarzenie
+              {event.is_test ? "Usuń wydarzenie testowe" : "Usuń wydarzenie"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

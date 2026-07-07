@@ -56,8 +56,9 @@ export default function Dashboard() {
 
   if (currentRole === 'admin' || currentRole === 'superadmin' || currentRole === 'editor') {
     const now = new Date();
-    const sourceEvents =
-      currentRole === 'admin' || currentRole === 'superadmin' ? dashboardEvents : visibleEvents;
+    const sourceEvents = (
+      currentRole === 'admin' || currentRole === 'superadmin' ? dashboardEvents : visibleEvents
+    ).filter(event => !event.is_test);
     const activeEvents = sourceEvents
       .filter((event) => isEventOfficeOpen(event, now))
       .sort(
