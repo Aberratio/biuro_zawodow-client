@@ -460,6 +460,8 @@ export default function SuperAdmin() {
   const [isChangingUserRole, setIsChangingUserRole] = useState(false);
 
   const allEvents = useMemo(() => [...events, ...archivedEvents], [archivedEvents, events]);
+  const productionEvents = useMemo(() => events.filter((event) => !event.is_test), [events]);
+  const productionArchivedEvents = useMemo(() => archivedEvents.filter((event) => !event.is_test), [archivedEvents]);
   const isOnline = connectionState === "online";
 
   const roleCounts = useMemo(() => {
@@ -1271,8 +1273,8 @@ export default function SuperAdmin() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={Users} label="Użytkownicy" value={users.length} detail={`${roleCounts.admin} adminów`} />
-        <MetricCard icon={Building2} label="Organizacje" value={organizations.length} detail={`${events.length} aktywnych wydarzeń`} />
-        <MetricCard icon={CalendarDays} label="Archiwum" value={archivedEvents.length} detail="wydarzenia po zamknięciu" />
+        <MetricCard icon={Building2} label="Organizacje" value={organizations.length} detail={`${productionEvents.length} aktywnych wydarzeń`} />
+        <MetricCard icon={CalendarDays} label="Archiwum" value={productionArchivedEvents.length} detail="wydarzenia po zamknięciu" />
         <MetricCard icon={Activity} label="Odprawy" value={checkedInCount} detail={`${participants.length} uczestników`} />
       </div>
 
@@ -2223,8 +2225,8 @@ export default function SuperAdmin() {
             </ControlCard>
 
             <ControlCard title="Wydarzenia" icon={CalendarDays}>
-              <ControlRow label="Aktywne" value={events.length} />
-              <ControlRow label="Archiwalne" value={archivedEvents.length} />
+              <ControlRow label="Aktywne" value={productionEvents.length} />
+              <ControlRow label="Archiwalne" value={productionArchivedEvents.length} />
               <ControlRow label="Z uczestnikami" value={new Set(participants.map((participant) => participant.event_id)).size} />
             </ControlCard>
 

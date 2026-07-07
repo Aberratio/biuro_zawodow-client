@@ -1,5 +1,5 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
 import { useRouteEventContext } from '@/hooks/use-route-event-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -35,6 +35,7 @@ import { formatParticipantCount } from '@/lib/participants';
 import {
   getParticipantFieldType,
   getParticipantValidationRules,
+  hasParticipantValidationRules,
   isConfigurableParticipantMapping,
   participantFieldTypeLabels,
   suggestSelectOptionsFromRows,
@@ -307,6 +308,7 @@ function parseCsvRows(csvContent: string, expectedHeaders: string[] = []): Recor
 export default function CsvImport() {
   const { id: routeEventId = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     events,
     selectedEventId,
@@ -320,6 +322,7 @@ export default function CsvImport() {
   const eventId = routeEventId || selectedEventId;
   const event = events.find(item => item.id === eventId);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const restoredImportStateAppliedRef = useRef(false);
 
   const [fileName, setFileName] = useState('');
   const [csvContent, setCsvContent] = useState('');
@@ -336,6 +339,32 @@ export default function CsvImport() {
   const isOnline = connectionState === 'online';
 
   useRouteEventContext(routeEventId);
+
+  useEffect(() => {
+    if (restoredImportStateAppliedRef.current) return;
+
+    const routeState = (location.state ?? {}) as {
+      restoreImport?: boolean;
+      csvContent?: string;
+      fileName?: string;
+      analysis?: Awaited<ReturnType<typeof analyzeParticipantImport>>;
+      selectedEmailColumn?: string;
+      replacementMode?: boolean;
+      validationPanelsOpen?: boolean;
+    };
+
+    if (!routeState.restoreImport || !routeState.analysis) return;
+
+    restoredImportStateAppliedRef.current = true;
+    setCsvContent(routeState.csvContent ?? '');
+    setFileName(routeState.fileName ?? '');
+    setAnalysis(routeState.analysis);
+    setSelectedEmailColumn(routeState.selectedEmailColumn ?? '');
+    setReplacementMode(Boolean(routeState.replacementMode));
+    setValidationPanelsOpen(routeState.validationPanelsOpen ?? true);
+    setSummary(null);
+    setMappingErrors({ aliases: {} });
+  }, [analyzeParticipantImport, location.state]);
 
   useEffect(() => {
     if (!analysis || (analysis.has_mapping && !replacementMode)) {
@@ -608,6 +637,7 @@ export default function CsvImport() {
     const rules = getParticipantValidationRules(field);
     const selectOptions = rules.options ?? [];
     const isValidationPanelOpen = validationPanelsOpen || Boolean(openValidationPanels[field.source_column_name]);
+    const hasColumnValidation = field.is_required || fieldType !== 'text' || hasParticipantValidationRules(rules);
     const updateRules = (patch: ParticipantFieldValidationRules) => {
       handleFieldChange(field.source_column_name, {
         validation_rules: {
@@ -633,6 +663,13 @@ export default function CsvImport() {
       handleFieldChange(field.source_column_name, {
         field_type: fieldTypeValue,
         validation_rules: fieldTypeValue === 'select' ? { options: rules.options?.length ? rules.options : [''] } : {},
+      });
+    };
+    const clearValidation = () => {
+      handleFieldChange(field.source_column_name, {
+        field_type: 'text',
+        validation_rules: {},
+        is_required: false,
       });
     };
     const suggestedOptions = () => {
@@ -672,6 +709,21 @@ export default function CsvImport() {
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-3 border-t px-3 py-3">
+          <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              {hasColumnValidation ? 'Kolumna ma ustawioną walidację.' : 'Kolumna nie ma dodatkowej walidacji.'}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={clearValidation}
+              disabled={!hasColumnValidation}
+            >
+              <X className="mr-1 h-4 w-4" />
+              Usuń walidację
+            </Button>
+          </div>
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
               checked={field.is_required}
@@ -905,6 +957,8 @@ export default function CsvImport() {
         headers: analysis?.headers ?? [],
         sourceRows: analysis ? parseCsvRows(csvContent, analysis.headers) : [],
         mappings: buildImportSummaryMappings(),
+        analysis,
+        csvContent,
         emailColumn,
         fileName,
         importedAt: new Date().toISOString(),

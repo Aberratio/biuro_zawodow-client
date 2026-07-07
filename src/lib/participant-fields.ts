@@ -1,5 +1,8 @@
 import type { Participant, ParticipantFieldMapping, ParticipantFieldValidationRules } from '@/types';
 
+export const PARTICIPANT_EMAIL_MAX_LENGTH = 190; // participants.email VARCHAR(190)
+export const PARTICIPANT_BIB_NUMBER_MAX_LENGTH = 32; // participants.bib_number VARCHAR(32)
+
 export const participantFieldTypeLabels = {
   text: 'Tekst',
   number: 'Liczba',
@@ -20,6 +23,13 @@ export function getParticipantValidationRules(
   mapping: Pick<ParticipantFieldMapping, 'validation_rules'>,
 ): NonNullable<ParticipantFieldMapping['validation_rules']> {
   return mapping.validation_rules ?? {};
+}
+
+export function hasParticipantValidationRules(rules: ParticipantFieldValidationRules): boolean {
+  return Object.values(rules).some(value => {
+    if (Array.isArray(value)) return value.some(option => option.trim() !== '');
+    return value !== undefined && value !== null && value !== '';
+  });
 }
 
 export function parseSelectOptions(value: string): string[] {
@@ -108,6 +118,10 @@ export function validateParticipantFieldValue(mapping: ParticipantFieldMapping, 
   const trimmedValue = value.trim();
   if (!trimmedValue) {
     return mapping.is_required ? `Uzupełnij pole: ${alias}.` : '';
+  }
+
+  if (mapping.field_role === 'bib_number' && trimmedValue.length > PARTICIPANT_BIB_NUMBER_MAX_LENGTH) {
+    return `Pole ${alias} może mieć maksymalnie ${PARTICIPANT_BIB_NUMBER_MAX_LENGTH} znaków.`;
   }
 
   const fieldType = getParticipantFieldType(mapping);

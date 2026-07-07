@@ -92,8 +92,8 @@ export default function Organizations() {
     return visibleOrganizations
       .filter(org => !normalizedQuery || org.name.toLocaleLowerCase('pl-PL').includes(normalizedQuery))
       .map(org => {
-        const organizationEvents = events.filter(event => event.organization_id === org.id);
-        const organizationArchivedEvents = archivedEvents.filter(event => event.organization_id === org.id);
+        const organizationEvents = events.filter(event => event.organization_id === org.id && !event.is_test);
+        const organizationArchivedEvents = archivedEvents.filter(event => event.organization_id === org.id && !event.is_test);
 
         return {
           ...org,

@@ -2,14 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ActivityLog, AppDiagnostics, ConnectionState, Event, Organization, Participant, ParticipantFieldMapping, ParticipantQrPreview, ParticipantScanResult, ParticipantStatus, Role, ScannerMode, ServiceWorkerState, SnapshotSource, User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { API_BASE_URL, fetchJson, getApiErrorCode, isApiResponseError, isNetworkRequestError } from '@/lib/api';
-import { type ApiEvent, type ApiOrganization, type ApiParticipant, type ApiUser, type BootstrapResponse, type ParticipantQrPreviewResponse, type ParticipantScanApiResponse, OFFLINE_ACTION_MESSAGE, applyPendingMutations, buildOfflineSnapshot, createBootstrapSnapshotVersion, createClientMutationId, extractConflictParticipant, getDefaultCurrentUser, getDeviceId, getInitialConnectionState, getSelectableOrganizationsForUser, getVisibleEventsForUser, mapApiOrganizationToUi, mapApiParticipantToUi, mapApiUserToUi, participantUiIdToApiId, persistStoredSelectedEventId, persistStoredSelectedOrganizationId, readStoredSelectedEventId, readStoredSelectedOrganizationId, resolveSelectedEventId, resolveSelectedOrganizationId } from '@/lib/data-context-helpers';
+import { type ApiEvent, type ApiOrganization, type ApiParticipant, type ApiUser, type BootstrapResponse, type ParticipantQrPreviewResponse, type ParticipantScanApiResponse, OFFLINE_ACTION_MESSAGE, applyPendingMutations, buildOfflineSnapshot, createBootstrapSnapshotVersion, createClientMutationId, extractConflictParticipant, getDefaultCurrentUser, getDeviceId, getInitialConnectionState, getSelectableOrganizationsForUser, getVisibleEventsForUser, mapApiEventToUi, mapApiOrganizationToUi, mapApiParticipantToUi, mapApiUserToUi, participantUiIdToApiId, persistStoredSelectedEventId, persistStoredSelectedOrganizationId, readStoredSelectedEventId, readStoredSelectedOrganizationId, resolveSelectedEventId, resolveSelectedOrganizationId } from '@/lib/data-context-helpers';
 import { deletePendingMutation, loadBootstrapSnapshot, loadPendingMutations, loadSyncMeta, saveBootstrapSnapshot, savePendingMutation, saveSyncMeta, updatePendingMutation, type OfflineBootstrapSnapshot, type PendingParticipantMutation } from '@/lib/offline-store';
 import { getEventOfficeCloseAt, isEventOfficeOpen } from '@/lib/events';
 import { hasGlobalOrganizationScope } from '@/lib/roles';
 import { checkBrowserStorage } from '@/lib/browser-storage';
 
 type UserCreateInput = Omit<User, 'id' | 'password'> & { password?: string };
-type EventMutationInput = Omit<Event, 'id' | 'archived_at' | 'deleted_at'>;
+type EventMutationInput = Omit<Event, 'id' | 'archived_at' | 'deleted_at' | 'is_test'>;
 type EventUpdateInput = EventMutationInput & { reopen_office?: boolean };
 
 interface MutationResult { ok: boolean; error?: string; entityId?: string; queued?: boolean; }
@@ -65,6 +65,8 @@ interface DataContextType {
   updateParticipantFieldMappings: (eventId: string, mappings: ParticipantFieldMapping[]) => Promise<ParticipantFieldMappingUpdateResult>;
   addParticipantManually: (eventId: string, email: string, fieldValues: Record<string, string>) => Promise<MutationResult>;
   createEvent: (e: EventMutationInput) => Promise<MutationResult>;
+  createTestEvent: (organizationId: string) => Promise<MutationResult>;
+  resetTestEvent: (eventId: string) => Promise<MutationResult>;
   updateEvent: (eventId: string, data: EventUpdateInput) => Promise<MutationResult>;
   archiveEvent: (eventId: string) => Promise<MutationResult>;
   deleteEvent: (eventId: string) => Promise<MutationResult>;
@@ -321,8 +323,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const hydrateData = useCallback((responseData: BootstrapResponse['data'] | OfflineBootstrapSnapshot['data'], source: SnapshotSource, generatedAt: string, preferredOrganizationId = '', preferredEventId = '') => {
     if (!authUser) return;
     const nextOrganizations = Array.isArray(responseData.organizations) ? responseData.organizations.map(mapApiOrganizationToUi) : [];
-    const nextEvents = Array.isArray(responseData.events) ? responseData.events : [];
-    const nextArchivedEvents = Array.isArray(responseData.archivedEvents) ? responseData.archivedEvents : [];
+    const nextEvents = Array.isArray(responseData.events) ? responseData.events.map(mapApiEventToUi) : [];
+    const nextArchivedEvents = Array.isArray(responseData.archivedEvents) ? responseData.archivedEvents.map(mapApiEventToUi) : [];
     const nextUsers = (responseData.users ?? []).map(mapApiUserToUi);
     const nextCurrentUser = nextUsers.find(user => user.id === authUser.id) ?? authUser;
     const nextVisibleEvents = getVisibleEventsForUser(nextEvents, nextCurrentUser);
@@ -362,7 +364,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       hydrateData(response.data, 'network', generatedAt);
       markConnectionHealthy();
       try {
-        await saveBootstrapSnapshot(buildOfflineSnapshot({ userId: authUser.id, selectedOrganizationId: readStoredSelectedOrganizationId(authUser.id), selectedEventId: readStoredSelectedEventId(authUser.id), organizations: Array.isArray(response.data.organizations) ? response.data.organizations.map(mapApiOrganizationToUi) : [], events: Array.isArray(response.data.events) ? response.data.events : [], archivedEvents: Array.isArray(response.data.archivedEvents) ? response.data.archivedEvents : [], users: (response.data.users ?? []).map(mapApiUserToUi), participants: (response.data.participants ?? []).map(participant => mapApiParticipantToUi(participant, '')), activityLog: Array.isArray(response.data.activityLog) ? response.data.activityLog : [], generatedAt, snapshotVersion }));
+        await saveBootstrapSnapshot(buildOfflineSnapshot({ userId: authUser.id, selectedOrganizationId: readStoredSelectedOrganizationId(authUser.id), selectedEventId: readStoredSelectedEventId(authUser.id), organizations: Array.isArray(response.data.organizations) ? response.data.organizations.map(mapApiOrganizationToUi) : [], events: Array.isArray(response.data.events) ? response.data.events.map(mapApiEventToUi) : [], archivedEvents: Array.isArray(response.data.archivedEvents) ? response.data.archivedEvents.map(mapApiEventToUi) : [], users: (response.data.users ?? []).map(mapApiUserToUi), participants: (response.data.participants ?? []).map(participant => mapApiParticipantToUi(participant, '')), activityLog: Array.isArray(response.data.activityLog) ? response.data.activityLog : [], generatedAt, snapshotVersion }));
         await updateSyncMeta(authUser.id, generatedAt, null);
       } catch {
         // The bootstrap itself succeeded; a failed offline-cache write must not push the app into degraded mode.
@@ -944,18 +946,57 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const createEvent = useCallback(async (eventData: EventMutationInput) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
-    const organization = organizations.find(entry => entry.id === eventData.organization_id); const organizationEventCount = [...events, ...archivedEvents].filter(event => event.organization_id === eventData.organization_id).length;
+    const organization = organizations.find(entry => entry.id === eventData.organization_id); const organizationEventCount = [...events, ...archivedEvents].filter(event => event.organization_id === eventData.organization_id && !event.is_test).length;
     if (organization && organizationEventCount >= organization.event_limit) return { ok: false, error: 'Limit wydarzeń dla tej organizacji został osiągnięty' };
     const payload = (await fetchJson(`${API_BASE_URL}/events`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(eventData) })).payload as { data?: ApiEvent };
     if (!payload.data) return { ok: false, error: 'API zwróciło pustą odpowiedź podczas tworzenia wydarzenia' };
-    markLocalDataChanged(); setEvents(previous => [...previous, payload.data]); addLog(`Utworzono wydarzenie: ${payload.data.name}`); return { ok: true, entityId: payload.data.id };
+    const createdEvent = mapApiEventToUi(payload.data);
+    markLocalDataChanged(); setEvents(previous => [...previous, createdEvent]); addLog(`Utworzono wydarzenie: ${createdEvent.name}`); return { ok: true, entityId: createdEvent.id };
   }), [addLog, archivedEvents, ensureOnline, events, getAuthHeaders, markLocalDataChanged, organizations, runMutation]);
+
+  const createTestEvent = useCallback(async (organizationId: string) => runMutation(async () => {
+    const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
+    const payload = (await fetchJson(`${API_BASE_URL}/events/test`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ organization_id: organizationId }) })).payload as { data?: { event?: ApiEvent; participants?: ApiParticipant[]; mappings?: ParticipantFieldMapping[] } };
+    const event = payload.data?.event;
+    if (!event) return { ok: false, error: 'API zwrocilo pusta odpowiedz podczas tworzenia wydarzenia testowego' };
+    const createdEvent = mapApiEventToUi(event);
+    const createdParticipants = (payload.data?.participants ?? []).map(participant => mapApiParticipantToUi(participant, createdEvent.id));
+    markLocalDataChanged();
+    setEvents(previous => [...previous.filter(item => item.id !== createdEvent.id), createdEvent]);
+    setParticipantRecords(previous => [...previous.filter(participant => participant.event_id !== createdEvent.id), ...createdParticipants]);
+    if (Array.isArray(payload.data?.mappings)) {
+      rememberParticipantFieldMappingsState(createdEvent.id, { has_mapping: payload.data.mappings.length > 0, has_baseline_import: true, mappings: payload.data.mappings });
+    }
+    addLog(`Utworzono wydarzenie testowe: ${createdEvent.name}`);
+    await loadBootstrap(true);
+    return { ok: true, entityId: createdEvent.id };
+  }), [addLog, ensureOnline, getAuthHeaders, loadBootstrap, markLocalDataChanged, rememberParticipantFieldMappingsState, runMutation]);
+
+  const resetTestEvent = useCallback(async (eventId: string) => runMutation(async () => {
+    const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
+    const payload = (await fetchJson(`${API_BASE_URL}/events/${eventId}/test-reset`, { method: 'POST', headers: getAuthHeaders() })).payload as { data?: { event?: ApiEvent; participants?: ApiParticipant[]; mappings?: ParticipantFieldMapping[] } };
+    const event = payload.data?.event;
+    if (!event) return { ok: false, error: 'API zwrocilo pusta odpowiedz podczas resetu wydarzenia testowego' };
+    const resetEvent = mapApiEventToUi(event);
+    const resetParticipants = (payload.data?.participants ?? []).map(participant => mapApiParticipantToUi(participant, resetEvent.id));
+    markLocalDataChanged();
+    setEvents(previous => [...previous.filter(item => item.id !== resetEvent.id), resetEvent]);
+    setArchivedEvents(previous => previous.filter(item => item.id !== resetEvent.id));
+    setParticipantRecords(previous => [...previous.filter(participant => participant.event_id !== resetEvent.id), ...resetParticipants]);
+    if (Array.isArray(payload.data?.mappings)) {
+      rememberParticipantFieldMappingsState(resetEvent.id, { has_mapping: payload.data.mappings.length > 0, has_baseline_import: true, mappings: payload.data.mappings });
+    }
+    addLog(`Zresetowano wydarzenie testowe: ${resetEvent.name}`);
+    await loadBootstrap(true);
+    return { ok: true, entityId: resetEvent.id };
+  }), [addLog, ensureOnline, getAuthHeaders, loadBootstrap, markLocalDataChanged, rememberParticipantFieldMappingsState, runMutation]);
 
   const updateEvent = useCallback(async (eventId: string, data: EventUpdateInput) => runMutation(async () => {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const payload = (await fetchJson(`${API_BASE_URL}/events/${eventId}`, { method: 'PATCH', headers: getAuthHeaders(true), body: JSON.stringify(data) })).payload as { data?: ApiEvent };
     if (!payload.data) return { ok: false, error: 'API zwróciło pustą odpowiedź podczas aktualizacji wydarzenia' };
-    markLocalDataChanged(); setEvents(previous => previous.map(event => event.id === eventId ? payload.data! : event)); addLog(`Zaktualizowano wydarzenie: ${payload.data.name}`); return { ok: true };
+    const updatedEvent = mapApiEventToUi(payload.data);
+    markLocalDataChanged(); setEvents(previous => previous.map(event => event.id === eventId ? updatedEvent : event)); addLog(`Zaktualizowano wydarzenie: ${updatedEvent.name}`); return { ok: true };
   }), [addLog, ensureOnline, getAuthHeaders, markLocalDataChanged, runMutation]);
 
   const archiveEvent = useCallback(async (eventId: string) => runMutation(async () => {
@@ -970,7 +1011,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const offlineError = ensureOnline(); if (offlineError) return { ok: false, error: offlineError };
     const existingEvent = events.find(event => event.id === eventId);
     const eventOfficeCloseAt = existingEvent ? getEventOfficeCloseAt(existingEvent) : null;
-    if (eventOfficeCloseAt !== null && Date.now() > eventOfficeCloseAt.getTime()) return { ok: false, error: 'Zakończone wydarzenia trzeba przenieść do archiwum zamiast usuwać' };
+    if (eventOfficeCloseAt !== null && Date.now() > eventOfficeCloseAt.getTime() && !existingEvent?.is_test) return { ok: false, error: 'Zakończone wydarzenia trzeba przenieść do archiwum zamiast usuwać' };
     await fetchJson(`${API_BASE_URL}/events/${eventId}/delete-ui`, { method: 'POST', headers: getAuthHeaders() }); markLocalDataChanged(); setEvents(previous => previous.filter(event => event.id !== eventId)); if (selectedEventId === eventId) setSelectedEventId(''); if (existingEvent) addLog(`Usunięto wydarzenie: ${existingEvent.name}`); await loadBootstrap(true); return { ok: true };
   }), [addLog, ensureOnline, events, getAuthHeaders, loadBootstrap, markLocalDataChanged, runMutation, selectedEventId, setSelectedEventId]);
 
@@ -1079,7 +1120,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const getParticipantQrPreview = useCallback(async (participantId: string) => {
     const payload = (await applyOnlineOnly(async () => fetchJson(`${API_BASE_URL}/participants/${participantUiIdToApiId(participantId)}/qr-preview`, { headers: getAuthHeaders() }), 'Podgląd QR jest dostępny tylko po połączeniu z serwerem.')).payload as ParticipantQrPreviewResponse;
     if (!payload.data?.participant || !payload.data.event) throw new Error('API QR preview failed');
-    return { participant: mapApiParticipantToUi(payload.data.participant, payload.data.event.id), event: payload.data.event, qr_code_svg_data_uri: payload.data.qr_code_svg_data_uri ?? '', qr_code_image_url: payload.data.qr_code_image_url ?? '' };
+    const previewEvent = mapApiEventToUi(payload.data.event);
+    return { participant: mapApiParticipantToUi(payload.data.participant, previewEvent.id), event: previewEvent, qr_code_svg_data_uri: payload.data.qr_code_svg_data_uri ?? '', qr_code_image_url: payload.data.qr_code_image_url ?? '' };
   }, [applyOnlineOnly, getAuthHeaders]);
 
   const scanParticipantQr = useCallback(async (qrCode: string) => {
@@ -1093,7 +1135,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const response = await fetchJson(`${API_BASE_URL}/participants/scan`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ qr_code: normalizedQrCode }) });
       const payload = response.payload as ParticipantScanApiResponse;
       if (!payload.data?.participant || !payload.data.event) return { ok: false, error: 'Nie znaleziono uczestnika dla tego kodu QR.', status: response.response.status };
-      return { ok: true, data: { participant: mapApiParticipantToUi(payload.data.participant, payload.data.event.id), event: payload.data.event, access: { allowed: Boolean(payload.data.access?.allowed) } }, status: response.response.status };
+      const scanEvent = mapApiEventToUi(payload.data.event);
+      return { ok: true, data: { participant: mapApiParticipantToUi(payload.data.participant, scanEvent.id), event: scanEvent, access: { allowed: Boolean(payload.data.access?.allowed) } }, status: response.response.status };
     } catch (error) {
       handleNetworkFailure(error);
       return { ok: false, error: normalizeScanParticipantErrorMessage(error), status: isApiResponseError(error) ? error.status : 0 };
@@ -1109,8 +1152,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const event = events.find(entry => entry.id === eventId) ?? archivedEvents.find(entry => entry.id === eventId);
     const eventName = event?.name ?? 'wydarzenie';
     const slug = eventName
-      .replace(/[ąćęłńóśźż]/g, letter => ({ ą: 'a', ć: 'c', ę: 'e', ł: 'l', ń: 'n', ó: 'o', ś: 's', ź: 'z', ż: 'z' }[letter] ?? letter))
-      .replace(/[ĄĆĘŁŃÓŚŹŻ]/g, letter => ({ Ą: 'A', Ć: 'C', Ę: 'E', Ł: 'L', Ń: 'N', Ó: 'O', Ś: 'S', Ź: 'Z', Ż: 'Z' }[letter] ?? letter))
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
@@ -1178,7 +1219,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [buildExportFallbackName, downloadCsvResponse, ensureOnline, getAuthHeaders, handleNetworkFailure]);
 
   return (
-    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, replaceParticipantImport, resetEventParticipantList, getParticipantFieldMappingsState, getParticipantFieldMappings, updateParticipantFieldMappings, addParticipantManually, createEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, setUserPassword, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, exportEventParticipantChangesCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, diagnostics, refreshData }}>
+    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, replaceParticipantImport, resetEventParticipantList, getParticipantFieldMappingsState, getParticipantFieldMappings, updateParticipantFieldMappings, addParticipantManually, createEvent, createTestEvent, resetTestEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, setUserPassword, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, exportEventParticipantChangesCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, diagnostics, refreshData }}>
       {children}
     </DataContext.Provider>
   );
@@ -1189,3 +1230,4 @@ export function useData() {
   if (!context) throw new Error('useData must be used within DataProvider');
   return context;
 }
+

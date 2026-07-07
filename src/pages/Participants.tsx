@@ -60,13 +60,15 @@ import { ParticipantFieldMapping } from "@/types";
 import {
   buildEmptyParticipantFieldValues,
   getActiveParticipantMappings,
+  PARTICIPANT_EMAIL_MAX_LENGTH,
+  validateParticipantFieldValue,
 } from "@/lib/participant-fields";
 import { formatBibNumber } from "@/lib/participants";
 import {
   getParticipantStatusDefinition,
   PARTICIPANT_STATUS_DEFINITIONS,
 } from "@/lib/participant-status";
-import { validateEmail, validateRequired } from "@/lib/form-validation";
+import { validateEmail } from "@/lib/form-validation";
 import { isScannerRole } from "@/lib/roles";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 import { PageHeader } from "@/components/PageHeader";
@@ -91,7 +93,7 @@ export default function Participants() {
     selectedEventId,
     currentRole,
     isLoading,
-    getParticipantFieldMappings,
+    getParticipantFieldMappingsState,
     addParticipantManually,
     resetEventParticipantList,
     connectionState,
@@ -104,6 +106,7 @@ export default function Participants() {
   const [sortKey, setSortKey] = useState<ParticipantSortKey>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
+  const [hasSavedParticipantListState, setHasSavedParticipantListState] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualEmail, setManualEmail] = useState("");
   const [manualFields, setManualFields] = useState<Record<string, string>>({});
@@ -182,19 +185,22 @@ export default function Participants() {
     if (!activeEventId || !isOnline) {
       setMappings([]);
       setManualFields({});
+      setHasSavedParticipantListState(false);
       return;
     }
 
-    void getParticipantFieldMappings(activeEventId)
-      .then((data) => {
-        setMappings(data);
-        setManualFields(buildEmptyParticipantFieldValues(data));
+    void getParticipantFieldMappingsState(activeEventId)
+      .then((state) => {
+        setMappings(state.mappings);
+        setManualFields(buildEmptyParticipantFieldValues(state.mappings));
+        setHasSavedParticipantListState(state.has_mapping || state.has_baseline_import);
       })
       .catch(() => {
         setMappings([]);
         setManualFields({});
+        setHasSavedParticipantListState(false);
       });
-  }, [activeEventId, getParticipantFieldMappings, isOnline]);
+  }, [activeEventId, getParticipantFieldMappingsState, isOnline]);
 
   const activeMappings = useMemo(
     () => getActiveParticipantMappings(mappings),
@@ -204,10 +210,9 @@ export default function Participants() {
     Boolean(activeEventId) && !isScannerRole(currentRole);
   const canResetParticipantList =
     Boolean(activeEventId) &&
-    eventParticipants.length > 0 &&
+    (eventParticipants.length > 0 || hasSavedParticipantListState) &&
     ["editor", "admin", "superadmin"].includes(currentRole);
   const canAddManually =
-    eventParticipants.length > 0 &&
     mappings.length > 0 &&
     !isScannerRole(currentRole);
 
@@ -251,21 +256,19 @@ export default function Participants() {
   };
 
   const handleManualSubmit = async () => {
-    const fieldErrors = activeMappings
-      .filter((mapping) => mapping.is_required)
-      .reduce<Record<string, string>>(
-        (accumulator, mapping) => {
-          const error = validateRequired(
-            manualFields[mapping.alias] ?? "",
-            `Uzupełnij pole: ${mapping.alias}.`,
-          );
-          if (error) accumulator[mapping.alias] = error;
-          return accumulator;
-        },
-        {},
-      );
+    const fieldErrors = activeMappings.reduce<Record<string, string>>(
+      (accumulator, mapping) => {
+        const error = validateParticipantFieldValue(
+          mapping,
+          manualFields[mapping.alias] ?? "",
+        );
+        if (error) accumulator[mapping.alias] = error;
+        return accumulator;
+      },
+      {},
+    );
     const nextErrors = {
-      email: validateEmail(manualEmail),
+      email: validateEmail(manualEmail, undefined, PARTICIPANT_EMAIL_MAX_LENGTH),
       fields: fieldErrors,
     };
 

@@ -1,5 +1,7 @@
-export function isValidEmailAddress(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+export function isValidEmailAddress(email: string, maxLength?: number): boolean {
+  const trimmed = email.trim();
+  if (maxLength !== undefined && trimmed.length > maxLength) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
 }
 
 export function validateRequired(value: string, message: string): string {
@@ -11,9 +13,12 @@ export function validateNonNegativeInteger(value: string, message: string): stri
   return Number.isInteger(parsed) && parsed >= 0 ? "" : message;
 }
 
-export function validateEmail(value: string, emptyMessage = "Podaj adres email."): string {
+export function validateEmail(value: string, emptyMessage = "Podaj adres email.", maxLength?: number): string {
   const email = value.trim();
   if (!email) return emptyMessage;
+  if (maxLength !== undefined && email.length > maxLength) {
+    return `Adres e-mail może mieć maksymalnie ${maxLength} znaków.`;
+  }
   return isValidEmailAddress(email) ? "" : "Podaj poprawny adres email.";
 }
 
