@@ -73,6 +73,7 @@ import { isScannerRole } from "@/lib/roles";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 import { PageHeader } from "@/components/PageHeader";
 import { ParticipantFieldRoleHint } from "@/components/ParticipantFieldRoleHint";
+import { ParticipantFieldValueInput } from "@/components/ParticipantFieldValueInput";
 import {
   buildEventImportPath,
   buildEventParticipantPath,
@@ -630,16 +631,17 @@ export default function Participants() {
               return (
                 <div key={`${mapping.alias}-${mapping.source_column_name}`}>
                   <Label htmlFor={fieldId}>{mapping.alias}</Label>
-                  <Input
+                  <ParticipantFieldValueInput
                     id={fieldId}
+                    mapping={mapping}
                     value={manualFields[mapping.alias] ?? ""}
-                    onChange={(event) =>
-                      handleManualFieldChange(mapping.alias, event.target.value)
+                    onChange={(value) =>
+                      handleManualFieldChange(mapping.alias, value)
                     }
                     className="mt-2"
                     required={mapping.is_required}
-                    aria-invalid={Boolean(fieldError)}
-                    aria-describedby={
+                    invalid={Boolean(fieldError)}
+                    describedBy={
                       fieldError ? `${descriptionId} ${errorId}` : descriptionId
                     }
                   />
