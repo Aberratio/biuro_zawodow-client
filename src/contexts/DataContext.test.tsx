@@ -33,6 +33,9 @@ function TestConsumer() {
     canAccessEvent,
     canViewEvent,
     createEvent,
+    createTestEvent,
+    resetTestEvent,
+    participants,
   } = useData();
 
   return (
@@ -40,6 +43,7 @@ function TestConsumer() {
       <div data-testid="selected-organization">{selectedOrganizationId}</div>
       <div data-testid="selected-event">{selectedEventId}</div>
       <div data-testid="visible-events-count">{visibleEvents.length}</div>
+      <div data-testid="participants-count">{participants.length}</div>
       <div data-testid="can-access-event-1">{String(canAccessEvent('event-1'))}</div>
       <div data-testid="can-access-event-2">{String(canAccessEvent('event-2'))}</div>
       <div data-testid="can-view-archived-event">{String(canViewEvent('archived-event-1'))}</div>
@@ -69,6 +73,12 @@ function TestConsumer() {
       >
         create-event-2
       </button>
+      <button type="button" onClick={() => { void createTestEvent('org-1'); }}>
+        create-test-event
+      </button>
+      <button type="button" onClick={() => { void resetTestEvent('event-1'); }}>
+        reset-test-event-1
+      </button>
     </div>
   );
 }
@@ -87,6 +97,7 @@ function createEvent(id: string, organizationId = 'org-1'): Event {
     organization_id: organizationId,
     office_open_at: '2099-04-12T07:00:00',
     office_close_at: '2099-04-12T15:00:00',
+    is_test: false,
   };
 }
 
@@ -105,7 +116,7 @@ function createOrganization(id: string): Organization {
   };
 }
 
-function createBootstrapResponse(user: User, events: Event[], organizations: Organization[] = []) {
+function createBootstrapResponse(user: User, events: Event[], organizations: Organization[] = [], participants: unknown[] = []) {
   return {
     ok: true,
     status: 200,
@@ -120,7 +131,7 @@ function createBootstrapResponse(user: User, events: Event[], organizations: Org
         events,
         archivedEvents: [],
         users: [user],
-        participants: [],
+        participants,
         activityLog: [],
       },
     }),
@@ -733,5 +744,161 @@ describe('DataProvider bootstrap loading', () => {
     expect(screen.getByTestId('can-access-event-2').textContent).toBe('true');
     expect(screen.getByTestId('can-view-archived-event').textContent).toBe('true');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates test events through the sandbox endpoint even when the organization limit is reached', async () => {
+    const adminUser: User = {
+      id: 'admin-1',
+      name: 'Admin',
+      email: 'admin@example.com',
+      password: '',
+      role: 'admin',
+      assigned_events: [],
+    };
+    const organization = { ...createOrganization('org-1'), event_limit: 1 };
+    const productionEvent = createEvent('event-1', 'org-1');
+    const testEvent = createEvent('event-test-1', 'org-1');
+    testEvent.is_test = true;
+
+    authState.user = adminUser;
+
+    let bootstrapCalls = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/bootstrap')) {
+        bootstrapCalls += 1;
+        return createBootstrapResponse(
+          adminUser,
+          bootstrapCalls === 1 ? [productionEvent] : [productionEvent, testEvent],
+          [organization],
+        );
+      }
+      if (url.endsWith('/events/test') && options?.method === 'POST') {
+        return createJsonResponse({ data: { event: testEvent, participants: [], mappings: [] } }, 201);
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <TestConsumer />
+      </DataProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('visible-events-count').textContent).toBe('1'));
+    fireEvent.click(screen.getByRole('button', { name: 'create-test-event' }));
+
+    await waitFor(() => expect(screen.getByTestId('visible-events-count').textContent).toBe('2'));
+    const sandboxCall = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/events/test'));
+    expect(sandboxCall).toBeDefined();
+    expect(JSON.parse(String(sandboxCall?.[1]?.body))).toEqual({ organization_id: 'org-1' });
+  });
+
+  it('does not count existing test events toward the local event limit for real events', async () => {
+    const adminUser: User = {
+      id: 'admin-1',
+      name: 'Admin',
+      email: 'admin@example.com',
+      password: '',
+      role: 'admin',
+      assigned_events: [],
+    };
+    const organization = { ...createOrganization('org-1'), event_limit: 1 };
+    const testEvent = createEvent('event-test-1', 'org-1');
+    testEvent.is_test = true;
+    const productionEvent = createEvent('event-2', 'org-1');
+
+    authState.user = adminUser;
+
+    let bootstrapCalls = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/bootstrap')) {
+        bootstrapCalls += 1;
+        return createBootstrapResponse(
+          adminUser,
+          bootstrapCalls === 1 ? [testEvent] : [testEvent, productionEvent],
+          [organization],
+        );
+      }
+      if (url.endsWith('/events') && options?.method === 'POST') {
+        return createJsonResponse({ data: productionEvent }, 201);
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <TestConsumer />
+      </DataProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('visible-events-count').textContent).toBe('1'));
+    fireEvent.click(screen.getByRole('button', { name: 'create-event-2' }));
+
+    await waitFor(() => expect(screen.getByTestId('visible-events-count').textContent).toBe('2'));
+    expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith('/events'))).toBe(true);
+  });
+
+  it('resets test event data through the reset endpoint and refreshes participants', async () => {
+    const adminUser: User = {
+      id: 'admin-1',
+      name: 'Admin',
+      email: 'admin@example.com',
+      password: '',
+      role: 'admin',
+      assigned_events: [],
+    };
+    const testEvent = createEvent('event-1', 'org-1');
+    testEvent.is_test = true;
+    const resetParticipant = {
+      id: 11,
+      event_id: 'event-1',
+      first_name: 'Anna',
+      last_name: 'Testowa',
+      email: 'anna@example.com',
+      bib_number: '101',
+      qr_code: 'pqr_test',
+      status: 'not_checked_in',
+      email_status: 'sent',
+      checked_in_at: null,
+      custom_fields: {},
+      important_field_aliases: [],
+    };
+
+    authState.user = adminUser;
+
+    let bootstrapCalls = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/bootstrap')) {
+        bootstrapCalls += 1;
+        return createBootstrapResponse(
+          adminUser,
+          [testEvent],
+          [createOrganization('org-1')],
+          bootstrapCalls === 1 ? [] : [resetParticipant],
+        );
+      }
+      if (url.endsWith('/events/event-1/test-reset') && options?.method === 'POST') {
+        return createJsonResponse({ data: { event: testEvent, participants: [resetParticipant], mappings: [] } });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <DataProvider>
+        <TestConsumer />
+      </DataProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('participants-count').textContent).toBe('0'));
+    fireEvent.click(screen.getByRole('button', { name: 'reset-test-event-1' }));
+
+    await waitFor(() => expect(screen.getByTestId('participants-count').textContent).toBe('1'));
+    expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith('/events/event-1/test-reset'))).toBe(true);
   });
 });
