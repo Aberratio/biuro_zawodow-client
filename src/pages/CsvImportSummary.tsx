@@ -30,6 +30,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PageHeader } from '@/components/PageHeader';
+import { ParticipantFieldValueInput } from '@/components/ParticipantFieldValueInput';
 import { buildEventImportPath, buildEventPath } from '@/lib/routes';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { toast } from '@/hooks/use-toast';
@@ -567,6 +568,7 @@ function ParticipantIssueEditorDialog({
                 const validationError = fieldErrors[header];
                 const importHint = reasonHints[header];
                 const describedBy = validationError ? `${inputId}-error` : importHint ? `${inputId}-hint` : undefined;
+                const mapping = header === emailColumn ? undefined : findMappingForHeader(mappings, header);
 
                 return (
                   <div key={`${issue.row_number}-${header}`} className="space-y-1.5">
@@ -574,15 +576,26 @@ function ParticipantIssueEditorDialog({
                       <span className="truncate">{header}</span>
                       {header === emailColumn && <Badge variant="secondary">e-mail</Badge>}
                     </Label>
-                    <Input
-                      id={inputId}
-                      type={header === emailColumn ? 'email' : 'text'}
-                      value={issue.row?.[header] ?? ''}
-                      onChange={event => onFieldChange(issue.row_number, header, event.target.value)}
-                      aria-invalid={Boolean(validationError)}
-                      aria-describedby={describedBy}
-                      placeholder={header === emailColumn ? 'email@example.com' : undefined}
-                    />
+                    {mapping && mapping.field_role !== 'email' ? (
+                      <ParticipantFieldValueInput
+                        id={inputId}
+                        mapping={mapping}
+                        value={issue.row?.[header] ?? ''}
+                        onChange={value => onFieldChange(issue.row_number, header, value)}
+                        invalid={Boolean(validationError)}
+                        describedBy={describedBy}
+                      />
+                    ) : (
+                      <Input
+                        id={inputId}
+                        type={header === emailColumn ? 'email' : 'text'}
+                        value={issue.row?.[header] ?? ''}
+                        onChange={event => onFieldChange(issue.row_number, header, event.target.value)}
+                        aria-invalid={Boolean(validationError)}
+                        aria-describedby={describedBy}
+                        placeholder={header === emailColumn ? 'email@example.com' : undefined}
+                      />
+                    )}
                     <FieldError id={`${inputId}-error`}>{validationError}</FieldError>
                     {!validationError && importHint && (
                       <p id={`${inputId}-hint`} className="text-xs text-amber-700">

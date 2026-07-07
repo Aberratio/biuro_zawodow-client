@@ -138,6 +138,16 @@ describe('participant field helpers', () => {
     expect(normalizeParticipantDateValue('06/07/2026', 'mdy')).toBe('2026-06-07');
     expect(normalizeParticipantDateValue('46109')).toBe('2026-03-28');
     expect(normalizeParticipantDateValue('06/07/2026')).toBeNull();
+    expect(normalizeParticipantDateValue('2026-07-06 12:30')).toBe('2026-07-06');
+    expect(normalizeParticipantDateValue('2026-07-06T12:30:00')).toBe('2026-07-06');
+    expect(normalizeParticipantDateValue('06.07.2026 12:30:45')).toBe('2026-07-06');
+    expect(normalizeParticipantDateValue('07/13/2026 5:30 PM')).toBe('2026-07-13');
+    expect(normalizeParticipantDateValue('46109.5')).toBe('2026-03-28');
+    expect(validateParticipantFieldValue({
+      ...mappings[4],
+      field_type: 'date',
+      validation_rules: { min: '2026-01-01', max: '2026-12-31' },
+    }, '2026-07-06 12:30')).toBe('');
     expect(validateParticipantFieldValue({
       ...mappings[4],
       field_type: 'date',

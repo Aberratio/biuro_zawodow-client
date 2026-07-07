@@ -79,7 +79,8 @@ function formatParticipantDate(year: number, month: number, day: number): string
 }
 
 export function normalizeParticipantDateValue(value: string, preferredFormat: ParticipantFieldValidationRules['date_format'] | 'auto' = 'auto'): string | null {
-  const trimmedValue = value.trim();
+  // Wartości z Excela/CSV często zawierają godzinę (np. "2026-07-06 12:30") — liczy się tylko data.
+  const trimmedValue = value.trim().replace(/[T\s]+\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:\s*(?:AM|PM))?$/i, '').trim();
   if (!trimmedValue) return null;
   const format = preferredFormat ?? 'auto';
 
@@ -104,7 +105,7 @@ export function normalizeParticipantDateValue(value: string, preferredFormat: Pa
       : formatParticipantDate(year, first, second);
   }
 
-  if (/^\d{4,5}(?:\.0+)?$/.test(trimmedValue)) {
+  if (/^\d{4,5}(?:\.\d+)?$/.test(trimmedValue)) {
     const serial = Number.parseInt(trimmedValue, 10);
     const date = new Date(Date.UTC(1899, 11, 30 + serial));
     return formatParticipantDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());

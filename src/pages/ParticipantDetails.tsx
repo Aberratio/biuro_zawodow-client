@@ -54,8 +54,6 @@ import {
 import {
   buildParticipantFieldValues,
   getActiveParticipantMappings,
-  getParticipantFieldType,
-  getParticipantValidationRules,
   PARTICIPANT_BIB_NUMBER_MAX_LENGTH,
   PARTICIPANT_EMAIL_MAX_LENGTH,
   validateParticipantFieldValue,
@@ -71,6 +69,7 @@ import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 import { PageHeader } from "@/components/PageHeader";
 import { PageBlockerOverlay } from "@/components/PageBlockerOverlay";
 import { ParticipantFieldRoleHint } from "@/components/ParticipantFieldRoleHint";
+import { ParticipantFieldValueInput } from "@/components/ParticipantFieldValueInput";
 import {
   canManageParticipantData as canManageParticipantDataForRole,
   canUseParticipantAdminActions,
@@ -1076,58 +1075,25 @@ export default function ParticipantDetails() {
               const errorId = `${fieldId}-error`;
               const descriptionId = `${fieldId}-description`;
               const fieldError = transferErrors.fields[mapping.alias];
-              const fieldType = getParticipantFieldType(mapping);
-              const rules = getParticipantValidationRules(mapping);
               const fieldValue = transferFields[mapping.alias] ?? "";
 
               return (
                 <div key={`${mapping.alias}-${mapping.source_column_name}`}>
                   <Label htmlFor={fieldId}>{mapping.alias}</Label>
-                  {fieldType === "select" ? (
-                    <Select
-                      value={fieldValue || "__empty"}
-                      onValueChange={(value) => handleTransferFieldChange(mapping.alias, value === "__empty" ? "" : value)}
-                    >
-                      <SelectTrigger
-                        id={fieldId}
-                        className="mt-2"
-                        aria-invalid={Boolean(fieldError)}
-                        aria-describedby={
-                          fieldError ? `${descriptionId} ${errorId}` : descriptionId
-                        }
-                      >
-                        <SelectValue placeholder="Wybierz wartość" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {!mapping.is_required && <SelectItem value="__empty">Brak wartości</SelectItem>}
-                        {(rules.options ?? []).map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      id={fieldId}
-                      type={fieldType === "number" ? "number" : fieldType === "date" ? "date" : "text"}
-                      min={fieldType === "number" || fieldType === "date" ? rules.min : undefined}
-                      max={fieldType === "number" || fieldType === "date" ? rules.max : undefined}
-                      value={fieldValue}
-                      onChange={(event) =>
-                        handleTransferFieldChange(
-                          mapping.alias,
-                          event.target.value,
-                        )
-                      }
-                      className="mt-2"
-                      required={mapping.is_required}
-                      aria-invalid={Boolean(fieldError)}
-                      aria-describedby={
-                        fieldError ? `${descriptionId} ${errorId}` : descriptionId
-                      }
-                    />
-                  )}
+                  <ParticipantFieldValueInput
+                    id={fieldId}
+                    mapping={mapping}
+                    value={fieldValue}
+                    onChange={(value) =>
+                      handleTransferFieldChange(mapping.alias, value)
+                    }
+                    className="mt-2"
+                    required={mapping.is_required}
+                    invalid={Boolean(fieldError)}
+                    describedBy={
+                      fieldError ? `${descriptionId} ${errorId}` : descriptionId
+                    }
+                  />
                   <ParticipantFieldRoleHint
                     id={descriptionId}
                     role={mapping.field_role}

@@ -103,6 +103,7 @@ import {
 import { getRoleLabel, isScannerRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
+import { ParticipantFieldValueInput } from "@/components/ParticipantFieldValueInput";
 import { PasswordRequirements } from "@/components/PasswordRequirements";
 import { generateStrongPassword } from "@/lib/password";
 import {
@@ -2354,53 +2355,22 @@ export default function EventDetails() {
               const fieldId = `event-manual-participant-field-${index}`;
               const errorId = `${fieldId}-error`;
               const fieldError = manualErrors.fields[mapping.alias];
-              const fieldType = getParticipantFieldType(mapping);
-              const rules = getParticipantValidationRules(mapping);
               const fieldValue = manualFields[mapping.alias] ?? "";
 
               return (
                 <div key={`${mapping.alias}-${mapping.source_column_name}`}>
                   <Label htmlFor={fieldId}>{mapping.alias}</Label>
-                  {fieldType === "select" ? (
-                    <Select
-                      value={fieldValue || "__empty"}
-                      onValueChange={(value) => handleManualFieldChange(mapping.alias, value === "__empty" ? "" : value)}
-                    >
-                      <SelectTrigger
-                        id={fieldId}
-                        className="mt-2"
-                        aria-invalid={Boolean(fieldError)}
-                        aria-describedby={fieldError ? errorId : undefined}
-                      >
-                        <SelectValue placeholder="Wybierz wartość" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {!mapping.is_required && <SelectItem value="__empty">Brak wartości</SelectItem>}
-                        {(rules.options ?? []).map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      id={fieldId}
-                      type={fieldType === "number" ? "number" : fieldType === "date" ? "date" : "text"}
-                      min={fieldType === "number" || fieldType === "date" ? rules.min : undefined}
-                      max={fieldType === "number" || fieldType === "date" ? rules.max : undefined}
-                      value={fieldValue}
-                      onChange={(eventValue) =>
-                        handleManualFieldChange(
-                          mapping.alias,
-                          eventValue.target.value,
-                        )
-                      }
-                      className="mt-2"
-                      aria-invalid={Boolean(fieldError)}
-                      aria-describedby={fieldError ? errorId : undefined}
-                    />
-                  )}
+                  <ParticipantFieldValueInput
+                    id={fieldId}
+                    mapping={mapping}
+                    value={fieldValue}
+                    onChange={(value) =>
+                      handleManualFieldChange(mapping.alias, value)
+                    }
+                    className="mt-2"
+                    invalid={Boolean(fieldError)}
+                    describedBy={fieldError ? errorId : undefined}
+                  />
                   <FieldError id={errorId} className="mt-2">
                     {fieldError}
                   </FieldError>
