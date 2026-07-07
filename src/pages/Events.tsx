@@ -54,6 +54,11 @@ import {
   parseEventDateTime,
 } from "@/lib/events";
 import { validateRequired } from "@/lib/form-validation";
+import {
+  countProductionEventsByOrganization,
+  matchesEventTestFilter,
+  type EventTestFilter,
+} from "@/lib/event-sandbox";
 import { buildEventPath } from "@/lib/routes";
 import { isScannerRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -63,7 +68,6 @@ import { PageHeader } from "@/components/PageHeader";
 const EVENTS_PAGE_SIZE = 20;
 
 type EventStatusFilter = "all" | "active" | "upcoming" | "finished";
-type EventTestFilter = "all" | "production" | "test";
 type EventTimingStatus = Exclude<EventStatusFilter, "all">;
 
 function getEventTimingStatus(
@@ -315,9 +319,7 @@ export default function Events() {
         event.organizationName.toLowerCase().includes(normalizedQuery);
       const matchesStatus =
         statusFilter === "all" || event.timingStatus === statusFilter;
-      const matchesTestFilter =
-        testFilter === "all" ||
-        (testFilter === "test" ? event.is_test : !event.is_test);
+      const matchesTestFilter = matchesEventTestFilter(event, testFilter);
 
       return matchesQuery && matchesStatus && matchesTestFilter;
     });
@@ -360,16 +362,7 @@ export default function Events() {
     [form.organization_id, organizations],
   );
   const totalEventsByOrganizationId = useMemo(
-    () =>
-      [...visibleEvents, ...archivedEvents].reduce<Record<string, number>>(
-        (counts, event) => {
-          if (!event.is_test) {
-            counts[event.organization_id] = (counts[event.organization_id] ?? 0) + 1;
-          }
-          return counts;
-        },
-        {},
-      ),
+    () => countProductionEventsByOrganization([...visibleEvents, ...archivedEvents]),
     [archivedEvents, visibleEvents],
   );
   const creatableOrganizations = useMemo(

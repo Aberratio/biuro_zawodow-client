@@ -24,9 +24,12 @@ vi.mock("@/hooks/use-toast", () => ({
 
 function renderPage(options: {
   addParticipantManually?: ReturnType<typeof vi.fn>;
+  event?: ReturnType<typeof createTestEvent>;
+  resetTestEvent?: ReturnType<typeof vi.fn>;
 } = {}) {
-  const event = createTestEvent();
+  const event = options.event ?? createTestEvent();
   const addParticipantManually = options.addParticipantManually ?? vi.fn(async () => ({ ok: true }));
+  const resetTestEvent = options.resetTestEvent ?? vi.fn(async () => ({ ok: true }));
 
   useDataMock.mockReturnValue({
     events: [event],
@@ -68,6 +71,7 @@ function renderPage(options: {
     addUser: vi.fn(async () => ({ ok: true })),
     assignScannerEvents: vi.fn(async () => ({ ok: true })),
     updateEvent: vi.fn(async () => ({ ok: true })),
+    resetTestEvent,
     archiveEvent: vi.fn(async () => ({ ok: true })),
     deleteEvent: vi.fn(async () => ({ ok: true })),
     exportEventCsv: vi.fn(async () => ({ ok: true })),
@@ -84,7 +88,7 @@ function renderPage(options: {
     </MemoryRouter>,
   );
 
-  return { addParticipantManually };
+  return { addParticipantManually, resetTestEvent };
 }
 
 describe("EventDetails page", () => {
@@ -121,6 +125,28 @@ describe("EventDetails page", () => {
         Dystans: "10K",
         Wiek: "21",
       }));
+    });
+  });
+
+  it("shows test mode controls and resets sandbox data after confirmation", async () => {
+    const resetTestEvent = vi.fn(async () => ({ ok: true }));
+    renderPage({
+      event: createTestEvent({ is_test: true }),
+      resetTestEvent,
+    });
+
+    expect(await screen.findByText("Tryb testowy")).toBeInTheDocument();
+
+    const adminSectionButtons = await screen.findAllByRole("button", { name: "Administracja" });
+    const adminSectionToggle = adminSectionButtons.find((button) => button.getAttribute("aria-expanded") === "false");
+    expect(adminSectionToggle).toBeDefined();
+    fireEvent.click(adminSectionToggle as HTMLElement);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Resetuj dane testowe" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Resetuj dane" }));
+
+    await waitFor(() => {
+      expect(resetTestEvent).toHaveBeenCalledWith("event-1");
     });
   });
 });
