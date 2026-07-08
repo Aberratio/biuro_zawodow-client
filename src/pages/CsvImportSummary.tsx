@@ -821,24 +821,30 @@ export default function CsvImportSummary() {
   };
 
   const handleReturnToValidationSettings = () => {
-    const restoredAnalysis = state.analysis ?? {
-      headers: state.headers ?? [],
-      sample_rows: (state.sourceRows ?? []).slice(0, 5),
-      email_candidates: state.emailColumn ? [{ column: state.emailColumn, matched_count: state.sourceRows?.length ?? 0 }] : [],
+    const restoredAnalysis = {
+      ...(state.analysis ?? {
+        headers: state.headers ?? [],
+        sample_rows: (state.sourceRows ?? []).slice(0, 5),
+        email_candidates: state.emailColumn ? [{ column: state.emailColumn, matched_count: state.sourceRows?.length ?? 0 }] : [],
+        has_baseline_import: false,
+        missing_required_columns: [],
+        row_count: state.sourceRows?.length ?? 0,
+        existing_participant_count: 0,
+        sent_qr_email_count: 0,
+        list_difference: {
+          columns_differ: false,
+          missing_columns: [],
+          extra_columns: [],
+          participant_difference_ratio: 0,
+          should_offer_replacement: false,
+        },
+      }),
+      // Prefer the mapping actually used for the import (state.mappings), which
+      // reflects the user's edits made in the mapping/validation step. Falling
+      // back to state.analysis.mappings here would discard those choices, since
+      // that object is the pre-edit analysis snapshot.
       has_mapping: false,
-      has_baseline_import: false,
-      mappings: state.mappings ?? [],
-      missing_required_columns: [],
-      row_count: state.sourceRows?.length ?? 0,
-      existing_participant_count: 0,
-      sent_qr_email_count: 0,
-      list_difference: {
-        columns_differ: false,
-        missing_columns: [],
-        extra_columns: [],
-        participant_difference_ratio: 0,
-        should_offer_replacement: false,
-      },
+      mappings: state.mappings ?? state.analysis?.mappings ?? [],
     };
 
     navigate(buildEventImportPath(eventId), {
@@ -931,7 +937,7 @@ export default function CsvImportSummary() {
                 onClick={handleReturnToValidationSettings}
                 className="w-full justify-center sm:w-auto"
               >
-                <RotateCcw className="mr-1 h-4 w-4" /> Wróć do ustawień walidacji
+                <RotateCcw className="mr-1 h-4 w-4" /> Wróć do Importu CSV
               </Button>
               {editableInvalidIssues.length > 0 && (
                 <>
