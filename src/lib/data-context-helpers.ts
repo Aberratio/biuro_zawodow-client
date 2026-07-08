@@ -1,4 +1,4 @@
-import type { ActivityLog, ConnectionState, Event, Organization, Participant, ParticipantStatus, User } from '@/types';
+import type { ActivityLog, ConnectionState, Event, Organization, Participant, ParticipantStatus, PaymentStatus, User } from '@/types';
 import { createSnapshotVersion, type OfflineBootstrapSnapshot, type PendingParticipantMutation } from '@/lib/offline-store';
 import { API_BASE_URL } from '@/lib/api';
 import { normalizeParticipantStatus } from '@/lib/participant-status';
@@ -23,6 +23,7 @@ export interface ApiParticipant {
   important_field_aliases?: string[] | null;
   status: ParticipantStatus | 'pending' | null;
   email_status: 'not_sent' | 'sent' | null;
+  payment_status?: PaymentStatus | string | null;
   checked_in_at: string | null;
 }
 
@@ -163,6 +164,7 @@ interface ParticipantLike {
   important_field_aliases?: string[] | null;
   status?: ParticipantStatus | 'pending' | string | null;
   email_status?: 'not_sent' | 'sent' | string | null;
+  payment_status?: PaymentStatus | string | null;
   checked_in_at?: string | null;
 }
 
@@ -196,6 +198,10 @@ function normalizeImportantFieldAliases(value: unknown): string[] {
   );
 }
 
+function normalizePaymentStatus(value: unknown): PaymentStatus {
+  return value === 'paid' || value === 'unpaid' || value === 'unknown' ? value : 'unknown';
+}
+
 export function mapApiParticipantToUi(participant: ParticipantLike | null | undefined, fallbackEventId: string): Participant {
   const eventId = toTrimmedString(participant?.event_id) || fallbackEventId;
   const displayName = toTrimmedString(participant?.display_name);
@@ -221,6 +227,7 @@ export function mapApiParticipantToUi(participant: ParticipantLike | null | unde
     qr_code: qrCode,
     status: normalizeParticipantStatus(toTrimmedString(participant?.status) || undefined),
     email_status: participant?.email_status === 'sent' ? 'sent' : 'not_sent',
+    payment_status: normalizePaymentStatus(participant?.payment_status),
     checked_in_at: checkedInAt || undefined,
     custom_fields: normalizeCustomFields(participant?.custom_fields),
     important_field_aliases: normalizeImportantFieldAliases(participant?.important_field_aliases),

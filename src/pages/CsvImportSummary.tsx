@@ -435,8 +435,10 @@ function IssueSummaryTable({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="max-h-[34rem] overflow-x-auto overflow-y-auto rounded-lg border">
-          <Table className="min-w-[56rem]">
+        <Table
+          className="min-w-[68rem]"
+          containerClassName="max-h-[34rem] overflow-auto rounded-lg"
+        >
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead className="w-24">Wiersz</TableHead>
@@ -504,8 +506,7 @@ function IssueSummaryTable({
                 );
               })}
             </TableBody>
-          </Table>
-        </div>
+        </Table>
       </CardContent>
     </Card>
   );
@@ -913,9 +914,10 @@ export default function CsvImportSummary() {
         </Button>
         <PageHeader
           title="Podsumowanie importu CSV"
-          className="sm:flex-col lg:flex-row"
-          headingClassName="break-words"
-          actionsClassName="w-full sm:flex-row lg:w-auto"
+          className="sm:flex-col"
+          contentClassName="w-full"
+          headingClassName="max-w-full text-balance leading-tight"
+          actionsClassName="w-full flex-row flex-wrap"
           description={
             <>
               <p>Wydarzenie: <span className="font-medium text-foreground">{event.name}</span></p>

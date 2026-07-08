@@ -42,7 +42,7 @@ import {
 } from '@/lib/participant-fields';
 import type { ParticipantFieldMapping, ParticipantFieldType, ParticipantFieldValidationRules } from '@/types';
 
-type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'custom' | 'important_custom';
+type EditableFieldRole = 'ignore' | 'display_name_part' | 'bib_number' | 'payment_status' | 'custom' | 'important_custom';
 
 interface MappingDraft {
   source_column_name: string;
@@ -146,6 +146,8 @@ function getPreviewFieldRoleLabel(role: MappingPreviewField['role']): string {
       return 'Imię i Nazwisko';
     case 'bib_number':
       return 'Numer startowy';
+    case 'payment_status':
+      return 'OpĹ‚ata';
     case 'important_custom':
       return 'Wyróżnij przy odprawie';
     case 'ignore':
@@ -162,6 +164,8 @@ function getPreviewRoleBadgeClassName(role: MappingPreviewField['role']): string
       return 'border-destructive/35 bg-destructive/10 text-muted-foreground';
     case 'bib_number':
       return 'border-amber-400/60 bg-amber-500/10 text-amber-700';
+    case 'payment_status':
+      return 'border-emerald-400/60 bg-emerald-500/10 text-emerald-700';
     case 'display_name_part':
       return 'border-sky-400/60 bg-sky-500/10 text-sky-700';
     case 'ignore':
@@ -177,10 +181,25 @@ function formatAddedParticipantsToast(count: number): string {
   return count === 0 ? 'nie dodano żadnych uczestników' : `dodano ${formatParticipantCount(count)}`;
 }
 
+function suggestFieldRoleFromHeader(header: string): EditableFieldRole {
+  const normalized = header
+    .toLocaleLowerCase('pl-PL')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (/(^|[^a-z])(oplata|oplac|platnosc|paid|payment)([^a-z]|$)/.test(normalized)) {
+    return 'payment_status';
+  }
+
+  return 'custom';
+}
+
 function getMappingFieldCardClassName(fieldRole: EditableFieldRole): string {
   switch (fieldRole) {
     case 'bib_number':
       return 'rounded-lg border border-amber-400/70 bg-amber-500/10 p-3 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.18)]';
+    case 'payment_status':
+      return 'rounded-lg border border-emerald-400/70 bg-emerald-500/10 p-3 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.16)]';
     case 'display_name_part':
       return 'rounded-lg border border-sky-400/70 bg-sky-500/10 p-3 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.16)]';
     case 'important_custom':
@@ -386,7 +405,7 @@ export default function CsvImport() {
           return {
             source_column_name: header,
             alias: savedMapping?.alias ?? header,
-            field_role: (savedMapping?.field_role as EditableFieldRole | undefined) ?? 'custom',
+            field_role: (savedMapping?.field_role as EditableFieldRole | undefined) ?? suggestFieldRoleFromHeader(header),
             field_type: savedMapping?.field_type ?? 'text',
             validation_rules: savedMapping?.validation_rules ?? {},
             is_required: Boolean(savedMapping?.is_required),
@@ -404,6 +423,7 @@ export default function CsvImport() {
   const shouldWaitForEmailSelection = isEditingMapping && !selectedEmailColumn && !hasAutoResolvableEmailColumn;
   const shouldShowEmailColumnStep = isEditingMapping && (multipleEmailCandidates || (!selectedEmailColumn && !hasAutoResolvableEmailColumn));
   const bibNumberColumn = mappingDrafts.find(field => field.field_role === 'bib_number')?.source_column_name ?? null;
+  const paymentStatusColumn = mappingDrafts.find(field => field.field_role === 'payment_status')?.source_column_name ?? null;
   const mappedBibNumberColumn = isEditingMapping
     ? bibNumberColumn
     : (analysis?.mappings.find(mapping => mapping.field_role === 'bib_number')?.source_column_name ?? null);
@@ -434,7 +454,7 @@ export default function CsvImport() {
     }
 
     for (const field of mappingDrafts) {
-      if (!['display_name_part', 'bib_number', 'important_custom'].includes(field.field_role)) continue;
+      if (!['display_name_part', 'bib_number', 'payment_status', 'important_custom'].includes(field.field_role)) continue;
       fields.push({
         source_column_name: field.source_column_name,
         label: field.alias.trim() || field.source_column_name,
@@ -541,6 +561,7 @@ export default function CsvImport() {
   const handlePreviewFieldRoleChange = (field: MappingPreviewField, role: EditableFieldRole) => {
     if (!field.source_column_name || field.role === 'email') return;
     if (role === 'bib_number' && bibNumberColumn && bibNumberColumn !== field.source_column_name) return;
+    if (role === 'payment_status' && paymentStatusColumn && paymentStatusColumn !== field.source_column_name) return;
 
     handleFieldChange(field.source_column_name, { field_role: role });
   };
@@ -561,6 +582,7 @@ export default function CsvImport() {
       { value: 'custom', label: 'Pole własne' },
       { value: 'display_name_part', label: 'Imię i Nazwisko' },
       { value: 'bib_number', label: 'Numer startowy' },
+      { value: 'payment_status', label: 'Opłata' },
       { value: 'ignore', label: 'Ignoruj' },
     ];
 
@@ -600,6 +622,8 @@ export default function CsvImport() {
                 {roleOptions.map(option => {
                   const isCurrentRole = field.role === option.value;
                   const isBibNumberBlocked = option.value === 'bib_number' && Boolean(bibNumberColumn && bibNumberColumn !== field.source_column_name);
+                  const isPaymentStatusBlocked = option.value === 'payment_status' && Boolean(paymentStatusColumn && paymentStatusColumn !== field.source_column_name);
+                  const isBlocked = isBibNumberBlocked || isPaymentStatusBlocked;
                   return (
                     <button
                       key={option.value}
@@ -608,13 +632,13 @@ export default function CsvImport() {
                         isCurrentRole
                           ? 'border-primary/50 bg-primary/10'
                           : 'border-border/60 bg-background/70 hover:bg-muted/50'
-                      } ${isBibNumberBlocked ? 'cursor-not-allowed opacity-50' : ''}`}
-                      disabled={isBibNumberBlocked}
+                      } ${isBlocked ? 'cursor-not-allowed opacity-50' : ''}`}
+                      disabled={isBlocked}
                       onClick={() => handlePreviewFieldRoleChange(field, option.value)}
                     >
                       <span className="min-w-0">
                         <span className="block truncate font-medium text-foreground">{option.label}</span>
-                        {isBibNumberBlocked && (
+                        {isBlocked && (
                           <span className="block truncate text-xs text-muted-foreground">Już przypisany</span>
                         )}
                       </span>
@@ -1333,6 +1357,9 @@ export default function CsvImport() {
                               <SelectItem value="display_name_part">Imię i Nazwisko</SelectItem>
                               <SelectItem value="bib_number" disabled={Boolean(bibNumberColumn && bibNumberColumn !== field.source_column_name)}>
                                 Numer startowy
+                              </SelectItem>
+                              <SelectItem value="payment_status" disabled={Boolean(paymentStatusColumn && paymentStatusColumn !== field.source_column_name)}>
+                                Opłata
                               </SelectItem>
                               <SelectItem value="important_custom">Wyróżnij przy odprawie</SelectItem>
                               <SelectItem value="custom">Pole własne</SelectItem>

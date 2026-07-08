@@ -10,6 +10,36 @@ export const participantFieldTypeLabels = {
   select: 'Lista wyboru',
 } as const;
 
+export const participantPaymentStatusLabels = {
+  unknown: 'Nieznany',
+  paid: 'Opłacony',
+  unpaid: 'Nieopłacony',
+} as const;
+
+export function normalizeParticipantPaymentFieldValue(value: string): 'unknown' | 'paid' | 'unpaid' | null {
+  const normalized = value.trim();
+  if (!normalized) return 'unpaid';
+  const key = normalized
+    .toLocaleLowerCase('pl-PL')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+
+  if (['tak', 't', 'yes', 'y', 'true', '1', 'x', 'ok', 'oplacone', 'oplacony', 'oplacona', 'zaplacone', 'paid'].includes(key)) {
+    return 'paid';
+  }
+
+  if (['nie', 'n', 'no', 'false', '0', 'nieoplacone', 'nieoplacony', 'nieoplacona', 'nie zaplacone', 'nie zaplacono', 'unpaid'].includes(key)) {
+    return 'unpaid';
+  }
+
+  if (['unknown', 'nieznane', 'brak danych', 'n/a', 'na'].includes(key)) {
+    return 'unknown';
+  }
+
+  return null;
+}
+
 export function isConfigurableParticipantMapping(mapping: { field_role: string }): boolean {
   return mapping.field_role === 'custom' || mapping.field_role === 'important_custom';
 }
@@ -117,6 +147,11 @@ export function normalizeParticipantDateValue(value: string, preferredFormat: Pa
 export function validateParticipantFieldValue(mapping: ParticipantFieldMapping, value: string): string {
   const alias = mapping.alias.trim() || mapping.source_column_name;
   const trimmedValue = value.trim();
+  if (mapping.field_role === 'payment_status') {
+    return normalizeParticipantPaymentFieldValue(trimmedValue) === null
+      ? `Pole ${alias} musi oznaczać opłatę, np. TAK, NIE albo puste.`
+      : '';
+  }
   if (!trimmedValue) {
     return mapping.is_required ? `Uzupełnij pole: ${alias}.` : '';
   }
@@ -186,6 +221,15 @@ export function buildParticipantFieldValues(
   for (const mapping of getActiveParticipantMappings(mappings)) {
     if (mapping.field_role === 'bib_number') {
       values[mapping.alias] = participant?.bib_number ?? values[mapping.alias];
+      continue;
+    }
+
+    if (mapping.field_role === 'payment_status') {
+      values[mapping.alias] = participant?.payment_status === 'paid'
+        ? 'TAK'
+        : participant?.payment_status === 'unpaid'
+          ? ''
+          : 'unknown';
       continue;
     }
 

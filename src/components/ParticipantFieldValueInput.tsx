@@ -47,6 +47,29 @@ export function ParticipantFieldValueInput({
   const fieldType = getParticipantFieldType(mapping);
   const rules = getParticipantValidationRules(mapping);
 
+  if (mapping.field_role === 'payment_status') {
+    return (
+      <Select
+        value={value.trim() === '' ? 'unpaid' : value.trim().toLocaleLowerCase('pl-PL') === 'tak' ? 'paid' : 'unknown'}
+        onValueChange={next => onChange(next === 'paid' ? 'TAK' : next === 'unpaid' ? '' : 'unknown')}
+      >
+        <SelectTrigger
+          id={id}
+          className={className}
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="paid">Opłacony</SelectItem>
+          <SelectItem value="unpaid">Nieopłacony</SelectItem>
+          <SelectItem value="unknown">Nieznany</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+  }
+
   if (fieldType === 'select') {
     const options = rules.options ?? [];
     const hasUnknownValue = Boolean(value) && !options.includes(value);

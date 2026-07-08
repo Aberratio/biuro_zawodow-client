@@ -57,6 +57,7 @@ export function createTestParticipant(
     qr_code: "QR-101",
     status: "not_checked_in",
     email_status: "not_sent",
+    payment_status: "unknown",
     custom_fields: {},
     important_field_aliases: [],
     sync_state: "synced",

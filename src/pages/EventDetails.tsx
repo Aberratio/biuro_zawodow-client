@@ -100,7 +100,7 @@ import {
   validateRequired,
   validateStrongPassword,
 } from "@/lib/form-validation";
-import { getRoleLabel, isScannerRole } from "@/lib/roles";
+import { canAddParticipantManually, getRoleLabel, isScannerRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 import { ParticipantFieldValueInput } from "@/components/ParticipantFieldValueInput";
@@ -135,6 +135,7 @@ const mappingRoleLabels: Record<ParticipantFieldRole, string> = {
   email: "E-mail",
   display_name_part: "Część nazwy",
   bib_number: "Numer startowy",
+  payment_status: "Opłata",
   custom: "Pole dodatkowe",
   important_custom: "Wyróżnij przy odprawie",
 };
@@ -627,6 +628,8 @@ export default function EventDetails() {
     isEventCurrentOrUpcoming(event, now);
   const canAssignScannersToEvent =
     !isArchivedEvent && officeCloseAt !== null && now <= officeCloseAt;
+  const canAddManualParticipantForEvent =
+    hasSavedMapping && canAddParticipantManually(currentRole);
   const canEditParticipantMappings = currentRole === "superadmin" && hasSavedMapping;
 
   const resetEditState = () => {
@@ -1758,7 +1761,7 @@ export default function EventDetails() {
                     <Mail className="mr-1 h-4 w-4" /> Wyślij QR do uczestników
                   </Button>
                 )}
-                {hasSavedMapping && (
+                {canAddManualParticipantForEvent && (
                   <Button
                     variant="outline"
                     onClick={() => setManualOpen(true)}

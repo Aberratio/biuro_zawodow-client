@@ -20,6 +20,11 @@ const roleDescriptions: Record<
     description:
       "Ta wartość trafia do numeru startowego i powinna być unikalna w wydarzeniu.",
   },
+  payment_status: {
+    badge: "Pole specjalne: opłata",
+    description:
+      "TAK oznacza opłacony pakiet, a pusta wartość oznacza brak opłaty.",
+  },
   important_custom: {
     badge: "Pole specjalne: odprawa",
     description:
