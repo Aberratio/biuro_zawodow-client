@@ -35,6 +35,22 @@ vi.mock("@/lib/api", () => ({
   fetchJson: (...args: unknown[]) => mocks.fetchJson(...args),
 }));
 
+function emptyOperationsPayload() {
+  return {
+    generated_at: "2099-04-12T10:00:00Z",
+    summary: {
+      critical_alerts: 0,
+      warning_alerts: 0,
+      quality_issues: 0,
+      sync_conflicts: 0,
+      active_rate_limit_blocks: 0,
+    },
+    alerts: [],
+    sync_events: [],
+    quality_issues: [],
+  };
+}
+
 function renderPage() {
   mocks.useData.mockReturnValue({
     users: [createTestUser({ role: "superadmin" })],
@@ -54,11 +70,19 @@ function renderPage() {
     connectionState: "online",
   });
 
-  render(
+  return render(
     <MemoryRouter>
       <SuperAdmin />
     </MemoryRouter>,
   );
+}
+
+function activateTab(name: string) {
+  const tab = screen.getByRole("tab", { name });
+  fireEvent.pointerDown(tab, { button: 0 });
+  fireEvent.mouseDown(tab, { button: 0 });
+  fireEvent.mouseUp(tab, { button: 0 });
+  fireEvent.click(tab);
 }
 
 describe("SuperAdmin page", () => {
@@ -120,7 +144,6 @@ describe("SuperAdmin page", () => {
     });
 
     renderPage();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Operacje" }), { button: 0 });
 
     await waitFor(() => {
       expect(mocks.fetchJson).toHaveBeenCalledWith(
@@ -133,10 +156,14 @@ describe("SuperAdmin page", () => {
     expect(screen.getByText("Konsola synchronizacji")).toBeInTheDocument();
     expect(screen.getByText("Powtarzające się adresy e-mail")).toBeInTheDocument();
     expect(screen.getByText("Konflikty synchronizacji")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Centrum" })).toHaveAttribute("data-state", "active");
   });
 
   it("loads and renders redacted server logs with logging status", async () => {
     mocks.fetchJson
+      .mockResolvedValueOnce({
+        payload: emptyOperationsPayload(),
+      })
       .mockResolvedValueOnce({
         payload: {
           data: [{
@@ -166,11 +193,85 @@ describe("SuperAdmin page", () => {
       });
 
     renderPage();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Logi serwera" }), { button: 0 });
+    activateTab("Logi");
 
     await waitFor(() => expect(screen.getByText("/superadmin/server-logs")).toBeInTheDocument());
     expect(screen.getByText("500")).toBeInTheDocument();
     expect(screen.getByText("GET")).toBeInTheDocument();
     expect(screen.getByText("Sentry aktywne")).toBeInTheDocument();
+  });
+
+  it("sends date and sorting parameters when searching audit logs", async () => {
+    mocks.fetchJson
+      .mockResolvedValueOnce({ payload: emptyOperationsPayload() })
+      .mockResolvedValue({
+        payload: {
+          data: [],
+          meta: { page: 1, per_page: 50, total: 0, total_pages: 1 },
+        },
+      });
+
+    const view = renderPage();
+    activateTab("Audyt");
+    await waitFor(() => expect(view.container.querySelector("#superadmin-audit-from")).not.toBeNull());
+    fireEvent.change(view.container.querySelector("#superadmin-audit-from") as HTMLInputElement, {
+      target: { value: "2099-04-12T08:00" },
+    });
+    fireEvent.change(view.container.querySelector("#superadmin-audit-to") as HTMLInputElement, {
+      target: { value: "2099-04-12T12:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Szukaj/ }));
+
+    await waitFor(() => {
+      expect(mocks.fetchJson.mock.calls.some(([url]) => (
+        typeof url === "string"
+        && url.includes("/superadmin/audit?")
+        && url.includes("from=2099-04-12T08%3A00")
+        && url.includes("to=2099-04-12T12%3A00")
+        && url.includes("sort=time")
+        && url.includes("direction=desc")
+      ))).toBe(true);
+    });
+  });
+
+  it("sends request id, event code, date range and sorting parameters for server logs", async () => {
+    mocks.fetchJson
+      .mockResolvedValueOnce({ payload: emptyOperationsPayload() })
+      .mockResolvedValue({
+        payload: {
+          data: [],
+          meta: { page: 1, per_page: 50, total: 0, total_pages: 1 },
+        },
+      });
+
+    const view = renderPage();
+    activateTab("Logi");
+    await waitFor(() => expect(view.container.querySelector("#superadmin-server-request-id")).not.toBeNull());
+    fireEvent.change(view.container.querySelector("#superadmin-server-request-id") as HTMLInputElement, {
+      target: { value: "req-12345678" },
+    });
+    fireEvent.change(view.container.querySelector("#superadmin-server-event-code") as HTMLInputElement, {
+      target: { value: "database.exception" },
+    });
+    fireEvent.change(view.container.querySelector("#superadmin-server-from") as HTMLInputElement, {
+      target: { value: "2099-04-12T08:00" },
+    });
+    fireEvent.change(view.container.querySelector("#superadmin-server-to") as HTMLInputElement, {
+      target: { value: "2099-04-12T12:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Szukaj/ }));
+
+    await waitFor(() => {
+      expect(mocks.fetchJson.mock.calls.some(([url]) => (
+        typeof url === "string"
+        && url.includes("/superadmin/server-logs?")
+        && url.includes("request_id=req-12345678")
+        && url.includes("event_code=database.exception")
+        && url.includes("from=2099-04-12T08%3A00")
+        && url.includes("to=2099-04-12T12%3A00")
+        && url.includes("sort=time")
+        && url.includes("direction=desc")
+      ))).toBe(true);
+    });
   });
 });
