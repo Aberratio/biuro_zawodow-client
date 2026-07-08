@@ -32,6 +32,7 @@ describe('mapApiParticipantToUi', () => {
       qr_code: 'false',
       status: 'not_checked_in',
       email_status: 'not_sent',
+      payment_status: 'unknown',
       checked_in_at: '0',
       custom_fields: {
         team: 'Fast Club',
