@@ -73,10 +73,13 @@ function renderSummaryState(state: Record<string, unknown>) {
 
 function ImportRouteProbe() {
   const location = useLocation();
+  const state = location.state as { restoreImport?: boolean; analysis?: { mappings?: { source_column_name: string }[] } } | null;
+  const restoredColumns = state?.analysis?.mappings?.map(mapping => mapping.source_column_name).join(',') ?? '';
   return (
     <div>
       <p>Import route reached</p>
-      <p>{((location.state as { restoreImport?: boolean } | null)?.restoreImport) ? 'restore enabled' : 'restore missing'}</p>
+      <p>{state?.restoreImport ? 'restore enabled' : 'restore missing'}</p>
+      <p>restored mapping: {restoredColumns}</p>
     </div>
   );
 }
@@ -303,10 +306,11 @@ describe('CsvImportSummary page', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Wróć do ustawień walidacji/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Wróć do Importu CSV/i }));
 
     expect(await screen.findByText('Import route reached')).toBeInTheDocument();
     expect(screen.getByText('restore enabled')).toBeInTheDocument();
+    expect(screen.getByText('restored mapping: Email,Category')).toBeInTheDocument();
   });
 
   it('can remove the whole participant list from the import summary', async () => {
