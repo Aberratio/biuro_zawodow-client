@@ -6,7 +6,6 @@ import { useData } from "@/contexts/DataContext";
 import { useRouteEventContext } from "@/hooks/use-route-event-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +48,7 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
+  ExternalLink,
   Eye,
   EyeOff,
   FileUp,
@@ -66,21 +66,25 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import DetailSkeleton from "@/components/skeletons/DetailSkeleton";
-import type { ParticipantFieldMapping, ParticipantFieldRole, ParticipantFieldType, ParticipantFieldValidationRules, User } from "@/types";
+import type { EventOfficeLocation, ParticipantFieldMapping, ParticipantFieldRole, ParticipantFieldType, ParticipantFieldValidationRules, User } from "@/types";
 import {
+  computeEventOfficeWindowFromLocations,
   formatEventOfficeEnd,
+  formatEventOfficeLocationRanges,
   formatEventOfficeStart,
-  getEventOfficeValidationErrors,
   formatEventOfficeWindow,
-  getEventOfficeRangeValidationResult,
   getEventOfficeCloseAt,
+  getEventOfficeLocationsValidationErrors,
   getEventOfficeOpenAt,
   isEventCurrentOrUpcoming,
-  isEventOfficeStartAtOrAfterNow,
   isEventOfficeOpen,
-  isValidEventOfficeRange,
   toLocalDateTimeValue,
+  type EventOfficeLocationsValidationErrors,
 } from "@/lib/events";
+import {
+  createEmptyEventOfficeLocation,
+  EventOfficeLocationsEditor,
+} from "@/components/EventOfficeLocationsEditor";
 import {
   buildEmptyParticipantFieldValues,
   formatSelectOptions,
@@ -181,14 +185,15 @@ function validateMappingValidationRules(mapping: MappingDraft): string {
 function buildEditFormFromEvent(event: {
   name: string;
   location: string;
-  office_open_at: string;
-  office_close_at: string;
+  office_locations: EventOfficeLocation[];
 }) {
   return {
     name: event.name,
     location: event.location,
-    office_open_at: toLocalDateTimeValue(event.office_open_at),
-    office_close_at: toLocalDateTimeValue(event.office_close_at),
+    office_locations: event.office_locations.map((location) => ({
+      ...location,
+      hours: location.hours.map((range) => ({ ...range })),
+    })),
   };
 }
 
@@ -449,8 +454,7 @@ export default function EventDetails() {
   const [editErrors, setEditErrors] = useState<{
     name?: string;
     location?: string;
-    office_open_at?: string;
-    office_close_at?: string;
+    office_locations?: EventOfficeLocationsValidationErrors;
     form?: string;
   }>({});
   const [exportingCsv, setExportingCsv] = useState(false);
@@ -464,11 +468,14 @@ export default function EventDetails() {
   const [resetTestConfirmOpen, setResetTestConfirmOpen] = useState(false);
   const [isResettingTestEvent, setIsResettingTestEvent] = useState(false);
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState<{
+    name: string;
+    location: string;
+    office_locations: EventOfficeLocation[];
+  }>({
     name: "",
     location: "",
-    office_open_at: "",
-    office_close_at: "",
+    office_locations: [createEmptyEventOfficeLocation()],
   });
 
   const event =
@@ -640,8 +647,7 @@ export default function EventDetails() {
       setEditForm({
         name: "",
         location: "",
-        office_open_at: "",
-        office_close_at: "",
+        office_locations: [createEmptyEventOfficeLocation()],
       });
       return;
     }
@@ -991,47 +997,57 @@ export default function EventDetails() {
     );
   };
 
+  const findLatestClosingOfficeRange = (locations: EventOfficeLocation[]) => {
+    let latest: { locationIndex: number; rangeIndex: number; closesAt: string } | null = null;
+
+    locations.forEach((location, locationIndex) => {
+      location.hours.forEach((range, rangeIndex) => {
+        if (!range.closes_at) return;
+        if (!latest || range.closes_at > latest.closesAt) {
+          latest = { locationIndex, rangeIndex, closesAt: range.closes_at };
+        }
+      });
+    });
+
+    return latest;
+  };
+
   const openReopenOfficeDialog = () => {
     setEditReopeningOffice(true);
+    const { office_locations: locations, ...rest } = buildEditFormFromEvent(event);
+    const latestRange = findLatestClosingOfficeRange(locations);
+    const nextCloseAt = getDefaultReopenCloseAt(new Date(nowTimestamp));
+
     setEditForm({
-      ...buildEditFormFromEvent(event),
-      office_close_at: getDefaultReopenCloseAt(new Date(nowTimestamp)),
+      ...rest,
+      office_locations: latestRange
+        ? locations.map((location, locationIndex) =>
+            locationIndex === latestRange.locationIndex
+              ? {
+                  ...location,
+                  hours: location.hours.map((range, rangeIndex) =>
+                    rangeIndex === latestRange.rangeIndex
+                      ? { ...range, closes_at: nextCloseAt }
+                      : range,
+                  ),
+                }
+              : location,
+          )
+        : locations,
     });
     setEditErrors({});
     setEditOpen(true);
   };
 
-  const canKeepPastOfficeOpenAt = (officeOpenAt: string) => {
-    const submittedOfficeOpenAt = toLocalDateTimeValue(officeOpenAt);
+  const canKeepPastOfficeOpenAt = () => {
+    const { opensAt } = computeEventOfficeWindowFromLocations(editForm.office_locations);
     const currentOfficeOpenAt = toLocalDateTimeValue(event.office_open_at);
 
     return (
       editReopeningOffice ||
       isEventOfficeOpen(event, new Date(nowTimestamp)) ||
-      submittedOfficeOpenAt === currentOfficeOpenAt
+      opensAt === currentOfficeOpenAt
     );
-  };
-
-  const applyEditOfficeValidationErrors = (
-    officeOpenAt: string,
-    officeCloseAt: string,
-  ) => {
-    const officeErrors = getEventOfficeValidationErrors(
-      officeOpenAt,
-      officeCloseAt,
-      {
-        allowPastOpenAt: canKeepPastOfficeOpenAt(officeOpenAt),
-      },
-    );
-
-    setEditErrors((current) => ({
-      ...current,
-      office_open_at: officeErrors.office_open_at,
-      office_close_at: officeErrors.office_close_at,
-      form: undefined,
-    }));
-
-    return officeErrors;
   };
 
   const handleManualFieldChange = (alias: string, value: string) => {
@@ -1252,83 +1268,39 @@ export default function EventDetails() {
   };
 
   const handleEditSubmit = async () => {
-    const submittedOfficeOpenAt = toLocalDateTimeValue(editForm.office_open_at);
-    const submittedOfficeCloseAt = toLocalDateTimeValue(editForm.office_close_at);
     const nextErrors = {
       name: validateRequired(editForm.name, "Podaj nazwę wydarzenia."),
       location: validateRequired(
         editForm.location,
         "Podaj lokalizację wydarzenia.",
       ),
-      office_open_at: validateRequired(
-        submittedOfficeOpenAt,
-        "Podaj datę i godzinę otwarcia biura.",
-      ),
-      office_close_at: validateRequired(
-        submittedOfficeCloseAt,
-        "Podaj datę i godzinę zamknięcia biura.",
-      ),
     };
 
-    if (
-      nextErrors.name ||
-      nextErrors.location ||
-      nextErrors.office_open_at ||
-      nextErrors.office_close_at
-    ) {
-      setEditErrors(nextErrors);
-      return;
-    }
+    const officeLocationsErrors = getEventOfficeLocationsValidationErrors(
+      editForm.office_locations,
+      { allowPastOpenAt: canKeepPastOfficeOpenAt() },
+    );
+    const hasOfficeLocationsErrors =
+      Boolean(officeLocationsErrors.form) ||
+      officeLocationsErrors.locations.some(
+        (location) =>
+          location.name ||
+          location.google_maps_url ||
+          location.form ||
+          location.hours?.some((hour) => hour.opens_at || hour.closes_at),
+      );
 
-    if (
-      !submittedOfficeOpenAt ||
-      (!canKeepPastOfficeOpenAt(submittedOfficeOpenAt) &&
-        !isEventOfficeStartAtOrAfterNow(submittedOfficeOpenAt))
-    ) {
-      setEditErrors({
-        office_open_at: "Otwarcie biura nie może być ustawione w przeszłości.",
-      });
-      toast({
-        title: "Nieprawidłowa data otwarcia",
-        description:
-          "Data i godzina otwarcia biura zawodów musi być nie wcześniejsza niż teraz.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (
-      getEventOfficeRangeValidationResult(
-        submittedOfficeOpenAt,
-        submittedOfficeCloseAt,
-      ) === "shorter_than_minimum"
-    ) {
-      setEditErrors({
-        office_close_at: "Biuro musi być otwarte przez co najmniej 1 godzinę.",
-      });
-      toast({
-        title: "Nieprawidłowe godziny biura",
-        description:
-          "Ustaw godziny biura tak, aby było otwarte przez co najmniej 1 godzinę.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (
-      !submittedOfficeOpenAt ||
-      !submittedOfficeCloseAt ||
-      !isValidEventOfficeRange(submittedOfficeOpenAt, submittedOfficeCloseAt)
-    ) {
-      setEditErrors({
-        office_close_at: "Zamknięcie biura musi być później niż otwarcie.",
-      });
-      toast({
-        title: "Nieprawidłowe godziny biura",
-        description:
-          "Podaj poprawną datę i godzinę otwarcia oraz zamknięcia biura zawodów.",
-        variant: "destructive",
-      });
+    if (nextErrors.name || nextErrors.location || hasOfficeLocationsErrors) {
+      setEditErrors({ ...nextErrors, office_locations: officeLocationsErrors });
+      if (hasOfficeLocationsErrors) {
+        toast({
+          title: "Nieprawidłowe lokalizacje biura zawodów",
+          description:
+            officeLocationsErrors.form ??
+            "Sprawdź nazwy lokalizacji i zakresy godzin.",
+          variant: "destructive",
+        });
+      }
       return;
     }
 
@@ -1338,8 +1310,7 @@ export default function EventDetails() {
       name: editForm.name,
       location: editForm.location,
       organization_id: event.organization_id,
-      office_open_at: submittedOfficeOpenAt,
-      office_close_at: submittedOfficeCloseAt,
+      office_locations: editForm.office_locations,
       reopen_office: editReopeningOffice,
     });
     setEditSaving(false);
@@ -1561,6 +1532,32 @@ export default function EventDetails() {
             <p className="event-detail-supporting-copy">
               {officeStatus.detail}
             </p>
+            {event.office_locations.length > 0 && (
+              <div className="space-y-1.5 text-sm">
+                {event.office_locations.map((location, index) => (
+                  <div key={location.id ?? index} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                    <span className="font-medium">
+                      {location.google_maps_url ? (
+                        <a
+                          href={location.google_maps_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 underline underline-offset-2"
+                        >
+                          {location.name}
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      ) : (
+                        location.name
+                      )}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {formatEventOfficeLocationRanges(location).join(", ")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="event-detail-summary-strip">
@@ -2044,78 +2041,25 @@ export default function EventDetails() {
                 {editErrors.location}
               </FieldError>
             </div>
-            <div>
-              <Label htmlFor="event-edit-office-open">
-                Data i godzina otwarcia biura zawodów
-              </Label>
-              <DateTimePicker
-                id="event-edit-office-open"
-                value={editForm.office_open_at}
-                disabled={isFinishedEvent}
-                onChange={(value) => {
-                  setEditForm((current) => ({
-                    ...current,
-                    office_open_at: value,
-                  }));
-                  setEditErrors((current) => ({
-                    ...current,
-                    office_open_at: undefined,
-                    office_close_at: undefined,
-                    form: undefined,
-                  }));
-                }}
-                onCommit={(value) => {
-                  applyEditOfficeValidationErrors(value, editForm.office_close_at);
-                }}
-                aria-invalid={Boolean(editErrors.office_open_at)}
-                aria-describedby={
-                  editErrors.office_open_at
-                    ? "event-edit-office-open-error"
-                    : undefined
-                }
-              />
-              {isFinishedEvent && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Data otwarcia zostaje bez zmian. Aby wznowić pracę biura,
-                  ustaw nowe zamknięcie w przyszłości.
-                </p>
-              )}
-              <FieldError id="event-edit-office-open-error" className="mt-2">
-                {editErrors.office_open_at}
-              </FieldError>
-            </div>
-            <div>
-              <Label htmlFor="event-edit-office-close">
-                Data i godzina zamknięcia biura zawodów
-              </Label>
-              <DateTimePicker
-                id="event-edit-office-close"
-                value={editForm.office_close_at}
-                onChange={(value) => {
-                  setEditForm((current) => ({
-                    ...current,
-                    office_close_at: value,
-                  }));
-                  setEditErrors((current) => ({
-                    ...current,
-                    office_close_at: undefined,
-                    form: undefined,
-                  }));
-                }}
-                onCommit={(value) => {
-                  applyEditOfficeValidationErrors(editForm.office_open_at, value);
-                }}
-                aria-invalid={Boolean(editErrors.office_close_at)}
-                aria-describedby={
-                  editErrors.office_close_at
-                    ? "event-edit-office-close-error"
-                    : undefined
-                }
-              />
-              <FieldError id="event-edit-office-close-error" className="mt-2">
-                {editErrors.office_close_at}
-              </FieldError>
-            </div>
+            {isFinishedEvent && (
+              <p className="text-xs text-muted-foreground">
+                Aby wznowić pracę biura, ustaw nowe zamknięcie w przyszłości
+                (dla dowolnej lokalizacji).
+              </p>
+            )}
+            <EventOfficeLocationsEditor
+              idPrefix="event-edit"
+              locations={editForm.office_locations}
+              onChange={(locations) => {
+                setEditForm((current) => ({ ...current, office_locations: locations }));
+                setEditErrors((current) => ({
+                  ...current,
+                  office_locations: undefined,
+                  form: undefined,
+                }));
+              }}
+              errors={editErrors.office_locations}
+            />
             <FieldError id="event-edit-form-error">
               {editErrors.form}
             </FieldError>

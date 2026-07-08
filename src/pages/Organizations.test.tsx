@@ -46,6 +46,7 @@ function createEvent(
     organization_id: organizationId,
     office_open_at: officeOpenAt,
     office_close_at: officeCloseAt,
+    office_locations: [{ name: 'Warszawa', google_maps_url: null, hours: [{ opens_at: officeOpenAt, closes_at: officeCloseAt }] }],
   };
 }
 

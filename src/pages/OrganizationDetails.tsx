@@ -5,7 +5,6 @@ import { useRouteOrganizationContext } from "@/hooks/use-route-organization-cont
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -56,14 +55,17 @@ import { PasswordRequirements } from "@/components/PasswordRequirements";
 import { toast } from "@/hooks/use-toast";
 import {
   formatEventOfficeWindow,
-  getEventOfficeValidationErrors,
-  getEventOfficeRangeValidationResult,
+  getEventOfficeLocationsValidationErrors,
   isEventCurrentOrUpcoming,
   isEventOfficeOpen,
-  isEventOfficeStartAtOrAfterNow,
-  isValidEventOfficeRange,
   parseEventDateTime,
+  type EventOfficeLocationsValidationErrors,
 } from "@/lib/events";
+import {
+  createEmptyEventOfficeLocation,
+  EventOfficeLocationsEditor,
+} from "@/components/EventOfficeLocationsEditor";
+import type { EventOfficeLocation } from "@/types";
 import {
   validateEmail,
   validateNonNegativeInteger,
@@ -250,11 +252,14 @@ export default function OrganizationDetails() {
     form?: string;
   }>({});
   const [profileUser, setProfileUser] = useState<User | null>(null);
-  const [eventForm, setEventForm] = useState({
+  const [eventForm, setEventForm] = useState<{
+    name: string;
+    location: string;
+    office_locations: EventOfficeLocation[];
+  }>({
     name: "",
     location: "",
-    office_open_at: "",
-    office_close_at: "",
+    office_locations: [createEmptyEventOfficeLocation()],
   });
   const [scannerAssignmentDraft, setScannerAssignmentDraft] = useState<
     string[]
@@ -287,8 +292,7 @@ export default function OrganizationDetails() {
   const [eventErrors, setEventErrors] = useState<{
     name?: string;
     location?: string;
-    office_open_at?: string;
-    office_close_at?: string;
+    office_locations?: EventOfficeLocationsValidationErrors;
     form?: string;
   }>({});
 
@@ -719,25 +723,6 @@ export default function OrganizationDetails() {
     toast({ title: "Zaktualizowano organizację" });
   };
 
-  const applyEventOfficeValidationErrors = (
-    officeOpenAt: string,
-    officeCloseAt: string,
-  ) => {
-    const officeErrors = getEventOfficeValidationErrors(
-      officeOpenAt,
-      officeCloseAt,
-    );
-
-    setEventErrors((current) => ({
-      ...current,
-      office_open_at: officeErrors.office_open_at,
-      office_close_at: officeErrors.office_close_at,
-      form: undefined,
-    }));
-
-    return officeErrors;
-  };
-
   const handleAddEvent = async () => {
     const nextErrors = {
       name: validateRequired(eventForm.name, "Podaj nazwę wydarzenia."),
@@ -745,86 +730,42 @@ export default function OrganizationDetails() {
         eventForm.location,
         "Podaj lokalizację wydarzenia.",
       ),
-      office_open_at: validateRequired(
-        eventForm.office_open_at,
-        "Podaj datę i godzinę otwarcia biura.",
-      ),
-      office_close_at: validateRequired(
-        eventForm.office_close_at,
-        "Podaj datę i godzinę zamknięcia biura.",
-      ),
     };
 
-    if (
-      nextErrors.name ||
-      nextErrors.location ||
-      nextErrors.office_open_at ||
-      nextErrors.office_close_at
-    ) {
-      setEventErrors(nextErrors);
+    const officeLocationsErrors = getEventOfficeLocationsValidationErrors(
+      eventForm.office_locations,
+    );
+    const hasOfficeLocationsErrors =
+      Boolean(officeLocationsErrors.form) ||
+      officeLocationsErrors.locations.some(
+        (location) =>
+          location.name ||
+          location.google_maps_url ||
+          location.form ||
+          location.hours?.some((hour) => hour.opens_at || hour.closes_at),
+      );
+
+    if (nextErrors.name || nextErrors.location || hasOfficeLocationsErrors) {
+      setEventErrors({ ...nextErrors, office_locations: officeLocationsErrors });
+      if (hasOfficeLocationsErrors) {
+        toast({
+          title: "Nieprawidłowe lokalizacje biura zawodów",
+          description:
+            officeLocationsErrors.form ??
+            "Sprawdź nazwy lokalizacji i zakresy godzin.",
+          variant: "destructive",
+        });
+      }
       return;
     }
 
-    if (
-      !eventForm.office_open_at ||
-      !isEventOfficeStartAtOrAfterNow(eventForm.office_open_at)
-    ) {
-      setEventErrors({
-        office_open_at: "Otwarcie biura nie może być ustawione w przeszłości.",
-      });
-      toast({
-        title: "Nieprawidłowa data otwarcia",
-        description:
-          "Data i godzina otwarcia biura zawodów nie może być wcześniejsza niż teraz.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (
-      getEventOfficeRangeValidationResult(
-        eventForm.office_open_at,
-        eventForm.office_close_at,
-      ) === "shorter_than_minimum"
-    ) {
-      setEventErrors({
-        office_close_at: "Biuro musi być otwarte przez co najmniej 1 godzinę.",
-      });
-      toast({
-        title: "Nieprawidłowe godziny biura",
-        description:
-          "Ustaw godziny biura tak, aby było otwarte przez co najmniej 1 godzinę.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (
-      !eventForm.office_open_at ||
-      !eventForm.office_close_at ||
-      !isValidEventOfficeRange(
-        eventForm.office_open_at,
-        eventForm.office_close_at,
-      )
-    ) {
-      setEventErrors({
-        office_close_at: "Zamknięcie biura musi być późniejsze niż otwarcie.",
-      });
-      toast({
-        title: "Nieprawidłowe godziny biura",
-        description: "Podaj poprawny czas otwarcia i zamknięcia biura zawodów.",
-        variant: "destructive",
-      });
-      return;
-    }
     setEventErrors({});
     setIsSubmittingEvent(true);
     const result = await createEvent({
       name: eventForm.name,
       location: eventForm.location,
       organization_id: organization.id,
-      office_open_at: eventForm.office_open_at,
-      office_close_at: eventForm.office_close_at,
+      office_locations: eventForm.office_locations,
     });
     setIsSubmittingEvent(false);
     if (!result.ok) {
@@ -843,8 +784,7 @@ export default function OrganizationDetails() {
     setEventForm({
       name: "",
       location: "",
-      office_open_at: "",
-      office_close_at: "",
+      office_locations: [createEmptyEventOfficeLocation()],
     });
     if (result.entityId) {
       setCreatedEventSuccess({
@@ -2560,79 +2500,19 @@ export default function OrganizationDetails() {
                 {eventErrors.location}
               </FieldError>
             </div>
-            <div>
-              <Label htmlFor="organization-event-office-open">
-                Data i godzina otwarcia biura zawodów
-              </Label>
-              <DateTimePicker
-                id="organization-event-office-open"
-                value={eventForm.office_open_at}
-                onChange={(value) => {
-                  setEventForm((prev) => ({
-                    ...prev,
-                    office_open_at: value,
-                  }));
-                  setEventErrors((prev) => ({
-                    ...prev,
-                    office_open_at: undefined,
-                    office_close_at: undefined,
-                    form: undefined,
-                  }));
-                }}
-                onCommit={(value) => {
-                  applyEventOfficeValidationErrors(value, eventForm.office_close_at);
-                }}
-                className="mt-2"
-                aria-invalid={Boolean(eventErrors.office_open_at)}
-                aria-describedby={
-                  eventErrors.office_open_at
-                    ? "organization-event-office-open-error"
-                    : undefined
-                }
-              />
-              <FieldError
-                id="organization-event-office-open-error"
-                className="mt-2"
-              >
-                {eventErrors.office_open_at}
-              </FieldError>
-            </div>
-            <div>
-              <Label htmlFor="organization-event-office-close">
-                Data i godzina zamknięcia biura zawodów
-              </Label>
-              <DateTimePicker
-                id="organization-event-office-close"
-                value={eventForm.office_close_at}
-                onChange={(value) => {
-                  setEventForm((prev) => ({
-                    ...prev,
-                    office_close_at: value,
-                  }));
-                  setEventErrors((prev) => ({
-                    ...prev,
-                    office_close_at: undefined,
-                    form: undefined,
-                  }));
-                }}
-                onCommit={(value) => {
-                  applyEventOfficeValidationErrors(eventForm.office_open_at, value);
-                }}
-                className="mt-2"
-                aria-invalid={Boolean(eventErrors.office_close_at)}
-                aria-describedby={
-                  eventErrors.office_close_at
-                    ? "organization-event-office-close-error"
-                    : undefined
-                }
-              />
-              <FieldError
-                id="organization-event-office-close-error"
-                className="mt-2"
-              >
-                {eventErrors.office_close_at}
-              </FieldError>
-            </div>
+            <EventOfficeLocationsEditor
+              idPrefix="organization-event"
+              locations={eventForm.office_locations}
+              onChange={(locations) => {
+                setEventForm((prev) => ({ ...prev, office_locations: locations }));
+                setEventErrors((prev) => ({
+                  ...prev,
+                  office_locations: undefined,
+                  form: undefined,
+                }));
+              }}
+              errors={eventErrors.office_locations}
+            />
             <p className="text-xs text-muted-foreground">
               Limit organizacji: {formatEventCount(organization.event_limit)}.
               Utworzono {formatEventCount(totalOrganizationEvents)}.

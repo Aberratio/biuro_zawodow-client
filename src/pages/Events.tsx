@@ -4,7 +4,6 @@ import { FlaskConical, ListFilter, Loader2, Plus } from "lucide-react";
 import { useData } from "@/contexts/DataContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/ui/field-error";
@@ -45,13 +44,13 @@ import { SuccessActionDialog } from "@/components/SuccessActionDialog";
 import { toast } from "@/hooks/use-toast";
 import {
   formatEventOfficeWindow,
-  getEventOfficeValidationErrors,
+  getEventOfficeLocationsValidationErrors,
   getEventOfficeOpenAt,
-  getEventOfficeRangeValidationResult,
   isEventOfficeStartAtOrAfterNow,
   isEventOfficeOpen,
   isValidEventOfficeRange,
   parseEventDateTime,
+  type EventOfficeLocationsValidationErrors,
 } from "@/lib/events";
 import { validateRequired } from "@/lib/form-validation";
 import {
@@ -64,6 +63,11 @@ import { isScannerRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 import { PageHeader } from "@/components/PageHeader";
+import {
+  EventOfficeLocationsEditor,
+  createEmptyEventOfficeLocation,
+} from "@/components/EventOfficeLocationsEditor";
+import type { EventOfficeLocation } from "@/types";
 
 const EVENTS_PAGE_SIZE = 20;
 
@@ -229,11 +233,15 @@ export default function Events() {
   const canCreateEvent = !isScannerRole(currentRole);
   const isOnline = connectionState === "online";
   const showOrganizationColumn = currentRole === "superadmin";
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    name: string;
+    location: string;
+    office_locations: EventOfficeLocation[];
+    organization_id: string;
+  }>({
     name: "",
     location: "",
-    office_open_at: "",
-    office_close_at: "",
+    office_locations: [createEmptyEventOfficeLocation()],
     organization_id:
       currentRole === "admin"
         ? selectedOrganizationId ||
@@ -247,8 +255,7 @@ export default function Events() {
     name?: string;
     location?: string;
     organization_id?: string;
-    office_open_at?: string;
-    office_close_at?: string;
+    office_locations?: EventOfficeLocationsValidationErrors;
     form?: string;
   }>({});
 
@@ -393,27 +400,6 @@ export default function Events() {
     () => buildPaginationModel(currentPage, totalPages),
     [currentPage, totalPages],
   );
-  const getOfficeValidationErrors = (
-    officeOpenAt: string,
-    officeCloseAt: string,
-  ) => getEventOfficeValidationErrors(officeOpenAt, officeCloseAt);
-
-  const applyOfficeValidationErrors = (
-    officeOpenAt: string,
-    officeCloseAt: string,
-  ) => {
-    const officeErrors = getOfficeValidationErrors(officeOpenAt, officeCloseAt);
-
-    setFormErrors((current) => ({
-      ...current,
-      office_open_at: officeErrors.office_open_at,
-      office_close_at: officeErrors.office_close_at,
-      form: undefined,
-    }));
-
-    return officeErrors;
-  };
-
   useEffect(() => {
     if (currentRole !== "superadmin" && currentRole !== "admin") {
       return;
@@ -466,77 +452,37 @@ export default function Events() {
         form.organization_id,
         "Wybierz organizację.",
       ),
-      office_open_at: validateRequired(
-        form.office_open_at,
-        "Podaj datę i godzinę otwarcia biura.",
-      ),
-      office_close_at: validateRequired(
-        form.office_close_at,
-        "Podaj datę i godzinę zamknięcia biura.",
-      ),
     };
+
+    const officeLocationsErrors = getEventOfficeLocationsValidationErrors(
+      form.office_locations,
+    );
+    const hasOfficeLocationsErrors =
+      Boolean(officeLocationsErrors.form) ||
+      officeLocationsErrors.locations.some(
+        (location) =>
+          location.name ||
+          location.google_maps_url ||
+          location.form ||
+          location.hours?.some((hour) => hour.opens_at || hour.closes_at),
+      );
 
     if (
       nextErrors.name ||
       nextErrors.location ||
       nextErrors.organization_id ||
-      nextErrors.office_open_at ||
-      nextErrors.office_close_at
+      hasOfficeLocationsErrors
     ) {
-      setFormErrors(nextErrors);
-      return;
-    }
-
-    const officeErrors = getOfficeValidationErrors(
-      form.office_open_at,
-      form.office_close_at,
-    );
-
-    if (officeErrors.office_open_at) {
-      setFormErrors({
-        office_open_at: "Otwarcie biura nie może być ustawione w przeszłości.",
-      });
-      toast({
-        title: "Nieprawidłowa data otwarcia",
-        description:
-          "Data i godzina otwarcia biura zawodów musi być nie wcześniejsza niż teraz.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const officeRangeValidation = getEventOfficeRangeValidationResult(
-      form.office_open_at,
-      form.office_close_at,
-    );
-
-    if (officeRangeValidation === "shorter_than_minimum") {
-      setFormErrors({
-        office_close_at: "Biuro musi być otwarte przez co najmniej 1 godzinę.",
-      });
-      toast({
-        title: "Nieprawidłowe godziny biura",
-        description:
-          "Ustaw godziny biura tak, aby było otwarte przez co najmniej 1 godzinę.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (
-      !form.office_open_at ||
-      !form.office_close_at ||
-      officeRangeValidation !== "valid"
-    ) {
-      setFormErrors({
-        office_close_at: "Zamknięcie biura musi być później niż otwarcie.",
-      });
-      toast({
-        title: "Nieprawidłowe godziny biura",
-        description:
-          "Podaj wymaganą datę i godzinę otwarcia oraz zamknięcia biura zawodów. Otwarcie musi być wcześniejsze od zamknięcia.",
-        variant: "destructive",
-      });
+      setFormErrors({ ...nextErrors, office_locations: officeLocationsErrors });
+      if (hasOfficeLocationsErrors) {
+        toast({
+          title: "Nieprawidłowe lokalizacje biura zawodów",
+          description:
+            officeLocationsErrors.form ??
+            "Sprawdź nazwy lokalizacji i zakresy godzin.",
+          variant: "destructive",
+        });
+      }
       return;
     }
 
@@ -546,8 +492,7 @@ export default function Events() {
       name: form.name,
       location: form.location,
       organization_id: form.organization_id,
-      office_open_at: form.office_open_at,
-      office_close_at: form.office_close_at,
+      office_locations: form.office_locations,
     });
     setIsSubmitting(false);
 
@@ -566,8 +511,7 @@ export default function Events() {
     setForm({
       name: "",
       location: "",
-      office_open_at: "",
-      office_close_at: "",
+      office_locations: [createEmptyEventOfficeLocation()],
       organization_id:
         currentRole === "admin"
           ? creatableOrganizations[0]?.id || ""
@@ -1034,68 +978,19 @@ export default function Events() {
                 {formErrors.location}
               </FieldError>
             </div>
-            <div>
-              <Label htmlFor="event-create-office-open">
-                Data i godzina otwarcia biura zawodów
-              </Label>
-              <DateTimePicker
-                id="event-create-office-open"
-                value={form.office_open_at}
-                onChange={(value) => {
-                  setForm((current) => ({ ...current, office_open_at: value }));
-                  setFormErrors((current) => ({
-                    ...current,
-                    office_open_at: undefined,
-                    office_close_at: undefined,
-                    form: undefined,
-                  }));
-                }}
-                onCommit={(value) => {
-                  applyOfficeValidationErrors(value, form.office_close_at);
-                }}
-                aria-invalid={Boolean(formErrors.office_open_at)}
-                aria-describedby={
-                  formErrors.office_open_at
-                    ? "event-create-office-open-error"
-                    : undefined
-                }
-              />
-              <FieldError id="event-create-office-open-error" className="mt-2">
-                {formErrors.office_open_at}
-              </FieldError>
-            </div>
-            <div>
-              <Label htmlFor="event-create-office-close">
-                Data i godzina zamknięcia biura zawodów
-              </Label>
-              <DateTimePicker
-                id="event-create-office-close"
-                value={form.office_close_at}
-                onChange={(value) => {
-                  setForm((current) => ({
-                    ...current,
-                    office_close_at: value,
-                  }));
-                  setFormErrors((current) => ({
-                    ...current,
-                    office_close_at: undefined,
-                    form: undefined,
-                  }));
-                }}
-                onCommit={(value) => {
-                  applyOfficeValidationErrors(form.office_open_at, value);
-                }}
-                aria-invalid={Boolean(formErrors.office_close_at)}
-                aria-describedby={
-                  formErrors.office_close_at
-                    ? "event-create-office-close-error"
-                    : undefined
-                }
-              />
-              <FieldError id="event-create-office-close-error" className="mt-2">
-                {formErrors.office_close_at}
-              </FieldError>
-            </div>
+            <EventOfficeLocationsEditor
+              idPrefix="event-create"
+              locations={form.office_locations}
+              onChange={(locations) => {
+                setForm((current) => ({ ...current, office_locations: locations }));
+                setFormErrors((current) => ({
+                  ...current,
+                  office_locations: undefined,
+                  form: undefined,
+                }));
+              }}
+              errors={formErrors.office_locations}
+            />
             {formOrganization && (
               <p className="text-[10px] text-muted-foreground">
                 Limit organizacji:{" "}

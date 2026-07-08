@@ -26,6 +26,19 @@ export interface Organization {
   event_limit: number;
 }
 
+export interface EventOfficeHourRange {
+  id?: string;
+  opens_at: string;
+  closes_at: string;
+}
+
+export interface EventOfficeLocation {
+  id?: string;
+  name: string;
+  google_maps_url?: string | null;
+  hours: EventOfficeHourRange[];
+}
+
 export interface Event {
   id: string;
   name: string;
@@ -33,6 +46,7 @@ export interface Event {
   organization_id: string;
   office_open_at: string;
   office_close_at: string;
+  office_locations: EventOfficeLocation[];
   is_test: boolean;
   archived_at?: string | null;
   deleted_at?: string | null;
