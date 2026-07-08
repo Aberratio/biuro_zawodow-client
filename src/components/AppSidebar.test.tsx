@@ -45,6 +45,7 @@ function createEvent(id: string, name: string, organizationId: string): Event {
     organization_id: organizationId,
     office_open_at: "2099-04-12T07:00:00",
     office_close_at: "2099-04-12T15:00:00",
+    office_locations: [{ name: "Warsaw", google_maps_url: null, hours: [{ opens_at: "2099-04-12T07:00:00", closes_at: "2099-04-12T15:00:00" }] }],
   };
 }
 

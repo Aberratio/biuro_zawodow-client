@@ -66,8 +66,7 @@ function TestConsumer() {
             name: 'Event event-2',
             location: 'Warsaw',
             organization_id: 'org-1',
-            office_open_at: '2099-04-12T07:00:00',
-            office_close_at: '2099-04-12T15:00:00',
+            office_locations: [{ name: 'Warsaw', google_maps_url: null, hours: [{ opens_at: '2099-04-12T07:00:00', closes_at: '2099-04-12T15:00:00' }] }],
           });
         }}
       >
@@ -97,6 +96,7 @@ function createEvent(id: string, organizationId = 'org-1'): Event {
     organization_id: organizationId,
     office_open_at: '2099-04-12T07:00:00',
     office_close_at: '2099-04-12T15:00:00',
+    office_locations: [{ name: 'Warsaw', google_maps_url: null, hours: [{ opens_at: '2099-04-12T07:00:00', closes_at: '2099-04-12T15:00:00' }] }],
     is_test: false,
   };
 }

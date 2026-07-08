@@ -9,7 +9,7 @@ import { hasGlobalOrganizationScope } from '@/lib/roles';
 import { checkBrowserStorage } from '@/lib/browser-storage';
 
 type UserCreateInput = Omit<User, 'id' | 'password'> & { password?: string };
-type EventMutationInput = Omit<Event, 'id' | 'archived_at' | 'deleted_at' | 'is_test'>;
+type EventMutationInput = Omit<Event, 'id' | 'archived_at' | 'deleted_at' | 'is_test' | 'office_open_at' | 'office_close_at'>;
 type EventUpdateInput = EventMutationInput & { reopen_office?: boolean };
 
 interface MutationResult { ok: boolean; error?: string; entityId?: string; queued?: boolean; }

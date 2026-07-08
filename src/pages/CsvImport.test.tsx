@@ -26,6 +26,7 @@ function createEvent(): Event {
     organization_id: 'org-1',
     office_open_at: '2099-04-12T07:00:00',
     office_close_at: '2099-04-12T15:00:00',
+    office_locations: [{ name: 'Warszawa', google_maps_url: null, hours: [{ opens_at: '2099-04-12T07:00:00', closes_at: '2099-04-12T15:00:00' }] }],
   };
 }
 
