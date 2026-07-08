@@ -545,6 +545,20 @@ export default function CsvImport() {
     }
   };
 
+  const handleClearSuggestedMapping = () => {
+    setMappingDrafts(prev => prev.map(field => ({
+      source_column_name: field.source_column_name,
+      alias: field.source_column_name,
+      field_role: suggestFieldRoleFromHeader(field.source_column_name),
+      field_type: 'text',
+      validation_rules: {},
+      is_required: false,
+    })));
+    setOpenValidationPanels({});
+    setMappingErrors({ aliases: {} });
+    toast({ title: 'Wyczyszczono sugerowane mapowanie', description: 'Role i aliasy kolumn ustawiono na podstawie tego pliku, bez podpowiedzi z poprzedniej listy.' });
+  };
+
   const handleFieldChange = (sourceColumnName: string, patch: Partial<MappingDraft>) => {
     setMappingDrafts(prev => prev.map(field => {
       if (field.source_column_name !== sourceColumnName) return field;
@@ -1209,9 +1223,17 @@ export default function CsvImport() {
                       </p>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {analysis.headers.length} kolumn, {analysis.row_count} wierszy
-                  </p>
+                  <div className="flex flex-col items-start gap-2 sm:items-end">
+                    <p className="text-xs text-muted-foreground">
+                      {analysis.headers.length} kolumn, {analysis.row_count} wierszy
+                    </p>
+                    {replacementMode && analysis.has_mapping && (
+                      <Button type="button" variant="outline" size="sm" onClick={handleClearSuggestedMapping}>
+                        <X className="mr-1 h-4 w-4" />
+                        Wyczyść sugerowane mapowanie
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
