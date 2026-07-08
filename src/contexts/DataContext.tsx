@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { ActivityLog, AppDiagnostics, ConnectionState, Event, Organization, Participant, ParticipantFieldMapping, ParticipantQrPreview, ParticipantScanResult, ParticipantStatus, Role, ScannerMode, ServiceWorkerState, SnapshotSource, User } from '@/types';
+import type { ActivityLog, AppDiagnostics, ConnectionState, Event, Organization, Participant, ParticipantFieldMapping, ParticipantQrPreview, ParticipantScanResult, ParticipantStatus, QrEmailDeliveryReport, Role, ScannerMode, ServiceWorkerState, SnapshotSource, User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { API_BASE_URL, fetchJson, getApiErrorCode, isApiResponseError, isNetworkRequestError } from '@/lib/api';
 import { type ApiEvent, type ApiOrganization, type ApiParticipant, type ApiUser, type BootstrapResponse, type ParticipantQrPreviewResponse, type ParticipantScanApiResponse, OFFLINE_ACTION_MESSAGE, applyPendingMutations, buildOfflineSnapshot, createBootstrapSnapshotVersion, createClientMutationId, extractConflictParticipant, getDefaultCurrentUser, getDeviceId, getInitialConnectionState, getSelectableOrganizationsForUser, getVisibleEventsForUser, mapApiEventToUi, mapApiOrganizationToUi, mapApiParticipantToUi, mapApiUserToUi, participantUiIdToApiId, persistStoredSelectedEventId, persistStoredSelectedOrganizationId, readStoredSelectedEventId, readStoredSelectedOrganizationId, resolveSelectedEventId, resolveSelectedOrganizationId } from '@/lib/data-context-helpers';
@@ -15,13 +15,14 @@ type EventUpdateInput = EventMutationInput & { reopen_office?: boolean };
 interface MutationResult { ok: boolean; error?: string; entityId?: string; queued?: boolean; }
 interface ParticipantBibNumberConflict { bibNumber: string; conflictingParticipants: Participant[]; }
 interface ParticipantBibNumberUpdateResult extends MutationResult { conflict?: ParticipantBibNumberConflict; }
-interface EventQrEmailResult { ok: boolean; sent_count: number; error_count: number; errors: Array<{ participant_id: number; participant_name: string; error: string }>; error?: string; }
+type EventQrPaymentScope = 'all' | 'paid_only';
+interface EventQrEmailResult { ok: boolean; sent_count: number; error_count: number; unpaid_count?: number; unknown_payment_count?: number; skipped_unpaid_count?: number; errors: Array<{ participant_id: number; participant_name: string; error: string }>; error?: string; }
 interface ParticipantImportListDifference { columns_differ: boolean; missing_columns: string[]; extra_columns: string[]; participant_difference_ratio: number; should_offer_replacement: boolean; }
 interface ParticipantImportAnalysis { headers: string[]; sample_rows: Record<string, string>[]; email_candidates: { column: string; matched_count: number }[]; has_mapping: boolean; has_baseline_import: boolean; mappings: ParticipantFieldMapping[]; missing_required_columns: string[]; row_count: number; existing_participant_count: number; sent_qr_email_count: number; list_difference: ParticipantImportListDifference; }
 interface ParticipantImportMappingFieldInput {
   source_column_name: string;
   alias: string;
-  field_role: 'display_name_part' | 'bib_number' | 'custom' | 'important_custom';
+  field_role: 'display_name_part' | 'bib_number' | 'payment_status' | 'custom' | 'important_custom';
   field_type?: ParticipantFieldMapping['field_type'];
   validation_rules?: ParticipantFieldMapping['validation_rules'];
   is_required?: boolean;
@@ -82,8 +83,9 @@ interface DataContextType {
   changeRole: (userId: string, role: Role) => Promise<MutationResult>;
   assignScannerEvents: (userId: string, eventIds: string[]) => Promise<MutationResult>;
   sendParticipantQrEmail: (participantId: string) => Promise<MutationResult>;
-  sendEventQrEmails: (eventId: string, resendAll?: boolean) => Promise<EventQrEmailResult>;
+  sendEventQrEmails: (eventId: string, resendAll?: boolean, paymentScope?: EventQrPaymentScope) => Promise<EventQrEmailResult>;
   getParticipantQrPreview: (participantId: string) => Promise<ParticipantQrPreview>;
+  getEventQrEmailDeliveries: (eventId: string) => Promise<QrEmailDeliveryReport>;
   scanParticipantQr: (qrCode: string) => Promise<{ ok: boolean; data?: ParticipantScanResult; error?: string; status?: number }>;
   deleteParticipant: (participantId: string) => Promise<MutationResult>;
   exportEventCsv: (eventId: string) => Promise<MutationResult>;
@@ -1100,17 +1102,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
     replaceParticipantRecord(mapApiParticipantToUi(payload.data, participants.find(participant => participant.id === participantId)?.event_id ?? '')); await loadBootstrap(true); return { ok: true };
   }), [ensureOnline, getAuthHeaders, loadBootstrap, participants, replaceParticipantRecord, runMutation]);
 
-  const sendEventQrEmails = useCallback(async (eventId: string, resendAll = false): Promise<EventQrEmailResult> => {
+  const sendEventQrEmails = useCallback(async (eventId: string, resendAll = false, paymentScope: EventQrPaymentScope = 'all'): Promise<EventQrEmailResult> => {
     try {
-      const offlineError = ensureOnline(); if (offlineError) return { ok: false, sent_count: 0, error_count: 0, errors: [], error: offlineError };
+      const offlineError = ensureOnline(); if (offlineError) return { ok: false, sent_count: 0, error_count: 0, unpaid_count: 0, unknown_payment_count: 0, skipped_unpaid_count: 0, errors: [], error: offlineError };
       const payload = (await fetchJson(`${API_BASE_URL}/events/${eventId}/send-qr-emails`, {
         method: 'POST',
         headers: getAuthHeaders(true),
-        body: JSON.stringify({ resend_all: resendAll }),
+        body: JSON.stringify({ resend_all: resendAll, payment_scope: paymentScope }),
         timeoutMs: 120_000,
-      })).payload as { data?: { sent_count?: number; error_count?: number; errors?: Array<{ participant_id: number; participant_name: string; error: string }> } };
+      })).payload as { data?: { sent_count?: number; error_count?: number; unpaid_count?: number; unknown_payment_count?: number; skipped_unpaid_count?: number; errors?: Array<{ participant_id: number; participant_name: string; error: string }> } };
       await loadBootstrap(true);
-      return { ok: true, sent_count: Number(payload.data?.sent_count ?? 0), error_count: Number(payload.data?.error_count ?? 0), errors: Array.isArray(payload.data?.errors) ? payload.data!.errors : [] };
+      return {
+        ok: true,
+        sent_count: Number(payload.data?.sent_count ?? 0),
+        error_count: Number(payload.data?.error_count ?? 0),
+        unpaid_count: Number(payload.data?.unpaid_count ?? 0),
+        unknown_payment_count: Number(payload.data?.unknown_payment_count ?? 0),
+        skipped_unpaid_count: Number(payload.data?.skipped_unpaid_count ?? 0),
+        errors: Array.isArray(payload.data?.errors) ? payload.data!.errors : [],
+      };
     } catch (error) {
       handleNetworkFailure(error);
       return { ok: false, sent_count: 0, error_count: 0, errors: [], error: error instanceof Error ? error.message : 'Nie udało się wysłać kodów QR.' };
@@ -1123,6 +1133,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const previewEvent = mapApiEventToUi(payload.data.event);
     return { participant: mapApiParticipantToUi(payload.data.participant, previewEvent.id), event: previewEvent, qr_code_svg_data_uri: payload.data.qr_code_svg_data_uri ?? '', qr_code_image_url: payload.data.qr_code_image_url ?? '' };
   }, [applyOnlineOnly, getAuthHeaders]);
+
+  const getEventQrEmailDeliveries = useCallback(async (eventId: string): Promise<QrEmailDeliveryReport> => {
+    // Endpoint stronicuje odpowiedzi mailera po stronie API, więc dostaje dłuższy timeout.
+    const payload = (await fetchJson(`${API_BASE_URL}/events/${eventId}/qr-email-deliveries`, {
+      headers: getAuthHeaders(),
+      timeoutMs: 30_000,
+    })).payload as { data?: QrEmailDeliveryReport };
+    if (!payload.data) throw new Error('API QR email deliveries returned empty payload');
+    return payload.data;
+  }, [getAuthHeaders]);
 
   const scanParticipantQr = useCallback(async (qrCode: string) => {
     const normalizedQrCode = qrCode.trim();
@@ -1219,7 +1239,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [buildExportFallbackName, downloadCsvResponse, ensureOnline, getAuthHeaders, handleNetworkFailure]);
 
   return (
-    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, replaceParticipantImport, resetEventParticipantList, getParticipantFieldMappingsState, getParticipantFieldMappings, updateParticipantFieldMappings, addParticipantManually, createEvent, createTestEvent, resetTestEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, setUserPassword, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, exportEventParticipantChangesCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, diagnostics, refreshData }}>
+    <DataContext.Provider value={{ organizations, events, archivedEvents, participants, users, activityLog, currentRole, currentUser, selectedOrganizationId, setSelectedOrganizationId, selectedEventId, setSelectedEventId, selectEventContext, updateParticipantStatus, updateParticipantBibNumber, updateParticipantDetails, analyzeParticipantImport, confirmParticipantImportMapping, runParticipantImport, replaceParticipantImport, resetEventParticipantList, getParticipantFieldMappingsState, getParticipantFieldMappings, updateParticipantFieldMappings, addParticipantManually, createEvent, createTestEvent, resetTestEvent, updateEvent, archiveEvent, deleteEvent, addUser, updateUser, createOrganization, updateOrganization, updateOrganizationEventLimit, deleteOrganization, removeUser, triggerUserPasswordReset, setUserPassword, changeRole, assignScannerEvents, sendParticipantQrEmail, sendEventQrEmails, getParticipantQrPreview, getEventQrEmailDeliveries, scanParticipantQr, deleteParticipant, exportEventCsv, exportEventLogsCsv, exportEventParticipantChangesCsv, visibleEvents, canAccessEvent, canViewEvent, isLoading, connectionState, lastSyncAt, snapshotSource, pendingMutationCount, scannerMode, diagnostics, refreshData }}>
       {children}
     </DataContext.Provider>
   );

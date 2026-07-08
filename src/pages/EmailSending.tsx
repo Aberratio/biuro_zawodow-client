@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
 import { useRouteEventContext } from '@/hooks/use-route-event-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,12 +26,20 @@ import { PageHeader } from '@/components/PageHeader';
 import { PageBlockerOverlay } from '@/components/PageBlockerOverlay';
 import { formatEventOfficeWindow, isEventCurrentOrUpcoming, isEventOfficeOpen } from '@/lib/events';
 import { buildEventPath } from '@/lib/routes';
-import type { ActivityLog, Participant } from '@/types';
+import {
+  QR_DELIVERY_STATUS_DEFINITIONS,
+  getQrDeliveryStatusDefinition,
+  normalizeQrDeliveryStatus,
+  type QrDeliveryDisplayStatus,
+} from '@/lib/qr-delivery-status';
+import type { ActivityLog, Participant, QrEmailDelivery, QrEmailDeliveryReport } from '@/types';
 
 type PendingEmailAction =
   | { kind: 'send-missing'; count: number }
   | { kind: 'resend-all'; count: number }
   | { kind: 'send-one'; participantId: string; participantName: string; participantEmail: string };
+
+type PaymentScope = 'all' | 'paid_only';
 
 const qrActionDateFormatter = new Intl.DateTimeFormat('pl-PL', {
   day: '2-digit',
@@ -38,6 +48,26 @@ const qrActionDateFormatter = new Intl.DateTimeFormat('pl-PL', {
   hour: '2-digit',
   minute: '2-digit',
 });
+
+const refreshTimeFormatter = new Intl.DateTimeFormat('pl-PL', { hour: '2-digit', minute: '2-digit' });
+
+const DELIVERY_REFRESH_INTERVAL_MS = 30_000;
+
+type DeliveryStatusFilter = 'all' | 'local_not_sent' | QrDeliveryDisplayStatus;
+
+interface ParticipantDeliveryRow {
+  participant: Participant;
+  delivery: QrEmailDelivery | null;
+  // null = brak danych z mailera dla tego wiersza -> pokazujemy lokalny stan wysyłki.
+  displayStatus: QrDeliveryDisplayStatus | null;
+}
+
+// Mailer zwraca daty w formacie 'Y-m-d H:i:s'; Safari nie parsuje spacji w dacie.
+const formatDeliveryTimestamp = (value: string | null | undefined): string => {
+  if (!value) return '—';
+  const parsed = new Date(value.includes('T') ? value : value.replace(' ', 'T'));
+  return Number.isNaN(parsed.getTime()) ? value : qrActionDateFormatter.format(parsed);
+};
 
 const isQrSendingActivity = (action: string) => {
   const normalizedAction = action.toLowerCase();
@@ -89,6 +119,7 @@ export default function EmailSending() {
     selectedEventId,
     sendEventQrEmails,
     sendParticipantQrEmail,
+    getEventQrEmailDeliveries,
     isLoading,
     connectionState,
   } = useData();
@@ -96,6 +127,12 @@ export default function EmailSending() {
   const [resendingAll, setResendingAll] = useState(false);
   const [sendingParticipantId, setSendingParticipantId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingEmailAction | null>(null);
+  const [deliveryReport, setDeliveryReport] = useState<QrEmailDeliveryReport | null>(null);
+  const [isRefreshingDeliveries, setIsRefreshingDeliveries] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const [deliveriesUnavailable, setDeliveriesUnavailable] = useState(false);
+  const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<DeliveryStatusFilter>('all');
+  const [deliverySearch, setDeliverySearch] = useState('');
   const activeEventId = routeEventId || selectedEventId;
 
   useRouteEventContext(routeEventId);
@@ -110,6 +147,9 @@ export default function EmailSending() {
   const isOfficeOpenNow = selectedEvent ? isEventOfficeOpen(selectedEvent) : false;
   const canSendBulkQrEmails = selectedEvent ? isEventCurrentOrUpcoming(selectedEvent) : false;
   const sent = eventParticipants.filter(participant => participant.email_status === 'sent').length;
+  const unpaidParticipantsCount = eventParticipants.filter(participant => participant.payment_status === 'unpaid').length;
+  const paidParticipantsCount = eventParticipants.filter(participant => participant.payment_status === 'paid').length;
+  const unknownPaymentCount = eventParticipants.filter(participant => participant.payment_status === 'unknown').length;
   const pending = eventParticipants.length - sent;
   const hasParticipants = eventParticipants.length > 0;
   const hasSentEmails = sent > 0;
@@ -126,11 +166,89 @@ export default function EmailSending() {
   const isSendingQrEmails = sendingAll || resendingAll || sendingParticipantId !== null;
   const isOnline = connectionState === 'online';
 
+  const loadDeliveries = useCallback(async (silent: boolean) => {
+    if (!activeEventId) return;
+    if (!silent) setIsRefreshingDeliveries(true);
+    try {
+      const report = await getEventQrEmailDeliveries(activeEventId);
+      setDeliveryReport(report);
+      setLastRefreshedAt(new Date());
+      setDeliveriesUnavailable(!report.mailer_available);
+    } catch {
+      // Polling nie może zasypywać użytkownika toastami — cicho przechodzimy na stan lokalny.
+      setDeliveriesUnavailable(true);
+      if (!silent) {
+        toast({
+          title: 'Nie udało się pobrać statusów dostarczenia',
+          description: 'Pokazujemy lokalny stan wysyłki. Spróbuj odświeżyć za chwilę.',
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      if (!silent) setIsRefreshingDeliveries(false);
+    }
+  }, [activeEventId, getEventQrEmailDeliveries]);
+
+  useEffect(() => {
+    setDeliveryReport(null);
+    setDeliveriesUnavailable(false);
+    setLastRefreshedAt(null);
+    if (!activeEventId || !isOnline) return;
+    void loadDeliveries(true);
+    const interval = window.setInterval(() => void loadDeliveries(true), DELIVERY_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, [activeEventId, isOnline, loadDeliveries]);
+
+  const deliveryDataAvailable = deliveryReport !== null && deliveryReport.mailer_available && !deliveriesUnavailable;
+  const isTestModeReport = deliveryReport?.mailer_error === 'test_mode';
+
+  const deliveryByParticipantId = useMemo(() => {
+    const map = new Map<string, QrEmailDelivery>();
+    for (const entry of deliveryReport?.participants ?? []) {
+      if (entry.delivery) {
+        // API zwraca liczbowe id uczestnika; UI używa prefiksu "p-".
+        map.set(`p-${entry.participant_id}`, entry.delivery);
+      }
+    }
+    return map;
+  }, [deliveryReport]);
+
+  const participantDeliveryRows = useMemo<ParticipantDeliveryRow[]>(
+    () => eventParticipants.map(participant => {
+      const delivery = deliveryByParticipantId.get(participant.id) ?? null;
+      const displayStatus: QrDeliveryDisplayStatus | null = !deliveryDataAvailable
+        ? null
+        : delivery
+          ? normalizeQrDeliveryStatus(delivery.effective_status)
+          : participant.email_status === 'sent'
+            ? 'no_data'
+            : null;
+      return { participant, delivery, displayStatus };
+    }),
+    [deliveryByParticipantId, deliveryDataAvailable, eventParticipants],
+  );
+
+  const filteredDeliveryRows = useMemo(() => {
+    const search = deliverySearch.trim().toLowerCase();
+    return participantDeliveryRows.filter(({ participant, displayStatus }) => {
+      if (deliveryStatusFilter === 'local_not_sent') {
+        if (!(displayStatus === null && participant.email_status !== 'sent')) return false;
+      } else if (deliveryStatusFilter !== 'all' && displayStatus !== deliveryStatusFilter) {
+        return false;
+      }
+      if (!search) return true;
+      return [participant.name, participant.email, participant.bib_number]
+        .some(value => String(value ?? '').toLowerCase().includes(search));
+    });
+  }, [deliverySearch, deliveryStatusFilter, participantDeliveryRows]);
+
+  const deliverySummary = deliveryDataAvailable ? deliveryReport.summary : null;
+
   if (isLoading) {
     return <TableSkeleton rows={5} cols={4} subtitle="" />;
   }
 
-  const handleSendAll = async (resendAll: boolean) => {
+  const handleSendAll = async (resendAll: boolean, paymentScope: PaymentScope) => {
     if (resendAll && isOfficeOpenNow) {
       setPendingAction(null);
       toast({
@@ -149,7 +267,7 @@ export default function EmailSending() {
     }
 
     try {
-      const result = await sendEventQrEmails(activeEventId, resendAll);
+      const result = await sendEventQrEmails(activeEventId, resendAll, paymentScope);
       if (!result.ok) {
         toast({ title: 'Nie udało się wysłać kodów QR', description: result.error, variant: 'destructive' });
         return;
@@ -171,6 +289,7 @@ export default function EmailSending() {
     } finally {
       setSendingAll(false);
       setResendingAll(false);
+      void loadDeliveries(true);
     }
   };
 
@@ -187,6 +306,7 @@ export default function EmailSending() {
       toast({ title: 'Mail wysłany', description: participantName });
     } finally {
       setSendingParticipantId(null);
+      void loadDeliveries(true);
     }
   };
 
@@ -209,6 +329,21 @@ export default function EmailSending() {
 
       {!isOnline && (
         <OnlineOnlyNotice description="Wysyłka i ponowne wysyłanie kodów QR wymagają aktywnego połączenia z serwerem. W trybie offline widoczny jest tylko stan z ostatniej synchronizacji." />
+      )}
+
+      {isOnline && !deliveryDataAvailable && deliveryReport !== null && (
+        <Card className="border-amber-400/50 bg-amber-500/10">
+          <CardContent className="py-3">
+            <div className="flex items-start gap-2 text-sm">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <p className="text-muted-foreground">
+                {isTestModeReport
+                  ? 'Wydarzenie testowe — wysyłka jest symulowana, więc statusy dostarczenia nie są dostępne.'
+                  : 'Statusy dostarczenia są chwilowo niedostępne — pokazujemy lokalny stan wysyłki.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <Card className="border-primary/20 bg-primary/5">
@@ -249,6 +384,43 @@ export default function EmailSending() {
             )}
             <div className="mt-3 h-2 rounded-full bg-muted">
               <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${eventParticipants.length ? (sent / eventParticipants.length) * 100 : 0}%` }} />
+            </div>
+            {deliverySummary && (
+              <div className="mt-3 flex flex-wrap gap-1.5" data-testid="delivery-summary">
+                <Badge variant="default" className="text-[10px]">Wysłane: {deliverySummary.sent}</Badge>
+                <Badge variant="secondary" className="text-[10px]">W kolejce: {deliverySummary.queued}</Badge>
+                {deliverySummary.bounced > 0 && (
+                  <Badge variant="destructive" className="text-[10px]">Odbite: {deliverySummary.bounced}</Badge>
+                )}
+                {deliverySummary.failed > 0 && (
+                  <Badge variant="destructive" className="text-[10px]">Błędy: {deliverySummary.failed}</Badge>
+                )}
+                {deliverySummary.unknown > 0 && (
+                  <Badge variant="outline" className="text-[10px]">Nieznane: {deliverySummary.unknown}</Badge>
+                )}
+                {deliverySummary.no_data > 0 && (
+                  <Badge variant="outline" className="text-[10px]">Brak danych: {deliverySummary.no_data}</Badge>
+                )}
+              </div>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => void loadDeliveries(false)}
+                disabled={!isOnline || isRefreshingDeliveries || !activeEventId}
+              >
+                {isRefreshingDeliveries
+                  ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  : <RefreshCcw className="mr-1 h-3.5 w-3.5" />}
+                Odśwież statusy
+              </Button>
+              {lastRefreshedAt && (
+                <span className="text-xs text-muted-foreground">
+                  Aktualizacja: {refreshTimeFormatter.format(lastRefreshedAt)}
+                </span>
+              )}
             </div>
             <div className="mt-4 grid gap-2">
               {hasNoSentEmails ? (
@@ -318,54 +490,118 @@ export default function EmailSending() {
       <Card>
         <CardHeader><CardTitle className="text-base">Lista uczestników</CardTitle></CardHeader>
         <CardContent className="-mx-6 overflow-x-auto px-6">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+            <Input
+              placeholder="Szukaj po imieniu, email lub numerze..."
+              value={deliverySearch}
+              onChange={event => setDeliverySearch(event.target.value)}
+              className="sm:max-w-xs"
+            />
+            <Select
+              value={deliveryStatusFilter}
+              onValueChange={value => setDeliveryStatusFilter(value as DeliveryStatusFilter)}
+              disabled={!deliveryDataAvailable}
+            >
+              <SelectTrigger className="sm:w-64" aria-label="Filtr statusu dostarczenia">
+                <SelectValue placeholder="Wszystkie statusy" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Wszystkie statusy</SelectItem>
+                <SelectItem value="local_not_sent">Oczekuje (nie wysłano)</SelectItem>
+                {QR_DELIVERY_STATUS_DEFINITIONS.map(definition => (
+                  <SelectItem key={definition.code} value={definition.code}>{definition.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Imię</TableHead>
                 <TableHead className="hidden md:table-cell">Email</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">Wysłano</TableHead>
                 <TableHead className="text-right">Akcja</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {eventParticipants.map(participant => (
-                <TableRow key={participant.id}>
-                  <TableCell className="text-sm font-medium">
-                    <div className="min-w-0">
-                      <p className="truncate">{participant.name}</p>
-                      <p className="truncate text-xs text-muted-foreground md:hidden">{participant.email}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{participant.email}</TableCell>
-                  <TableCell>
-                    <Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'} className="gap-1 text-[10px]">
-                      {participant.email_status === 'sent'
-                        ? <><CheckCircle className="h-3 w-3" /> Wysłany</>
-                        : <><Mail className="h-3 w-3" /> Oczekuje</>}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 w-full sm:w-auto"
-                      disabled={sendingParticipantId === participant.id || !isOnline}
-                      onClick={() => setPendingAction({
-                        kind: 'send-one',
-                        participantId: participant.id,
-                        participantName: participant.name,
-                        participantEmail: participant.email,
-                      })}
-                    >
-                      {sendingParticipantId === participant.id
-                        ? <Loader2 className="h-4 w-4 animate-spin" />
-                        : participant.email_status === 'sent'
-                          ? 'Wyślij ponownie'
-                          : 'Wyślij'}
-                    </Button>
+              {filteredDeliveryRows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+                    Brak uczestników pasujących do filtrów.
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
+              {filteredDeliveryRows.map(({ participant, delivery, displayStatus }) => {
+                const statusDefinition = displayStatus !== null ? getQrDeliveryStatusDefinition(displayStatus) : null;
+                const showError = delivery?.last_error
+                  && (displayStatus === 'failed' || displayStatus === 'bounced' || displayStatus === 'suppressed' || displayStatus === 'retry');
+                return (
+                  <TableRow key={participant.id}>
+                    <TableCell className="text-sm font-medium">
+                      <div className="min-w-0">
+                        <p className="truncate">{participant.name}</p>
+                        <p className="truncate text-xs text-muted-foreground md:hidden">{participant.email}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{participant.email}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {statusDefinition ? (
+                          <Badge variant={statusDefinition.badgeVariant} className="gap-1 text-[10px]">
+                            {displayStatus === 'sent' && <CheckCircle className="h-3 w-3" />}
+                            {statusDefinition.shortLabel}
+                          </Badge>
+                        ) : (
+                          <Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'} className="gap-1 text-[10px]">
+                            {participant.email_status === 'sent'
+                              ? <><CheckCircle className="h-3 w-3" /> Wysłany</>
+                              : <><Mail className="h-3 w-3" /> Oczekuje</>}
+                          </Badge>
+                        )}
+                        {delivery && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px]"
+                            title={delivery.is_batch ? `Wysyłka masowa (batch: ${delivery.batch_id ?? ''})` : 'Wysyłka pojedyncza'}
+                          >
+                            {delivery.is_batch ? 'Masowa' : 'Pojedyncza'}
+                            {delivery.send_count > 1 ? ` ×${delivery.send_count}` : ''}
+                          </Badge>
+                        )}
+                      </div>
+                      {showError && (
+                        <p className="mt-1 max-w-56 truncate text-xs text-muted-foreground" title={delivery?.last_error ?? undefined}>
+                          {delivery?.last_error}
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
+                      {formatDeliveryTimestamp(delivery?.sent_at)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 w-full sm:w-auto"
+                        disabled={sendingParticipantId === participant.id || !isOnline}
+                        onClick={() => setPendingAction({
+                          kind: 'send-one',
+                          participantId: participant.id,
+                          participantName: participant.name,
+                          participantEmail: participant.email,
+                        })}
+                      >
+                        {sendingParticipantId === participant.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : participant.email_status === 'sent'
+                            ? 'Wyślij ponownie'
+                            : 'Wyślij'}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -384,9 +620,25 @@ export default function EmailSending() {
                     ? <>Ta operacja wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia.</>
                     : <>Ta operacja wyśle brakujące maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia.</>}
             </AlertDialogDescription>
+            {pendingAction && pendingAction.kind !== 'send-one' && (unpaidParticipantsCount > 0 || unknownPaymentCount > 0) && (
+              <div className="rounded-md border border-amber-400/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-950">
+                Nieopłaconych: {unpaidParticipantsCount}. Nieznany status opłaty: {unknownPaymentCount}.
+              </div>
+            )}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            {pendingAction && pendingAction.kind !== 'send-one' && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  void handleSendAll(pendingAction.kind === 'resend-all', 'paid_only');
+                }}
+                disabled={isConfirmingAction || !isOnline || paidParticipantsCount === 0}
+              >
+                Tylko opłaceni ({paidParticipantsCount})
+              </Button>
+            )}
             <AlertDialogAction
               onClick={() => {
                 if (!pendingAction) {
@@ -398,7 +650,7 @@ export default function EmailSending() {
                   return;
                 }
 
-                void handleSendAll(pendingAction.kind === 'resend-all');
+                void handleSendAll(pendingAction.kind === 'resend-all', 'all');
               }}
               disabled={isConfirmingAction || !isOnline}
             >

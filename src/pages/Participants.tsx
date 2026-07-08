@@ -61,6 +61,7 @@ import {
   buildEmptyParticipantFieldValues,
   getActiveParticipantMappings,
   PARTICIPANT_EMAIL_MAX_LENGTH,
+  participantPaymentStatusLabels,
   validateParticipantFieldValue,
 } from "@/lib/participant-fields";
 import { formatBibNumber } from "@/lib/participants";
@@ -69,7 +70,7 @@ import {
   PARTICIPANT_STATUS_DEFINITIONS,
 } from "@/lib/participant-status";
 import { validateEmail } from "@/lib/form-validation";
-import { isScannerRole } from "@/lib/roles";
+import { canAddParticipantManually, isScannerRole } from "@/lib/roles";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 import { PageHeader } from "@/components/PageHeader";
 import { ParticipantFieldRoleHint } from "@/components/ParticipantFieldRoleHint";
@@ -81,7 +82,7 @@ import {
   buildEventPath,
 } from "@/lib/routes";
 
-type ParticipantSortKey = "name" | "email" | "bib_number" | "status";
+type ParticipantSortKey = "name" | "email" | "bib_number" | "status" | "payment_status";
 type SortDirection = "asc" | "desc";
 
 function normalizeParticipantText(value: string | null | undefined) {
@@ -104,6 +105,7 @@ export default function Participants() {
   const { id: routeEventId = "" } = useParams<{ id: string }>();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
   const [sortKey, setSortKey] = useState<ParticipantSortKey>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
@@ -161,8 +163,12 @@ export default function Participants() {
       .filter(
         (participant) =>
           statusFilter === "all" || participant.status === statusFilter,
+      )
+      .filter(
+        (participant) =>
+          paymentFilter === "all" || participant.payment_status === paymentFilter,
       );
-  }, [eventParticipants, search, statusFilter]);
+  }, [eventParticipants, paymentFilter, search, statusFilter]);
 
   const sortedParticipants = useMemo(() => {
     const directionFactor = sortDirection === "asc" ? 1 : -1;
@@ -170,8 +176,16 @@ export default function Participants() {
     return [...filtered].sort((first, second) => {
       const firstStatus = getParticipantStatusDefinition(first.status).label;
       const secondStatus = getParticipantStatusDefinition(second.status).label;
-      const firstValue = sortKey === "status" ? firstStatus : first[sortKey];
-      const secondValue = sortKey === "status" ? secondStatus : second[sortKey];
+      const firstValue = sortKey === "status"
+        ? firstStatus
+        : sortKey === "payment_status"
+          ? participantPaymentStatusLabels[first.payment_status]
+          : first[sortKey];
+      const secondValue = sortKey === "status"
+        ? secondStatus
+        : sortKey === "payment_status"
+          ? participantPaymentStatusLabels[second.payment_status]
+          : second[sortKey];
 
       return (
         String(firstValue).localeCompare(String(secondValue), "pl", {
@@ -207,6 +221,8 @@ export default function Participants() {
     () => getActiveParticipantMappings(mappings),
     [mappings],
   );
+  const canAddParticipantsManuallyForRole =
+    canAddParticipantManually(currentRole);
   const canImportParticipants =
     Boolean(activeEventId) && !isScannerRole(currentRole);
   const canResetParticipantList =
@@ -214,8 +230,9 @@ export default function Participants() {
     (eventParticipants.length > 0 || hasSavedParticipantListState) &&
     ["editor", "admin", "superadmin"].includes(currentRole);
   const canAddManually =
+    Boolean(activeEventId) &&
     mappings.length > 0 &&
-    !isScannerRole(currentRole);
+    canAddParticipantsManuallyForRole;
 
   const handleSort = (key: ParticipantSortKey) => {
     if (sortKey === key) {
@@ -422,8 +439,8 @@ export default function Participants() {
         </p>
       )}
 
-      {!isOnline && !isScannerRole(currentRole) && (
-        <OnlineOnlyNotice description="Import CSV i ręczne dodawanie uczestników są dostępne tylko po połączeniu z serwerem. Lista pozostaje dostępna do odczytu z lokalnego snapshotu." />
+      {!isOnline && (canImportParticipants || canAddParticipantsManuallyForRole) && (
+        <OnlineOnlyNotice description="Operacje na liście uczestników są dostępne tylko po połączeniu z serwerem. Lista pozostaje dostępna do odczytu z lokalnego snapshotu." />
       )}
 
       <div className="flex flex-col gap-3">
@@ -448,6 +465,17 @@ export default function Participants() {
                   {status.label}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+            <SelectTrigger className="w-full sm:w-[220px] h-10">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Wszystkie opłaty</SelectItem>
+              <SelectItem value="paid">Opłaceni</SelectItem>
+              <SelectItem value="unpaid">Nieopłaceni</SelectItem>
+              <SelectItem value="unknown">Nieznany status opłaty</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -477,6 +505,7 @@ export default function Participants() {
                 </TableHead>
                 <TableHead>{renderSortHeader("bib_number", "Numer")}</TableHead>
                 <TableHead>{renderSortHeader("status", "Status")}</TableHead>
+                <TableHead>{renderSortHeader("payment_status", "Opłata")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -528,6 +557,14 @@ export default function Participants() {
                         className="text-[10px]"
                       >
                         {status.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={participant.payment_status === "unpaid" ? "destructive" : participant.payment_status === "paid" ? "default" : "secondary"}
+                        className="text-[10px]"
+                      >
+                        {participantPaymentStatusLabels[participant.payment_status]}
                       </Badge>
                     </TableCell>
                   </TableRow>

@@ -2,6 +2,7 @@ export type Role = 'superadmin' | 'admin' | 'editor' | 'scanner' | 'scanner_plus
 
 export type ParticipantStatus = 'not_checked_in' | 'checked_in' | 'checked_in_not_starting';
 export type EmailStatus = 'not_sent' | 'sent';
+export type PaymentStatus = 'unknown' | 'paid' | 'unpaid';
 export type ParticipantSyncState = 'synced' | 'pending_sync' | 'requires_review';
 export type ConnectionState = 'online' | 'degraded' | 'offline';
 export type SnapshotSource = 'network' | 'cache' | 'none';
@@ -46,11 +47,62 @@ export interface Participant {
   qr_code: string;
   status: ParticipantStatus;
   email_status: EmailStatus;
+  payment_status: PaymentStatus;
   checked_in_at?: string;
   custom_fields?: Record<string, string>;
   important_field_aliases?: string[];
   sync_state?: ParticipantSyncState;
   sync_error?: string;
+}
+
+export type QrDeliveryEffectiveStatus =
+  | 'pending'
+  | 'processing'
+  | 'retry'
+  | 'sent'
+  | 'failed'
+  | 'bounced'
+  | 'suppressed'
+  | 'unknown';
+
+export interface QrEmailDelivery {
+  email_id: string;
+  status: string;
+  effective_status: QrDeliveryEffectiveStatus;
+  is_batch: boolean;
+  batch_id: string | null;
+  sent_at: string | null;
+  created_at: string | null;
+  last_error: string | null;
+  send_count: number;
+}
+
+export interface QrEmailDeliveryParticipant {
+  participant_id: number;
+  name: string;
+  email: string;
+  bib_number: string;
+  local_email_status: EmailStatus;
+  delivery: QrEmailDelivery | null;
+}
+
+export interface QrEmailDeliverySummary {
+  participants_total: number;
+  sent: number;
+  queued: number;
+  failed: number;
+  bounced: number;
+  unknown: number;
+  no_data: number;
+}
+
+export interface QrEmailDeliveryReport {
+  event_id: string;
+  generated_at: string;
+  mailer_available: boolean;
+  mailer_error: string | null;
+  summary: QrEmailDeliverySummary;
+  participants: QrEmailDeliveryParticipant[];
 }
 
 export interface ParticipantQrPreview {
@@ -68,7 +120,7 @@ export interface ParticipantScanResult {
   };
 }
 
-export type ParticipantFieldRole = 'email' | 'display_name_part' | 'bib_number' | 'custom' | 'important_custom';
+export type ParticipantFieldRole = 'email' | 'display_name_part' | 'bib_number' | 'payment_status' | 'custom' | 'important_custom';
 export type ParticipantFieldType = 'text' | 'number' | 'date' | 'select';
 
 export interface ParticipantFieldValidationRules {

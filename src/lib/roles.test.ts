@@ -1,5 +1,6 @@
 import type { Role } from '@/types';
 import {
+  canAddParticipantManually,
   canManageParticipantData,
   canUseParticipantAdminActions,
   getRoleLabel,
@@ -21,6 +22,7 @@ describe('role helpers', () => {
 
   it('separates participant editing from administrative participant actions', () => {
     expect(roles.filter(canManageParticipantData)).toEqual(['superadmin', 'admin', 'editor', 'scanner_plus']);
+    expect(roles.filter(canAddParticipantManually)).toEqual(['superadmin', 'admin', 'editor', 'scanner_plus']);
     expect(roles.filter(canUseParticipantAdminActions)).toEqual(['superadmin', 'admin', 'editor']);
   });
 

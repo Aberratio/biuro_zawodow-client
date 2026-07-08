@@ -16,7 +16,7 @@ import type { Event, Participant, ParticipantFieldMapping } from '@/types';
 import QrScannerView from '@/components/QrScannerView';
 import ParticipantSearch from '@/components/ParticipantSearch';
 import ScannerSkeleton from '@/components/skeletons/ScannerSkeleton';
-import { buildParticipantFieldValues } from '@/lib/participant-fields';
+import { buildParticipantFieldValues, participantPaymentStatusLabels } from '@/lib/participant-fields';
 import { formatBibNumber } from '@/lib/participants';
 import { getParticipantStatusDefinition } from '@/lib/participant-status';
 import { formatEventOfficeWindow, isEventOfficeOpen } from '@/lib/events';
@@ -642,9 +642,18 @@ export default function Scanner() {
                 {scannedParticipant.sync_state === 'requires_review' && (
                   <Badge variant="destructive">Wymaga weryfikacji</Badge>
                 )}
+                <Badge variant={scannedParticipant.payment_status === 'unpaid' ? 'destructive' : scannedParticipant.payment_status === 'paid' ? 'default' : 'secondary'}>
+                  {participantPaymentStatusLabels[scannedParticipant.payment_status]}
+                </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-5 p-4 sm:p-6">
+              {scannedParticipant.payment_status === 'unpaid' && (
+                <div className="rounded-2xl border-2 border-destructive bg-destructive/10 px-4 py-4 text-destructive sm:px-5">
+                  <p className="font-heading text-xl font-black uppercase leading-tight sm:text-2xl">Pakiet nieopłacony</p>
+                  <p className="mt-1 text-sm font-medium">Przed odprawą zweryfikuj płatność z organizatorem.</p>
+                </div>
+              )}
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
                 <div className="rounded-2xl border bg-muted/20 p-4 sm:p-5">
                   <div className="mb-3">
@@ -734,6 +743,12 @@ export default function Scanner() {
                     <div className="rounded-xl border bg-background/90 px-4 py-3 shadow-sm">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Status</p>
                       <p className="mt-2 break-words text-lg font-bold leading-snug text-foreground [overflow-wrap:anywhere]">{getParticipantStatusDefinition(scannedParticipant.status).label}</p>
+                    </div>
+                    <div className={`rounded-xl border px-4 py-3 shadow-sm ${scannedParticipant.payment_status === 'unpaid' ? 'border-destructive/50 bg-destructive/10' : 'bg-background/90'}`}>
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Opłata</p>
+                      <p className={`mt-2 break-words text-lg font-bold leading-snug [overflow-wrap:anywhere] ${scannedParticipant.payment_status === 'unpaid' ? 'text-destructive' : 'text-foreground'}`}>
+                        {participantPaymentStatusLabels[scannedParticipant.payment_status]}
+                      </p>
                     </div>
                     <div className="rounded-xl border bg-background/90 px-4 py-3 shadow-sm sm:col-span-2 xl:col-span-1">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ostatnia odprawa</p>

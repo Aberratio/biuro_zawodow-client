@@ -56,6 +56,7 @@ import {
   getActiveParticipantMappings,
   PARTICIPANT_BIB_NUMBER_MAX_LENGTH,
   PARTICIPANT_EMAIL_MAX_LENGTH,
+  participantPaymentStatusLabels,
   validateParticipantFieldValue,
 } from "@/lib/participant-fields";
 import { formatBibNumber } from "@/lib/participants";
@@ -380,7 +381,7 @@ export default function ParticipantDetails() {
     const seenLabels = new Set(["Imię i nazwisko", "Email"]);
 
     for (const mapping of activeMappings) {
-      if (mapping.field_role === "bib_number") continue;
+      if (mapping.field_role === "bib_number" || mapping.field_role === "payment_status") continue;
       const value = (mappedValues[mapping.alias] ?? "").trim();
       if (!value) continue;
       entries.push({
@@ -805,6 +806,12 @@ export default function ParticipantDetails() {
               <span className="text-muted-foreground">Status</span>
               <Badge variant={statusDefinition.badgeVariant}>
                 {statusDefinition.label}
+              </Badge>
+            </div>
+            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-muted-foreground">Opłata</span>
+              <Badge variant={participant.payment_status === "unpaid" ? "destructive" : participant.payment_status === "paid" ? "default" : "secondary"}>
+                {participantPaymentStatusLabels[participant.payment_status]}
               </Badge>
             </div>
             {(participant.sync_state === "pending_sync" ||
