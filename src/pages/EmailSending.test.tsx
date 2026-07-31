@@ -147,6 +147,33 @@ describe("EmailSending page", () => {
     }));
   });
 
+  it("can send bulk QR emails only to paid participants", async () => {
+    const { sendEventQrEmails } = renderPage({
+      participants: [
+        createTestParticipant({ id: "p-1", payment_status: "paid" }),
+        createTestParticipant({
+          id: "p-2",
+          name: "Jan Nowak",
+          email: "jan@example.com",
+          payment_status: "unpaid",
+        }),
+        createTestParticipant({
+          id: "p-3",
+          name: "Celina Trzecia",
+          email: "celina@example.com",
+          payment_status: "unknown",
+        }),
+      ],
+    });
+
+    fireEvent.click(findButtonByText("wszystkich"));
+    fireEvent.click(findButtonByText("Tylko op"));
+
+    await waitFor(() => {
+      expect(sendEventQrEmails).toHaveBeenCalledWith("event-1", false, "paid_only");
+    });
+  });
+
   it("disables QR sending actions while offline", () => {
     renderPage({ connectionState: "offline" });
 
@@ -231,6 +258,45 @@ describe("EmailSending page", () => {
     expect(screen.getByText("Pojedyncza")).toBeInTheDocument();
     expect(screen.getByText("User unknown")).toBeInTheDocument();
     expect(screen.getByTestId("delivery-summary")).toHaveTextContent("Odbite: 1");
+  });
+
+  it("shows when the mail server confirms every QR email was sent", async () => {
+    renderPage({
+      participants: [
+        createTestParticipant({ id: "p-1", name: "Anna Pierwsza", email: "anna@example.com", email_status: "sent" }),
+        createTestParticipant({ id: "p-2", name: "Bartek Drugi", email: "bartek@example.com", email_status: "sent" }),
+      ],
+      getEventQrEmailDeliveries: vi.fn(async () => createTestDeliveryReport({
+        summary: { participants_total: 2, sent: 2, queued: 0, failed: 0, bounced: 0, unknown: 0, no_data: 0 },
+        participants: [
+          createTestDeliveryParticipant({
+            participant_id: 1,
+            name: "Anna Pierwsza",
+            email: "anna@example.com",
+          }),
+          createTestDeliveryParticipant({
+            participant_id: 2,
+            name: "Bartek Drugi",
+            email: "bartek@example.com",
+            delivery: {
+              email_id: "mail-2",
+              status: "sent",
+              effective_status: "sent",
+              is_batch: true,
+              batch_id: "batch-9",
+              sent_at: "2026-07-08 10:05:00",
+              created_at: "2026-07-08 10:00:00",
+              last_error: null,
+              send_count: 1,
+            },
+          }),
+        ],
+      })),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("all-mailer-deliveries-sent")).toHaveTextContent("Serwer pocztowy");
+    });
   });
 
   it("filters participants by delivery status", async () => {

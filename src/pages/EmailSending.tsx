@@ -243,6 +243,16 @@ export default function EmailSending() {
   }, [deliverySearch, deliveryStatusFilter, participantDeliveryRows]);
 
   const deliverySummary = deliveryDataAvailable ? deliveryReport.summary : null;
+  const allMailerDeliveriesSent = Boolean(
+    deliverySummary
+      && deliverySummary.participants_total > 0
+      && deliverySummary.sent === deliverySummary.participants_total
+      && deliverySummary.queued === 0
+      && deliverySummary.failed === 0
+      && deliverySummary.bounced === 0
+      && deliverySummary.unknown === 0
+      && deliverySummary.no_data === 0,
+  );
 
   if (isLoading) {
     return <TableSkeleton rows={5} cols={4} subtitle="" />;
@@ -401,6 +411,15 @@ export default function EmailSending() {
                 {deliverySummary.no_data > 0 && (
                   <Badge variant="outline" className="text-[10px]">Brak danych: {deliverySummary.no_data}</Badge>
                 )}
+              </div>
+            )}
+            {allMailerDeliveriesSent && (
+              <div
+                className="mt-3 flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-900"
+                data-testid="all-mailer-deliveries-sent"
+              >
+                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>Serwer pocztowy potwierdził wysłanie wszystkich maili z kodami QR.</span>
               </div>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-2">
