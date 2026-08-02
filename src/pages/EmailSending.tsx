@@ -18,7 +18,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, CheckCircle, Info, Loader2, Mail, RefreshCcw, Send } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { AlertCircle, ArrowLeft, CheckCircle, Copy, Info, Loader2, Mail, RefreshCcw, Send } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
@@ -136,6 +137,15 @@ export default function EmailSending() {
   const activeEventId = routeEventId || selectedEventId;
 
   useRouteEventContext(routeEventId);
+
+  const copyDeliveryError = useCallback(async (message: string) => {
+    try {
+      await navigator.clipboard.writeText(message);
+      toast({ title: 'Skopiowano treść błędu' });
+    } catch {
+      toast({ title: 'Nie udało się skopiować błędu', variant: 'destructive' });
+    }
+  }, []);
 
   const eventParticipants = useMemo(
     () => participants
@@ -573,35 +583,63 @@ export default function EmailSending() {
                     </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{participant.email}</TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap items-center gap-1">
-                        {statusDefinition ? (
-                          <Badge variant={statusDefinition.badgeVariant} className="gap-1 text-[10px]">
-                            {displayStatus === 'sent' && <CheckCircle className="h-3 w-3" />}
-                            {statusDefinition.shortLabel}
-                          </Badge>
-                        ) : (
-                          <Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'} className="gap-1 text-[10px]">
-                            {participant.email_status === 'sent'
-                              ? <><CheckCircle className="h-3 w-3" /> Wysłany</>
-                              : <><Mail className="h-3 w-3" /> Oczekuje</>}
-                          </Badge>
-                        )}
-                        {delivery && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px]"
-                            title={delivery.is_batch ? `Wysyłka masowa (batch: ${delivery.batch_id ?? ''})` : 'Wysyłka pojedyncza'}
-                          >
-                            {delivery.is_batch ? 'Masowa' : 'Pojedyncza'}
-                            {delivery.send_count > 1 ? ` ×${delivery.send_count}` : ''}
-                          </Badge>
+                      <div className="flex min-h-9 flex-col justify-center gap-1">
+                        <div className="flex flex-wrap items-center gap-1">
+                          {statusDefinition ? (
+                            <Badge variant={statusDefinition.badgeVariant} className="gap-1 text-[10px]">
+                              {displayStatus === 'sent' && <CheckCircle className="h-3 w-3" />}
+                              {statusDefinition.shortLabel}
+                            </Badge>
+                          ) : (
+                            <Badge variant={participant.email_status === 'sent' ? 'default' : 'secondary'} className="gap-1 text-[10px]">
+                              {participant.email_status === 'sent'
+                                ? <><CheckCircle className="h-3 w-3" /> Wysłany</>
+                                : <><Mail className="h-3 w-3" /> Oczekuje</>}
+                            </Badge>
+                          )}
+                          {delivery && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px]"
+                              title={delivery.is_batch ? `Wysyłka masowa (batch: ${delivery.batch_id ?? ''})` : 'Wysyłka pojedyncza'}
+                            >
+                              {delivery.is_batch ? 'Masowa' : 'Pojedyncza'}
+                              {delivery.send_count > 1 ? ` ×${delivery.send_count}` : ''}
+                            </Badge>
+                          )}
+                        </div>
+                        {showError && delivery?.last_error && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 w-fit gap-1 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                              >
+                                <AlertCircle className="h-3 w-3" />
+                                Szczegóły błędu
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="start" className="w-80 space-y-2">
+                              <p className="text-sm font-medium">Treść błędu wysyłki</p>
+                              <p className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                                {delivery.last_error}
+                              </p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="w-full"
+                                onClick={() => copyDeliveryError(delivery.last_error ?? '')}
+                              >
+                                <Copy className="mr-1 h-3.5 w-3.5" />
+                                Kopiuj
+                              </Button>
+                            </PopoverContent>
+                          </Popover>
                         )}
                       </div>
-                      {showError && (
-                        <p className="mt-1 max-w-56 truncate text-xs text-muted-foreground" title={delivery?.last_error ?? undefined}>
-                          {delivery?.last_error}
-                        </p>
-                      )}
                     </TableCell>
                     <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                       {formatDeliveryTimestamp(delivery?.sent_at)}
