@@ -34,6 +34,7 @@ import {
   type QrDeliveryDisplayStatus,
 } from '@/lib/qr-delivery-status';
 import type { ActivityLog, Participant, QrEmailDelivery, QrEmailDeliveryReport } from '@/types';
+import { cn } from '@/lib/utils';
 
 type PendingEmailAction =
   | { kind: 'send-missing'; count: number }
@@ -413,33 +414,51 @@ export default function EmailSending() {
             <div className="mt-3 h-2 rounded-full bg-muted">
               <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${eventParticipants.length ? (sent / eventParticipants.length) * 100 : 0}%` }} />
             </div>
-            {deliverySummary && (
-              <div className="mt-3 flex flex-wrap gap-1.5" data-testid="delivery-summary">
-                <Badge variant="default" className="text-[10px]">Wysłane: {deliverySummary.sent}</Badge>
-                <Badge variant="secondary" className="text-[10px]">W kolejce: {deliverySummary.queued}</Badge>
-                {deliverySummary.bounced > 0 && (
-                  <Badge variant="destructive" className="text-[10px]">Odbite: {deliverySummary.bounced}</Badge>
-                )}
-                {deliverySummary.failed > 0 && (
-                  <Badge variant="destructive" className="text-[10px]">Błędy: {deliverySummary.failed}</Badge>
-                )}
-                {deliverySummary.unknown > 0 && (
-                  <Badge variant="outline" className="text-[10px]">Nieznane: {deliverySummary.unknown}</Badge>
-                )}
-                {deliverySummary.no_data > 0 && (
-                  <Badge variant="outline" className="text-[10px]">Brak danych: {deliverySummary.no_data}</Badge>
-                )}
+            <div
+              className={cn(
+                'grid transition-[grid-template-rows] duration-300 ease-in-out',
+                deliverySummary ? 'mt-3 grid-rows-[1fr]' : 'grid-rows-[0fr]',
+              )}
+            >
+              <div className="overflow-hidden">
+                <div className="flex flex-wrap gap-1.5" data-testid="delivery-summary">
+                  {deliverySummary && (
+                    <>
+                      <Badge variant="default" className="text-[10px]">Wysłane: {deliverySummary.sent}</Badge>
+                      <Badge variant="secondary" className="text-[10px]">W kolejce: {deliverySummary.queued}</Badge>
+                      {deliverySummary.bounced > 0 && (
+                        <Badge variant="destructive" className="text-[10px]">Odbite: {deliverySummary.bounced}</Badge>
+                      )}
+                      {deliverySummary.failed > 0 && (
+                        <Badge variant="destructive" className="text-[10px]">Błędy: {deliverySummary.failed}</Badge>
+                      )}
+                      {deliverySummary.unknown > 0 && (
+                        <Badge variant="outline" className="text-[10px]">Nieznane: {deliverySummary.unknown}</Badge>
+                      )}
+                      {deliverySummary.no_data > 0 && (
+                        <Badge variant="outline" className="text-[10px]">Brak danych: {deliverySummary.no_data}</Badge>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-            )}
-            {allMailerDeliveriesSent && (
-              <div
-                className="mt-3 flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-900"
-                data-testid="all-mailer-deliveries-sent"
-              >
-                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>Serwer pocztowy potwierdził wysłanie wszystkich maili z kodami QR.</span>
+            </div>
+            <div
+              className={cn(
+                'grid transition-[grid-template-rows] duration-300 ease-in-out',
+                allMailerDeliveriesSent ? 'mt-3 grid-rows-[1fr]' : 'grid-rows-[0fr]',
+              )}
+            >
+              <div className="overflow-hidden">
+                <div
+                  className="flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-900"
+                  data-testid="all-mailer-deliveries-sent"
+                >
+                  <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>Serwer pocztowy potwierdził wysłanie wszystkich maili z kodami QR.</span>
+                </div>
               </div>
-            )}
+            </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
