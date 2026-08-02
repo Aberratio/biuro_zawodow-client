@@ -320,6 +320,14 @@ export default function EmailSending() {
     }
   };
 
+  const hasUnpaidOrUnknownInPendingAction = pendingAction?.kind !== 'send-one' && (unpaidParticipantsCount > 0 || unknownPaymentCount > 0);
+  const unpaidInlineClause = pendingAction?.kind !== 'send-one' && unpaidParticipantsCount > 0
+    ? <>, w tym <span className="font-medium text-amber-200">{unpaidParticipantsCount}</span> nieopłaconych</>
+    : null;
+  const confirmActionLabel = pendingAction && pendingAction.kind !== 'send-one' && unpaidParticipantsCount > 0
+    ? `Wyślij do wszystkich (${pendingAction.count}, w tym ${unpaidParticipantsCount} nieopłaconych)`
+    : 'Wyślij mail';
+
   return (
     <div className="space-y-6">
       <div className="space-y-6">
@@ -634,18 +642,18 @@ export default function EmailSending() {
               {pendingAction?.kind === 'send-one'
                 ? <>Do uczestnika <span className="font-medium text-foreground">{pendingAction.participantName}</span> zostanie wysłany mail na adres <span className="font-medium text-foreground">{pendingAction.participantEmail}</span>.</>
                 : pendingAction?.kind === 'resend-all'
-                  ? <>Ta operacja ponownie wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestników wydarzenia.</>
+                  ? <>Ta operacja ponownie wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction.count}</span> uczestników wydarzenia{unpaidInlineClause}.</>
                   : hasNoSentEmails
-                    ? <>Ta operacja wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia.</>
-                    : <>Ta operacja wyśle brakujące maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia.</>}
+                    ? <>Ta operacja wyśle maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia{unpaidInlineClause}.</>
+                    : <>Ta operacja wyśle brakujące maile z kodem QR do <span className="font-medium text-foreground">{pendingAction?.count ?? 0}</span> uczestników wydarzenia{unpaidInlineClause}.</>}
             </AlertDialogDescription>
-            {pendingAction && pendingAction.kind !== 'send-one' && (unpaidParticipantsCount > 0 || unknownPaymentCount > 0) && (
-              <div className="rounded-md border border-amber-400/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-950">
+            {hasUnpaidOrUnknownInPendingAction && (
+              <div className="rounded-md border border-amber-400/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
                 Nieopłaconych: {unpaidParticipantsCount}. Nieznany status opłaty: {unknownPaymentCount}.
               </div>
             )}
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-wrap gap-2 sm:space-x-0">
             <AlertDialogCancel>Anuluj</AlertDialogCancel>
             {pendingAction && pendingAction.kind !== 'send-one' && (
               <Button
@@ -674,7 +682,7 @@ export default function EmailSending() {
               disabled={isConfirmingAction || !isOnline}
             >
               {isConfirmingAction && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-              Wyślij mail
+              {confirmActionLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
