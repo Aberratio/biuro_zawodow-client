@@ -190,40 +190,42 @@ export function EventOfficeLocationsEditor({
                 const rangeErrors = locationErrors?.hours?.[rangeIndex];
 
                 return (
-                  <div key={rangeIndex} className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                    <div className="flex-1">
-                      <DateTimePicker
-                        id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-open`}
-                        value={range.opens_at}
-                        disabled={disabled}
-                        onChange={(value) => updateRange(locationIndex, rangeIndex, { opens_at: value })}
-                        placeholder="Otwarcie"
-                        aria-invalid={Boolean(rangeErrors?.opens_at)}
-                      />
-                      <FieldError
-                        id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-open-error`}
-                        className="mt-1"
-                        reserveSpace
-                      >
-                        {rangeErrors?.opens_at}
-                      </FieldError>
-                    </div>
-                    <div className="flex-1">
-                      <DateTimePicker
-                        id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-close`}
-                        value={range.closes_at}
-                        disabled={disabled}
-                        onChange={(value) => updateRange(locationIndex, rangeIndex, { closes_at: value })}
-                        placeholder="Zamknięcie"
-                        aria-invalid={Boolean(rangeErrors?.closes_at)}
-                      />
-                      <FieldError
-                        id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-close-error`}
-                        className="mt-1"
-                        reserveSpace
-                      >
-                        {rangeErrors?.closes_at}
-                      </FieldError>
+                  <div key={rangeIndex} className="flex items-start gap-2">
+                    <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-start">
+                      <div className="min-w-0 flex-1">
+                        <DateTimePicker
+                          id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-open`}
+                          value={range.opens_at}
+                          disabled={disabled}
+                          onChange={(value) => updateRange(locationIndex, rangeIndex, { opens_at: value })}
+                          placeholder="Otwarcie"
+                          aria-invalid={Boolean(rangeErrors?.opens_at)}
+                        />
+                        <FieldError
+                          id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-open-error`}
+                          className="mt-1"
+                          reserveSpace
+                        >
+                          {rangeErrors?.opens_at}
+                        </FieldError>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <DateTimePicker
+                          id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-close`}
+                          value={range.closes_at}
+                          disabled={disabled}
+                          onChange={(value) => updateRange(locationIndex, rangeIndex, { closes_at: value })}
+                          placeholder="Zamknięcie"
+                          aria-invalid={Boolean(rangeErrors?.closes_at)}
+                        />
+                        <FieldError
+                          id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-close-error`}
+                          className="mt-1"
+                          reserveSpace
+                        >
+                          {rangeErrors?.closes_at}
+                        </FieldError>
+                      </div>
                     </div>
                     <Button
                       type="button"
@@ -231,8 +233,9 @@ export function EventOfficeLocationsEditor({
                       size="icon"
                       disabled={disabled}
                       onClick={() => removeRange(locationIndex, rangeIndex)}
-                      aria-label="Usuń zakres godzin"
-                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      aria-label={`Usuń zakres godzin ${rangeIndex + 1}`}
+                      title="Usuń zakres godzin"
+                      className="shrink-0 self-center text-muted-foreground hover:text-destructive sm:self-start"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
