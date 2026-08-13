@@ -10,6 +10,7 @@ import {
   getParticipantFieldType,
   getParticipantValidationRules,
   normalizeParticipantDateValue,
+  normalizeParticipantPaymentFieldValue,
 } from '@/lib/participant-fields';
 import type { ParticipantFieldMapping } from '@/types';
 
@@ -50,7 +51,7 @@ export function ParticipantFieldValueInput({
   if (mapping.field_role === 'payment_status') {
     return (
       <Select
-        value={value.trim() === '' ? 'unpaid' : value.trim().toLocaleLowerCase('pl-PL') === 'tak' ? 'paid' : 'unknown'}
+        value={normalizeParticipantPaymentFieldValue(value)}
         onValueChange={next => onChange(next === 'paid' ? 'TAK' : next === 'unpaid' ? '' : 'unknown')}
       >
         <SelectTrigger
