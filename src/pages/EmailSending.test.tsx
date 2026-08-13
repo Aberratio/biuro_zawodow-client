@@ -256,8 +256,11 @@ describe("EmailSending page", () => {
     });
     expect(screen.getByText("Masowa ×2")).toBeInTheDocument();
     expect(screen.getByText("Pojedyncza")).toBeInTheDocument();
-    expect(screen.getByText("User unknown")).toBeInTheDocument();
     expect(screen.getByTestId("delivery-summary")).toHaveTextContent("Odbite: 1");
+
+    // Tresc bledu siedzi w popoverze, zeby nie rozpychala wiersza tabeli.
+    fireEvent.click(screen.getByRole("button", { name: /Szczegóły błędu/ }));
+    expect(await screen.findByText("User unknown")).toBeInTheDocument();
   });
 
   it("shows when the mail server confirms every QR email was sent", async () => {
@@ -360,7 +363,8 @@ describe("EmailSending page", () => {
       expect(screen.getByText(/Statusy dostarczenia są chwilowo niedostępne/)).toBeInTheDocument();
     });
     expect(screen.getByText("Wysłany")).toBeInTheDocument();
-    expect(screen.queryByTestId("delivery-summary")).not.toBeInTheDocument();
+    // Kontener podsumowania zostaje w drzewie (rezerwuje miejsce na animacje), ale jest pusty.
+    expect(screen.getByTestId("delivery-summary")).toBeEmptyDOMElement();
   });
 
   it("refetches delivery statuses when refresh button is clicked", async () => {
