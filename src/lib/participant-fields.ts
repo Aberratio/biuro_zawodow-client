@@ -16,7 +16,10 @@ export const participantPaymentStatusLabels = {
   unpaid: 'Nieopłacony',
 } as const;
 
-export function normalizeParticipantPaymentFieldValue(value: string): 'unknown' | 'paid' | 'unpaid' | null {
+// Pusto w kolumnie opłaty znaczy „brak opłaty”, a każda inna wartość niż jawne zaprzeczenie
+// znaczy „opłacone” — w tej kolumnie trafiają się kwoty, daty i nazwy płatności, a traktowanie
+// ich jako „nieznane” blokowało wysyłkę kodów QR tylko do opłaconych.
+export function normalizeParticipantPaymentFieldValue(value: string): 'unknown' | 'paid' | 'unpaid' {
   const normalized = value.trim();
   if (!normalized) return 'unpaid';
   const key = normalized
@@ -37,7 +40,7 @@ export function normalizeParticipantPaymentFieldValue(value: string): 'unknown' 
     return 'unknown';
   }
 
-  return null;
+  return 'paid';
 }
 
 export function isConfigurableParticipantMapping(mapping: { field_role: string }): boolean {
@@ -148,9 +151,8 @@ export function validateParticipantFieldValue(mapping: ParticipantFieldMapping, 
   const alias = mapping.alias.trim() || mapping.source_column_name;
   const trimmedValue = value.trim();
   if (mapping.field_role === 'payment_status') {
-    return normalizeParticipantPaymentFieldValue(trimmedValue) === null
-      ? `Pole ${alias} musi oznaczać opłatę, np. TAK, NIE albo puste.`
-      : '';
+    // Każda wartość jest interpretowalna, więc kolumna opłaty nigdy nie blokuje zapisu.
+    return '';
   }
   if (!trimmedValue) {
     return mapping.is_required ? `Uzupełnij pole: ${alias}.` : '';
