@@ -43,7 +43,7 @@ import EventsSkeleton from "@/components/skeletons/EventsSkeleton";
 import { SuccessActionDialog } from "@/components/SuccessActionDialog";
 import { toast } from "@/hooks/use-toast";
 import {
-  formatEventOfficeWindow,
+  formatEventOfficeSchedule,
   getEventOfficeLocationsValidationErrors,
   getEventOfficeOpenAt,
   isEventOfficeStartAtOrAfterNow,
@@ -75,7 +75,7 @@ type EventStatusFilter = "all" | "active" | "upcoming" | "finished";
 type EventTimingStatus = Exclude<EventStatusFilter, "all">;
 
 function getEventTimingStatus(
-  event: { office_open_at: string; office_close_at: string },
+  event: { office_open_at: string; office_close_at: string; office_locations: EventOfficeLocation[] },
   now: Date,
 ): EventTimingStatus {
   if (isEventOfficeOpen(event, now)) {
@@ -797,7 +797,7 @@ export default function Events() {
                       {event.location}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {formatEventOfficeWindow(event)}
+                      {formatEventOfficeSchedule(event)}
                     </TableCell>
                   </TableRow>
                   );
@@ -873,10 +873,11 @@ export default function Events() {
           if (!nextOpen) setFormErrors({});
         }}
       >
-        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="shrink-0 px-6 pb-2 pt-6">
             <DialogTitle>Nowe wydarzenie</DialogTitle>
           </DialogHeader>
+          <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4">
           <div className="space-y-4">
             {(currentRole === "superadmin" || currentRole === "admin") && (
               <div>
@@ -1009,7 +1010,8 @@ export default function Events() {
               {formErrors.form}
             </FieldError>
           </div>
-          <DialogFooter>
+          </div>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button
               onClick={handleCreate}
               disabled={formOrganizationLimitReached || isSubmitting}

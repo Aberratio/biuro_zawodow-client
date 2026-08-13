@@ -6,12 +6,14 @@ export function FieldError({
   id,
   children,
   className,
+  reserveSpace = false,
 }: {
   id: string;
   children?: string;
   className?: string;
+  reserveSpace?: boolean;
 }) {
-  if (!children) return null;
+  if (!children && !reserveSpace) return null;
 
   return (
     <p
@@ -20,6 +22,7 @@ export function FieldError({
       aria-live="polite"
       className={cn(
         "flex items-start gap-1.5 text-xs font-medium leading-5 text-destructive",
+        !children && "invisible",
         className,
       )}
     >
