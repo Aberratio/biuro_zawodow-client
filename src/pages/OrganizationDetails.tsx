@@ -1448,7 +1448,7 @@ export default function OrganizationDetails() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className={`${actionButtonClassName} w-full px-5 whitespace-normal text-center leading-[1.15rem]`}
+                                className={`${actionButtonClassName} w-full whitespace-normal text-center leading-[1.15rem]`}
                                 onClick={() =>
                                   openScannerAssignmentsDialog(scanner.id)
                                 }
