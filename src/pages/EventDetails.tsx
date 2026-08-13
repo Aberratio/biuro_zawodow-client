@@ -69,13 +69,16 @@ import DetailSkeleton from "@/components/skeletons/DetailSkeleton";
 import type { EventOfficeLocation, ParticipantFieldMapping, ParticipantFieldRole, ParticipantFieldType, ParticipantFieldValidationRules, User } from "@/types";
 import {
   computeEventOfficeWindowFromLocations,
-  formatEventOfficeEnd,
+  formatEventOfficeDateTime,
   formatEventOfficeLocationRanges,
-  formatEventOfficeStart,
-  formatEventOfficeWindow,
+  formatEventOfficeSchedule,
+  getCurrentEventOfficeHourRange,
   getEventOfficeCloseAt,
   getEventOfficeLocationsValidationErrors,
   getEventOfficeOpenAt,
+  getFirstEventOfficeHourRange,
+  getLastEventOfficeHourRange,
+  getNextEventOfficeHourRange,
   isEventCurrentOrUpcoming,
   isEventOfficeOpen,
   toLocalDateTimeValue,
@@ -212,13 +215,14 @@ function getDefaultReopenCloseAt(now: Date): string {
 }
 
 function getOfficeStatusSummary(
-  eventOffice: { office_open_at: string; office_close_at: string },
+  eventOffice: { office_open_at: string; office_close_at: string; office_locations: EventOfficeLocation[] },
   now: Date,
 ): OfficeStatusSummary {
-  const openAt = getEventOfficeOpenAt(eventOffice);
-  const closeAt = getEventOfficeCloseAt(eventOffice);
+  const currentRange = getCurrentEventOfficeHourRange(eventOffice, now);
+  const nextRange = getNextEventOfficeHourRange(eventOffice, now);
+  const lastRange = getLastEventOfficeHourRange(eventOffice);
 
-  if (!openAt || !closeAt) {
+  if (!lastRange) {
     return {
       tone: "closed",
       badgeLabel: "Brak godzin",
@@ -230,36 +234,45 @@ function getOfficeStatusSummary(
     };
   }
 
-  if (isEventOfficeOpen(eventOffice, now)) {
+  if (currentRange) {
+    const closesAtLabel = formatEventOfficeDateTime(currentRange.closesAt);
+
     return {
       tone: "open",
       badgeLabel: "Biuro otwarte",
-      headline: `Biuro pracuje jeszcze przez ${formatDistanceToNowStrict(closeAt, { addSuffix: false, locale: pl })}.`,
-      detail: `Uczestnicy mogą być teraz odprawiani. Biuro zamyka się ${formatEventOfficeEnd(eventOffice)}.`,
+      headline: `Biuro pracuje jeszcze przez ${formatDistanceToNowStrict(currentRange.closesAt, { addSuffix: false, locale: pl })}.`,
+      detail: `Uczestnicy mogą być teraz odprawiani. Biuro zamyka się ${closesAtLabel}.`,
       timingLabel: "Zamknięcie",
-      timingValue: formatEventOfficeEnd(eventOffice),
+      timingValue: closesAtLabel,
     };
   }
 
-  if (now < openAt) {
+  // Wielodniowe wydarzenie ma przerwe miedzy dniami - "zamkniete na dzis" to nie to samo
+  // co "zakonczylo prace", wiec liczymy sie z najblizszym realnym zakresem godzin.
+  if (nextRange) {
+    const opensAtLabel = formatEventOfficeDateTime(nextRange.opensAt);
+    const firstRange = getFirstEventOfficeHourRange(eventOffice);
+    const isBreakBetweenRanges =
+      firstRange !== null && nextRange.opensAt.getTime() !== firstRange.opensAt.getTime();
+
     return {
       tone: "upcoming",
-      badgeLabel: "Biuro przed otwarciem",
-      headline: `Biuro otworzy się za ${formatDistanceToNowStrict(openAt, { addSuffix: false, locale: pl })}.`,
-      detail: `Zespół zacznie pracę ${formatEventOfficeStart(eventOffice)}. Do tego czasu operatorzy nie zobaczą aktywnego wydarzenia.`,
+      badgeLabel: isBreakBetweenRanges ? "Przerwa w pracy biura" : "Biuro przed otwarciem",
+      headline: `Biuro ${isBreakBetweenRanges ? "otworzy się ponownie" : "otworzy się"} za ${formatDistanceToNowStrict(nextRange.opensAt, { addSuffix: false, locale: pl })}.`,
+      detail: `Zespół zacznie pracę ${opensAtLabel}. Do tego czasu operatorzy nie zobaczą aktywnego wydarzenia.`,
       timingLabel: "Otwarcie",
-      timingValue: formatEventOfficeStart(eventOffice),
+      timingValue: opensAtLabel,
     };
   }
 
   return {
     tone: "closed",
     badgeLabel: "Biuro zamknięte",
-    headline: `Biuro zakończyło pracę ${formatDistanceToNowStrict(closeAt, { addSuffix: true, locale: pl })}.`,
+    headline: `Biuro zakończyło pracę ${formatDistanceToNowStrict(lastRange.closesAt, { addSuffix: true, locale: pl })}.`,
     detail:
       "Odprawa dla tego wydarzenia została już zamknięta. Nadal możesz sprawdzić dane, eksporty i skład zespołu.",
     timingLabel: "Zamknięcie",
-    timingValue: formatEventOfficeEnd(eventOffice),
+    timingValue: formatEventOfficeDateTime(lastRange.closesAt),
   };
 }
 
@@ -1525,7 +1538,7 @@ export default function EventDetails() {
               </span>
               <span className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                {formatEventOfficeWindow(event)}
+                {formatEventOfficeSchedule(event)}
               </span>
             </div>
             <p className="event-detail-headline">{officeStatus.headline}</p>
@@ -1982,12 +1995,13 @@ export default function EventDetails() {
           if (!nextOpen) resetEditState();
         }}
       >
-        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="shrink-0 px-6 pb-2 pt-6">
             <DialogTitle>
               {isFinishedEvent ? "Otwórz biuro ponownie" : "Edytuj wydarzenie"}
             </DialogTitle>
           </DialogHeader>
+          <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4">
           <div className="space-y-4">
             <div>
               <Label htmlFor="event-edit-name">Nazwa</Label>
@@ -2064,7 +2078,8 @@ export default function EventDetails() {
               {editErrors.form}
             </FieldError>
           </div>
-          <DialogFooter>
+          </div>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button
               type="button"
               className="w-full sm:w-auto"

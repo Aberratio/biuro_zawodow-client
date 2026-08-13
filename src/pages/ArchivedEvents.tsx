@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import TableSkeleton from "@/components/skeletons/TableSkeleton";
 import { PageHeader } from "@/components/PageHeader";
-import { formatEventOfficeWindow, getEventOfficeOpenAt } from "@/lib/events";
+import { formatEventOfficeSchedule, getEventOfficeOpenAt } from "@/lib/events";
 import { participantCountsAsCheckedIn } from "@/lib/participant-status";
 import { buildOrganizationPath } from "@/lib/routes";
 
@@ -172,7 +172,7 @@ export default function ArchivedEvents() {
                       {event.location}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {formatEventOfficeWindow(event)}
+                      {formatEventOfficeSchedule(event)}
                     </TableCell>
                     <TableCell className="hidden text-sm tabular-nums sm:table-cell">
                       {event.checkedInCount}/{event.participantCount}
