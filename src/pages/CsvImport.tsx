@@ -26,7 +26,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AlertTriangle, ArrowLeft, Check, ChevronDown, FileUp, Info, Loader2, Plus, RefreshCcw, Sparkles, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
-import { formatEventOfficeWindow } from '@/lib/events';
+import { formatEventOfficeSchedule } from '@/lib/events';
 import { validateRequired } from '@/lib/form-validation';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 import { buildEventImportSummaryPath, buildEventPath } from '@/lib/routes';
@@ -1109,7 +1109,7 @@ export default function CsvImport() {
                 Wydarzenie: <span className="font-medium text-foreground">{event.name}</span>
               </p>
               <p className="mt-1 text-xs">
-                Biuro zawodów: {formatEventOfficeWindow(event)}
+                Biuro zawodów: {formatEventOfficeSchedule(event)}
               </p>
             </>
           }

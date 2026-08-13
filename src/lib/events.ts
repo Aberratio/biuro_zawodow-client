@@ -1,4 +1,4 @@
-import type { Event, EventOfficeLocation } from '@/types';
+import type { Event, EventOfficeHourRange, EventOfficeLocation } from '@/types';
 
 const MIN_EVENT_OFFICE_DURATION_MS = 60 * 60 * 1000;
 
@@ -59,12 +59,58 @@ export function toLocalDateTimeValue(value: string): string {
   return `${parsed.getFullYear()}-${padDateTimePart(parsed.getMonth() + 1)}-${padDateTimePart(parsed.getDate())}T${padDateTimePart(parsed.getHours())}:${padDateTimePart(parsed.getMinutes())}:${padDateTimePart(parsed.getSeconds())}`;
 }
 
-export function isEventOfficeOpen(event: Pick<Event, 'office_open_at' | 'office_close_at'>, now = new Date()): boolean {
-  const openAt = parseEventDateTime(event.office_open_at);
-  const closeAt = parseEventDateTime(event.office_close_at);
+export interface EventOfficeHourRangeInstance {
+  opensAt: Date;
+  closesAt: Date;
+}
 
-  if (!openAt || !closeAt) return false;
-  return now >= openAt && now <= closeAt;
+/**
+ * Every parsable hour range of every location, sorted by start. The single source for
+ * "when is the office really open" — the aggregate office_open_at/office_close_at pair
+ * cannot express the gap between the days of a multi-day event.
+ */
+function getEventOfficeHourRanges(event: Pick<Event, 'office_locations'>): EventOfficeHourRangeInstance[] {
+  return event.office_locations
+    .flatMap(location => location.hours)
+    .map(range => ({
+      opensAt: parseEventDateTime(range.opens_at),
+      closesAt: parseEventDateTime(range.closes_at),
+    }))
+    .filter((range): range is EventOfficeHourRangeInstance => range.opensAt !== null && range.closesAt !== null)
+    .sort((left, right) => left.opensAt.getTime() - right.opensAt.getTime());
+}
+
+export function getCurrentEventOfficeHourRange(
+  event: Pick<Event, 'office_locations'>,
+  now = new Date(),
+): EventOfficeHourRangeInstance | null {
+  return getEventOfficeHourRanges(event).find(range => now >= range.opensAt && now <= range.closesAt) ?? null;
+}
+
+export function getFirstEventOfficeHourRange(
+  event: Pick<Event, 'office_locations'>,
+): EventOfficeHourRangeInstance | null {
+  return getEventOfficeHourRanges(event)[0] ?? null;
+}
+
+export function getNextEventOfficeHourRange(
+  event: Pick<Event, 'office_locations'>,
+  now = new Date(),
+): EventOfficeHourRangeInstance | null {
+  return getEventOfficeHourRanges(event).find(range => range.opensAt > now) ?? null;
+}
+
+export function getLastEventOfficeHourRange(
+  event: Pick<Event, 'office_locations'>,
+): EventOfficeHourRangeInstance | null {
+  return getEventOfficeHourRanges(event).reduce<EventOfficeHourRangeInstance | null>(
+    (latest, range) => (latest === null || range.closesAt > latest.closesAt ? range : latest),
+    null,
+  );
+}
+
+export function isEventOfficeOpen(event: Pick<Event, 'office_locations'>, now = new Date()): boolean {
+  return getCurrentEventOfficeHourRange(event, now) !== null;
 }
 
 export function isValidEventOfficeRange(openAt: string, closeAt: string): boolean {
@@ -142,21 +188,25 @@ export function isEventCurrentOrUpcoming(event: Pick<Event, 'office_close_at'>, 
   return closeAt !== null && closeAt > now;
 }
 
+const OFFICE_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('pl-PL', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+export function formatEventOfficeDateTime(date: Date): string {
+  return OFFICE_DATE_TIME_FORMATTER.format(date);
+}
+
 export function formatEventOfficeStart(event: Pick<Event, 'office_open_at'>): string {
   const openAt = getEventOfficeOpenAt(event);
   if (!openAt) {
     return 'Termin otwarcia biura niedostępny';
   }
 
-  const formatter = new Intl.DateTimeFormat('pl-PL', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  return formatter.format(openAt);
+  return formatEventOfficeDateTime(openAt);
 }
 
 export function formatEventOfficeEnd(event: Pick<Event, 'office_close_at'>): string {
@@ -165,16 +215,23 @@ export function formatEventOfficeEnd(event: Pick<Event, 'office_close_at'>): str
     return 'Termin zamknięcia biura niedostępny';
   }
 
-  const formatter = new Intl.DateTimeFormat('pl-PL', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  return formatter.format(closeAt);
+  return formatEventOfficeDateTime(closeAt);
 }
+
+const OFFICE_WINDOW_DAY_FORMATTER = new Intl.DateTimeFormat('pl-PL', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
+const OFFICE_WINDOW_TIME_FORMATTER = new Intl.DateTimeFormat('pl-PL', {
+  hour: '2-digit',
+  minute: '2-digit',
+});
+const OFFICE_WINDOW_WEEKDAY_FORMATTER = new Intl.DateTimeFormat('pl-PL', { weekday: 'short' });
+const OFFICE_WINDOW_SHORT_DAY_FORMATTER = new Intl.DateTimeFormat('pl-PL', {
+  day: '2-digit',
+  month: '2-digit',
+});
 
 export function formatEventOfficeWindow(event: Pick<Event, 'office_open_at' | 'office_close_at'>): string {
   const openAt = parseEventDateTime(event.office_open_at);
@@ -184,23 +241,96 @@ export function formatEventOfficeWindow(event: Pick<Event, 'office_open_at' | 'o
     return 'Godziny biura zawodów niedostępne';
   }
 
-  const dayFormatter = new Intl.DateTimeFormat('pl-PL', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-  const timeFormatter = new Intl.DateTimeFormat('pl-PL', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const openDayLabel = OFFICE_WINDOW_DAY_FORMATTER.format(openAt);
+  const closeDayLabel = OFFICE_WINDOW_DAY_FORMATTER.format(closeAt);
 
-  return `${dayFormatter.format(openAt)}, ${timeFormatter.format(openAt)} - ${timeFormatter.format(closeAt)}`;
+  if (openDayLabel === closeDayLabel) {
+    return `${openDayLabel}, ${OFFICE_WINDOW_TIME_FORMATTER.format(openAt)} - ${OFFICE_WINDOW_TIME_FORMATTER.format(closeAt)}`;
+  }
+
+  return `${openDayLabel}, ${OFFICE_WINDOW_TIME_FORMATTER.format(openAt)} - ${closeDayLabel}, ${OFFICE_WINDOW_TIME_FORMATTER.format(closeAt)}`;
 }
 
 export function formatEventOfficeLocationRanges(location: Pick<EventOfficeLocation, 'hours'>): string[] {
-  return location.hours.map(range =>
-    formatEventOfficeWindow({ office_open_at: range.opens_at, office_close_at: range.closes_at }),
+  return location.hours.map(
+    range =>
+      formatEventOfficeHourRangeWithWeekday(range, { withYear: true }) ?? 'Godziny biura zawodów niedostępne',
   );
+}
+
+interface EventOfficeHourRangeFormatOptions {
+  withYear?: boolean;
+}
+
+function formatEventOfficeDayLabel(date: Date, withYear: boolean): string {
+  const weekdayLabel = OFFICE_WINDOW_WEEKDAY_FORMATTER.format(date).replace(/\.$/, '');
+  const capitalizedWeekdayLabel = weekdayLabel.charAt(0).toUpperCase() + weekdayLabel.slice(1);
+  const dayLabel = withYear
+    ? OFFICE_WINDOW_DAY_FORMATTER.format(date)
+    : OFFICE_WINDOW_SHORT_DAY_FORMATTER.format(date);
+
+  return `${capitalizedWeekdayLabel} ${dayLabel}`;
+}
+
+/**
+ * Formats a single hour range with its weekday/date, e.g. "Pt 12.09, 15:00 - 19:00" —
+ * used where ranges from different locations/days must stay visually distinct instead
+ * of being collapsed into one aggregate window. A range crossing midnight repeats the
+ * day on both sides so the change of day never disappears from the label.
+ */
+export function formatEventOfficeHourRangeWithWeekday(
+  range: Pick<EventOfficeHourRange, 'opens_at' | 'closes_at'>,
+  options: EventOfficeHourRangeFormatOptions = {},
+): string | null {
+  const opensAt = parseEventDateTime(range.opens_at);
+  const closesAt = parseEventDateTime(range.closes_at);
+
+  if (!opensAt || !closesAt) {
+    return null;
+  }
+
+  const { withYear = false } = options;
+  const openDayLabel = formatEventOfficeDayLabel(opensAt, withYear);
+  const closeDayLabel = formatEventOfficeDayLabel(closesAt, withYear);
+  const openTime = OFFICE_WINDOW_TIME_FORMATTER.format(opensAt);
+  const closeTime = OFFICE_WINDOW_TIME_FORMATTER.format(closesAt);
+
+  if (openDayLabel === closeDayLabel) {
+    return `${openDayLabel}, ${openTime} - ${closeTime}`;
+  }
+
+  return `${openDayLabel}, ${openTime} - ${closeDayLabel}, ${closeTime}`;
+}
+
+/**
+ * Real opening hours of an event: every hour range of every location, sorted by start
+ * and deduplicated. Replaces the aggregate min(open)/max(close) window, which claimed the
+ * office was open overnight between the days of a multi-day event.
+ */
+export function getEventOfficeScheduleEntries(event: Pick<Event, 'office_locations'>): string[] {
+  const entries = event.office_locations
+    .flatMap(location =>
+      location.hours.map(range => ({
+        sortKey: toLocalDateTimeValue(range.opens_at),
+        label: formatEventOfficeHourRangeWithWeekday(range, { withYear: true }),
+      })),
+    )
+    .filter((entry): entry is { sortKey: string; label: string } => entry.label !== null)
+    .sort((left, right) => left.sortKey.localeCompare(right.sortKey));
+
+  return [...new Set(entries.map(entry => entry.label))];
+}
+
+export function formatEventOfficeSchedule(
+  event: Pick<Event, 'office_locations' | 'office_open_at' | 'office_close_at'>,
+): string {
+  const entries = getEventOfficeScheduleEntries(event);
+
+  if (entries.length === 0) {
+    return formatEventOfficeWindow(event);
+  }
+
+  return entries.join(' • ');
 }
 
 export function isValidOptionalUrl(value: string): boolean {
@@ -304,6 +434,10 @@ export function getEventOfficeLocationsValidationErrors(
         return { closes_at: 'Zamknięcie musi być później niż otwarcie.' };
       }
 
+      if (rangeValidation === 'shorter_than_minimum') {
+        return { closes_at: 'Ten zakres musi trwać co najmniej 1 godzinę.' };
+      }
+
       return {};
     });
 
@@ -322,10 +456,10 @@ export function getEventOfficeLocationsValidationErrors(
     };
   }
 
-  const aggregateErrors = getEventOfficeValidationErrors(opensAt, closesAt, options);
-  if (aggregateErrors.office_open_at || aggregateErrors.office_close_at) {
+  const { allowPastOpenAt = false } = options;
+  if (!allowPastOpenAt && !isEventOfficeStartAtOrAfterNow(opensAt)) {
     return {
-      form: aggregateErrors.office_open_at ?? aggregateErrors.office_close_at,
+      form: 'Otwarcie biura nie może być ustawione w przeszłości.',
       locations: locationErrors,
     };
   }

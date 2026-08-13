@@ -12,7 +12,12 @@ import { FieldError } from '@/components/ui/field-error';
 import { SuccessActionDialog } from '@/components/SuccessActionDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { formatEventOfficeEnd, formatEventOfficeStart, getEventOfficeCloseAt, getEventOfficeOpenAt, isEventOfficeOpen } from '@/lib/events';
+import {
+  formatEventOfficeDateTime,
+  getCurrentEventOfficeHourRange,
+  getNextEventOfficeHourRange,
+  type EventOfficeHourRangeInstance,
+} from '@/lib/events';
 import { validateNonNegativeInteger, validateRequired } from '@/lib/form-validation';
 import { buildOrganizationPath } from '@/lib/routes';
 import type { Event } from '@/types';
@@ -20,22 +25,24 @@ import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 import { PageHeader } from '@/components/PageHeader';
 
 function getClosestOrganizationEventLabel(organizationEvents: Event[], now: Date): string {
-  const activeEvent = organizationEvents
-    .map(event => ({ event, closeAt: getEventOfficeCloseAt(event) }))
-    .filter((entry): entry is { event: Event; closeAt: Date } => entry.closeAt !== null && isEventOfficeOpen(entry.event, now))
-    .sort((left, right) => left.closeAt.getTime() - right.closeAt.getTime())[0];
+  // Zakres, w ktorym biuro jest teraz otwarte - zbiorcze office_close_at wskazywaloby
+  // koniec ostatniego dnia, wiec przy wydarzeniu wielodniowym klamaloby o kilkanascie godzin.
+  const activeRange = organizationEvents
+    .map(event => getCurrentEventOfficeHourRange(event, now))
+    .filter((range): range is EventOfficeHourRangeInstance => range !== null)
+    .sort((left, right) => left.closesAt.getTime() - right.closesAt.getTime())[0];
 
-  if (activeEvent) {
-    return `W trakcie do ${formatEventOfficeEnd(activeEvent.event)}`;
+  if (activeRange) {
+    return `W trakcie do ${formatEventOfficeDateTime(activeRange.closesAt)}`;
   }
 
-  const upcomingEvent = organizationEvents
-    .map(event => ({ event, openAt: getEventOfficeOpenAt(event) }))
-    .filter((entry): entry is { event: Event; openAt: Date } => entry.openAt !== null && entry.openAt.getTime() > now.getTime())
-    .sort((left, right) => left.openAt.getTime() - right.openAt.getTime())[0];
+  const upcomingRange = organizationEvents
+    .map(event => getNextEventOfficeHourRange(event, now))
+    .filter((range): range is EventOfficeHourRangeInstance => range !== null)
+    .sort((left, right) => left.opensAt.getTime() - right.opensAt.getTime())[0];
 
-  if (upcomingEvent) {
-    return formatEventOfficeStart(upcomingEvent.event);
+  if (upcomingRange) {
+    return formatEventOfficeDateTime(upcomingRange.opensAt);
   }
 
   return 'Brak zaplanowanego';

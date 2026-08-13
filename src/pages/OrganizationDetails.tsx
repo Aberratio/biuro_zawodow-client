@@ -54,7 +54,7 @@ import { SuccessActionDialog } from "@/components/SuccessActionDialog";
 import { PasswordRequirements } from "@/components/PasswordRequirements";
 import { toast } from "@/hooks/use-toast";
 import {
-  formatEventOfficeWindow,
+  formatEventOfficeSchedule,
   getEventOfficeLocationsValidationErrors,
   isEventCurrentOrUpcoming,
   isEventOfficeOpen,
@@ -1231,7 +1231,7 @@ export default function OrganizationDetails() {
                           {event.location}
                         </TableCell>
                         <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
-                          {formatEventOfficeWindow(event)}
+                          {formatEventOfficeSchedule(event)}
                         </TableCell>
                         </TableRow>
                       );
