@@ -19,11 +19,13 @@ import {
 import DashboardSkeleton from '@/components/skeletons/DashboardSkeleton';
 import { PageHeader } from '@/components/PageHeader';
 import {
+  formatEventOfficeDateTime,
+  formatEventOfficeSchedule,
   formatEventOfficeStart,
-  formatEventOfficeWindow,
-  getEventOfficeCloseAt,
-  getEventOfficeOpenAt,
+  getCurrentEventOfficeHourRange,
+  getNextEventOfficeHourRange,
   isEventOfficeOpen,
+  type EventOfficeHourRangeInstance,
 } from '@/lib/events';
 import { participantCountsAsCheckedIn } from '@/lib/participant-status';
 import type { Event } from '@/types';
@@ -63,19 +65,20 @@ export default function Dashboard() {
       .filter((event) => isEventOfficeOpen(event, now))
       .sort(
         (left, right) =>
-          (getEventOfficeCloseAt(left)?.getTime() ?? Number.MAX_SAFE_INTEGER) -
-          (getEventOfficeCloseAt(right)?.getTime() ?? Number.MAX_SAFE_INTEGER),
+          (getCurrentEventOfficeHourRange(left, now)?.closesAt.getTime() ?? Number.MAX_SAFE_INTEGER) -
+          (getCurrentEventOfficeHourRange(right, now)?.closesAt.getTime() ?? Number.MAX_SAFE_INTEGER),
       );
+    // Najblizszy realny zakres godzin, a nie zbiorcze office_open_at - inaczej wydarzenie
+    // wielodniowe znika z pulpitu w nocy miedzy dniami (nie jest juz "przed otwarciem",
+    // a jeszcze nie jest otwarte).
     const upcomingEvents = sourceEvents
-      .filter((event) => {
-        const openAt = getEventOfficeOpenAt(event);
-        return openAt !== null && openAt > now;
-      })
-      .sort(
-        (left, right) =>
-          (getEventOfficeOpenAt(left)?.getTime() ?? Number.MAX_SAFE_INTEGER) -
-          (getEventOfficeOpenAt(right)?.getTime() ?? Number.MAX_SAFE_INTEGER),
-      );
+      .map((event) => ({ event, nextRange: getNextEventOfficeHourRange(event, now) }))
+      .filter(
+        (entry): entry is { event: Event; nextRange: EventOfficeHourRangeInstance } =>
+          entry.nextRange !== null && !isEventOfficeOpen(entry.event, now),
+      )
+      .sort((left, right) => left.nextRange.opensAt.getTime() - right.nextRange.opensAt.getTime())
+      .map((entry) => entry.event);
 
     const activeDescription =
       currentRole === 'editor'
@@ -156,7 +159,11 @@ export default function Dashboard() {
                   events={upcomingEvents}
                   organizationNames={organizationNames}
                   metaColumnLabel="Start biura"
-                  getMetaValue={(event) => formatEventOfficeStart(event)}
+                  getMetaValue={(event) => {
+                    const nextRange = getNextEventOfficeHourRange(event, now);
+
+                    return nextRange ? formatEventOfficeDateTime(nextRange.opensAt) : formatEventOfficeStart(event);
+                  }}
                   onOpen={(eventId) => navigate(`/events/${eventId}`)}
                 />
               )}
@@ -179,7 +186,7 @@ export default function Dashboard() {
             </p>
             <p className="text-sm text-muted-foreground sm:text-base">{currentEvent.location}</p>
             <p className="text-sm text-muted-foreground sm:text-base">
-              Biuro: {formatEventOfficeWindow(currentEvent)}
+              Biuro: {formatEventOfficeSchedule(currentEvent)}
             </p>
           </CardContent>
         </Card>
@@ -287,7 +294,7 @@ function ActiveEventCard({
           <p className="pt-1.5 text-[0.7rem] font-medium uppercase tracking-[0.16em] text-[hsl(40_18%_64%/0.72)]">
             Godziny biura
           </p>
-          <p className="text-[0.96rem] leading-6 text-[hsl(40_24%_94%)] sm:text-[1rem]">{formatEventOfficeWindow(event)}</p>
+          <p className="text-[0.96rem] leading-6 text-[hsl(40_24%_94%)] sm:text-[1rem]">{formatEventOfficeSchedule(event)}</p>
         </div>
 
         <div className="space-y-2">

@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/ui/field-error";
 import {
-  computeEventOfficeWindowFromLocations,
-  formatEventOfficeWindow,
+  formatEventOfficeHourRangeWithWeekday,
+  toLocalDateTimeValue,
   type EventOfficeLocationsValidationErrors,
 } from "@/lib/events";
 
@@ -25,6 +25,31 @@ function createEmptyRange(): EventOfficeHourRange {
 
 export function createEmptyEventOfficeLocation(): EventOfficeLocation {
   return { name: "", google_maps_url: "", hours: [createEmptyRange()] };
+}
+
+interface ComputedOfficeRangeSummary {
+  key: string;
+  label: string;
+}
+
+function buildComputedOfficeRangeSummaries(locations: EventOfficeLocation[]): ComputedOfficeRangeSummary[] {
+  const showLocationName = locations.length > 1;
+
+  return locations
+    .flatMap((location, locationIndex) =>
+      location.hours.map((range, rangeIndex) => {
+        const label = formatEventOfficeHourRangeWithWeekday(range);
+        if (!label) return null;
+
+        return {
+          key: `${locationIndex}-${rangeIndex}`,
+          sortKey: toLocalDateTimeValue(range.opens_at),
+          label: showLocationName ? `${location.name || "Lokalizacja"} — ${label}` : label,
+        };
+      }),
+    )
+    .filter((summary): summary is ComputedOfficeRangeSummary & { sortKey: string } => summary !== null)
+    .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 }
 
 export function EventOfficeLocationsEditor({
@@ -72,11 +97,7 @@ export function EventOfficeLocationsEditor({
     );
   };
 
-  const { opensAt, closesAt } = computeEventOfficeWindowFromLocations(locations);
-  const computedWindowLabel =
-    opensAt && closesAt
-      ? formatEventOfficeWindow({ office_open_at: opensAt, office_close_at: closesAt })
-      : "Uzupełnij lokalizacje i godziny, aby zobaczyć wyliczone okno";
+  const computedRangeSummaries = buildComputedOfficeRangeSummaries(locations);
 
   return (
     <div className="space-y-4">
@@ -179,7 +200,11 @@ export function EventOfficeLocationsEditor({
                         placeholder="Otwarcie"
                         aria-invalid={Boolean(rangeErrors?.opens_at)}
                       />
-                      <FieldError id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-open-error`} className="mt-1">
+                      <FieldError
+                        id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-open-error`}
+                        className="mt-1"
+                        reserveSpace
+                      >
                         {rangeErrors?.opens_at}
                       </FieldError>
                     </div>
@@ -192,7 +217,11 @@ export function EventOfficeLocationsEditor({
                         placeholder="Zamknięcie"
                         aria-invalid={Boolean(rangeErrors?.closes_at)}
                       />
-                      <FieldError id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-close-error`} className="mt-1">
+                      <FieldError
+                        id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-close-error`}
+                        className="mt-1"
+                        reserveSpace
+                      >
                         {rangeErrors?.closes_at}
                       </FieldError>
                     </div>
@@ -233,9 +262,20 @@ export function EventOfficeLocationsEditor({
         Dodaj lokalizację
       </Button>
 
-      <p className="text-sm text-muted-foreground">
-        Wyliczone okno otwarcia biura: <span className="font-medium text-foreground">{computedWindowLabel}</span>
-      </p>
+      <div className="text-sm text-muted-foreground">
+        <p>Godziny otwarcia biura:</p>
+        {computedRangeSummaries.length === 0 ? (
+          <p className="font-medium text-foreground">Uzupełnij lokalizacje i godziny, aby zobaczyć podsumowanie</p>
+        ) : (
+          <ul className="mt-1 list-inside list-disc space-y-0.5">
+            {computedRangeSummaries.map((summary) => (
+              <li key={summary.key} className="font-medium text-foreground">
+                {summary.label}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

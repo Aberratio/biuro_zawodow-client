@@ -25,7 +25,7 @@ import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { OnlineOnlyNotice } from '@/components/OnlineOnlyNotice';
 import { PageHeader } from '@/components/PageHeader';
 import { PageBlockerOverlay } from '@/components/PageBlockerOverlay';
-import { formatEventOfficeWindow, isEventCurrentOrUpcoming, isEventOfficeOpen } from '@/lib/events';
+import { formatEventOfficeSchedule, isEventCurrentOrUpcoming, isEventOfficeOpen } from '@/lib/events';
 import { buildEventPath } from '@/lib/routes';
 import {
   QR_DELIVERY_STATUS_DEFINITIONS,
@@ -409,7 +409,7 @@ export default function EmailSending() {
             <div className="text-3xl font-bold tabular-nums">{sent}/{eventParticipants.length}</div>
             <p className="mt-1 text-sm text-muted-foreground">uczestników ma już mail z QR</p>
             {selectedEvent && (
-              <p className="mt-2 text-xs text-muted-foreground">Biuro: {formatEventOfficeWindow(selectedEvent)}</p>
+              <p className="mt-2 text-xs text-muted-foreground">Biuro: {formatEventOfficeSchedule(selectedEvent)}</p>
             )}
             <div className="mt-3 h-2 rounded-full bg-muted">
               <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${eventParticipants.length ? (sent / eventParticipants.length) * 100 : 0}%` }} />

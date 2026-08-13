@@ -19,7 +19,7 @@ import ScannerSkeleton from '@/components/skeletons/ScannerSkeleton';
 import { buildParticipantFieldValues, participantPaymentStatusLabels } from '@/lib/participant-fields';
 import { formatBibNumber } from '@/lib/participants';
 import { getParticipantStatusDefinition } from '@/lib/participant-status';
-import { formatEventOfficeWindow, isEventOfficeOpen } from '@/lib/events';
+import { formatEventOfficeSchedule, isEventOfficeOpen } from '@/lib/events';
 import { buildEventParticipantPath } from '@/lib/routes';
 import { canManageParticipantData, canUseParticipantAdminActions, isScannerRole } from '@/lib/roles';
 
@@ -541,7 +541,7 @@ export default function Scanner() {
             </p>
             <div className="mt-5 rounded-xl border bg-muted/30 px-4 py-3 text-left text-sm">
               <p className="font-medium text-foreground">{selectedEvent.name}</p>
-              <p className="mt-1 text-muted-foreground">Biuro: {formatEventOfficeWindow(selectedEvent)}</p>
+              <p className="mt-1 text-muted-foreground">Biuro: {formatEventOfficeSchedule(selectedEvent)}</p>
             </div>
           </CardContent>
         </Card>
