@@ -12,6 +12,7 @@ import { FieldError } from '@/components/ui/field-error';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import { useHardwareScanner } from '@/hooks/use-hardware-scanner';
 import type { Event, Participant, ParticipantFieldMapping } from '@/types';
 import QrScannerView from '@/components/QrScannerView';
 import ParticipantSearch from '@/components/ParticipantSearch';
@@ -231,6 +232,20 @@ export default function Scanner() {
       scanRequestInFlightRef.current = false;
     }
   }, [activeEventId, addToRecent, scanParticipantQr, selectEventContext]);
+
+  // Czytnik sprzetowy wystukuje token jak klawiatura. Hook lapie tylko te
+  // serie, ktore nie trafiaja do zadnego pola tekstowego - gdy fokus siedzi w
+  // wyszukiwarce, token obsluguje ParticipantSearch (dopasowanie po qr_code).
+  const handleHardwareScan = useCallback((code: string) => {
+    if (successTimerRef.current) {
+      clearTimeout(successTimerRef.current);
+      successTimerRef.current = undefined;
+    }
+
+    void handleQrScan(code);
+  }, [handleQrScan]);
+
+  useHardwareScanner({ onScan: handleHardwareScan, enabled: scannerAvailable && !isLoading });
 
   const handleSearchSelect = useCallback((participant: Participant) => {
     if (successTimerRef.current) {
@@ -611,8 +626,11 @@ export default function Scanner() {
             <ParticipantSearch participants={eventParticipants} onSelect={handleSearchSelect} autoFocus={false} />
           </div>
 
-          <div className="px-4 md:px-0">
+          <div className="space-y-2 px-4 md:px-0">
             <QrScannerView onScan={handleQrScan} paused={false} />
+            <p className="text-sm text-muted-foreground">
+              Masz czytnik sprzętowy? Po prostu zeskanuj kod — nie trzeba wcześniej klikać w żadne pole.
+            </p>
           </div>
         </>
       )}
