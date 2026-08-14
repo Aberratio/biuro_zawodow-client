@@ -192,7 +192,7 @@ export function EventOfficeLocationsEditor({
                 return (
                   <div key={rangeIndex} className="flex items-start gap-2">
                     <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-start">
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 basis-0">
                         <DateTimePicker
                           id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-open`}
                           value={range.opens_at}
@@ -209,7 +209,7 @@ export function EventOfficeLocationsEditor({
                           {rangeErrors?.opens_at}
                         </FieldError>
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 basis-0">
                         <DateTimePicker
                           id={`${idPrefix}-office-location-${locationIndex}-range-${rangeIndex}-close`}
                           value={range.closes_at}

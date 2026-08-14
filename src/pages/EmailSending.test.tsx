@@ -137,7 +137,7 @@ describe("EmailSending page", () => {
     const { sendEventQrEmails } = renderPage();
 
     fireEvent.click(findButtonByText("wszystkich"));
-    fireEvent.click(findButtonByText("mail"));
+    fireEvent.click(findButtonByText("Wyślij do wszystkich uczestników"));
 
     await waitFor(() => {
       expect(sendEventQrEmails).toHaveBeenCalledWith("event-1", false, "all");
@@ -145,6 +145,111 @@ describe("EmailSending page", () => {
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({
       title: expect.stringMatching(/QR/i),
     }));
+  });
+
+  it("counts only participants without a QR email in the confirmation modal", () => {
+    renderPage({
+      participants: [
+        createTestParticipant({
+          id: "p-1",
+          payment_status: "paid",
+          email_status: "sent",
+        }),
+        createTestParticipant({
+          id: "p-2",
+          name: "Jan Nowak",
+          email: "jan@example.com",
+          payment_status: "paid",
+          email_status: "not_sent",
+        }),
+        createTestParticipant({
+          id: "p-3",
+          name: "Celina Trzecia",
+          email: "celina@example.com",
+          payment_status: "unpaid",
+          email_status: "not_sent",
+        }),
+      ],
+    });
+
+    fireEvent.click(findButtonByText("Wyślij brakujące kody QR"));
+
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveTextContent(
+      "Do 2 uczestników nie wysłano dotychczas kodów QR, w tym 1 nieopłaconych.",
+    );
+    expect(dialog).toHaveTextContent("Sprawdź status opłat");
+    // Etykieta jest łamana na dwa wiersze, więc licznik sprawdzamy osobno.
+    expect(findButtonByText("Wyślij do wszystkich uczestników")).toHaveTextContent(
+      "(1 opłaconych i 1 nieopłaconych)",
+    );
+    expect(findButtonByText("Wyślij tylko do opłaconych uczestników")).toHaveTextContent(
+      "(1 opłaconych)",
+    );
+  });
+
+  it("lists unpaid and unknown payment statuses separately", () => {
+    renderPage({
+      participants: [
+        createTestParticipant({ id: "p-1", payment_status: "paid" }),
+        createTestParticipant({
+          id: "p-2",
+          name: "Jan Nowak",
+          email: "jan@example.com",
+          payment_status: "unpaid",
+        }),
+        createTestParticipant({
+          id: "p-3",
+          name: "Celina Trzecia",
+          email: "celina@example.com",
+          payment_status: "unknown",
+        }),
+      ],
+    });
+
+    fireEvent.click(findButtonByText("wszystkich"));
+
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveTextContent(
+      "Do 3 uczestników nie wysłano dotychczas kodów QR, w tym 1 nieopłaconych.",
+    );
+    expect(dialog).toHaveTextContent("Uczestników nieopłaconych: 1");
+    expect(dialog).toHaveTextContent(
+      "Uczestników z nieznanym statusem opłaty: 1",
+    );
+    expect(findButtonByText("Wyślij do wszystkich uczestników")).toHaveTextContent(
+      "(1 opłaconych, 1 nieopłaconych, 1 z nieznanym statusem opłaty)",
+    );
+  });
+
+  it("skips the unpaid note when every pending participant is paid", () => {
+    renderPage({
+      participants: [
+        createTestParticipant({ id: "p-1", payment_status: "paid" }),
+        createTestParticipant({
+          id: "p-2",
+          name: "Jan Nowak",
+          email: "jan@example.com",
+          payment_status: "paid",
+        }),
+      ],
+    });
+
+    fireEvent.click(findButtonByText("wszystkich"));
+
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveTextContent(
+      "Do 2 uczestników nie wysłano dotychczas kodów QR.",
+    );
+    expect(dialog).not.toHaveTextContent("nieopłaconych");
+    expect(dialog).not.toHaveTextContent("Sprawdź status opłat");
+    expect(
+      screen
+        .getAllByRole("button")
+        .some((element) =>
+          element.textContent?.includes("Wyślij tylko do opłaconych uczestników"),
+        ),
+    ).toBe(false);
   });
 
   it("can send bulk QR emails only to paid participants", async () => {
@@ -167,7 +272,7 @@ describe("EmailSending page", () => {
     });
 
     fireEvent.click(findButtonByText("wszystkich"));
-    fireEvent.click(findButtonByText("Tylko op"));
+    fireEvent.click(findButtonByText("Wyślij tylko do opłaconych uczestników"));
 
     await waitFor(() => {
       expect(sendEventQrEmails).toHaveBeenCalledWith("event-1", false, "paid_only");

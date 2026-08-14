@@ -2436,7 +2436,7 @@ export default function OrganizationDetails() {
           if (!open) setEventErrors({});
         }}
       >
-        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-[calc(28rem+100px)]">
           <DialogHeader>
             <DialogTitle>Dodaj wydarzenie</DialogTitle>
           </DialogHeader>
