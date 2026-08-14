@@ -80,8 +80,10 @@ import type {
 import { cn } from "@/lib/utils";
 
 type PendingEmailAction =
-  | { kind: "send-missing"; count: number }
-  | { kind: "resend-all"; count: number }
+  // Liczniki wyliczamy w modalu z aktualnej listy uczestników, żeby nie trzymać
+  // dwóch źródeł prawdy o tym, ilu osób dotyczy akcja.
+  | { kind: "send-missing" }
+  | { kind: "resend-all" }
   | {
       kind: "send-one";
       participantId: string;
@@ -122,7 +124,8 @@ interface ParticipantDeliveryRow {
 
 // Mailer zwraca daty w formacie 'Y-m-d H:i:s'; Safari nie parsuje spacji w dacie.
 const formatDeliveryTimestamp = (value: string | null | undefined): string => {
-  if (!value) return "—";
+  // Brak daty zostawiamy jako puste pole — myślnik niepotrzebnie zaszumiał kolumnę.
+  if (!value) return "";
   const parsed = new Date(
     value.includes("T") ? value : value.replace(" ", "T"),
   );
@@ -179,6 +182,14 @@ const formatQrActivityAction = (log: ActivityLog) => {
     ? `${log.action} ${log.participant_name}.`
     : log.action;
 };
+
+// Etykiety akcji masowych łamiemy na dwa wiersze: opis akcji nad licznikami.
+const BulkActionLabel = ({ text, counts }: { text: string; counts: string }) => (
+  <span className="flex flex-col items-center gap-1">
+    <span>{text}</span>
+    <span>{counts}</span>
+  </span>
+);
 
 const compareParticipantsByStableListOrder = (
   first: Participant,
@@ -248,15 +259,6 @@ export default function EmailSending() {
     : false;
   const sent = eventParticipants.filter(
     (participant) => participant.email_status === "sent",
-  ).length;
-  const unpaidParticipantsCount = eventParticipants.filter(
-    (participant) => participant.payment_status === "unpaid",
-  ).length;
-  const paidParticipantsCount = eventParticipants.filter(
-    (participant) => participant.payment_status === "paid",
-  ).length;
-  const unknownPaymentCount = eventParticipants.filter(
-    (participant) => participant.payment_status === "unknown",
   ).length;
   const pending = eventParticipants.length - sent;
   const hasParticipants = eventParticipants.length > 0;
@@ -473,25 +475,58 @@ export default function EmailSending() {
     }
   };
 
-  const hasUnpaidOrUnknownInPendingAction =
-    pendingAction?.kind !== "send-one" &&
-    (unpaidParticipantsCount > 0 || unknownPaymentCount > 0);
+  const isBulkPendingAction =
+    pendingAction !== null && pendingAction.kind !== "send-one";
+  // Liczby w modalu opisują tylko uczestników objętych daną akcją: przy wysyłce
+  // brakujących są to osoby bez wysłanego kodu QR, przy ponownej wysyłce — wszyscy.
+  const pendingActionParticipants =
+    pendingAction === null || pendingAction.kind === "send-one"
+      ? []
+      : pendingAction.kind === "resend-all"
+        ? eventParticipants
+        : eventParticipants.filter(
+            (participant) => participant.email_status !== "sent",
+          );
+  const pendingActionTotalCount = pendingActionParticipants.length;
+  const pendingActionPaidCount = pendingActionParticipants.filter(
+    (participant) => participant.payment_status === "paid",
+  ).length;
+  const pendingActionStrictUnpaidCount = pendingActionParticipants.filter(
+    (participant) => participant.payment_status === "unpaid",
+  ).length;
+  const pendingActionUnknownPaymentCount = pendingActionParticipants.filter(
+    (participant) => participant.payment_status === "unknown",
+  ).length;
   const unpaidInlineClause =
-    pendingAction?.kind !== "send-one" && unpaidParticipantsCount > 0 ? (
+    isBulkPendingAction && pendingActionStrictUnpaidCount > 0 ? (
       <>
         , w tym{" "}
-        <span className="font-medium text-amber-200">
-          {unpaidParticipantsCount}
+        <span className="mx-1 font-medium text-amber-200">
+          {pendingActionStrictUnpaidCount}
         </span>{" "}
         nieopłaconych
       </>
     ) : null;
-  const confirmActionLabel =
-    pendingAction &&
-    pendingAction.kind !== "send-one" &&
-    unpaidParticipantsCount > 0
-      ? `Wyślij do wszystkich (${pendingAction.count}, w tym ${unpaidParticipantsCount} nieopłaconych)`
-      : "Wyślij mail";
+  // Zerowych grup nie wypisujemy; przy nieznanym statusie opłaty lista jest
+  // trzyelementowa, więc rozdzielamy ją przecinkami zamiast spójnikiem.
+  const sendAllCountsParts = [
+    pendingActionPaidCount > 0 ? `${pendingActionPaidCount} opłaconych` : null,
+    pendingActionStrictUnpaidCount > 0
+      ? `${pendingActionStrictUnpaidCount} nieopłaconych`
+      : null,
+    pendingActionUnknownPaymentCount > 0
+      ? `${pendingActionUnknownPaymentCount} z nieznanym statusem opłaty`
+      : null,
+  ].filter((part): part is string => part !== null);
+  const sendAllCountsLabel = `(${
+    pendingActionUnknownPaymentCount > 0
+      ? sendAllCountsParts.join(", ")
+      : sendAllCountsParts.join(" i ")
+  })`;
+  // Węższe zakresy pokazujemy tylko wtedy, gdy faktycznie zawężają wysyłkę.
+  const canSendToPaidOnly =
+    pendingActionPaidCount > 0 &&
+    pendingActionPaidCount < pendingActionTotalCount;
 
   return (
     <div className="space-y-6">
@@ -692,9 +727,7 @@ export default function EmailSending() {
               {hasNoSentEmails ? (
                 <Button
                   className={BULK_ACTION_BUTTON_CLASS}
-                  onClick={() =>
-                    setPendingAction({ kind: "send-missing", count: pending })
-                  }
+                  onClick={() => setPendingAction({ kind: "send-missing" })}
                   disabled={
                     sendingAll ||
                     !hasParticipants ||
@@ -716,12 +749,7 @@ export default function EmailSending() {
                     <Button
                       variant="outline"
                       className={BULK_ACTION_BUTTON_CLASS}
-                      onClick={() =>
-                        setPendingAction({
-                          kind: "resend-all",
-                          count: eventParticipants.length,
-                        })
-                      }
+                      onClick={() => setPendingAction({ kind: "resend-all" })}
                       disabled={
                         resendingAll ||
                         !hasParticipants ||
@@ -741,12 +769,7 @@ export default function EmailSending() {
                   {hasPartialDelivery && (
                     <Button
                       className={BULK_ACTION_BUTTON_CLASS}
-                      onClick={() =>
-                        setPendingAction({
-                          kind: "send-missing",
-                          count: pending,
-                        })
-                      }
+                      onClick={() => setPendingAction({ kind: "send-missing" })}
                       disabled={
                         sendingAll ||
                         !hasPendingEmails ||
@@ -868,20 +891,24 @@ export default function EmailSending() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Imię</TableHead>
-                  <TableHead className="hidden md:table-cell">Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden md:table-cell">
+                  {/* Imię i email dzielą jedną kolumnę — dwuwierszowy nagłówek
+                      opisuje obie wartości i skraca szerokość tabeli. */}
+                  <TableHead className="h-auto py-3 text-center leading-tight">
+                    <span className="block">Imię i nazwisko</span>
+                    <span className="block">Email</span>
+                  </TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="hidden text-center md:table-cell">
                     Wysłano
                   </TableHead>
-                  <TableHead className="text-right">Akcja</TableHead>
+                  <TableHead className="text-center">Akcja</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredDeliveryRows.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={4}
                       className="py-6 text-center text-sm text-muted-foreground"
                     >
                       Brak uczestników pasujących do filtrów.
@@ -903,15 +930,12 @@ export default function EmailSending() {
                     return (
                       <TableRow key={participant.id}>
                         <TableCell className="text-sm font-medium">
-                          <div className="min-w-0">
+                          <div className="min-w-0 max-w-[16rem]">
                             <p className="truncate">{participant.name}</p>
-                            <p className="truncate text-xs text-muted-foreground md:hidden">
+                            <p className="truncate text-xs font-normal text-muted-foreground">
                               {participant.email}
                             </p>
                           </div>
-                        </TableCell>
-                        <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
-                          {participant.email}
                         </TableCell>
                         <TableCell>
                           <div className="flex min-h-9 flex-col justify-center gap-1">
@@ -1009,11 +1033,11 @@ export default function EmailSending() {
                         <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                           {formatDeliveryTimestamp(delivery?.sent_at)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-center">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-9 w-full sm:w-auto"
+                            className="h-9 w-full sm:mx-auto sm:w-auto"
                             disabled={
                               sendingParticipantId === participant.id ||
                               !isOnline
@@ -1052,10 +1076,12 @@ export default function EmailSending() {
       >
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>
+            <AlertDialogTitle className="text-center">
               Potwierdź wysyłkę maili z kodem QR
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription
+              className={isBulkPendingAction ? "text-left" : undefined}
+            >
               {pendingAction?.kind === "send-one" ? (
                 <>
                   Do uczestnika{" "}
@@ -1070,31 +1096,22 @@ export default function EmailSending() {
                 </>
               ) : pendingAction?.kind === "resend-all" ? (
                 <>
-                  Ta operacja ponownie wyśle maile z kodem QR do{" "}
-                  <span className="font-medium text-foreground">
-                    {pendingAction.count}
-                  </span>{" "}
-                  uczestników wydarzenia{unpaidInlineClause}.
-                </>
-              ) : hasNoSentEmails ? (
-                <>
-                  Ta operacja wyśle maile z kodem QR do{" "}
-                  <span className="font-medium text-foreground">
-                    {pendingAction?.count ?? 0}
-                  </span>{" "}
-                  uczestników wydarzenia{unpaidInlineClause}.
+                  Ponowna wysyłka kodów QR do uczestników, do których wysłano
+                  wcześniej kody QR i do których ich nie wysłano.
                 </>
               ) : (
                 <>
-                  Ta operacja wyśle brakujące maile z kodem QR do{" "}
-                  <span className="font-medium text-foreground">
-                    {pendingAction?.count ?? 0}
+                  Do{" "}
+                  <span className="mx-1 font-medium text-foreground">
+                    {pendingActionTotalCount}
                   </span>{" "}
-                  uczestników wydarzenia{unpaidInlineClause}.
+                  uczestników nie wysłano dotychczas kodów QR{unpaidInlineClause}.
                 </>
               )}
             </AlertDialogDescription>
-            {hasUnpaidOrUnknownInPendingAction && (
+            {isBulkPendingAction &&
+              pendingActionStrictUnpaidCount + pendingActionUnknownPaymentCount >
+                0 && (
               <div className="mt-1 flex items-start gap-2.5 rounded-xl border border-amber-400/45 bg-amber-500/[0.14] px-3.5 py-3 text-left">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
                 <div className="min-w-0 space-y-1 text-sm leading-relaxed">
@@ -1102,19 +1119,19 @@ export default function EmailSending() {
                     Sprawdź status opłat
                   </p>
                   <ul className="space-y-0.5 text-amber-50/90">
-                    {unpaidParticipantsCount > 0 && (
+                    {pendingActionStrictUnpaidCount > 0 && (
                       <li>
-                        Nieopłaconych:{" "}
+                        Uczestników nieopłaconych:{" "}
                         <span className="font-semibold text-amber-100">
-                          {unpaidParticipantsCount}
+                          {pendingActionStrictUnpaidCount}
                         </span>
                       </li>
                     )}
-                    {unknownPaymentCount > 0 && (
+                    {pendingActionUnknownPaymentCount > 0 && (
                       <li>
-                        Nieznany status opłaty:{" "}
+                        Uczestników z nieznanym statusem opłaty:{" "}
                         <span className="font-semibold text-amber-100">
-                          {unknownPaymentCount}
+                          {pendingActionUnknownPaymentCount}
                         </span>
                       </li>
                     )}
@@ -1123,17 +1140,39 @@ export default function EmailSending() {
               </div>
             )}
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:space-x-0">
-            <AlertDialogCancel className="mt-0 w-full sm:w-auto">
-              Anuluj
-            </AlertDialogCancel>
-            {pendingAction &&
-              pendingAction.kind !== "send-one" &&
-              paidParticipantsCount > 0 && (
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto"
+          {pendingAction?.kind === "send-one" ? (
+            <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:space-x-0">
+              <AlertDialogCancel className="mt-0 w-full sm:w-auto">
+                Anuluj
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  void handleSendOne(
+                    pendingAction.participantId,
+                    pendingAction.participantName,
+                  );
+                }}
+                className="w-full sm:w-auto"
+                disabled={isConfirmingAction || !isOnline}
+              >
+                {isConfirmingAction && (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                )}
+                Wyślij mail
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          ) : (
+            // Akcje masowe układamy jedna pod drugą — etykiety z licznikami są za długie na jeden rząd.
+            <AlertDialogFooter className="mt-6 flex-col gap-3 sm:flex-col sm:space-x-0">
+              {/* Wysyłka tylko do opłaconych jest sugerowaną akcją, więc to ona ma pełne wypełnienie. */}
+              {canSendToPaidOnly && (
+                <AlertDialogAction
+                  className={BULK_ACTION_BUTTON_CLASS}
                   onClick={() => {
+                    if (!pendingAction) {
+                      return;
+                    }
+
                     void handleSendAll(
                       pendingAction.kind === "resend-all",
                       "paid_only",
@@ -1141,34 +1180,40 @@ export default function EmailSending() {
                   }}
                   disabled={isConfirmingAction || !isOnline}
                 >
-                  Tylko opłaceni ({paidParticipantsCount})
-                </Button>
+                  {isConfirmingAction && (
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  )}
+                  <BulkActionLabel
+                    text="Wyślij tylko do opłaconych uczestników"
+                    counts={`(${pendingActionPaidCount} opłaconych)`}
+                  />
+                </AlertDialogAction>
               )}
-            <AlertDialogAction
-              onClick={() => {
-                if (!pendingAction) {
-                  return;
-                }
+              <Button
+                // Bez przycisku dla opłaconych to jedyna akcja wysyłki, więc przejmuje wyróżnienie.
+                variant={canSendToPaidOnly ? "outline" : "default"}
+                onClick={() => {
+                  if (!pendingAction) {
+                    return;
+                  }
 
-                if (pendingAction.kind === "send-one") {
-                  void handleSendOne(
-                    pendingAction.participantId,
-                    pendingAction.participantName,
-                  );
-                  return;
-                }
-
-                void handleSendAll(pendingAction.kind === "resend-all", "all");
-              }}
-              className="w-full sm:w-auto"
-              disabled={isConfirmingAction || !isOnline}
-            >
-              {isConfirmingAction && (
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-              )}
-              {confirmActionLabel}
-            </AlertDialogAction>
-          </AlertDialogFooter>
+                  void handleSendAll(pendingAction.kind === "resend-all", "all");
+                }}
+                className={BULK_ACTION_BUTTON_CLASS}
+                disabled={isConfirmingAction || !isOnline}
+              >
+                <BulkActionLabel
+                  text="Wyślij do wszystkich uczestników"
+                  counts={sendAllCountsLabel}
+                />
+              </Button>
+              <AlertDialogCancel
+                className={cn(BULK_ACTION_BUTTON_CLASS, "mt-0")}
+              >
+                Rezygnuję z wysyłania maili
+              </AlertDialogCancel>
+            </AlertDialogFooter>
+          )}
         </AlertDialogContent>
       </AlertDialog>
 
