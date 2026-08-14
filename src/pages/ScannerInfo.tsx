@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Clock3, TimerReset } from 'lucide-react';
+import { CalendarDays, Clock3, ScanLine, TimerReset } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useData } from '@/contexts/DataContext';
 import { formatEventOfficeStart, getEventOfficeOpenAt } from '@/lib/events';
@@ -112,6 +112,37 @@ export default function ScannerInfo() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardContent className="px-6 py-6">
+          <div className="flex items-start gap-3">
+            <ScanLine className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <div>
+              <h2 className="text-lg font-semibold">Czytnik sprzętowy — jak przygotować</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Skaner w aplikacji działa zarówno z kamerą, jak i z czytnikiem podłączonym przez USB lub Bluetooth.
+                Zanim otworzy się biuro, sprawdź ustawienia czytnika:
+              </p>
+              <ul className="mt-4 space-y-2 text-sm text-foreground">
+                <li>
+                  <span className="font-semibold">Tryb HID (emulacja klawiatury)</span> — nie USB-COM ani tryb magazynowy.
+                  Czytnik ma „wpisywać” zeskanowany kod tak, jak robi to klawiatura.
+                </li>
+                <li>
+                  <span className="font-semibold">Układ klawiatury US</span> — inne układy potrafią przekłamać znaki w kodzie.
+                </li>
+                <li>
+                  <span className="font-semibold">Sufiks Enter (CR)</span> — zalecany, choć aplikacja rozpozna skan także bez niego.
+                </li>
+                <li>
+                  <span className="font-semibold">Nie klikaj w pole wyszukiwania przed skanem</span> — na ekranie skanera wystarczy
+                  zeskanować kod, aplikacja sama otworzy kartę uczestnika.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

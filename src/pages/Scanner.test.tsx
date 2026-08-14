@@ -164,6 +164,16 @@ function createDataState(
   };
 }
 
+const HARDWARE_SCAN_TOKEN = `pqr_${'ab12cd34'.repeat(6)}`;
+
+// Czytnik sprzetowy wystukuje token jak klawiatura i konczy Enterem.
+function typeHardwareScan(token: string, target: HTMLElement = document.body) {
+  for (const character of token) {
+    fireEvent.keyDown(target, { key: character });
+  }
+  fireEvent.keyDown(target, { key: 'Enter' });
+}
+
 function renderPages(initialEntries: string[] = ['/scanner']) {
   render(
     <MemoryRouter initialEntries={initialEntries}>
@@ -321,6 +331,33 @@ describe('Scanner page', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('textbox', { name: 'Email' })).toHaveValue('anna@example.com');
+  });
+
+  it('opens the participant card when a hardware scanner types a token outside any input', async () => {
+    const dataState = createDataState('scanner_plus');
+    useDataMock.mockReturnValue(dataState);
+
+    renderPages();
+
+    typeHardwareScan(HARDWARE_SCAN_TOKEN);
+
+    await screen.findByText('Dane do weryfikacji');
+    expect(dataState.scanParticipantQr).toHaveBeenCalledWith(HARDWARE_SCAN_TOKEN);
+    expect(screen.getByText('Anna Kowalska')).toBeInTheDocument();
+  });
+
+  it('ignores hardware scanner keystrokes that land in the search field', async () => {
+    const dataState = createDataState('scanner_plus');
+    useDataMock.mockReturnValue(dataState);
+
+    renderPages();
+
+    typeHardwareScan(HARDWARE_SCAN_TOKEN, screen.getByRole('textbox', { name: 'Szukaj uczestnika' }));
+
+    await waitFor(() => {
+      expect(dataState.scanParticipantQr).not.toHaveBeenCalled();
+    });
+    expect(screen.getByRole('textbox', { name: 'Szukaj uczestnika' })).toBeInTheDocument();
   });
 
   it('highlights important participant data in the participant details view', async () => {

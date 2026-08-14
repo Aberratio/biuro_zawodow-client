@@ -54,6 +54,19 @@ describe('ParticipantSearch', () => {
     expect(screen.getByText('Jan Nowak')).toBeInTheDocument();
   });
 
+  it('finds a participant by full qr code, which is what a hardware scanner types into the field', () => {
+    const onSelect = vi.fn();
+    render(<ParticipantSearch participants={participants} onSelect={onSelect} autoFocus={false} />);
+
+    fireEvent.change(screen.getByPlaceholderText('Nazwisko, numer, email...'), {
+      target: { value: 'qr-2' },
+    });
+    act(() => vi.advanceTimersByTime(300));
+
+    expect(screen.getByText('Jan Nowak')).toBeInTheDocument();
+    expect(screen.queryByText('Anna Kowalska')).not.toBeInTheDocument();
+  });
+
   it('clears search after selecting a participant', () => {
     const onSelect = vi.fn();
     render(<ParticipantSearch participants={participants} onSelect={onSelect} autoFocus={false} />);
