@@ -58,16 +58,21 @@ export default function ParticipantSearch({
     setOpen(true);
     debounceRef.current = setTimeout(() => {
       const q = nextQuery.toLocaleLowerCase('pl').trim();
+      // Czytnik sprzetowy wpisuje surowy token do pola, jesli akurat ma fokus -
+      // wtedy to jest jedyna droga, zeby skan cokolwiek znalazl.
+      const rawQuery = nextQuery.trim();
       const response = participants.filter(
         participant => {
           const participantName = normalizeSearchText(participant.name).toLocaleLowerCase('pl');
           const participantEmail = normalizeSearchText(participant.email).toLocaleLowerCase('pl');
           const participantBibNumber = normalizeSearchText(participant.bib_number);
+          const participantQrCode = normalizeSearchText(participant.qr_code);
 
           return (
             participantName.includes(q) ||
             participantEmail.includes(q) ||
-            participantBibNumber === q
+            participantBibNumber === q ||
+            (participantQrCode !== '' && participantQrCode === rawQuery)
           );
         }
       );
