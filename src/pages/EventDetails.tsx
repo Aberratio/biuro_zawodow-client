@@ -1995,7 +1995,7 @@ export default function EventDetails() {
           if (!nextOpen) resetEditState();
         }}
       >
-        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-md">
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-[calc(28rem+100px)]">
           <DialogHeader className="shrink-0 px-6 pb-2 pt-6">
             <DialogTitle>
               {isFinishedEvent ? "Otwórz biuro ponownie" : "Edytuj wydarzenie"}
