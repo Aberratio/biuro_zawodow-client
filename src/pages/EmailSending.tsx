@@ -701,7 +701,7 @@ export default function EmailSending() {
             >
               <div className="overflow-hidden">
                 <div
-                  className="flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-900"
+                  className="flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"
                   data-testid="all-mailer-deliveries-sent"
                 >
                   <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" />
