@@ -30,6 +30,13 @@ vi.mock("@/hooks/use-toast", () => ({
   toast: vi.fn(),
 }));
 
+// Testy sprawdzają parametry zapytań, a nie sam wybierak daty — zastępujemy go zwykłym polem.
+vi.mock("@/components/ui/date-time-picker", () => ({
+  DateTimePicker: ({ id, value, onChange }: { id?: string; value: string; onChange: (value: string) => void }) => (
+    <input id={id} value={value} onChange={(event) => onChange(event.target.value)} />
+  ),
+}));
+
 vi.mock("@/lib/api", () => ({
   API_BASE_URL: "http://api.test",
   fetchJson: (...args: unknown[]) => mocks.fetchJson(...args),

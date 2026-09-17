@@ -3,6 +3,7 @@ import { pl } from "date-fns/locale";
 import { CalendarIcon, Clock3 } from "lucide-react";
 
 import { useIsMobile } from "@/hooks/use-mobile";
+import { maskTimeInput, TIME_PATTERN } from "@/lib/polish-date";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -25,7 +26,6 @@ interface DateTimePickerProps
 }
 
 const DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:T| )(\d{2}):(\d{2})/;
-const TIME_PATTERN = /^\d{2}:\d{2}$/;
 
 function padDatePart(value: number): string {
   return String(value).padStart(2, "0");
@@ -121,12 +121,18 @@ function PickerPanel({
           </label>
           <div className="flex items-center gap-2">
             <Clock3 className="h-4 w-4 text-muted-foreground" />
+            {/* Tekst zamiast type="time", bo natywne pole w anglojęzycznej przeglądarce pokazuje AM/PM. */}
             <Input
               id={timeInputId}
-              type="time"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="GG:MM"
+              maxLength={5}
               value={draftTime}
-              onChange={(event) => onSelectTime(event.target.value)}
-              className="h-9"
+              onChange={(event) => onSelectTime(maskTimeInput(event.target.value))}
+              aria-invalid={!TIME_PATTERN.test(draftTime) || undefined}
+              className="h-9 tabular-nums"
             />
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -107,27 +108,21 @@ export function ParticipantFieldValueInput({
 
   if (fieldType === 'date') {
     const normalizedDate = normalizeParticipantDateValue(value, rules.date_format ?? 'auto');
-    // Podczas wpisywania roku cyfra po cyfrze przeglądarka zgłasza np. "0001-05-12". Taka wartość
-    // nie przechodzi normalizacji (rok < 1900), ale nie wolno jej zastąpić pustym stringiem —
-    // React wyczyściłby wtedy całe pole i nie dałoby się wpisać daty w kolejności dzień → miesiąc → rok.
-    const isNativeDateValue = /^\d{4}-\d{2}-\d{2}$/.test(value);
-    const inputValue = normalizedDate ?? (isNativeDateValue ? value : '');
 
     return (
       <>
-        <Input
+        <DateInput
           id={id}
-          type="date"
           min={typeof rules.min === 'string' ? rules.min : undefined}
           max={typeof rules.max === 'string' ? rules.max : undefined}
-          value={inputValue}
-          onChange={event => onChange(event.target.value)}
+          value={normalizedDate ?? ''}
+          onChange={onChange}
           className={className}
           required={required}
           aria-invalid={invalid}
           aria-describedby={describedBy}
         />
-        {value.trim() !== '' && !inputValue && <UnrecognizedValueHint value={value} />}
+        {value.trim() !== '' && !normalizedDate && <UnrecognizedValueHint value={value} />}
       </>
     );
   }

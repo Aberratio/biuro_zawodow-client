@@ -13,18 +13,14 @@ const dateMapping: ParticipantFieldMapping = {
 };
 
 describe('ParticipantFieldValueInput (date)', () => {
-  it('keeps a partially typed year so typing day, month, year in order does not clear the field', () => {
-    // Przy wpisywaniu roku cyfra po cyfrze przeglądarka zgłasza np. "0001-05-12".
-    render(<ParticipantFieldValueInput id="birth" mapping={dateMapping} value="0001-05-12" onChange={() => {}} />);
+  it('shows stored and imported dates in Polish DD.MM.RRRR format', () => {
+    const { rerender } = render(
+      <ParticipantFieldValueInput id="birth" mapping={dateMapping} value="1990-05-12" onChange={() => {}} />,
+    );
+    expect(screen.getByDisplayValue('12.05.1990')).toBeInTheDocument();
 
-    expect(screen.getByDisplayValue('0001-05-12')).toBeInTheDocument();
-    expect(screen.queryByText(/Nierozpoznana wartość/)).not.toBeInTheDocument();
-  });
-
-  it('shows imported values in other formats normalized to ISO', () => {
-    render(<ParticipantFieldValueInput id="birth" mapping={dateMapping} value="12.05.1990" onChange={() => {}} />);
-
-    expect(screen.getByDisplayValue('1990-05-12')).toBeInTheDocument();
+    rerender(<ParticipantFieldValueInput id="birth" mapping={dateMapping} value="3.7.1985" onChange={() => {}} />);
+    expect(screen.getByDisplayValue('03.07.1985')).toBeInTheDocument();
   });
 
   it('flags values that cannot be interpreted as a date', () => {

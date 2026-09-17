@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldError } from '@/components/ui/field-error';
@@ -858,21 +859,19 @@ export default function CsvImport() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor={`csv-date-min-${index}`}>Data od</Label>
-                  <Input
+                  <DateInput
                     id={`csv-date-min-${index}`}
-                    type="date"
                     value={typeof rules.min === 'string' ? rules.min : ''}
-                    onChange={eventValue => updateRules({ min: eventValue.target.value || undefined })}
+                    onChange={nextValue => updateRules({ min: nextValue || undefined })}
                     className="h-9"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor={`csv-date-max-${index}`}>Data do</Label>
-                  <Input
+                  <DateInput
                     id={`csv-date-max-${index}`}
-                    type="date"
                     value={typeof rules.max === 'string' ? rules.max : ''}
-                    onChange={eventValue => updateRules({ max: eventValue.target.value || undefined })}
+                    onChange={nextValue => updateRules({ max: nextValue || undefined })}
                     className="h-9"
                   />
                 </div>

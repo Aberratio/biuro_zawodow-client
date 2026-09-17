@@ -42,6 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1749,11 +1750,11 @@ export default function SuperAdmin() {
               <div className="grid gap-3 lg:grid-cols-[minmax(10rem,14rem)_minmax(10rem,14rem)_minmax(10rem,14rem)_minmax(10rem,12rem)_auto_auto]">
                 <div className="space-y-2">
                   <Label htmlFor="superadmin-audit-from">Od</Label>
-                  <Input id="superadmin-audit-from" type="datetime-local" value={auditFrom} onChange={(event) => setAuditFrom(event.target.value)} />
+                  <DateTimePicker id="superadmin-audit-from" value={auditFrom} onChange={setAuditFrom} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="superadmin-audit-to">Do</Label>
-                  <Input id="superadmin-audit-to" type="datetime-local" value={auditTo} onChange={(event) => setAuditTo(event.target.value)} />
+                  <DateTimePicker id="superadmin-audit-to" value={auditTo} onChange={setAuditTo} />
                 </div>
                 <div className="space-y-2">
                   <Label>Sortuj po</Label>
@@ -1991,11 +1992,11 @@ export default function SuperAdmin() {
               <div className="grid gap-3 lg:grid-cols-[minmax(10rem,14rem)_minmax(10rem,14rem)_minmax(10rem,14rem)_minmax(10rem,12rem)_auto_auto]">
                 <div className="space-y-2">
                   <Label htmlFor="superadmin-server-from">Od</Label>
-                  <Input id="superadmin-server-from" type="datetime-local" value={serverLogFrom} onChange={(event) => setServerLogFrom(event.target.value)} />
+                  <DateTimePicker id="superadmin-server-from" value={serverLogFrom} onChange={setServerLogFrom} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="superadmin-server-to">Do</Label>
-                  <Input id="superadmin-server-to" type="datetime-local" value={serverLogTo} onChange={(event) => setServerLogTo(event.target.value)} />
+                  <DateTimePicker id="superadmin-server-to" value={serverLogTo} onChange={setServerLogTo} />
                 </div>
                 <div className="space-y-2">
                   <Label>Sortuj po</Label>

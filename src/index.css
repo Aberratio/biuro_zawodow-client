@@ -110,26 +110,6 @@ All colors MUST be HSL.
     font-family: var(--font-mono);
   }
 
-  input[type="date"],
-  input[type="datetime-local"] {
-    color-scheme: dark;
-  }
-
-  input[type="date"]::-webkit-calendar-picker-indicator,
-  input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-    filter: brightness(0) invert(1);
-    opacity: 1;
-    cursor: pointer;
-  }
-
-  input[type="date"]:hover::-webkit-calendar-picker-indicator,
-  input[type="date"]:focus::-webkit-calendar-picker-indicator,
-  input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator,
-  input[type="datetime-local"]:focus::-webkit-calendar-picker-indicator {
-    filter: brightness(0) invert(1);
-    opacity: 1;
-  }
-
   html {
     background-color: hsl(var(--background));
   }

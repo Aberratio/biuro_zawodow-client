@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -972,21 +973,19 @@ export default function EventDetails() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor={`event-mapping-date-min-${index}`}>Data od</Label>
-                  <Input
+                  <DateInput
                     id={`event-mapping-date-min-${index}`}
-                    type="date"
                     value={typeof rules.min === "string" ? rules.min : ""}
-                    onChange={(eventValue) => updateRules({ min: eventValue.target.value || undefined })}
+                    onChange={(nextValue) => updateRules({ min: nextValue || undefined })}
                     className="h-9"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor={`event-mapping-date-max-${index}`}>Data do</Label>
-                  <Input
+                  <DateInput
                     id={`event-mapping-date-max-${index}`}
-                    type="date"
                     value={typeof rules.max === "string" ? rules.max : ""}
-                    onChange={(eventValue) => updateRules({ max: eventValue.target.value || undefined })}
+                    onChange={(nextValue) => updateRules({ max: nextValue || undefined })}
                     className="h-9"
                   />
                 </div>
