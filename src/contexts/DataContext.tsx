@@ -16,7 +16,7 @@ interface MutationResult { ok: boolean; error?: string; entityId?: string; queue
 interface ParticipantBibNumberConflict { bibNumber: string; conflictingParticipants: Participant[]; }
 interface ParticipantBibNumberUpdateResult extends MutationResult { conflict?: ParticipantBibNumberConflict; }
 type EventQrPaymentScope = 'all' | 'paid_only';
-interface EventQrEmailResult { ok: boolean; sent_count: number; error_count: number; unpaid_count?: number; unknown_payment_count?: number; skipped_unpaid_count?: number; errors: Array<{ participant_id: number; participant_name: string; error: string }>; error?: string; }
+interface EventQrEmailResult { ok: boolean; sent_count: number; error_count: number; unpaid_count?: number; unknown_payment_count?: number; skipped_unpaid_count?: number; reconciled_count?: number; errors: Array<{ participant_id: number; participant_name: string; error: string }>; error?: string; }
 interface ParticipantImportListDifference { columns_differ: boolean; missing_columns: string[]; extra_columns: string[]; participant_difference_ratio: number; should_offer_replacement: boolean; }
 interface ParticipantImportAnalysis { headers: string[]; sample_rows: Record<string, string>[]; email_candidates: { column: string; matched_count: number }[]; has_mapping: boolean; has_baseline_import: boolean; mappings: ParticipantFieldMapping[]; missing_required_columns: string[]; row_count: number; existing_participant_count: number; sent_qr_email_count: number; list_difference: ParticipantImportListDifference; }
 interface ParticipantImportMappingFieldInput {
@@ -1109,8 +1109,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: getAuthHeaders(true),
         body: JSON.stringify({ resend_all: resendAll, payment_scope: paymentScope }),
-        timeoutMs: 120_000,
-      })).payload as { data?: { sent_count?: number; error_count?: number; unpaid_count?: number; unknown_payment_count?: number; skipped_unpaid_count?: number; errors?: Array<{ participant_id: number; participant_name: string; error: string }> } };
+        // Duża wysyłka (1600 uczestników to ok. 32 paczki po 50) nie mieści się w 2 minutach.
+        // Przekroczenie timeoutu nie gubi już pracy: API oznacza uczestników paczka po paczce,
+        // a ponowne kliknięcie dosyła tylko brakujących — duplikatów pilnuje guard po stronie API.
+        timeoutMs: 600_000,
+      })).payload as { data?: { sent_count?: number; error_count?: number; unpaid_count?: number; unknown_payment_count?: number; skipped_unpaid_count?: number; reconciled_count?: number; errors?: Array<{ participant_id: number; participant_name: string; error: string }> } };
       await loadBootstrap(true);
       return {
         ok: true,
@@ -1119,6 +1122,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         unpaid_count: Number(payload.data?.unpaid_count ?? 0),
         unknown_payment_count: Number(payload.data?.unknown_payment_count ?? 0),
         skipped_unpaid_count: Number(payload.data?.skipped_unpaid_count ?? 0),
+        reconciled_count: Number(payload.data?.reconciled_count ?? 0),
         errors: Array.isArray(payload.data?.errors) ? payload.data!.errors : [],
       };
     } catch (error) {

@@ -431,10 +431,20 @@ export default function EmailSending() {
         return;
       }
 
+      // Uczestnicy, którzy mieli już maila w kolejce mailera mimo lokalnego "niewysłane".
+      // Bez tej informacji wynik "wysłano 0" wygląda jak awaria i kusi, żeby kliknąć jeszcze raz.
+      const reconciled = result.reconciled_count ?? 0;
+      const reconciledNote =
+        reconciled > 0
+          ? ` Pominięto ${reconciled}, bo te wiadomości były już w kolejce wysyłki.`
+          : "";
+
       if (result.error_count > 0) {
         toast({
           title: "Wysyłka zakończona częściowo",
-          description: `Wysłano ${result.sent_count}, błędów: ${result.error_count}.`,
+          description:
+            `Wysłano ${result.sent_count}, błędów: ${result.error_count}.${reconciledNote}` +
+            " Kliknij ponownie, aby dosłać brakujące — nikt nie dostanie duplikatu.",
           variant: "destructive",
         });
         return;
@@ -442,7 +452,7 @@ export default function EmailSending() {
 
       toast({
         title: resendAll ? "Ponownie wysłano kody QR" : "Wysłano kody QR",
-        description: `Łącznie wysłano ${result.sent_count} wiadomości.`,
+        description: `Łącznie wysłano ${result.sent_count} wiadomości.${reconciledNote}`,
       });
     } finally {
       setSendingAll(false);
