@@ -102,7 +102,10 @@ export const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
                 caption_dropdowns: "flex items-center gap-3",
                 dropdown_month: "relative inline-flex items-center",
                 dropdown_year: "relative inline-flex items-center",
-                dropdown: "absolute inset-0 z-10 w-full cursor-pointer opacity-0",
+                // Rozwinięta lista to natywny <select>: bez ciemnego color-scheme przeglądarka rysuje jasne tło
+                // pod białym tekstem odziedziczonym z motywu.
+                dropdown:
+                  "absolute inset-0 z-10 w-full cursor-pointer bg-popover text-popover-foreground opacity-0 [color-scheme:dark] [&_option]:bg-popover [&_option]:text-popover-foreground",
                 dropdown_icon: "h-3 w-3",
                 vhidden: "sr-only",
               }}
