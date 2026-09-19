@@ -59,6 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -224,12 +225,20 @@ type OperationsSummary = {
   active_rate_limit_blocks: number;
 };
 
+type ArchivedOperationalIssue = OperationalIssue & {
+  archived_by_user_id: string;
+  archived_by_name: string;
+  archived_reason: string;
+  archived_at: string;
+};
+
 type OperationsData = {
   generated_at?: string | null;
   summary: OperationsSummary;
   alerts: OperationalIssue[];
   sync_events: SyncEventStatus[];
   quality_issues: OperationalIssue[];
+  archived_issues: ArchivedOperationalIssue[];
 };
 
 const AUDIT_PAGE_SIZE = 50;
@@ -249,6 +258,7 @@ const EMPTY_OPERATIONS_DATA: OperationsData = {
   alerts: [],
   sync_events: [],
   quality_issues: [],
+  archived_issues: [],
 };
 
 const USER_ROLE_TABS: Array<{ value: UserRoleTab; label: string }> = [
@@ -449,6 +459,9 @@ export default function SuperAdmin() {
   const [operationsData, setOperationsData] = useState<OperationsData>(EMPTY_OPERATIONS_DATA);
   const [hasLoadedOperations, setHasLoadedOperations] = useState(false);
   const [isOperationsLoading, setIsOperationsLoading] = useState(false);
+  const [archiveIssueTarget, setArchiveIssueTarget] = useState<OperationalIssue | null>(null);
+  const [archiveIssueReason, setArchiveIssueReason] = useState("");
+  const [isArchivingIssue, setIsArchivingIssue] = useState(false);
   const [activeTab, setActiveTab] = useState("center");
   const [activeUserRoleTab, setActiveUserRoleTab] = useState<UserRoleTab>("admin");
   const [userSearch, setUserSearch] = useState("");
@@ -963,6 +976,7 @@ export default function SuperAdmin() {
         alerts: Array.isArray(responseData.alerts) ? responseData.alerts : [],
         sync_events: Array.isArray(responseData.sync_events) ? responseData.sync_events : [],
         quality_issues: Array.isArray(responseData.quality_issues) ? responseData.quality_issues : [],
+        archived_issues: Array.isArray(responseData.archived_issues) ? responseData.archived_issues : [],
       });
       setHasLoadedOperations(true);
     } catch (error) {
@@ -973,6 +987,51 @@ export default function SuperAdmin() {
       });
     } finally {
       setIsOperationsLoading(false);
+    }
+  };
+
+  const openArchiveIssueDialog = (issue: OperationalIssue) => {
+    setArchiveIssueTarget(issue);
+    setArchiveIssueReason("");
+  };
+
+  const archiveOperationalIssue = async () => {
+    if (!archiveIssueTarget) return;
+    const reason = archiveIssueReason.trim();
+    if (!reason) {
+      toast({ title: "Podaj powód archiwizacji", variant: "destructive" });
+      return;
+    }
+
+    setIsArchivingIssue(true);
+    try {
+      await fetchJson(`${API_BASE_URL}/superadmin/operations/archived-issues`, {
+        method: "POST",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          issue_id: archiveIssueTarget.id,
+          severity: archiveIssueTarget.severity,
+          category: archiveIssueTarget.category,
+          title: archiveIssueTarget.title,
+          description: archiveIssueTarget.description,
+          count: archiveIssueTarget.count,
+          organization_id: archiveIssueTarget.organization_id ?? null,
+          event_id: archiveIssueTarget.event_id ?? null,
+          reason,
+        }),
+      });
+      toast({ title: "Ostrzeżenie zarchiwizowane" });
+      setArchiveIssueTarget(null);
+      setArchiveIssueReason("");
+      void loadOperations();
+    } catch (error) {
+      toast({
+        title: "Nie udało się zarchiwizować ostrzeżenia",
+        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsArchivingIssue(false);
     }
   };
 
@@ -2328,9 +2387,47 @@ export default function SuperAdmin() {
                   Brak aktywnych alertów i problemów jakości danych.
                 </div>
               )}
-              {criticalIssues.length > 0 && <IssueGroup title="Krytyczne" issues={criticalIssues} />}
-              {warningIssues.length > 0 && <IssueGroup title="Ostrzeżenia" issues={warningIssues} />}
-              {infoIssues.length > 0 && <IssueGroup title="Informacyjne" issues={infoIssues} />}
+              {criticalIssues.length > 0 && <IssueGroup title="Krytyczne" issues={criticalIssues} onArchive={openArchiveIssueDialog} />}
+              {warningIssues.length > 0 && <IssueGroup title="Ostrzeżenia" issues={warningIssues} onArchive={openArchiveIssueDialog} />}
+              {infoIssues.length > 0 && <IssueGroup title="Informacyjne" issues={infoIssues} onArchive={openArchiveIssueDialog} />}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <CardTitle className="text-lg">Zarchiwizowane ostrzeżenia</CardTitle>
+              <Badge variant="secondary">{operationsData.archived_issues.length}</Badge>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {operationsData.archived_issues.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Żadne ostrzeżenie nie zostało jeszcze zarchiwizowane.
+                </p>
+              )}
+              {operationsData.archived_issues.map((issue) => (
+                <div key={issue.id} className="space-y-2 rounded-lg border p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{issue.title}</p>
+                    <Badge variant="outline">
+                      {issue.severity === "critical" ? "krytyczne" : issue.severity === "warning" ? "ostrzeżenie" : "informacja"}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{issue.description}</p>
+                  {[issue.organization_name, issue.event_name].filter(Boolean).length > 0 && (
+                    <p className="truncate text-xs text-muted-foreground">
+                      {[issue.organization_name, issue.event_name].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                  <div className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
+                    <p>
+                      Zarchiwizował(a): <span className="font-medium text-foreground">{issue.archived_by_name}</span>
+                      {" · "}
+                      {formatDateTime(issue.archived_at)}
+                    </p>
+                    <p className="mt-1">Powód: {issue.archived_reason}</p>
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
@@ -2435,6 +2532,63 @@ export default function SuperAdmin() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog
+        open={archiveIssueTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setArchiveIssueTarget(null);
+            setArchiveIssueReason("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Archiwizuj ostrzeżenie</DialogTitle>
+          </DialogHeader>
+          {archiveIssueTarget && (
+            <div className="space-y-4">
+              <div>
+                <p className="font-medium">{archiveIssueTarget.title}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{archiveIssueTarget.description}</p>
+              </div>
+              <div>
+                <Label htmlFor="archive-issue-reason">Powód archiwizacji</Label>
+                <Textarea
+                  id="archive-issue-reason"
+                  value={archiveIssueReason}
+                  onChange={(event) => setArchiveIssueReason(event.target.value)}
+                  className="mt-2"
+                  rows={4}
+                  required
+                  placeholder="Opisz, dlaczego to ostrzeżenie można zignorować."
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setArchiveIssueTarget(null);
+                setArchiveIssueReason("");
+              }}
+              disabled={isArchivingIssue}
+            >
+              Anuluj
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void archiveOperationalIssue()}
+              disabled={isArchivingIssue || !archiveIssueReason.trim()}
+            >
+              {isArchivingIssue && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              Archiwizuj
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={auditDialogOpen} onOpenChange={setAuditDialogOpen}>
         <DialogContent className="max-h-[85vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-4xl">
@@ -2880,7 +3034,15 @@ function operationalIssuePath(issue: OperationalIssue): string | null {
   return null;
 }
 
-function IssueGroup({ title, issues }: { title: string; issues: OperationalIssue[] }) {
+function IssueGroup({
+  title,
+  issues,
+  onArchive,
+}: {
+  title: string;
+  issues: OperationalIssue[];
+  onArchive: (issue: OperationalIssue) => void;
+}) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
@@ -2888,13 +3050,19 @@ function IssueGroup({ title, issues }: { title: string; issues: OperationalIssue
         <Badge variant="outline">{issues.length}</Badge>
       </div>
       {issues.map((issue) => (
-        <OperationalIssueRow key={issue.id} issue={issue} />
+        <OperationalIssueRow key={issue.id} issue={issue} onArchive={onArchive} />
       ))}
     </div>
   );
 }
 
-function OperationalIssueRow({ issue }: { issue: OperationalIssue }) {
+function OperationalIssueRow({
+  issue,
+  onArchive,
+}: {
+  issue: OperationalIssue;
+  onArchive: (issue: OperationalIssue) => void;
+}) {
   const actionPath = operationalIssuePath(issue);
   const contextLabel = [issue.organization_name, issue.event_name].filter(Boolean).join(" · ");
 
@@ -2922,11 +3090,17 @@ function OperationalIssueRow({ issue }: { issue: OperationalIssue }) {
           {contextLabel && <p className="mt-1 truncate text-xs text-muted-foreground">{contextLabel}</p>}
         </div>
       </div>
-      {actionPath && (
-        <Button asChild variant="outline" size="sm" className="shrink-0">
-          <Link to={actionPath}>Przejdź</Link>
+      <div className="flex shrink-0 gap-2">
+        {actionPath && (
+          <Button asChild variant="outline" size="sm">
+            <Link to={actionPath}>Przejdź</Link>
+          </Button>
+        )}
+        <Button variant="ghost" size="sm" onClick={() => onArchive(issue)}>
+          <Archive className="mr-1 h-4 w-4" />
+          Archiwizuj
         </Button>
-      )}
+      </div>
     </div>
   );
 }
