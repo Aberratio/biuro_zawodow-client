@@ -1,6 +1,14 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FlaskConical, ListFilter, Loader2, Plus } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  FlaskConical,
+  ListFilter,
+  Loader2,
+  Plus,
+} from "lucide-react";
 import { useData } from "@/contexts/DataContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,6 +81,8 @@ const EVENTS_PAGE_SIZE = 20;
 
 type EventStatusFilter = "all" | "active" | "upcoming" | "finished";
 type EventTimingStatus = Exclude<EventStatusFilter, "all">;
+type EventSortKey = "name" | "organizationName" | "location" | "officeOpenAt";
+type SortDirection = "asc" | "desc";
 
 function getEventTimingStatus(
   event: { office_open_at: string; office_close_at: string; office_locations: EventOfficeLocation[] },
@@ -202,6 +212,8 @@ export default function Events() {
   const [statusFilter, setStatusFilter] = useState<EventStatusFilter>("all");
   const [testFilter, setTestFilter] = useState<EventTestFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortKey, setSortKey] = useState<EventSortKey>("officeOpenAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const adminOrganizationIds = useMemo(
     () => organizations.map((organization) => organization.id),
     [organizations],
@@ -290,6 +302,33 @@ export default function Events() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedOrganizationId, statusFilter, testFilter]);
+  const handleSort = (key: EventSortKey) => {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortKey(key);
+    setSortDirection("asc");
+  };
+  const renderSortIcon = (key: EventSortKey) => {
+    if (sortKey !== key)
+      return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />;
+    if (sortDirection === "asc") return <ArrowUp className="h-3.5 w-3.5" />;
+    return <ArrowDown className="h-3.5 w-3.5" />;
+  };
+  const renderSortHeader = (key: EventSortKey, label: string) => (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={() => handleSort(key)}
+      className="-ml-3 h-8 px-3 text-xs font-medium"
+    >
+      {label}
+      {renderSortIcon(key)}
+    </Button>
+  );
   const scopedEvents = useMemo(
     () =>
       currentRole === "admin"
@@ -331,12 +370,24 @@ export default function Events() {
       return matchesQuery && matchesStatus && matchesTestFilter;
     });
 
-    return [...filtered].sort(
-      (left, right) =>
-        left.officeOpenAtTimestamp - right.officeOpenAtTimestamp ||
-        left.name.localeCompare(right.name, "pl"),
-    );
-  }, [eventRows, searchQuery, statusFilter, testFilter]);
+    const directionFactor = sortDirection === "asc" ? 1 : -1;
+
+    return [...filtered].sort((left, right) => {
+      if (sortKey === "officeOpenAt") {
+        return (
+          (left.officeOpenAtTimestamp - right.officeOpenAtTimestamp ||
+            left.name.localeCompare(right.name, "pl")) * directionFactor
+        );
+      }
+
+      return (
+        left[sortKey].localeCompare(right[sortKey], "pl", {
+          numeric: true,
+          sensitivity: "base",
+        }) * directionFactor
+      );
+    });
+  }, [eventRows, searchQuery, sortDirection, sortKey, statusFilter, testFilter]);
   const totalPages = Math.max(
     1,
     Math.ceil(processedRows.length / EVENTS_PAGE_SIZE),
@@ -710,16 +761,18 @@ export default function Events() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nazwa</TableHead>
+                  <TableHead>{renderSortHeader("name", "Nazwa")}</TableHead>
                   {showOrganizationColumn && (
                     <TableHead className="hidden lg:table-cell">
-                      Organizacja
+                      {renderSortHeader("organizationName", "Organizacja")}
                     </TableHead>
                   )}
                   <TableHead className="hidden md:table-cell">
-                    Lokalizacja
+                    {renderSortHeader("location", "Lokalizacja")}
                   </TableHead>
-                  <TableHead>Godziny otwarcia biura</TableHead>
+                  <TableHead>
+                    {renderSortHeader("officeOpenAt", "Godziny otwarcia biura")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -80,7 +80,10 @@ import {
 } from "@/lib/routes";
 import type { User } from "@/types";
 import {
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
+  ArrowUpDown,
   Archive,
   Building2,
   CalendarCheck,
@@ -100,6 +103,8 @@ import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 
 type MemberRole = "editor" | "scanner" | "scanner_plus";
+type OrgEventSortKey = "name" | "location" | "officeOpenAt";
+type SortDirection = "asc" | "desc";
 
 function CollapsibleOrganizationSection({
   title,
@@ -317,6 +322,62 @@ export default function OrganizationDetails() {
         )
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
     [events, organization?.id],
+  );
+  const [orgEventsSortKey, setOrgEventsSortKey] =
+    useState<OrgEventSortKey>("name");
+  const [orgEventsSortDirection, setOrgEventsSortDirection] =
+    useState<SortDirection>("asc");
+  const sortedOrgEvents = useMemo(() => {
+    const directionFactor = orgEventsSortDirection === "asc" ? 1 : -1;
+
+    return [...orgEvents].sort((left, right) => {
+      if (orgEventsSortKey === "officeOpenAt") {
+        const leftTimestamp =
+          parseEventDateTime(left.office_open_at)?.getTime() ??
+          Number.MAX_SAFE_INTEGER;
+        const rightTimestamp =
+          parseEventDateTime(right.office_open_at)?.getTime() ??
+          Number.MAX_SAFE_INTEGER;
+        return (leftTimestamp - rightTimestamp) * directionFactor;
+      }
+
+      return (
+        left[orgEventsSortKey].localeCompare(right[orgEventsSortKey], "pl", {
+          numeric: true,
+          sensitivity: "base",
+        }) * directionFactor
+      );
+    });
+  }, [orgEvents, orgEventsSortDirection, orgEventsSortKey]);
+  const handleOrgEventsSort = (key: OrgEventSortKey) => {
+    if (orgEventsSortKey === key) {
+      setOrgEventsSortDirection((current) =>
+        current === "asc" ? "desc" : "asc",
+      );
+      return;
+    }
+
+    setOrgEventsSortKey(key);
+    setOrgEventsSortDirection("asc");
+  };
+  const renderOrgEventsSortIcon = (key: OrgEventSortKey) => {
+    if (orgEventsSortKey !== key)
+      return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />;
+    if (orgEventsSortDirection === "asc")
+      return <ArrowUp className="h-3.5 w-3.5" />;
+    return <ArrowDown className="h-3.5 w-3.5" />;
+  };
+  const renderOrgEventsSortHeader = (key: OrgEventSortKey, label: string) => (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={() => handleOrgEventsSort(key)}
+      className="-ml-3 h-8 px-3 text-xs font-medium"
+    >
+      {label}
+      {renderOrgEventsSortIcon(key)}
+    </Button>
   );
   const orgArchivedEvents = useMemo(
     () =>
@@ -1148,18 +1209,18 @@ export default function OrganizationDetails() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                        Wydarzenie
+                        {renderOrgEventsSortHeader("name", "Wydarzenie")}
                       </TableHead>
                       <TableHead className="hidden h-12 px-5 text-[0.72rem] tracking-[0.2em] md:table-cell sm:px-7">
-                        Lokalizacja
+                        {renderOrgEventsSortHeader("location", "Lokalizacja")}
                       </TableHead>
                       <TableHead className="h-12 px-5 text-[0.72rem] tracking-[0.2em] sm:px-7">
-                        Biuro
+                        {renderOrgEventsSortHeader("officeOpenAt", "Biuro")}
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {orgEvents.map((event) => {
+                    {sortedOrgEvents.map((event) => {
                       const now = new Date();
                       const openAt = parseEventDateTime(event.office_open_at);
                       const isOfficeOpen = isEventOfficeOpen(event, now);

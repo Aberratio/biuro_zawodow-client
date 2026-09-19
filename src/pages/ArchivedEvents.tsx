@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Archive, ArrowLeft } from "lucide-react";
+import { Archive, ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useData } from "@/contexts/DataContext";
 import { useRouteOrganizationContext } from "@/hooks/use-route-organization-context";
 import { Badge } from "@/components/ui/badge";
@@ -20,11 +20,16 @@ import { formatEventOfficeSchedule, getEventOfficeOpenAt } from "@/lib/events";
 import { participantCountsAsCheckedIn } from "@/lib/participant-status";
 import { buildOrganizationPath } from "@/lib/routes";
 
+type ArchivedEventSortKey = "name" | "location" | "officeOpenAt" | "checkedIn";
+type SortDirection = "asc" | "desc";
+
 export default function ArchivedEvents() {
   const { id } = useParams<{ id: string }>();
   useRouteOrganizationContext(id ?? "");
   const navigate = useNavigate();
   const { archivedEvents, organizations, participants, isLoading } = useData();
+  const [sortKey, setSortKey] = useState<ArchivedEventSortKey>("officeOpenAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const organization = useMemo(
     () => organizations.find((entry) => entry.id === id),
@@ -63,9 +68,57 @@ export default function ArchivedEvents() {
           participantCount: participantStats.participantCount,
           officeOpenAtTimestamp: getEventOfficeOpenAt(event)?.getTime() ?? 0,
         };
-      })
-      .sort((left, right) => right.officeOpenAtTimestamp - left.officeOpenAtTimestamp);
+      });
   }, [archivedEvents, id, participantStatsByEventId]);
+
+  const sortedEventRows = useMemo(() => {
+    const directionFactor = sortDirection === "asc" ? 1 : -1;
+
+    return [...eventRows].sort((left, right) => {
+      if (sortKey === "officeOpenAt") {
+        return (left.officeOpenAtTimestamp - right.officeOpenAtTimestamp) * directionFactor;
+      }
+
+      if (sortKey === "checkedIn") {
+        return (left.checkedInCount - right.checkedInCount) * directionFactor;
+      }
+
+      return (
+        left[sortKey].localeCompare(right[sortKey], "pl", {
+          numeric: true,
+          sensitivity: "base",
+        }) * directionFactor
+      );
+    });
+  }, [eventRows, sortDirection, sortKey]);
+
+  const handleSort = (key: ArchivedEventSortKey) => {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortKey(key);
+    setSortDirection(key === "officeOpenAt" ? "desc" : "asc");
+  };
+  const renderSortIcon = (key: ArchivedEventSortKey) => {
+    if (sortKey !== key)
+      return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />;
+    if (sortDirection === "asc") return <ArrowUp className="h-3.5 w-3.5" />;
+    return <ArrowDown className="h-3.5 w-3.5" />;
+  };
+  const renderSortHeader = (key: ArchivedEventSortKey, label: string) => (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={() => handleSort(key)}
+      className="-ml-3 h-8 px-3 text-xs font-medium"
+    >
+      {label}
+      {renderSortIcon(key)}
+    </Button>
+  );
 
   if (isLoading) return <TableSkeleton rows={4} cols={4} subtitle="" />;
   if (!organization) {
@@ -139,14 +192,18 @@ export default function ArchivedEvents() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nazwa</TableHead>
-                  <TableHead className="hidden md:table-cell">Lokalizacja</TableHead>
-                  <TableHead>Biuro</TableHead>
-                  <TableHead className="hidden sm:table-cell">Odprawieni</TableHead>
+                  <TableHead>{renderSortHeader("name", "Nazwa")}</TableHead>
+                  <TableHead className="hidden md:table-cell">
+                    {renderSortHeader("location", "Lokalizacja")}
+                  </TableHead>
+                  <TableHead>{renderSortHeader("officeOpenAt", "Biuro")}</TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                    {renderSortHeader("checkedIn", "Odprawieni")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {eventRows.map((event) => (
+                {sortedEventRows.map((event) => (
                   <TableRow
                     key={event.id}
                     className="cursor-pointer active:bg-accent/50"
