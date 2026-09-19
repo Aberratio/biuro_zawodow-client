@@ -101,7 +101,7 @@ interface DataContextType {
   pendingMutationCount: number;
   scannerMode: ScannerMode;
   diagnostics: AppDiagnostics;
-  refreshData: () => Promise<void>;
+  refreshData: (silent?: boolean) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -388,7 +388,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [authUser, clearSession, getAuthHeaders, handleNetworkFailure, hydrateData, markConnectionHealthy, resetState, restoreCachedBootstrap, setDegradedState, token, updateSyncMeta]);
 
-  const refreshData = useCallback(async () => { await loadBootstrap(); }, [loadBootstrap]);
+  const refreshData = useCallback(async (silent = false) => { await loadBootstrap(silent); }, [loadBootstrap]);
 
   useEffect(() => { void loadBootstrap(); }, [loadBootstrap]);
   useEffect(() => {

@@ -213,6 +213,7 @@ export default function EmailSending() {
     getEventQrEmailDeliveries,
     isLoading,
     connectionState,
+    refreshData,
   } = useData();
   const [sendingAll, setSendingAll] = useState(false);
   const [resendingAll, setResendingAll] = useState(false);
@@ -308,6 +309,12 @@ export default function EmailSending() {
     },
     [activeEventId, getEventQrEmailDeliveries],
   );
+
+  // Duża liczba „X/Y ma już mail" liczy lokalny email_status z bootstrapu, a chip „Wysłane"
+  // pochodzi z raportu mailera. Odświeżamy oba źródła, żeby „Aktualizacja: HH:MM" dotyczyła obu.
+  const refreshStatuses = useCallback(async () => {
+    await Promise.all([loadDeliveries(false), refreshData(true)]);
+  }, [loadDeliveries, refreshData]);
 
   useEffect(() => {
     setDeliveryReport(null);
@@ -717,7 +724,7 @@ export default function EmailSending() {
                 variant="outline"
                 size="sm"
                 className="h-8"
-                onClick={() => void loadDeliveries(false)}
+                onClick={() => void refreshStatuses()}
                 disabled={!isOnline || isRefreshingDeliveries || !activeEventId}
               >
                 {isRefreshingDeliveries ? (

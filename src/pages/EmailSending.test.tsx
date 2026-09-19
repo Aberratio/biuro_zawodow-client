@@ -83,7 +83,9 @@ function renderPage(options: {
   sendEventQrEmails?: ReturnType<typeof vi.fn>;
   sendParticipantQrEmail?: ReturnType<typeof vi.fn>;
   getEventQrEmailDeliveries?: ReturnType<typeof vi.fn>;
+  refreshData?: ReturnType<typeof vi.fn>;
 } = {}) {
+  const refreshData = options.refreshData ?? vi.fn(async () => {});
   const sendEventQrEmails = options.sendEventQrEmails ?? vi.fn(async () => ({
     ok: true,
     sent_count: 2,
@@ -114,6 +116,7 @@ function renderPage(options: {
     getEventQrEmailDeliveries,
     isLoading: false,
     connectionState: options.connectionState ?? "online",
+    refreshData,
   });
 
   render(
@@ -472,18 +475,22 @@ describe("EmailSending page", () => {
     expect(screen.getByTestId("delivery-summary")).toBeEmptyDOMElement();
   });
 
-  it("refetches delivery statuses when refresh button is clicked", async () => {
+  it("refetches delivery statuses and local participant data when refresh button is clicked", async () => {
+    // Bez przeładowania uczestników chip „Wysłane" się odświeżał, a duża liczba „X/Y" nie.
     const getEventQrEmailDeliveries = vi.fn(async () => createTestDeliveryReport());
-    renderPage({ getEventQrEmailDeliveries });
+    const refreshData = vi.fn(async () => {});
+    renderPage({ getEventQrEmailDeliveries, refreshData });
 
     await waitFor(() => {
       expect(getEventQrEmailDeliveries).toHaveBeenCalledTimes(1);
     });
+    expect(refreshData).not.toHaveBeenCalled();
 
     fireEvent.click(findButtonByText("Odśwież statusy"));
 
     await waitFor(() => {
       expect(getEventQrEmailDeliveries).toHaveBeenCalledTimes(2);
     });
+    expect(refreshData).toHaveBeenCalledWith(true);
   });
 });
