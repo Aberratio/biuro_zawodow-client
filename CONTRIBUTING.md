@@ -1,8 +1,9 @@
 # Contributing
 
-Thanks for taking a look at this project. This is primarily a portfolio/showcase
-repo, but it's set up the way a real production frontend would be, and
-contributions or suggestions are welcome.
+Thanks for taking a look at this project. This is the production frontend for
+the `biuro_zawodow` race-office system, live at
+[biuro.zmierzymyczas.pl](https://biuro.zmierzymyczas.pl/), and contributions
+or suggestions are welcome.
 
 ## Local setup
 
