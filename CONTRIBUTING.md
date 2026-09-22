@@ -46,3 +46,11 @@ existing style in this repo's history. Conventional Commits prefixes
 Fill in the PR template (what changed, why, how it was tested). Pull requests
 are routed to reviewers via [`CODEOWNERS`](./.github/CODEOWNERS), so no need to
 manually pick a reviewer.
+
+## Future considerations
+
+Adopting [Conventional Commits](https://www.conventionalcommits.org/) with a
+`commitlint` Husky hook has been discussed as a possible future improvement
+(e.g. for automated changelogs). Not implemented yet — the existing commit
+history doesn't follow that format, so enforcing it retroactively would need a
+deliberate decision first.

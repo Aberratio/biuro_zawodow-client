@@ -1,5 +1,12 @@
 # biuro_zawodow-client
 
+[![CI](https://github.com/Aberratio/biuro_zawodow-client/actions/workflows/ci.yml/badge.svg)](https://github.com/Aberratio/biuro_zawodow-client/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![React](https://img.shields.io/badge/react-18-61DAFB.svg?logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/typescript-5-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/vite-5-646CFF.svg?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/tailwindcss-3-06B6D4.svg?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+
 React + Vite frontend for the `biuro_zawodow` race-office system. It connects to the PHP API and provides role-aware navigation for event check-in, participant management, QR scanning, CSV import, QR email sending and event exports.
 
 ## Stack
