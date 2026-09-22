@@ -4,7 +4,7 @@ import { sentryVitePlugin } from "@sentry/vite-plugin";
 import path from "path";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(() => ({
   base: "./",
   server: {
     host: "::",
@@ -16,18 +16,27 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    ...(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
-      ? [sentryVitePlugin({
-          authToken: process.env.SENTRY_AUTH_TOKEN,
-          org: process.env.SENTRY_ORG,
-          project: process.env.SENTRY_PROJECT,
-          release: { name: process.env.VITE_APP_RELEASE || "unknown" },
-          sourcemaps: { filesToDeleteAfterUpload: ["./dist/**/*.map"] },
-        })]
+    ...(process.env.SENTRY_AUTH_TOKEN &&
+    process.env.SENTRY_ORG &&
+    process.env.SENTRY_PROJECT
+      ? [
+          sentryVitePlugin({
+            authToken: process.env.SENTRY_AUTH_TOKEN,
+            org: process.env.SENTRY_ORG,
+            project: process.env.SENTRY_PROJECT,
+            release: { name: process.env.VITE_APP_RELEASE || "unknown" },
+            sourcemaps: { filesToDeleteAfterUpload: ["./dist/**/*.map"] },
+          }),
+        ]
       : []),
   ],
   build: {
-    sourcemap: process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT ? "hidden" : false,
+    sourcemap:
+      process.env.SENTRY_AUTH_TOKEN &&
+      process.env.SENTRY_ORG &&
+      process.env.SENTRY_PROJECT
+        ? "hidden"
+        : false,
   },
   resolve: {
     alias: {

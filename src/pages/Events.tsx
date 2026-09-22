@@ -54,9 +54,7 @@ import {
   formatEventOfficeSchedule,
   getEventOfficeLocationsValidationErrors,
   getEventOfficeOpenAt,
-  isEventOfficeStartAtOrAfterNow,
   isEventOfficeOpen,
-  isValidEventOfficeRange,
   parseEventDateTime,
   type EventOfficeLocationsValidationErrors,
 } from "@/lib/events";
@@ -85,8 +83,12 @@ type EventSortKey = "name" | "organizationName" | "location" | "officeOpenAt";
 type SortDirection = "asc" | "desc";
 
 function getEventTimingStatus(
-  event: { office_open_at: string; office_close_at: string; office_locations: EventOfficeLocation[] },
-  now: Date,
+  event: {
+    office_open_at: string;
+    office_close_at: string;
+    office_locations: EventOfficeLocation[];
+  },
+  now: Date
 ): EventTimingStatus {
   if (isEventOfficeOpen(event, now)) {
     return "active";
@@ -131,7 +133,7 @@ function getEventStatusPresentation(status: EventTimingStatus) {
 
 function buildPaginationModel(
   currentPage: number,
-  totalPages: number,
+  totalPages: number
 ): Array<number | "ellipsis"> {
   if (totalPages <= 7) {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -165,7 +167,7 @@ function buildPaginationModel(
 
 function scrollAppContentToTop() {
   const scrollRoot = document.querySelector<HTMLElement>(
-    '[data-app-scroll-root="true"]',
+    '[data-app-scroll-root="true"]'
   );
   scrollRoot?.scrollTo({ top: 0 });
 }
@@ -216,11 +218,11 @@ export default function Events() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const adminOrganizationIds = useMemo(
     () => organizations.map((organization) => organization.id),
-    [organizations],
+    [organizations]
   );
   const adminOrganizations = useMemo(
     () => organizations.filter((org) => adminOrganizationIds.includes(org.id)),
-    [adminOrganizationIds, organizations],
+    [adminOrganizationIds, organizations]
   );
   const accessibleOrganizations = useMemo(() => {
     if (currentRole === "superadmin") {
@@ -228,10 +230,14 @@ export default function Events() {
     }
 
     if (currentRole === "admin") {
-      return organizations.filter((org) => adminOrganizationIds.includes(org.id));
+      return organizations.filter((org) =>
+        adminOrganizationIds.includes(org.id)
+      );
     }
 
-    return organizations.filter((org) => org.id === currentUser.organization_id);
+    return organizations.filter(
+      (org) => org.id === currentUser.organization_id
+    );
   }, [
     adminOrganizationIds,
     currentRole,
@@ -240,7 +246,7 @@ export default function Events() {
   ]);
   const organizationNames = useMemo(
     () => Object.fromEntries(organizations.map((org) => [org.id, org.name])),
-    [organizations],
+    [organizations]
   );
   const canCreateEvent = !isScannerRole(currentRole);
   const isOnline = connectionState === "online";
@@ -333,10 +339,10 @@ export default function Events() {
     () =>
       currentRole === "admin"
         ? visibleEvents.filter(
-            (event) => event.organization_id === selectedOrganizationId,
+            (event) => event.organization_id === selectedOrganizationId
           )
         : visibleEvents,
-    [currentRole, selectedOrganizationId, visibleEvents],
+    [currentRole, selectedOrganizationId, visibleEvents]
   );
   const eventRows = useMemo(() => {
     const now = new Date();
@@ -387,10 +393,17 @@ export default function Events() {
         }) * directionFactor
       );
     });
-  }, [eventRows, searchQuery, sortDirection, sortKey, statusFilter, testFilter]);
+  }, [
+    eventRows,
+    searchQuery,
+    sortDirection,
+    sortKey,
+    statusFilter,
+    testFilter,
+  ]);
   const totalPages = Math.max(
     1,
-    Math.ceil(processedRows.length / EVENTS_PAGE_SIZE),
+    Math.ceil(processedRows.length / EVENTS_PAGE_SIZE)
   );
 
   useEffect(() => {
@@ -417,18 +430,22 @@ export default function Events() {
   }, [currentPage, processedRows, shouldShowFiltersAndPagination]);
   const formOrganization = useMemo(
     () => organizations.find((org) => org.id === form.organization_id),
-    [form.organization_id, organizations],
+    [form.organization_id, organizations]
   );
   const totalEventsByOrganizationId = useMemo(
-    () => countProductionEventsByOrganization([...visibleEvents, ...archivedEvents]),
-    [archivedEvents, visibleEvents],
+    () =>
+      countProductionEventsByOrganization([
+        ...visibleEvents,
+        ...archivedEvents,
+      ]),
+    [archivedEvents, visibleEvents]
   );
   const creatableOrganizations = useMemo(
     () =>
       accessibleOrganizations.filter(
-        (org) => (totalEventsByOrganizationId[org.id] ?? 0) < org.event_limit,
+        (org) => (totalEventsByOrganizationId[org.id] ?? 0) < org.event_limit
       ),
-    [accessibleOrganizations, totalEventsByOrganizationId],
+    [accessibleOrganizations, totalEventsByOrganizationId]
   );
   const canCreateForAnyOrganization = creatableOrganizations.length > 0;
   const canCreateTestForAnyOrganization = accessibleOrganizations.length > 0;
@@ -440,16 +457,18 @@ export default function Events() {
     "";
   const formOrganizationUsedSlots = useMemo(
     () => totalEventsByOrganizationId[form.organization_id] ?? 0,
-    [form.organization_id, totalEventsByOrganizationId],
+    [form.organization_id, totalEventsByOrganizationId]
   );
   const formOrganizationLimitReached = formOrganization
     ? formOrganizationUsedSlots >= formOrganization.event_limit
     : false;
   const hasActiveFilters =
-    searchQuery.trim().length > 0 || statusFilter !== "all" || testFilter !== "all";
+    searchQuery.trim().length > 0 ||
+    statusFilter !== "all" ||
+    testFilter !== "all";
   const paginationModel = useMemo(
     () => buildPaginationModel(currentPage, totalPages),
-    [currentPage, totalPages],
+    [currentPage, totalPages]
   );
   useEffect(() => {
     if (currentRole !== "superadmin" && currentRole !== "admin") {
@@ -497,16 +516,16 @@ export default function Events() {
       name: validateRequired(form.name, "Podaj nazwę wydarzenia."),
       location: validateRequired(
         form.location,
-        "Podaj lokalizację wydarzenia.",
+        "Podaj lokalizację wydarzenia."
       ),
       organization_id: validateRequired(
         form.organization_id,
-        "Wybierz organizację.",
+        "Wybierz organizację."
       ),
     };
 
     const officeLocationsErrors = getEventOfficeLocationsValidationErrors(
-      form.office_locations,
+      form.office_locations
     );
     const hasOfficeLocationsErrors =
       Boolean(officeLocationsErrors.form) ||
@@ -515,7 +534,7 @@ export default function Events() {
           location.name ||
           location.google_maps_url ||
           location.form ||
-          location.hours?.some((hour) => hour.opens_at || hour.closes_at),
+          location.hours?.some((hour) => hour.opens_at || hour.closes_at)
       );
 
     if (
@@ -623,7 +642,11 @@ export default function Events() {
               size="sm"
               variant="outline"
               className="w-full sm:w-auto"
-              disabled={!isOnline || !canCreateTestForAnyOrganization || isCreatingTestEvent}
+              disabled={
+                !isOnline ||
+                !canCreateTestForAnyOrganization ||
+                isCreatingTestEvent
+              }
             >
               {isCreatingTestEvent ? (
                 <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -780,79 +803,79 @@ export default function Events() {
                   const status = getEventStatusPresentation(event.timingStatus);
 
                   return (
-                  <TableRow
-                    key={event.id}
-                    className="cursor-pointer active:bg-accent/50"
-                    onClick={() =>
-                      navigate(`/events/${event.id}`, {
-                        state: {
-                          backTo: "/events",
-                          backLabel: "Wróć do listy wszystkich wydarzeń",
-                        },
-                      })
-                    }
-                    onKeyDown={(keyboardEvent) => {
-                      if (
-                        keyboardEvent.key === "Enter" ||
-                        keyboardEvent.key === " "
-                      ) {
-                        keyboardEvent.preventDefault();
+                    <TableRow
+                      key={event.id}
+                      className="cursor-pointer active:bg-accent/50"
+                      onClick={() =>
                         navigate(`/events/${event.id}`, {
                           state: {
                             backTo: "/events",
                             backLabel: "Wróć do listy wszystkich wydarzeń",
                           },
-                        });
+                        })
                       }
-                    }}
-                    tabIndex={0}
-                    aria-label={`Wyświetl wydarzenie ${event.name}`}
-                  >
-                    <TableCell>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-sm">
-                            {event.name}
-                          </span>
-                          <Badge
-                            className={cn(
-                              "rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium shadow-none",
-                              status.className,
-                            )}
-                          >
-                            {status.label}
-                          </Badge>
-                          {event.is_test && (
+                      onKeyDown={(keyboardEvent) => {
+                        if (
+                          keyboardEvent.key === "Enter" ||
+                          keyboardEvent.key === " "
+                        ) {
+                          keyboardEvent.preventDefault();
+                          navigate(`/events/${event.id}`, {
+                            state: {
+                              backTo: "/events",
+                              backLabel: "Wróć do listy wszystkich wydarzeń",
+                            },
+                          });
+                        }
+                      }}
+                      tabIndex={0}
+                      aria-label={`Wyświetl wydarzenie ${event.name}`}
+                    >
+                      <TableCell>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-sm">
+                              {event.name}
+                            </span>
                             <Badge
-                              variant="outline"
-                              className="rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium shadow-none"
+                              className={cn(
+                                "rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium shadow-none",
+                                status.className
+                              )}
                             >
-                              Testowe
+                              {status.label}
                             </Badge>
+                            {event.is_test && (
+                              <Badge
+                                variant="outline"
+                                className="rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium shadow-none"
+                              >
+                                Testowe
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="block truncate text-xs text-muted-foreground md:hidden">
+                            {event.location}
+                          </span>
+                          {showOrganizationColumn && (
+                            <span className="block truncate text-xs text-muted-foreground lg:hidden">
+                              {event.organizationName}
+                            </span>
                           )}
                         </div>
-                        <span className="block truncate text-xs text-muted-foreground md:hidden">
-                          {event.location}
-                        </span>
-                        {showOrganizationColumn && (
-                          <span className="block truncate text-xs text-muted-foreground lg:hidden">
-                            {event.organizationName}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    {showOrganizationColumn && (
-                      <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
-                        {event.organizationName}
                       </TableCell>
-                    )}
-                    <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
-                      {event.location}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatEventOfficeSchedule(event)}
-                    </TableCell>
-                  </TableRow>
+                      {showOrganizationColumn && (
+                        <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
+                          {event.organizationName}
+                        </TableCell>
+                      )}
+                      <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                        {event.location}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatEventOfficeSchedule(event)}
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
               </TableBody>
@@ -931,138 +954,141 @@ export default function Events() {
             <DialogTitle>Nowe wydarzenie</DialogTitle>
           </DialogHeader>
           <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4">
-          <div className="space-y-4">
-            {(currentRole === "superadmin" || currentRole === "admin") && (
+            <div className="space-y-4">
+              {(currentRole === "superadmin" || currentRole === "admin") && (
+                <div>
+                  <Label htmlFor="event-create-organization">Organizacja</Label>
+                  <Select
+                    value={form.organization_id}
+                    onValueChange={(value) => {
+                      setForm((current) => ({
+                        ...current,
+                        organization_id: value,
+                      }));
+                      setFormErrors((current) => ({
+                        ...current,
+                        organization_id: undefined,
+                        form: undefined,
+                      }));
+                    }}
+                  >
+                    <SelectTrigger
+                      id="event-create-organization"
+                      aria-invalid={Boolean(formErrors.organization_id)}
+                      aria-describedby={
+                        formErrors.organization_id
+                          ? "event-create-organization-error"
+                          : undefined
+                      }
+                    >
+                      <SelectValue placeholder="Wybierz organizację" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {creatableOrganizations.map((org) => (
+                        <SelectItem key={org.id} value={org.id}>
+                          {org.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldError
+                    id="event-create-organization-error"
+                    className="mt-2"
+                  >
+                    {formErrors.organization_id}
+                  </FieldError>
+                </div>
+              )}
               <div>
-                <Label htmlFor="event-create-organization">Organizacja</Label>
-                <Select
-                  value={form.organization_id}
-                  onValueChange={(value) => {
+                <Label htmlFor="event-create-name">Nazwa</Label>
+                <Input
+                  id="event-create-name"
+                  value={form.name}
+                  onChange={(event) => {
                     setForm((current) => ({
                       ...current,
-                      organization_id: value,
+                      name: event.target.value,
                     }));
                     setFormErrors((current) => ({
                       ...current,
-                      organization_id: undefined,
+                      name: undefined,
                       form: undefined,
                     }));
                   }}
-                >
-                  <SelectTrigger
-                    id="event-create-organization"
-                    aria-invalid={Boolean(formErrors.organization_id)}
-                    aria-describedby={
-                      formErrors.organization_id
-                        ? "event-create-organization-error"
-                        : undefined
-                    }
-                  >
-                    <SelectValue placeholder="Wybierz organizację" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {creatableOrganizations.map((org) => (
-                      <SelectItem key={org.id} value={org.id}>
-                        {org.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldError
-                  id="event-create-organization-error"
-                  className="mt-2"
-                >
-                  {formErrors.organization_id}
+                  placeholder="np. Bieg Wiosenny"
+                  required
+                  aria-invalid={Boolean(formErrors.name)}
+                  aria-describedby={
+                    formErrors.name ? "event-create-name-error" : undefined
+                  }
+                />
+                <FieldError id="event-create-name-error" className="mt-2">
+                  {formErrors.name}
                 </FieldError>
               </div>
-            )}
-            <div>
-              <Label htmlFor="event-create-name">Nazwa</Label>
-              <Input
-                id="event-create-name"
-                value={form.name}
-                onChange={(event) => {
+              <div>
+                <Label htmlFor="event-create-location">Lokalizacja</Label>
+                <Input
+                  id="event-create-location"
+                  value={form.location}
+                  onChange={(event) => {
+                    setForm((current) => ({
+                      ...current,
+                      location: event.target.value,
+                    }));
+                    setFormErrors((current) => ({
+                      ...current,
+                      location: undefined,
+                      form: undefined,
+                    }));
+                  }}
+                  placeholder="np. Kraków, Błonia"
+                  required
+                  aria-invalid={Boolean(formErrors.location)}
+                  aria-describedby={
+                    formErrors.location
+                      ? "event-create-location-error"
+                      : undefined
+                  }
+                />
+                <FieldError id="event-create-location-error" className="mt-2">
+                  {formErrors.location}
+                </FieldError>
+              </div>
+              <EventOfficeLocationsEditor
+                idPrefix="event-create"
+                locations={form.office_locations}
+                onChange={(locations) => {
                   setForm((current) => ({
                     ...current,
-                    name: event.target.value,
+                    office_locations: locations,
                   }));
                   setFormErrors((current) => ({
                     ...current,
-                    name: undefined,
+                    office_locations: undefined,
                     form: undefined,
                   }));
                 }}
-                placeholder="np. Bieg Wiosenny"
-                required
-                aria-invalid={Boolean(formErrors.name)}
-                aria-describedby={
-                  formErrors.name ? "event-create-name-error" : undefined
-                }
+                errors={formErrors.office_locations}
               />
-              <FieldError id="event-create-name-error" className="mt-2">
-                {formErrors.name}
-              </FieldError>
-            </div>
-            <div>
-              <Label htmlFor="event-create-location">Lokalizacja</Label>
-              <Input
-                id="event-create-location"
-                value={form.location}
-                onChange={(event) => {
-                  setForm((current) => ({
-                    ...current,
-                    location: event.target.value,
-                  }));
-                  setFormErrors((current) => ({
-                    ...current,
-                    location: undefined,
-                    form: undefined,
-                  }));
-                }}
-                placeholder="np. Kraków, Błonia"
-                required
-                aria-invalid={Boolean(formErrors.location)}
-                aria-describedby={
-                  formErrors.location
-                    ? "event-create-location-error"
-                    : undefined
-                }
-              />
-              <FieldError id="event-create-location-error" className="mt-2">
-                {formErrors.location}
-              </FieldError>
-            </div>
-            <EventOfficeLocationsEditor
-              idPrefix="event-create"
-              locations={form.office_locations}
-              onChange={(locations) => {
-                setForm((current) => ({ ...current, office_locations: locations }));
-                setFormErrors((current) => ({
-                  ...current,
-                  office_locations: undefined,
-                  form: undefined,
-                }));
-              }}
-              errors={formErrors.office_locations}
-            />
-            {formOrganization && (
-              <p className="text-[10px] text-muted-foreground">
-                Limit organizacji:{" "}
-                {formatEventCount(formOrganization.event_limit)}. Utworzono{" "}
-                {formatEventCount(formOrganizationUsedSlots)}.
-              </p>
-            )}
-            {(currentRole === "superadmin" || currentRole === "admin") &&
-              creatableOrganizations.length === 0 && (
+              {formOrganization && (
                 <p className="text-[10px] text-muted-foreground">
-                  Brak organizacji, dla których można jeszcze utworzyć
-                  wydarzenie.
+                  Limit organizacji:{" "}
+                  {formatEventCount(formOrganization.event_limit)}. Utworzono{" "}
+                  {formatEventCount(formOrganizationUsedSlots)}.
                 </p>
               )}
-            <FieldError id="event-create-form-error">
-              {formErrors.form}
-            </FieldError>
-          </div>
+              {(currentRole === "superadmin" || currentRole === "admin") &&
+                creatableOrganizations.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Brak organizacji, dla których można jeszcze utworzyć
+                    wydarzenie.
+                  </p>
+                )}
+              <FieldError id="event-create-form-error">
+                {formErrors.form}
+              </FieldError>
+            </div>
           </div>
           <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button

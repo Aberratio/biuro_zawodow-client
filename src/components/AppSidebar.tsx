@@ -1,4 +1,3 @@
-import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Building2,
@@ -268,7 +267,7 @@ export function AppSidebar() {
               ? buildOrganizationPath(currentUser.organization_id)
               : "/organizations",
           }
-        : item,
+        : item
     );
 
   const generalItems = items.filter((item) => !eventScopedUrls.has(item.url));
@@ -276,12 +275,12 @@ export function AppSidebar() {
   const contextOrganizations = usesOrganizationContext ? organizations : [];
   const selectedOrganization =
     contextOrganizations.find(
-      (organization) => organization.id === selectedOrganizationId,
+      (organization) => organization.id === selectedOrganizationId
     ) ?? null;
   const scopedVisibleEvents =
     usesOrganizationContext && selectedOrganizationId
       ? visibleEvents.filter(
-          (event) => event.organization_id === selectedOrganizationId,
+          (event) => event.organization_id === selectedOrganizationId
         )
       : visibleEvents;
   const selectedEvent =
@@ -403,7 +402,7 @@ export function AppSidebar() {
                           ? buildEventParticipantsPath(selectedEvent.id)
                           : item.url === "/emails"
                             ? buildEventEmailsPath(selectedEvent.id)
-                          : item.url
+                            : item.url
                     }
                     end={item.url !== "/participants"}
                     className={workspaceNavItemClassName}

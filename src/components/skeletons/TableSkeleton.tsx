@@ -1,14 +1,18 @@
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TableSkeletonProps {
   rows?: number;
   cols?: number;
-  title?: string;
   subtitle?: string;
   showFilters?: boolean;
 }
 
-export default function TableSkeleton({ rows = 6, cols = 4, title, subtitle, showFilters }: TableSkeletonProps) {
+export default function TableSkeleton({
+  rows = 6,
+  cols = 4,
+  subtitle,
+  showFilters,
+}: TableSkeletonProps) {
   return (
     <div className="space-y-4">
       <div>
@@ -31,9 +35,15 @@ export default function TableSkeleton({ rows = 6, cols = 4, title, subtitle, sho
           ))}
         </div>
         {Array.from({ length: rows }).map((_, i) => (
-          <div key={i} className="flex gap-4 border-b border-white/[0.06] px-5 py-4 last:border-0 sm:px-6 sm:py-5">
+          <div
+            key={i}
+            className="flex gap-4 border-b border-white/[0.06] px-5 py-4 last:border-0 sm:px-6 sm:py-5"
+          >
             {Array.from({ length: cols }).map((_, j) => (
-              <Skeleton key={j} className="h-4 flex-1 rounded-full bg-white/10" />
+              <Skeleton
+                key={j}
+                className="h-4 flex-1 rounded-full bg-white/10"
+              />
             ))}
           </div>
         ))}
