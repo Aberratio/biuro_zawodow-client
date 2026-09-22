@@ -30,14 +30,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   API_BASE_URL,
   fetchJson,
-  getApiErrorCode,
   isApiResponseError,
   isNetworkRequestError,
 } from "@/lib/api";
 import {
   type ApiParticipant,
   type BootstrapResponse,
-  type ParticipantQrPreviewResponse,
   type ParticipantScanApiResponse,
   OFFLINE_ACTION_MESSAGE,
   applyPendingMutations,
@@ -77,10 +75,6 @@ import {
 import { isEventOfficeOpen } from "@/lib/events";
 import { hasGlobalOrganizationScope } from "@/lib/roles";
 import { checkBrowserStorage } from "@/lib/browser-storage";
-import {
-  buildExportFallbackName as buildExportFallbackNameForEvent,
-  downloadCsvResponse,
-} from "@/lib/csv-export";
 import { useOrganizationMutations } from "@/contexts/data/useOrganizationMutations";
 import { useUserMutations } from "@/contexts/data/useUserMutations";
 import {
@@ -93,6 +87,7 @@ import {
   type ParticipantListResetResult,
 } from "@/contexts/data/useParticipantImport";
 import { useEventMutations } from "@/contexts/data/useEventMutations";
+import { useParticipantMutations } from "@/contexts/data/useParticipantMutations";
 
 type UserCreateInput = Omit<User, "id" | "password"> & { password?: string };
 type EventMutationInput = Omit<
@@ -1322,106 +1317,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  const updateParticipantBibNumber = useCallback(
-    async (
-      participantId: string,
-      bibNumber: string,
-      options?: ParticipantBibNumberUpdateOptions
-    ): Promise<ParticipantBibNumberUpdateResult> => {
-      const offlineError = ensureOnline(
-        "Zmiana numeru startowego jest dostępna tylko po połączeniu z serwerem."
-      );
-      if (offlineError) return { ok: false, error: offlineError };
-
-      try {
-        const participant = await updateParticipantInApi(participantId, {
-          bib_number: bibNumber.trim(),
-          bib_number_conflict_resolution: options?.conflictResolution,
-        });
-        replaceParticipantRecord(participant);
-        await loadBootstrap(true);
-        return { ok: true };
-      } catch (error) {
-        handleNetworkFailure(error);
-        if (
-          isApiResponseError(error) &&
-          error.status === 409 &&
-          getApiErrorCode(error) === "bib_number_conflict"
-        ) {
-          const payload = error.payload as {
-            data?: {
-              bib_number?: string;
-              conflicting_participants?: ApiParticipant[];
-            };
-          };
-
-          return {
-            ok: false,
-            error: error.message,
-            conflict: {
-              bibNumber: String(payload.data?.bib_number ?? bibNumber.trim()),
-              conflictingParticipants: Array.isArray(
-                payload.data?.conflicting_participants
-              )
-                ? payload.data.conflicting_participants.map(
-                    (conflictParticipant) =>
-                      mapApiParticipantToUi(
-                        conflictParticipant,
-                        participants.find(
-                          (participant) => participant.id === participantId
-                        )?.event_id ?? ""
-                      )
-                  )
-                : [],
-            },
-          };
-        }
-
-        return {
-          ok: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Nie udało się zapisać numeru startowego.",
-        };
-      }
-    },
-    [
-      ensureOnline,
-      handleNetworkFailure,
-      loadBootstrap,
-      participants,
-      replaceParticipantRecord,
-      updateParticipantInApi,
-    ]
-  );
-
-  const updateParticipantDetails = useCallback(
-    async (
-      participantId: string,
-      email: string,
-      fieldValues: Record<string, string>
-    ) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const participant = await updateParticipantInApi(participantId, {
-          email,
-          field_values: fieldValues,
-        });
-        replaceParticipantRecord(participant);
-        await loadBootstrap(true);
-        return { ok: true };
-      }),
-    [
-      ensureOnline,
-      loadBootstrap,
-      replaceParticipantRecord,
-      runMutation,
-      updateParticipantInApi,
-    ]
-  );
-
   const {
     analyzeParticipantImport,
     confirmParticipantImportMapping,
@@ -1444,35 +1339,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   });
   clearParticipantImportCachesRef.current = clearParticipantImportCaches;
 
-  const addParticipantManually = useCallback(
-    async (
-      eventId: string,
-      email: string,
-      fieldValues: Record<string, string>
-    ) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const payload = (
-          await fetchJson(
-            `${API_BASE_URL}/events/${eventId}/participants/manual`,
-            {
-              method: "POST",
-              headers: getAuthHeaders(true),
-              body: JSON.stringify({ email, field_values: fieldValues }),
-            }
-          )
-        ).payload as { data?: ApiParticipant };
-        if (payload.data) {
-          const mapped = mapApiParticipantToUi(payload.data, eventId);
-          setParticipantRecords((previous) => [...previous, mapped]);
-          addLog("Dodano uczestnika", mapped.name);
-        }
-        return { ok: true };
-      }),
-    [addLog, ensureOnline, getAuthHeaders, runMutation]
-  );
-
   const {
     createEvent,
     createTestEvent,
@@ -1480,6 +1346,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateEvent,
     archiveEvent,
     deleteEvent,
+    exportEventCsv,
+    exportEventLogsCsv,
   } = useEventMutations({
     organizations,
     events,
@@ -1495,6 +1363,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     markLocalDataChanged,
     getAuthHeaders,
     loadBootstrap,
+    handleNetworkFailure,
     rememberParticipantFieldMappingsState,
   });
 
@@ -1533,165 +1402,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     getAuthHeaders,
     loadBootstrap,
   });
-
-  const sendParticipantQrEmail = useCallback(
-    async (participantId: string) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const payload = (
-          await fetchJson(
-            `${API_BASE_URL}/participants/${participantUiIdToApiId(participantId)}/send-qr-email`,
-            { method: "POST", headers: getAuthHeaders() }
-          )
-        ).payload as { data?: ApiParticipant };
-        if (!payload.data)
-          return { ok: false, error: "API QR email send failed" };
-        replaceParticipantRecord(
-          mapApiParticipantToUi(
-            payload.data,
-            participants.find((participant) => participant.id === participantId)
-              ?.event_id ?? ""
-          )
-        );
-        await loadBootstrap(true);
-        return { ok: true };
-      }),
-    [
-      ensureOnline,
-      getAuthHeaders,
-      loadBootstrap,
-      participants,
-      replaceParticipantRecord,
-      runMutation,
-    ]
-  );
-
-  const sendEventQrEmails = useCallback(
-    async (
-      eventId: string,
-      resendAll = false,
-      paymentScope: EventQrPaymentScope = "all"
-    ): Promise<EventQrEmailResult> => {
-      try {
-        const offlineError = ensureOnline();
-        if (offlineError)
-          return {
-            ok: false,
-            sent_count: 0,
-            error_count: 0,
-            unpaid_count: 0,
-            unknown_payment_count: 0,
-            skipped_unpaid_count: 0,
-            errors: [],
-            error: offlineError,
-          };
-        const payload = (
-          await fetchJson(`${API_BASE_URL}/events/${eventId}/send-qr-emails`, {
-            method: "POST",
-            headers: getAuthHeaders(true),
-            body: JSON.stringify({
-              resend_all: resendAll,
-              payment_scope: paymentScope,
-            }),
-            // Duża wysyłka (1600 uczestników to ok. 32 paczki po 50) nie mieści się w 2 minutach.
-            // Przekroczenie timeoutu nie gubi już pracy: API oznacza uczestników paczka po paczce,
-            // a ponowne kliknięcie dosyła tylko brakujących — duplikatów pilnuje guard po stronie API.
-            timeoutMs: 600_000,
-          })
-        ).payload as {
-          data?: {
-            sent_count?: number;
-            error_count?: number;
-            unpaid_count?: number;
-            unknown_payment_count?: number;
-            skipped_unpaid_count?: number;
-            reconciled_count?: number;
-            errors?: Array<{
-              participant_id: number;
-              participant_name: string;
-              error: string;
-            }>;
-          };
-        };
-        await loadBootstrap(true);
-        return {
-          ok: true,
-          sent_count: Number(payload.data?.sent_count ?? 0),
-          error_count: Number(payload.data?.error_count ?? 0),
-          unpaid_count: Number(payload.data?.unpaid_count ?? 0),
-          unknown_payment_count: Number(
-            payload.data?.unknown_payment_count ?? 0
-          ),
-          skipped_unpaid_count: Number(payload.data?.skipped_unpaid_count ?? 0),
-          reconciled_count: Number(payload.data?.reconciled_count ?? 0),
-          errors: Array.isArray(payload.data?.errors)
-            ? payload.data!.errors
-            : [],
-        };
-      } catch (error) {
-        handleNetworkFailure(error);
-        return {
-          ok: false,
-          sent_count: 0,
-          error_count: 0,
-          errors: [],
-          error:
-            error instanceof Error
-              ? error.message
-              : "Nie udało się wysłać kodów QR.",
-        };
-      }
-    },
-    [ensureOnline, getAuthHeaders, handleNetworkFailure, loadBootstrap]
-  );
-
-  const getParticipantQrPreview = useCallback(
-    async (participantId: string) => {
-      const payload = (
-        await applyOnlineOnly(
-          async () =>
-            fetchJson(
-              `${API_BASE_URL}/participants/${participantUiIdToApiId(participantId)}/qr-preview`,
-              { headers: getAuthHeaders() }
-            ),
-          "Podgląd QR jest dostępny tylko po połączeniu z serwerem."
-        )
-      ).payload as ParticipantQrPreviewResponse;
-      if (!payload.data?.participant || !payload.data.event)
-        throw new Error("API QR preview failed");
-      const previewEvent = mapApiEventToUi(payload.data.event);
-      return {
-        participant: mapApiParticipantToUi(
-          payload.data.participant,
-          previewEvent.id
-        ),
-        event: previewEvent,
-        qr_code_svg_data_uri: payload.data.qr_code_svg_data_uri ?? "",
-        qr_code_image_url: payload.data.qr_code_image_url ?? "",
-      };
-    },
-    [applyOnlineOnly, getAuthHeaders]
-  );
-
-  const getEventQrEmailDeliveries = useCallback(
-    async (eventId: string): Promise<QrEmailDeliveryReport> => {
-      // Endpoint stronicuje odpowiedzi mailera po stronie API, więc dostaje dłuższy timeout.
-      const payload = (
-        await fetchJson(
-          `${API_BASE_URL}/events/${eventId}/qr-email-deliveries`,
-          {
-            headers: getAuthHeaders(),
-            timeoutMs: 30_000,
-          }
-        )
-      ).payload as { data?: QrEmailDeliveryReport };
-      if (!payload.data)
-        throw new Error("API QR email deliveries returned empty payload");
-      return payload.data;
-    },
-    [getAuthHeaders]
-  );
 
   const scanParticipantQr = useCallback(
     async (qrCode: string) => {
@@ -1768,165 +1478,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  const deleteParticipant = useCallback(
-    async (participantId: string) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const existingParticipant = participants.find(
-          (participant) => participant.id === participantId
-        );
-        await fetchJson(
-          `${API_BASE_URL}/participants/${participantUiIdToApiId(participantId)}`,
-          { method: "DELETE", headers: getAuthHeaders() }
-        );
-        setParticipantRecords((previous) =>
-          previous.filter((participant) => participant.id !== participantId)
-        );
-        if (existingParticipant)
-          addLog("Usunięto uczestnika", existingParticipant.name);
-        return { ok: true };
-      }),
-    [addLog, ensureOnline, getAuthHeaders, participants, runMutation]
-  );
-
-  const buildExportFallbackName = useCallback(
-    (eventId: string, type: "uczestnicy" | "logi" | "zmiany") =>
-      buildExportFallbackNameForEvent(events, archivedEvents, eventId, type),
-    [archivedEvents, events]
-  );
-
-  const exportEventCsv = useCallback(
-    async (eventId: string): Promise<MutationResult> => {
-      const offlineError = ensureOnline();
-      if (offlineError) return { ok: false, error: offlineError };
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/events/${eventId}/export.csv`,
-          { headers: getAuthHeaders() }
-        );
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => ({}))) as {
-            error?: string;
-          };
-          return {
-            ok: false,
-            error:
-              payload.error ??
-              `Eksport wydarzenia nie powiódł się: ${response.status}`,
-          };
-        }
-        await downloadCsvResponse(
-          response,
-          buildExportFallbackName(eventId, "uczestnicy")
-        );
-        return { ok: true };
-      } catch (error) {
-        handleNetworkFailure(error);
-        return {
-          ok: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Nie udało się wyeksportować CSV",
-        };
-      }
-    },
-    [
-      buildExportFallbackName,
-      ensureOnline,
-      getAuthHeaders,
-      handleNetworkFailure,
-    ]
-  );
-
-  const exportEventLogsCsv = useCallback(
-    async (eventId: string): Promise<MutationResult> => {
-      const offlineError = ensureOnline();
-      if (offlineError) return { ok: false, error: offlineError };
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/events/${eventId}/logs/export.csv`,
-          { headers: getAuthHeaders() }
-        );
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => ({}))) as {
-            error?: string;
-          };
-          return {
-            ok: false,
-            error:
-              payload.error ??
-              `Eksport logów wydarzenia nie powiódł się: ${response.status}`,
-          };
-        }
-        await downloadCsvResponse(
-          response,
-          buildExportFallbackName(eventId, "logi")
-        );
-        return { ok: true };
-      } catch (error) {
-        handleNetworkFailure(error);
-        return {
-          ok: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Nie udało się wyeksportować logów CSV",
-        };
-      }
-    },
-    [
-      buildExportFallbackName,
-      ensureOnline,
-      getAuthHeaders,
-      handleNetworkFailure,
-    ]
-  );
-
-  const exportEventParticipantChangesCsv = useCallback(
-    async (eventId: string): Promise<MutationResult> => {
-      const offlineError = ensureOnline();
-      if (offlineError) return { ok: false, error: offlineError };
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/events/${eventId}/participant-changes/export.csv`,
-          { headers: getAuthHeaders() }
-        );
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => ({}))) as {
-            error?: string;
-          };
-          return {
-            ok: false,
-            error:
-              payload.error ??
-              `Eksport zmian uczestników nie powiódł się: ${response.status}`,
-          };
-        }
-        await downloadCsvResponse(
-          response,
-          buildExportFallbackName(eventId, "zmiany")
-        );
-        return { ok: true };
-      } catch (error) {
-        handleNetworkFailure(error);
-        return {
-          ok: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Nie udało się wyeksportować CSV zmian uczestników",
-        };
-      }
-    },
-    [
-      buildExportFallbackName,
-      ensureOnline,
-      getAuthHeaders,
-      handleNetworkFailure,
-    ]
-  );
+  const {
+    updateParticipantBibNumber,
+    updateParticipantDetails,
+    addParticipantManually,
+    deleteParticipant,
+    sendParticipantQrEmail,
+    sendEventQrEmails,
+    getParticipantQrPreview,
+    getEventQrEmailDeliveries,
+    exportEventParticipantChangesCsv,
+  } = useParticipantMutations({
+    participants,
+    setParticipantRecords,
+    events,
+    archivedEvents,
+    ensureOnline,
+    applyOnlineOnly,
+    runMutation,
+    handleNetworkFailure,
+    addLog,
+    getAuthHeaders,
+    loadBootstrap,
+    updateParticipantInApi,
+    replaceParticipantRecord,
+  });
 
   return (
     <DataContext.Provider

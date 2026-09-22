@@ -14,6 +14,7 @@ import {
   mapApiParticipantToUi,
 } from "@/lib/data-context-helpers";
 import { getEventOfficeCloseAt } from "@/lib/events";
+import { buildExportFallbackName, downloadCsvResponse } from "@/lib/csv-export";
 import type { ParticipantFieldMappingsState } from "@/contexts/data/useParticipantImport";
 
 interface MutationResult {
@@ -51,6 +52,10 @@ interface UseEventMutationsArgs {
   markLocalDataChanged: () => void;
   getAuthHeaders: (includeJsonContentType?: boolean) => Record<string, string>;
   loadBootstrap: (silent?: boolean) => Promise<void>;
+  handleNetworkFailure: (
+    error: unknown,
+    options?: { immediate?: boolean }
+  ) => void;
   rememberParticipantFieldMappingsState: (
     eventId: string,
     state: ParticipantFieldMappingsState
@@ -72,6 +77,7 @@ export function useEventMutations({
   markLocalDataChanged,
   getAuthHeaders,
   loadBootstrap,
+  handleNetworkFailure,
   rememberParticipantFieldMappingsState,
 }: UseEventMutationsArgs) {
   const createEvent = useCallback(
@@ -387,6 +393,84 @@ export function useEventMutations({
     ]
   );
 
+  const exportEventCsv = useCallback(
+    async (eventId: string): Promise<MutationResult> => {
+      const offlineError = ensureOnline();
+      if (offlineError) return { ok: false, error: offlineError };
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/events/${eventId}/export.csv`,
+          { headers: getAuthHeaders() }
+        );
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          return {
+            ok: false,
+            error:
+              payload.error ??
+              `Eksport wydarzenia nie powiódł się: ${response.status}`,
+          };
+        }
+        await downloadCsvResponse(
+          response,
+          buildExportFallbackName(events, archivedEvents, eventId, "uczestnicy")
+        );
+        return { ok: true };
+      } catch (error) {
+        handleNetworkFailure(error);
+        return {
+          ok: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Nie udało się wyeksportować CSV",
+        };
+      }
+    },
+    [archivedEvents, ensureOnline, events, getAuthHeaders, handleNetworkFailure]
+  );
+
+  const exportEventLogsCsv = useCallback(
+    async (eventId: string): Promise<MutationResult> => {
+      const offlineError = ensureOnline();
+      if (offlineError) return { ok: false, error: offlineError };
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/events/${eventId}/logs/export.csv`,
+          { headers: getAuthHeaders() }
+        );
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          return {
+            ok: false,
+            error:
+              payload.error ??
+              `Eksport logów wydarzenia nie powiódł się: ${response.status}`,
+          };
+        }
+        await downloadCsvResponse(
+          response,
+          buildExportFallbackName(events, archivedEvents, eventId, "logi")
+        );
+        return { ok: true };
+      } catch (error) {
+        handleNetworkFailure(error);
+        return {
+          ok: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Nie udało się wyeksportować logów CSV",
+        };
+      }
+    },
+    [archivedEvents, ensureOnline, events, getAuthHeaders, handleNetworkFailure]
+  );
+
   return {
     createEvent,
     createTestEvent,
@@ -394,5 +478,7 @@ export function useEventMutations({
     updateEvent,
     archiveEvent,
     deleteEvent,
+    exportEventCsv,
+    exportEventLogsCsv,
   };
 }
