@@ -19,8 +19,6 @@ export default defineConfig({
         "src/**/*.d.ts",
         "src/main.tsx",
         "src/vite-env.d.ts",
-        "playwright-fixture.ts",
-        "playwright.config.ts",
         "*.config.{ts,js}",
       ],
       thresholds: {
