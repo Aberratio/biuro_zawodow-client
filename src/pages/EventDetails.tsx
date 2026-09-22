@@ -67,7 +67,14 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import DetailSkeleton from "@/components/skeletons/DetailSkeleton";
-import type { EventOfficeLocation, ParticipantFieldMapping, ParticipantFieldRole, ParticipantFieldType, ParticipantFieldValidationRules, User } from "@/types";
+import type {
+  EventOfficeLocation,
+  ParticipantFieldMapping,
+  ParticipantFieldRole,
+  ParticipantFieldType,
+  ParticipantFieldValidationRules,
+  User,
+} from "@/types";
 import {
   computeEventOfficeWindowFromLocations,
   formatEventOfficeDateTime,
@@ -76,7 +83,6 @@ import {
   getCurrentEventOfficeHourRange,
   getEventOfficeCloseAt,
   getEventOfficeLocationsValidationErrors,
-  getEventOfficeOpenAt,
   getFirstEventOfficeHourRange,
   getLastEventOfficeHourRange,
   getNextEventOfficeHourRange,
@@ -108,7 +114,11 @@ import {
   validateRequired,
   validateStrongPassword,
 } from "@/lib/form-validation";
-import { canAddParticipantManually, getRoleLabel, isScannerRole } from "@/lib/roles";
+import {
+  canAddParticipantManually,
+  getRoleLabel,
+  isScannerRole,
+} from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { OnlineOnlyNotice } from "@/components/OnlineOnlyNotice";
 import { ParticipantFieldValueInput } from "@/components/ParticipantFieldValueInput";
@@ -121,7 +131,10 @@ import {
 } from "@/lib/routes";
 
 type OfficeStatusTone = "open" | "upcoming" | "closed";
-type EditableMappingRole = Extract<ParticipantFieldRole, "custom" | "important_custom">;
+type EditableMappingRole = Extract<
+  ParticipantFieldRole,
+  "custom" | "important_custom"
+>;
 
 type MappingDraft = ParticipantFieldMapping;
 
@@ -148,7 +161,9 @@ const mappingRoleLabels: Record<ParticipantFieldRole, string> = {
   important_custom: "Wyróżnij przy odprawie",
 };
 
-function isEditableMappingRole(role: ParticipantFieldRole): role is EditableMappingRole {
+function isEditableMappingRole(
+  role: ParticipantFieldRole
+): role is EditableMappingRole {
   return role === "custom" || role === "important_custom";
 }
 
@@ -160,7 +175,11 @@ function validateMappingValidationRules(mapping: MappingDraft): string {
   if (fieldType === "text") {
     const minLength = rules.min_length;
     const maxLength = rules.max_length;
-    if (typeof minLength === "number" && typeof maxLength === "number" && minLength > maxLength) {
+    if (
+      typeof minLength === "number" &&
+      typeof maxLength === "number" &&
+      minLength > maxLength
+    ) {
       return "Minimalna liczba znaków nie może być większa od maksymalnej.";
     }
   }
@@ -176,7 +195,8 @@ function validateMappingValidationRules(mapping: MappingDraft): string {
   if (fieldType === "date") {
     const min = typeof rules.min === "string" ? rules.min : "";
     const max = typeof rules.max === "string" ? rules.max : "";
-    if (min && max && min > max) return "Data od nie może być późniejsza niż data do.";
+    if (min && max && min > max)
+      return "Data od nie może być późniejsza niż data do.";
   }
 
   if (fieldType === "select" && (rules.options ?? []).length === 0) {
@@ -216,8 +236,12 @@ function getDefaultReopenCloseAt(now: Date): string {
 }
 
 function getOfficeStatusSummary(
-  eventOffice: { office_open_at: string; office_close_at: string; office_locations: EventOfficeLocation[] },
-  now: Date,
+  eventOffice: {
+    office_open_at: string;
+    office_close_at: string;
+    office_locations: EventOfficeLocation[];
+  },
+  now: Date
 ): OfficeStatusSummary {
   const currentRange = getCurrentEventOfficeHourRange(eventOffice, now);
   const nextRange = getNextEventOfficeHourRange(eventOffice, now);
@@ -254,11 +278,14 @@ function getOfficeStatusSummary(
     const opensAtLabel = formatEventOfficeDateTime(nextRange.opensAt);
     const firstRange = getFirstEventOfficeHourRange(eventOffice);
     const isBreakBetweenRanges =
-      firstRange !== null && nextRange.opensAt.getTime() !== firstRange.opensAt.getTime();
+      firstRange !== null &&
+      nextRange.opensAt.getTime() !== firstRange.opensAt.getTime();
 
     return {
       tone: "upcoming",
-      badgeLabel: isBreakBetweenRanges ? "Przerwa w pracy biura" : "Biuro przed otwarciem",
+      badgeLabel: isBreakBetweenRanges
+        ? "Przerwa w pracy biura"
+        : "Biuro przed otwarciem",
       headline: `Biuro ${isBreakBetweenRanges ? "otworzy się ponownie" : "otworzy się"} za ${formatDistanceToNowStrict(nextRange.opensAt, { addSuffix: false, locale: pl })}.`,
       detail: `Zespół zacznie pracę ${opensAtLabel}. Do tego czasu operatorzy nie zobaczą aktywnego wydarzenia.`,
       timingLabel: "Otwarcie",
@@ -497,61 +524,63 @@ export default function EventDetails() {
     archivedEvents.find((entry) => entry.id === id);
   const isArchivedEvent = Boolean(event?.archived_at);
   const eventParticipants = participants.filter(
-    (participant) => participant.event_id === id,
+    (participant) => participant.event_id === id
   );
   const checkedIn = eventParticipants.filter(
-    participantCountsAsCheckedIn,
+    participantCountsAsCheckedIn
   ).length;
   const activeMappings = useMemo(
     () => getActiveParticipantMappings(mappings),
-    [mappings],
+    [mappings]
   );
   const organizationScanners = useMemo(
     () =>
       users.filter(
         (user) =>
           isScannerRole(user.role) &&
-          user.organization_id === event?.organization_id,
+          user.organization_id === event?.organization_id
       ),
-    [event?.organization_id, users],
+    [event?.organization_id, users]
   );
   const organizationStandardScanners = useMemo(
     () =>
       organizationScanners
         .filter((user) => user.role === "scanner")
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
-    [organizationScanners],
+    [organizationScanners]
   );
   const organizationPlusScanners = useMemo(
     () =>
       organizationScanners
         .filter((user) => user.role === "scanner_plus")
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
-    [organizationScanners],
+    [organizationScanners]
   );
   const assignedScanners = useMemo(
     () =>
       organizationStandardScanners.filter((scanner) =>
-        scanner.assigned_events.includes(event?.id ?? ""),
+        scanner.assigned_events.includes(event?.id ?? "")
       ),
-    [event?.id, organizationStandardScanners],
+    [event?.id, organizationStandardScanners]
   );
   const assignedScannerPlus = useMemo(
     () =>
       organizationPlusScanners.filter((scanner) =>
-        scanner.assigned_events.includes(event?.id ?? ""),
+        scanner.assigned_events.includes(event?.id ?? "")
       ),
-    [event?.id, organizationPlusScanners],
+    [event?.id, organizationPlusScanners]
   );
   const managedRoleScanners = useMemo(
     () =>
       managedScannerRole === "scanner"
         ? organizationStandardScanners
         : organizationPlusScanners,
-    [managedScannerRole, organizationPlusScanners, organizationStandardScanners],
+    [managedScannerRole, organizationPlusScanners, organizationStandardScanners]
   );
   const filteredManagedRoleScanners = useMemo(() => {
-    const normalizedQuery = scannerSearchQuery.trim().toLocaleLowerCase("pl-PL");
+    const normalizedQuery = scannerSearchQuery
+      .trim()
+      .toLocaleLowerCase("pl-PL");
 
     if (!normalizedQuery) {
       return managedRoleScanners;
@@ -560,7 +589,7 @@ export default function EventDetails() {
     return managedRoleScanners.filter((scanner) =>
       `${scanner.name} ${scanner.email}`
         .toLocaleLowerCase("pl-PL")
-        .includes(normalizedQuery),
+        .includes(normalizedQuery)
     );
   }, [managedRoleScanners, scannerSearchQuery]);
   const canManageScanners = useMemo(() => {
@@ -594,7 +623,7 @@ export default function EventDetails() {
   useEffect(() => {
     const intervalId = window.setInterval(
       () => setNowTimestamp(Date.now()),
-      30_000,
+      30_000
     );
     return () => window.clearInterval(intervalId);
   }, []);
@@ -642,16 +671,17 @@ export default function EventDetails() {
   const isFinishedEvent = officeCloseAt !== null && now > officeCloseAt;
   const canArchiveEvent = canManageEventLifecycle && isFinishedEvent;
   const canDeleteEvent = canManageEventLifecycle;
-  const canDeleteEventNow = canDeleteEvent && (!isFinishedEvent || Boolean(event.is_test));
+  const canDeleteEventNow =
+    canDeleteEvent && (!isFinishedEvent || Boolean(event.is_test));
   const canReopenEvent = canEditEvent && !isArchivedEvent && isFinishedEvent;
   const canSendQrForEvent =
-    !isArchivedEvent &&
-    isEventCurrentOrUpcoming(event, now);
+    !isArchivedEvent && isEventCurrentOrUpcoming(event, now);
   const canAssignScannersToEvent =
     !isArchivedEvent && officeCloseAt !== null && now <= officeCloseAt;
   const canAddManualParticipantForEvent =
     hasSavedMapping && canAddParticipantManually(currentRole);
-  const canEditParticipantMappings = currentRole === "superadmin" && hasSavedMapping;
+  const canEditParticipantMappings =
+    currentRole === "superadmin" && hasSavedMapping;
 
   const resetEditState = () => {
     setEditErrors({});
@@ -681,7 +711,7 @@ export default function EventDetails() {
 
   const updateMappingDraft = (
     sourceColumnName: string,
-    patch: Partial<MappingDraft>,
+    patch: Partial<MappingDraft>
   ) => {
     setMappingDrafts((current) =>
       current.map((mapping) => {
@@ -695,7 +725,7 @@ export default function EventDetails() {
           };
         }
         return nextMapping;
-      }),
+      })
     );
     setMappingErrors((current) => ({
       ...current,
@@ -710,7 +740,7 @@ export default function EventDetails() {
   const moveMappingDraft = (sourceColumnName: string, direction: -1 | 1) => {
     setMappingDrafts((current) => {
       const currentIndex = current.findIndex(
-        (mapping) => mapping.source_column_name === sourceColumnName,
+        (mapping) => mapping.source_column_name === sourceColumnName
       );
       const nextIndex = currentIndex + direction;
       if (
@@ -799,12 +829,15 @@ export default function EventDetails() {
           ? false
           : mapping.field_role === "email" ||
               mapping.field_role === "display_name_part"
-          ? true
-          : mapping.is_required,
+            ? true
+            : mapping.is_required,
       is_active: mapping.field_role === "email" ? true : mapping.is_active,
       display_order: mapping.field_role === "email" ? 0 : index,
     }));
-    const result = await updateParticipantFieldMappings(event.id, orderedMappings);
+    const result = await updateParticipantFieldMappings(
+      event.id,
+      orderedMappings
+    );
     setMappingSaving(false);
 
     if (!result.ok) {
@@ -827,12 +860,18 @@ export default function EventDetails() {
     toast({ title: "Zapisano mapowanie kolumn" });
   };
 
-  const renderMappingValidationControls = (mapping: MappingDraft, index: number) => {
+  const renderMappingValidationControls = (
+    mapping: MappingDraft,
+    index: number
+  ) => {
     if (!isConfigurableParticipantMapping(mapping)) return null;
 
     const fieldType = getParticipantFieldType(mapping);
     const rules = getParticipantValidationRules(mapping);
-    const hasColumnValidation = mapping.is_required || fieldType !== "text" || hasParticipantValidationRules(rules);
+    const hasColumnValidation =
+      mapping.is_required ||
+      fieldType !== "text" ||
+      hasParticipantValidationRules(rules);
     const updateRules = (patch: ParticipantFieldValidationRules) => {
       updateMappingDraft(mapping.source_column_name, {
         validation_rules: {
@@ -844,7 +883,8 @@ export default function EventDetails() {
     const updateFieldType = (fieldTypeValue: ParticipantFieldType) => {
       updateMappingDraft(mapping.source_column_name, {
         field_type: fieldTypeValue,
-        validation_rules: fieldTypeValue === "select" ? { options: rules.options ?? [] } : {},
+        validation_rules:
+          fieldTypeValue === "select" ? { options: rules.options ?? [] } : {},
       });
     };
     const clearValidation = () => {
@@ -858,11 +898,18 @@ export default function EventDetails() {
     return (
       <Collapsible className="mt-3 rounded-md border border-border/60 bg-background/65 lg:col-span-4">
         <CollapsibleTrigger asChild>
-          <Button type="button" variant="ghost" className="flex h-auto w-full justify-between rounded-md px-3 py-2 text-left">
+          <Button
+            type="button"
+            variant="ghost"
+            className="flex h-auto w-full justify-between rounded-md px-3 py-2 text-left"
+          >
             <span className="min-w-0">
-              <span className="block text-sm font-medium">Walidacja i typ pola</span>
+              <span className="block text-sm font-medium">
+                Walidacja i typ pola
+              </span>
               <span className="block truncate text-xs text-muted-foreground">
-                {mapping.is_required ? "Wymagane" : "Opcjonalne"} · {participantFieldTypeLabels[fieldType]}
+                {mapping.is_required ? "Wymagane" : "Opcjonalne"} ·{" "}
+                {participantFieldTypeLabels[fieldType]}
               </span>
             </span>
             <ChevronDown className="h-4 w-4 shrink-0" />
@@ -871,7 +918,9 @@ export default function EventDetails() {
         <CollapsibleContent className="space-y-3 border-t px-3 py-3">
           <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted-foreground">
-              {hasColumnValidation ? "Kolumna ma ustawioną walidację." : "Kolumna nie ma dodatkowej walidacji."}
+              {hasColumnValidation
+                ? "Kolumna ma ustawioną walidację."
+                : "Kolumna nie ma dodatkowej walidacji."}
             </p>
             <Button
               type="button"
@@ -886,16 +935,34 @@ export default function EventDetails() {
           </div>
           <div className="grid gap-3 md:grid-cols-[minmax(0,14rem)_1fr]">
             <div className="space-y-1.5">
-              <Label htmlFor={`event-mapping-field-type-${index}`}>Typ pola</Label>
-              <Select value={fieldType} onValueChange={(value) => updateFieldType(value as ParticipantFieldType)}>
-                <SelectTrigger id={`event-mapping-field-type-${index}`} className="h-9">
+              <Label htmlFor={`event-mapping-field-type-${index}`}>
+                Typ pola
+              </Label>
+              <Select
+                value={fieldType}
+                onValueChange={(value) =>
+                  updateFieldType(value as ParticipantFieldType)
+                }
+              >
+                <SelectTrigger
+                  id={`event-mapping-field-type-${index}`}
+                  className="h-9"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="text">{participantFieldTypeLabels.text}</SelectItem>
-                  <SelectItem value="number">{participantFieldTypeLabels.number}</SelectItem>
-                  <SelectItem value="date">{participantFieldTypeLabels.date}</SelectItem>
-                  <SelectItem value="select">{participantFieldTypeLabels.select}</SelectItem>
+                  <SelectItem value="text">
+                    {participantFieldTypeLabels.text}
+                  </SelectItem>
+                  <SelectItem value="number">
+                    {participantFieldTypeLabels.number}
+                  </SelectItem>
+                  <SelectItem value="date">
+                    {participantFieldTypeLabels.date}
+                  </SelectItem>
+                  <SelectItem value="select">
+                    {participantFieldTypeLabels.select}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -903,24 +970,42 @@ export default function EventDetails() {
             {fieldType === "text" && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor={`event-mapping-text-min-${index}`}>Min. znaków</Label>
+                  <Label htmlFor={`event-mapping-text-min-${index}`}>
+                    Min. znaków
+                  </Label>
                   <Input
                     id={`event-mapping-text-min-${index}`}
                     type="number"
                     min={0}
                     value={rules.min_length ?? ""}
-                    onChange={(eventValue) => updateRules({ min_length: eventValue.target.value === "" ? undefined : Number(eventValue.target.value) })}
+                    onChange={(eventValue) =>
+                      updateRules({
+                        min_length:
+                          eventValue.target.value === ""
+                            ? undefined
+                            : Number(eventValue.target.value),
+                      })
+                    }
                     className="h-9"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor={`event-mapping-text-max-${index}`}>Max. znaków</Label>
+                  <Label htmlFor={`event-mapping-text-max-${index}`}>
+                    Max. znaków
+                  </Label>
                   <Input
                     id={`event-mapping-text-max-${index}`}
                     type="number"
                     min={0}
                     value={rules.max_length ?? ""}
-                    onChange={(eventValue) => updateRules({ max_length: eventValue.target.value === "" ? undefined : Number(eventValue.target.value) })}
+                    onChange={(eventValue) =>
+                      updateRules({
+                        max_length:
+                          eventValue.target.value === ""
+                            ? undefined
+                            : Number(eventValue.target.value),
+                      })
+                    }
                     className="h-9"
                   />
                 </div>
@@ -930,22 +1015,40 @@ export default function EventDetails() {
             {fieldType === "number" && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor={`event-mapping-number-min-${index}`}>Min. wartość</Label>
+                  <Label htmlFor={`event-mapping-number-min-${index}`}>
+                    Min. wartość
+                  </Label>
                   <Input
                     id={`event-mapping-number-min-${index}`}
                     type="number"
                     value={rules.min ?? ""}
-                    onChange={(eventValue) => updateRules({ min: eventValue.target.value === "" ? undefined : Number(eventValue.target.value) })}
+                    onChange={(eventValue) =>
+                      updateRules({
+                        min:
+                          eventValue.target.value === ""
+                            ? undefined
+                            : Number(eventValue.target.value),
+                      })
+                    }
                     className="h-9"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor={`event-mapping-number-max-${index}`}>Max. wartość</Label>
+                  <Label htmlFor={`event-mapping-number-max-${index}`}>
+                    Max. wartość
+                  </Label>
                   <Input
                     id={`event-mapping-number-max-${index}`}
                     type="number"
                     value={rules.max ?? ""}
-                    onChange={(eventValue) => updateRules({ max: eventValue.target.value === "" ? undefined : Number(eventValue.target.value) })}
+                    onChange={(eventValue) =>
+                      updateRules({
+                        max:
+                          eventValue.target.value === ""
+                            ? undefined
+                            : Number(eventValue.target.value),
+                      })
+                    }
                     className="h-9"
                   />
                 </div>
@@ -955,12 +1058,24 @@ export default function EventDetails() {
             {fieldType === "date" && (
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor={`event-mapping-date-format-${index}`}>Format w CSV</Label>
+                  <Label htmlFor={`event-mapping-date-format-${index}`}>
+                    Format w CSV
+                  </Label>
                   <Select
                     value={rules.date_format ?? "auto"}
-                    onValueChange={(value) => updateRules({ date_format: value === "auto" ? undefined : value as ParticipantFieldValidationRules["date_format"] })}
+                    onValueChange={(value) =>
+                      updateRules({
+                        date_format:
+                          value === "auto"
+                            ? undefined
+                            : (value as ParticipantFieldValidationRules["date_format"]),
+                      })
+                    }
                   >
-                    <SelectTrigger id={`event-mapping-date-format-${index}`} className="h-9">
+                    <SelectTrigger
+                      id={`event-mapping-date-format-${index}`}
+                      className="h-9"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -972,20 +1087,28 @@ export default function EventDetails() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor={`event-mapping-date-min-${index}`}>Data od</Label>
+                  <Label htmlFor={`event-mapping-date-min-${index}`}>
+                    Data od
+                  </Label>
                   <DateInput
                     id={`event-mapping-date-min-${index}`}
                     value={typeof rules.min === "string" ? rules.min : ""}
-                    onChange={(nextValue) => updateRules({ min: nextValue || undefined })}
+                    onChange={(nextValue) =>
+                      updateRules({ min: nextValue || undefined })
+                    }
                     className="h-9"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor={`event-mapping-date-max-${index}`}>Data do</Label>
+                  <Label htmlFor={`event-mapping-date-max-${index}`}>
+                    Data do
+                  </Label>
                   <DateInput
                     id={`event-mapping-date-max-${index}`}
                     value={typeof rules.max === "string" ? rules.max : ""}
-                    onChange={(nextValue) => updateRules({ max: nextValue || undefined })}
+                    onChange={(nextValue) =>
+                      updateRules({ max: nextValue || undefined })
+                    }
                     className="h-9"
                   />
                 </div>
@@ -995,11 +1118,17 @@ export default function EventDetails() {
 
           {fieldType === "select" && (
             <div className="space-y-2">
-              <Label htmlFor={`event-mapping-select-options-${index}`}>Opcje listy, po jednej w linii</Label>
+              <Label htmlFor={`event-mapping-select-options-${index}`}>
+                Opcje listy, po jednej w linii
+              </Label>
               <Textarea
                 id={`event-mapping-select-options-${index}`}
                 value={formatSelectOptions(rules.options)}
-                onChange={(eventValue) => updateRules({ options: parseSelectOptions(eventValue.target.value) })}
+                onChange={(eventValue) =>
+                  updateRules({
+                    options: parseSelectOptions(eventValue.target.value),
+                  })
+                }
                 rows={4}
               />
             </div>
@@ -1009,8 +1138,14 @@ export default function EventDetails() {
     );
   };
 
-  const findLatestClosingOfficeRange = (locations: EventOfficeLocation[]) => {
-    let latest: { locationIndex: number; rangeIndex: number; closesAt: string } | null = null;
+  const findLatestClosingOfficeRange = (
+    locations: EventOfficeLocation[]
+  ): { locationIndex: number; rangeIndex: number; closesAt: string } | null => {
+    let latest: {
+      locationIndex: number;
+      rangeIndex: number;
+      closesAt: string;
+    } | null = null;
 
     locations.forEach((location, locationIndex) => {
       location.hours.forEach((range, rangeIndex) => {
@@ -1026,7 +1161,8 @@ export default function EventDetails() {
 
   const openReopenOfficeDialog = () => {
     setEditReopeningOffice(true);
-    const { office_locations: locations, ...rest } = buildEditFormFromEvent(event);
+    const { office_locations: locations, ...rest } =
+      buildEditFormFromEvent(event);
     const latestRange = findLatestClosingOfficeRange(locations);
     const nextCloseAt = getDefaultReopenCloseAt(new Date(nowTimestamp));
 
@@ -1040,10 +1176,10 @@ export default function EventDetails() {
                   hours: location.hours.map((range, rangeIndex) =>
                     rangeIndex === latestRange.rangeIndex
                       ? { ...range, closes_at: nextCloseAt }
-                      : range,
+                      : range
                   ),
                 }
-              : location,
+              : location
           )
         : locations,
     });
@@ -1052,7 +1188,9 @@ export default function EventDetails() {
   };
 
   const canKeepPastOfficeOpenAt = () => {
-    const { opensAt } = computeEventOfficeWindowFromLocations(editForm.office_locations);
+    const { opensAt } = computeEventOfficeWindowFromLocations(
+      editForm.office_locations
+    );
     const currentOfficeOpenAt = toLocalDateTimeValue(event.office_open_at);
 
     return (
@@ -1075,7 +1213,7 @@ export default function EventDetails() {
     setScannerSelection((previous) =>
       checked
         ? [...previous, scannerId]
-        : previous.filter((idValue) => idValue !== scannerId),
+        : previous.filter((idValue) => idValue !== scannerId)
     );
   };
 
@@ -1110,8 +1248,8 @@ export default function EventDetails() {
     setManagedScannerRole(role);
     setScannerSelection(
       (role === "scanner" ? assignedScanners : assignedScannerPlus).map(
-        (scanner) => scanner.id,
-      ),
+        (scanner) => scanner.id
+      )
     );
     resetScannerDialogState();
     setScannerDialogOpen(true);
@@ -1138,17 +1276,17 @@ export default function EventDetails() {
         const nextAssignedEvents = shouldBeAssigned
           ? [...new Set([...scanner.assigned_events, event.id])]
           : scanner.assigned_events.filter(
-              (assignedEventId) => assignedEventId !== event.id,
+              (assignedEventId) => assignedEventId !== event.id
             );
 
         const result = await assignScannerEvents(
           scanner.id,
-          nextAssignedEvents,
+          nextAssignedEvents
         );
         if (!result.ok) {
           toast({
             title: `Nie udało się zapisać przypisań ${getRoleLabel(
-              managedScannerRole,
+              managedScannerRole
             ).toLocaleLowerCase("pl-PL")}`,
             description:
               result.error ??
@@ -1163,7 +1301,7 @@ export default function EventDetails() {
       resetScannerDialogState();
       toast({
         title: `Zapisano przypisania ${getRoleLabel(
-          managedScannerRole,
+          managedScannerRole
         ).toLocaleLowerCase("pl-PL")}`,
       });
     } finally {
@@ -1175,7 +1313,7 @@ export default function EventDetails() {
     const nextErrors = {
       name: validateRequired(
         scannerCreateForm.name,
-        "Podaj imię i nazwisko operatora.",
+        "Podaj imię i nazwisko operatora."
       ),
       email: validateEmail(scannerCreateForm.email),
       password: scannerCreateForm.use_manual_password
@@ -1206,13 +1344,13 @@ export default function EventDetails() {
       setScannerCreateErrors({
         form:
           result.error ??
-          `Nie udało się dodać ${getRoleLabel(managedScannerRole).toLocaleLowerCase(
-            "pl-PL",
-          )}.`,
+          `Nie udało się dodać ${getRoleLabel(
+            managedScannerRole
+          ).toLocaleLowerCase("pl-PL")}.`,
       });
       toast({
         title: `Nie udało się dodać ${getRoleLabel(
-          managedScannerRole,
+          managedScannerRole
         ).toLocaleLowerCase("pl-PL")}`,
         description: result.error ?? "Spróbuj ponownie.",
         variant: "destructive",
@@ -1227,21 +1365,29 @@ export default function EventDetails() {
         managedScannerRole === "scanner"
           ? "Dodano operatora i przypisano do wydarzenia"
           : "Dodano operatora Plus i przypisano do wydarzenia",
-      description: "Użytkownik otrzyma e-mail z linkiem do ustawienia hasła ważnym przez 7 dni.",
+      description:
+        "Użytkownik otrzyma e-mail z linkiem do ustawienia hasła ważnym przez 7 dni.",
     });
   };
 
   const handleManualSubmit = async () => {
     const fieldErrors = activeMappings.reduce<Record<string, string>>(
       (accumulator, mapping) => {
-        const error = validateParticipantFieldValue(mapping, manualFields[mapping.alias] ?? "");
+        const error = validateParticipantFieldValue(
+          mapping,
+          manualFields[mapping.alias] ?? ""
+        );
         if (error) accumulator[mapping.alias] = error;
         return accumulator;
       },
-      {},
+      {}
     );
     const nextErrors = {
-      email: validateEmail(manualEmail, undefined, PARTICIPANT_EMAIL_MAX_LENGTH),
+      email: validateEmail(
+        manualEmail,
+        undefined,
+        PARTICIPANT_EMAIL_MAX_LENGTH
+      ),
       fields: fieldErrors,
     };
 
@@ -1255,7 +1401,7 @@ export default function EventDetails() {
     const result = await addParticipantManually(
       event.id,
       manualEmail,
-      manualFields,
+      manualFields
     );
     setManualSaving(false);
 
@@ -1284,13 +1430,13 @@ export default function EventDetails() {
       name: validateRequired(editForm.name, "Podaj nazwę wydarzenia."),
       location: validateRequired(
         editForm.location,
-        "Podaj lokalizację wydarzenia.",
+        "Podaj lokalizację wydarzenia."
       ),
     };
 
     const officeLocationsErrors = getEventOfficeLocationsValidationErrors(
       editForm.office_locations,
-      { allowPastOpenAt: canKeepPastOfficeOpenAt() },
+      { allowPastOpenAt: canKeepPastOfficeOpenAt() }
     );
     const hasOfficeLocationsErrors =
       Boolean(officeLocationsErrors.form) ||
@@ -1299,7 +1445,7 @@ export default function EventDetails() {
           location.name ||
           location.google_maps_url ||
           location.form ||
-          location.hours?.some((hour) => hour.opens_at || hour.closes_at),
+          location.hours?.some((hour) => hour.opens_at || hour.closes_at)
       );
 
     if (nextErrors.name || nextErrors.location || hasOfficeLocationsErrors) {
@@ -1503,7 +1649,9 @@ export default function EventDetails() {
             <div>
               <p className="font-semibold">Tryb testowy</p>
               <p className="mt-1 text-sky-100/80">
-                To wydarzenie służy do sprawdzania działania biura zawodów. Nie wlicza się do limitu realnych wydarzeń, a wysyłka QR jest symulowana.
+                To wydarzenie służy do sprawdzania działania biura zawodów. Nie
+                wlicza się do limitu realnych wydarzeń, a wysyłka QR jest
+                symulowana.
               </p>
             </div>
           </div>
@@ -1547,7 +1695,10 @@ export default function EventDetails() {
             {event.office_locations.length > 0 && (
               <div className="space-y-1.5 text-sm">
                 {event.office_locations.map((location, index) => (
-                  <div key={location.id ?? index} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                  <div
+                    key={location.id ?? index}
+                    className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5"
+                  >
                     <span className="font-medium">
                       {location.google_maps_url ? (
                         <a
@@ -1615,14 +1766,14 @@ export default function EventDetails() {
               </Button>
             )}
             {!isArchivedEvent && event && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedEventId(event.id);
-                    navigate(buildEventParticipantsPath(event.id));
-                  }}
-                  className="event-detail-secondary-action h-12 w-full"
-                >
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedEventId(event.id);
+                  navigate(buildEventParticipantsPath(event.id));
+                }}
+                className="event-detail-secondary-action h-12 w-full"
+              >
                 <Users className="mr-1 h-4 w-4" /> Uczestnicy
               </Button>
             )}
@@ -1748,10 +1899,10 @@ export default function EventDetails() {
               <div className="flex flex-col gap-2">
                 <Button
                   variant="outline"
-                    onClick={() => {
-                      setSelectedEventId(event.id);
-                      navigate(buildEventImportPath(event.id));
-                    }}
+                  onClick={() => {
+                    setSelectedEventId(event.id);
+                    navigate(buildEventImportPath(event.id));
+                  }}
                   className="event-detail-operation-button h-11 justify-start"
                   disabled={!isOnline}
                 >
@@ -1852,8 +2003,8 @@ export default function EventDetails() {
                 <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>
-                    Ten eksport będzie dostępny po pierwszym udanym imporcie
-                    CSV dla tego wydarzenia.
+                    Ten eksport będzie dostępny po pierwszym udanym imporcie CSV
+                    dla tego wydarzenia.
                   </p>
                 </div>
               )}
@@ -1906,7 +2057,9 @@ export default function EventDetails() {
       >
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Przenieść wydarzenie do archiwum?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Przenieść wydarzenie do archiwum?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Wydarzenie{" "}
               <span className="font-medium text-foreground">{event.name}</span>{" "}
@@ -1961,7 +2114,9 @@ export default function EventDetails() {
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {event.is_test ? "Usunąć wydarzenie testowe?" : "Usunąć wydarzenie?"}
+              {event.is_test
+                ? "Usunąć wydarzenie testowe?"
+                : "Usunąć wydarzenie?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               Wydarzenie{" "}
@@ -2001,82 +2156,87 @@ export default function EventDetails() {
             </DialogTitle>
           </DialogHeader>
           <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4">
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="event-edit-name">Nazwa</Label>
-              <Input
-                id="event-edit-name"
-                value={editForm.name}
-                onChange={(eventValue) => {
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="event-edit-name">Nazwa</Label>
+                <Input
+                  id="event-edit-name"
+                  value={editForm.name}
+                  onChange={(eventValue) => {
+                    setEditForm((current) => ({
+                      ...current,
+                      name: eventValue.target.value,
+                    }));
+                    setEditErrors((current) => ({
+                      ...current,
+                      name: undefined,
+                      form: undefined,
+                    }));
+                  }}
+                  required
+                  aria-invalid={Boolean(editErrors.name)}
+                  aria-describedby={
+                    editErrors.name ? "event-edit-name-error" : undefined
+                  }
+                />
+                <FieldError id="event-edit-name-error" className="mt-2">
+                  {editErrors.name}
+                </FieldError>
+              </div>
+              <div>
+                <Label htmlFor="event-edit-location">Lokalizacja</Label>
+                <Input
+                  id="event-edit-location"
+                  value={editForm.location}
+                  onChange={(eventValue) => {
+                    setEditForm((current) => ({
+                      ...current,
+                      location: eventValue.target.value,
+                    }));
+                    setEditErrors((current) => ({
+                      ...current,
+                      location: undefined,
+                      form: undefined,
+                    }));
+                  }}
+                  required
+                  aria-invalid={Boolean(editErrors.location)}
+                  aria-describedby={
+                    editErrors.location
+                      ? "event-edit-location-error"
+                      : undefined
+                  }
+                />
+                <FieldError id="event-edit-location-error" className="mt-2">
+                  {editErrors.location}
+                </FieldError>
+              </div>
+              {isFinishedEvent && (
+                <p className="text-xs text-muted-foreground">
+                  Aby wznowić pracę biura, ustaw nowe zamknięcie w przyszłości
+                  (dla dowolnej lokalizacji).
+                </p>
+              )}
+              <EventOfficeLocationsEditor
+                idPrefix="event-edit"
+                locations={editForm.office_locations}
+                onChange={(locations) => {
                   setEditForm((current) => ({
                     ...current,
-                    name: eventValue.target.value,
+                    office_locations: locations,
                   }));
                   setEditErrors((current) => ({
                     ...current,
-                    name: undefined,
+                    office_locations: undefined,
                     form: undefined,
                   }));
                 }}
-                required
-                aria-invalid={Boolean(editErrors.name)}
-                aria-describedby={
-                  editErrors.name ? "event-edit-name-error" : undefined
-                }
+                errors={editErrors.office_locations}
               />
-              <FieldError id="event-edit-name-error" className="mt-2">
-                {editErrors.name}
+              <FieldError id="event-edit-form-error">
+                {editErrors.form}
               </FieldError>
             </div>
-            <div>
-              <Label htmlFor="event-edit-location">Lokalizacja</Label>
-              <Input
-                id="event-edit-location"
-                value={editForm.location}
-                onChange={(eventValue) => {
-                  setEditForm((current) => ({
-                    ...current,
-                    location: eventValue.target.value,
-                  }));
-                  setEditErrors((current) => ({
-                    ...current,
-                    location: undefined,
-                    form: undefined,
-                  }));
-                }}
-                required
-                aria-invalid={Boolean(editErrors.location)}
-                aria-describedby={
-                  editErrors.location ? "event-edit-location-error" : undefined
-                }
-              />
-              <FieldError id="event-edit-location-error" className="mt-2">
-                {editErrors.location}
-              </FieldError>
-            </div>
-            {isFinishedEvent && (
-              <p className="text-xs text-muted-foreground">
-                Aby wznowić pracę biura, ustaw nowe zamknięcie w przyszłości
-                (dla dowolnej lokalizacji).
-              </p>
-            )}
-            <EventOfficeLocationsEditor
-              idPrefix="event-edit"
-              locations={editForm.office_locations}
-              onChange={(locations) => {
-                setEditForm((current) => ({ ...current, office_locations: locations }));
-                setEditErrors((current) => ({
-                  ...current,
-                  office_locations: undefined,
-                  form: undefined,
-                }));
-              }}
-              errors={editErrors.office_locations}
-            />
-            <FieldError id="event-edit-form-error">
-              {editErrors.form}
-            </FieldError>
-          </div>
           </div>
           <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button
@@ -2103,13 +2263,16 @@ export default function EventDetails() {
           <DialogHeader className="shrink-0 px-6 pb-2 pt-6">
             <DialogTitle>Mapowanie kolumn uczestników</DialogTitle>
             <p className="mt-2 text-sm text-muted-foreground">
-              Kolumna CSV i role systemowe pozostają zablokowane. Zmiana etykiety przenosi zapisane wartości uczestników na nową nazwę pola.
+              Kolumna CSV i role systemowe pozostają zablokowane. Zmiana
+              etykiety przenosi zapisane wartości uczestników na nową nazwę
+              pola.
             </p>
           </DialogHeader>
           <div className="themed-scrollbar flex-1 overflow-y-auto px-6 py-4">
             <div className="space-y-3">
               {mappingDrafts.map((mapping, index) => {
-                const aliasError = mappingErrors.aliases[mapping.source_column_name];
+                const aliasError =
+                  mappingErrors.aliases[mapping.source_column_name];
                 const isSystemRole =
                   mapping.field_role === "email" ||
                   mapping.field_role === "display_name_part" ||
@@ -2145,10 +2308,15 @@ export default function EventDetails() {
                         className="mt-2"
                         aria-invalid={Boolean(aliasError)}
                         aria-describedby={
-                          aliasError ? `mapping-alias-${index}-error` : undefined
+                          aliasError
+                            ? `mapping-alias-${index}-error`
+                            : undefined
                         }
                       />
-                      <FieldError id={`mapping-alias-${index}-error`} className="mt-2">
+                      <FieldError
+                        id={`mapping-alias-${index}-error`}
+                        className="mt-2"
+                      >
                         {aliasError}
                       </FieldError>
                     </div>
@@ -2230,7 +2398,9 @@ export default function EventDetails() {
                       </label>
                       <label className="flex items-center gap-2 text-sm">
                         <Checkbox
-                          checked={mapping.is_active ? mapping.is_required : false}
+                          checked={
+                            mapping.is_active ? mapping.is_required : false
+                          }
                           disabled={
                             !mapping.is_active ||
                             mapping.field_role === "email" ||
@@ -2430,7 +2600,7 @@ export default function EventDetails() {
                             onCheckedChange={(checked) =>
                               toggleScannerSelection(
                                 scanner.id,
-                                checked === true,
+                                checked === true
                               )
                             }
                           />
@@ -2582,9 +2752,7 @@ export default function EventDetails() {
                             }}
                             autoComplete="new-password"
                             className="pr-10"
-                            aria-invalid={Boolean(
-                              scannerCreateErrors.password,
-                            )}
+                            aria-invalid={Boolean(scannerCreateErrors.password)}
                             aria-describedby={
                               scannerCreateErrors.password
                                 ? "event-scanner-create-password-error"
@@ -2598,7 +2766,7 @@ export default function EventDetails() {
                             className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
                             onClick={() =>
                               setShowScannerCreatePassword(
-                                (visible) => !visible,
+                                (visible) => !visible
                               )
                             }
                             aria-label={
