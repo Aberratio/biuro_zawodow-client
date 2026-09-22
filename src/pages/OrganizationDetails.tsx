@@ -85,7 +85,6 @@ import {
   ArrowUp,
   ArrowUpDown,
   Archive,
-  Building2,
   CalendarCheck,
   ChevronDown,
   Copy,
@@ -235,10 +234,10 @@ export default function OrganizationDetails() {
   const [isSavingScannerAssignments, setIsSavingScannerAssignments] =
     useState(false);
   const [selectedActionUser, setSelectedActionUser] = useState<User | null>(
-    null,
+    null
   );
   const [selectedScannerId, setSelectedScannerId] = useState<string | null>(
-    null,
+    null
   );
   const [selectedScanner, setSelectedScanner] = useState<User | null>(null);
   const [memberForm, setMemberForm] = useState({
@@ -303,7 +302,7 @@ export default function OrganizationDetails() {
 
   const organization = useMemo(
     () => organizations.find((org) => org.id === id),
-    [id, organizations],
+    [id, organizations]
   );
 
   const allowed = useMemo(() => {
@@ -318,10 +317,10 @@ export default function OrganizationDetails() {
       events
         .filter(
           (event) =>
-            event.organization_id === organization?.id && !event.archived_at,
+            event.organization_id === organization?.id && !event.archived_at
         )
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
-    [events, organization?.id],
+    [events, organization?.id]
   );
   const [orgEventsSortKey, setOrgEventsSortKey] =
     useState<OrgEventSortKey>("name");
@@ -352,7 +351,7 @@ export default function OrganizationDetails() {
   const handleOrgEventsSort = (key: OrgEventSortKey) => {
     if (orgEventsSortKey === key) {
       setOrgEventsSortDirection((current) =>
-        current === "asc" ? "desc" : "asc",
+        current === "asc" ? "desc" : "asc"
       );
       return;
     }
@@ -384,7 +383,7 @@ export default function OrganizationDetails() {
       archivedEvents
         .filter((event) => event.organization_id === organization?.id)
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
-    [archivedEvents, organization?.id],
+    [archivedEvents, organization?.id]
   );
   const totalOrganizationEvents =
     orgEvents.filter((event) => !event.is_test).length +
@@ -396,10 +395,10 @@ export default function OrganizationDetails() {
       users
         .filter(
           (user) =>
-            user.organization_id === organization?.id && user.role === "editor",
+            user.organization_id === organization?.id && user.role === "editor"
         )
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
-    [users, organization?.id],
+    [users, organization?.id]
   );
   const scanners = useMemo(
     () =>
@@ -407,10 +406,10 @@ export default function OrganizationDetails() {
         .filter(
           (user) =>
             user.organization_id === organization?.id &&
-            isScannerRole(user.role),
+            isScannerRole(user.role)
         )
         .sort((a, b) => a.name.localeCompare(b.name, "pl")),
-    [users, organization?.id],
+    [users, organization?.id]
   );
   if (isLoading) return <TableSkeleton rows={4} cols={4} subtitle="" />;
   if (!organization || !allowed)
@@ -422,17 +421,17 @@ export default function OrganizationDetails() {
 
   const remainingSlots = Math.max(
     organization.event_limit - totalOrganizationEvents,
-    0,
+    0
   );
   const addEventDisabledReason =
     remainingSlots <= 0
       ? "Osiągnięto limit wydarzeń dla tej organizacji, łącznie z wydarzeniami w archiwum. Zwiększ limit, aby dodać kolejne wydarzenie."
       : null;
   const assignableScannerEvents = orgEvents.filter((event) =>
-    isEventCurrentOrUpcoming(event),
+    isEventCurrentOrUpcoming(event)
   );
   const assignableScannerEventIds = new Set(
-    assignableScannerEvents.map((event) => event.id),
+    assignableScannerEvents.map((event) => event.id)
   );
   const canCreateEvent = !isScannerRole(currentRole);
   const canEditOrganization =
@@ -461,7 +460,7 @@ export default function OrganizationDetails() {
     }
     if (orgEvents.length > 0) {
       reasons.push(
-        "Najpierw zarchiwizuj lub usuń aktywne i nadchodzące wydarzenia tej organizacji.",
+        "Najpierw zarchiwizuj lub usuń aktywne i nadchodzące wydarzenia tej organizacji."
       );
     }
     if (organizers.length > 0 || scanners.length > 0) {
@@ -470,13 +469,8 @@ export default function OrganizationDetails() {
 
     return reasons.join(" ");
   })();
-  const adminLabel = "Wszystkie organizacje";
   const sectionClassName =
     "overflow-hidden rounded-[1.35rem] border border-[hsl(var(--button-highlight)/0.14)] bg-[linear-gradient(180deg,hsl(220_13%_8%/_0.95),hsl(220_14%_6%/_0.98))] shadow-[0_18px_44px_hsl(var(--surface-shadow)/0.28),inset_0_1px_0_hsl(var(--foreground)/0.04)]";
-  const sectionPrimaryButtonClassName =
-    "h-12 w-full rounded-[1rem] border border-[hsl(42_62%_62%/0.78)] bg-[linear-gradient(180deg,hsl(42_46%_56%),hsl(38_34%_42%))] px-4 text-[0.98rem] font-semibold text-white shadow-[inset_0_1px_0_hsl(48_65%_78%/0.32)] hover:brightness-105";
-  const sectionSecondaryButtonClassName =
-    "h-12 w-full rounded-[1rem] border border-[hsl(var(--button-highlight)/0.32)] bg-[linear-gradient(180deg,hsl(220_10%_10%/_0.94),hsl(220_11%_8%/_0.96))] px-4 text-[0.98rem] font-semibold text-foreground shadow-[inset_0_1px_0_hsl(var(--foreground)/0.08)] hover:border-[hsl(var(--button-highlight)/0.52)] hover:bg-[linear-gradient(180deg,hsl(220_10%_11%/_0.98),hsl(220_11%_9%/_0.98))]";
   const subtleIconButtonClassName =
     "h-10 w-10 rounded-[0.95rem] border border-[hsl(var(--button-highlight)/0.22)] bg-[hsl(var(--background)/0.66)] text-[hsl(var(--button-highlight))] hover:bg-[hsl(var(--button-highlight)/0.12)] hover:text-[hsl(var(--button-highlight))]";
   const tableContainerClassName =
@@ -507,8 +501,8 @@ export default function OrganizationDetails() {
     setSelectedScannerId(scannerId);
     setScannerAssignmentDraft(
       (scanner?.assigned_events ?? []).filter((eventId) =>
-        assignableScannerEventIds.has(eventId),
-      ),
+        assignableScannerEventIds.has(eventId)
+      )
     );
     setScannerAssignmentsDialogOpen(true);
   };
@@ -553,7 +547,11 @@ export default function OrganizationDetails() {
       password: generateStrongPassword(),
     }));
     setShowMemberPassword(true);
-    setMemberErrors((prev) => ({ ...prev, password: undefined, form: undefined }));
+    setMemberErrors((prev) => ({
+      ...prev,
+      password: undefined,
+      form: undefined,
+    }));
   };
 
   const generatePasswordDraft = () => {
@@ -597,7 +595,7 @@ export default function OrganizationDetails() {
     setScannerAssignmentDraft((prev) =>
       checked
         ? [...prev, eventId]
-        : prev.filter((idValue) => idValue !== eventId),
+        : prev.filter((idValue) => idValue !== eventId)
     );
   };
 
@@ -631,10 +629,12 @@ export default function OrganizationDetails() {
       organization_id: organization.id,
       assigned_events: isScannerRole(memberForm.role)
         ? memberForm.assigned_events.filter((eventId) =>
-            assignableScannerEventIds.has(eventId),
+            assignableScannerEventIds.has(eventId)
           )
         : [],
-      password: memberForm.use_manual_password ? memberForm.password : undefined,
+      password: memberForm.use_manual_password
+        ? memberForm.password
+        : undefined,
     });
     setIsSubmittingMember(false);
 
@@ -660,7 +660,8 @@ export default function OrganizationDetails() {
         memberForm.role === "editor"
           ? "Dodano organizatora"
           : `Dodano ${getRoleLabel(memberForm.role).toLocaleLowerCase("pl-PL")}`,
-      description: "Użytkownik otrzyma e-mail z linkiem do ustawienia hasła ważnym przez 7 dni.",
+      description:
+        "Użytkownik otrzyma e-mail z linkiem do ustawienia hasła ważnym przez 7 dni.",
     });
   };
 
@@ -668,7 +669,7 @@ export default function OrganizationDetails() {
     const parsed = Number(limitDraft || organization.event_limit);
     const limitError = validateNonNegativeInteger(
       limitDraft || String(organization.event_limit),
-      "Podaj liczbę całkowitą większą lub równą 0.",
+      "Podaj liczbę całkowitą większą lub równą 0."
     );
     if (limitError || !Number.isInteger(parsed) || parsed < 0) {
       setLimitErrors({
@@ -714,7 +715,7 @@ export default function OrganizationDetails() {
     const parsedLimit = Number(limitDraft || organization.event_limit);
     const limitError = validateNonNegativeInteger(
       limitDraft || String(organization.event_limit),
-      "Podaj liczbę całkowitą większą lub równą 0.",
+      "Podaj liczbę całkowitą większą lub równą 0."
     );
     const nameError = validateRequired(name, "Podaj nazwę organizacji.");
     if (nameError) {
@@ -763,7 +764,7 @@ export default function OrganizationDetails() {
     if (parsedLimit !== organization.event_limit) {
       const limitResult = await updateOrganizationEventLimit(
         organization.id,
-        parsedLimit,
+        parsedLimit
       );
       if (!limitResult.ok) {
         setIsSavingOrganization(false);
@@ -789,12 +790,12 @@ export default function OrganizationDetails() {
       name: validateRequired(eventForm.name, "Podaj nazwę wydarzenia."),
       location: validateRequired(
         eventForm.location,
-        "Podaj lokalizację wydarzenia.",
+        "Podaj lokalizację wydarzenia."
       ),
     };
 
     const officeLocationsErrors = getEventOfficeLocationsValidationErrors(
-      eventForm.office_locations,
+      eventForm.office_locations
     );
     const hasOfficeLocationsErrors =
       Boolean(officeLocationsErrors.form) ||
@@ -803,11 +804,14 @@ export default function OrganizationDetails() {
           location.name ||
           location.google_maps_url ||
           location.form ||
-          location.hours?.some((hour) => hour.opens_at || hour.closes_at),
+          location.hours?.some((hour) => hour.opens_at || hour.closes_at)
       );
 
     if (nextErrors.name || nextErrors.location || hasOfficeLocationsErrors) {
-      setEventErrors({ ...nextErrors, office_locations: officeLocationsErrors });
+      setEventErrors({
+        ...nextErrors,
+        office_locations: officeLocationsErrors,
+      });
       if (hasOfficeLocationsErrors) {
         toast({
           title: "Nieprawidłowe lokalizacje biura zawodów",
@@ -861,8 +865,8 @@ export default function OrganizationDetails() {
     const result = await assignScannerEvents(
       selectedScannerId,
       scannerAssignmentDraft.filter((eventId) =>
-        assignableScannerEventIds.has(eventId),
-      ),
+        assignableScannerEventIds.has(eventId)
+      )
     );
     setIsSavingScannerAssignments(false);
     if (!result.ok) {
@@ -917,7 +921,7 @@ export default function OrganizationDetails() {
     };
     setSelectedScanner(updatedScanner);
     setProfileUser((prev) =>
-      prev?.id === updatedScanner.id ? updatedScanner : prev,
+      prev?.id === updatedScanner.id ? updatedScanner : prev
     );
     setScannerErrors({});
     toast({ title: "Zaktualizowano dane operatora" });
@@ -925,7 +929,7 @@ export default function OrganizationDetails() {
 
   const handleChangeScannerRole = async (
     scanner: User,
-    role: "scanner" | "scanner_plus",
+    role: "scanner" | "scanner_plus"
   ) => {
     setIsChangingScannerRole(true);
     const result = await changeRole(scanner.id, role);
@@ -940,10 +944,10 @@ export default function OrganizationDetails() {
     }
 
     setSelectedScanner((prev) =>
-      prev && prev.id === scanner.id ? { ...prev, role } : prev,
+      prev && prev.id === scanner.id ? { ...prev, role } : prev
     );
     setProfileUser((prev) =>
-      prev && prev.id === scanner.id ? { ...prev, role } : prev,
+      prev && prev.id === scanner.id ? { ...prev, role } : prev
     );
     toast({
       title:
@@ -1133,10 +1137,7 @@ export default function OrganizationDetails() {
               {canEditOrganization && !canDeleteOrganization && (
                 <Popover>
                   <PopoverTrigger asChild>
-                    <span
-                      className="inline-flex w-full lg:w-auto"
-                      tabIndex={0}
-                    >
+                    <span className="inline-flex w-full lg:w-auto" tabIndex={0}>
                       <Button
                         variant="destructive"
                         className="pointer-events-none w-full rounded-[1rem] px-5 lg:w-auto"
@@ -1241,59 +1242,59 @@ export default function OrganizationDetails() {
 
                       return (
                         <TableRow
-                        key={event.id}
-                        className="cursor-pointer border-0 transition-colors hover:bg-[hsl(var(--button-highlight)/0.06)] active:bg-[hsl(var(--button-highlight)/0.1)] [&>td]:py-4"
-                        onClick={() =>
-                          navigate(`/events/${event.id}`, {
-                            state: {
-                              backTo: `/organizations/${organization.id}`,
-                              backLabel: "Wróć do szczegółów organizacji",
-                            },
-                          })
-                        }
-                        onKeyDown={(keyboardEvent) => {
-                          if (
-                            keyboardEvent.key === "Enter" ||
-                            keyboardEvent.key === " "
-                          ) {
-                            keyboardEvent.preventDefault();
+                          key={event.id}
+                          className="cursor-pointer border-0 transition-colors hover:bg-[hsl(var(--button-highlight)/0.06)] active:bg-[hsl(var(--button-highlight)/0.1)] [&>td]:py-4"
+                          onClick={() =>
                             navigate(`/events/${event.id}`, {
                               state: {
                                 backTo: `/organizations/${organization.id}`,
                                 backLabel: "Wróć do szczegółów organizacji",
                               },
-                            });
+                            })
                           }
-                        }}
-                        tabIndex={0}
-                        aria-label={`Wyświetl wydarzenie ${event.name}`}
-                      >
-                        <TableCell className="px-5 sm:px-7">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-base font-medium text-foreground">
-                                {event.name}
+                          onKeyDown={(keyboardEvent) => {
+                            if (
+                              keyboardEvent.key === "Enter" ||
+                              keyboardEvent.key === " "
+                            ) {
+                              keyboardEvent.preventDefault();
+                              navigate(`/events/${event.id}`, {
+                                state: {
+                                  backTo: `/organizations/${organization.id}`,
+                                  backLabel: "Wróć do szczegółów organizacji",
+                                },
+                              });
+                            }
+                          }}
+                          tabIndex={0}
+                          aria-label={`Wyświetl wydarzenie ${event.name}`}
+                        >
+                          <TableCell className="px-5 sm:px-7">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-base font-medium text-foreground">
+                                  {event.name}
+                                </span>
+                                <Badge
+                                  className={cn(
+                                    "rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium shadow-none",
+                                    statusClassName
+                                  )}
+                                >
+                                  {statusLabel}
+                                </Badge>
+                              </div>
+                              <span className="mt-1 block text-sm text-muted-foreground md:hidden">
+                                {event.location}
                               </span>
-                              <Badge
-                                className={cn(
-                                  "rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium shadow-none",
-                                  statusClassName
-                                )}
-                              >
-                                {statusLabel}
-                              </Badge>
                             </div>
-                            <span className="mt-1 block text-sm text-muted-foreground md:hidden">
-                              {event.location}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden px-5 text-sm text-muted-foreground md:table-cell sm:px-7">
-                          {event.location}
-                        </TableCell>
-                        <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
-                          {formatEventOfficeSchedule(event)}
-                        </TableCell>
+                          </TableCell>
+                          <TableCell className="hidden px-5 text-sm text-muted-foreground md:table-cell sm:px-7">
+                            {event.location}
+                          </TableCell>
+                          <TableCell className="px-5 text-sm text-muted-foreground sm:px-7">
+                            {formatEventOfficeSchedule(event)}
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -1389,10 +1390,8 @@ export default function OrganizationDetails() {
                 </Table>
                 {currentRole === "editor" && (
                   <p className="rounded-xl border border-dashed px-4 py-3 text-xs text-muted-foreground mt-3">
-                                        
-
-                    Skontaktuj się z administratorem, jeśli chcesz
-                    usunąć konto organizatora.
+                    Skontaktuj się z administratorem, jeśli chcesz usunąć konto
+                    organizatora.
                   </p>
                 )}
               </div>
@@ -1633,8 +1632,8 @@ export default function OrganizationDetails() {
                 {limitErrors.event_limit}
               </FieldError>
               <p className="mt-2 text-xs text-muted-foreground">
-                Minimalny limit to {totalOrganizationEvents}, ponieważ tyle wydarzeń,
-                łącznie z archiwalnymi, jest już przypisanych.
+                Minimalny limit to {totalOrganizationEvents}, ponieważ tyle
+                wydarzeń, łącznie z archiwalnymi, jest już przypisanych.
               </p>
             </div>
             <FieldError id="organization-edit-form-error">
@@ -1703,9 +1702,9 @@ export default function OrganizationDetails() {
               </FieldError>
             </div>
             <p className="text-xs text-muted-foreground">
-              Minimalny dozwolony limit to {totalOrganizationEvents}, ponieważ tyle
-              wydarzeń, łącznie z archiwalnymi, jest już przypisanych do tej
-              organizacji.
+              Minimalny dozwolony limit to {totalOrganizationEvents}, ponieważ
+              tyle wydarzeń, łącznie z archiwalnymi, jest już przypisanych do
+              tej organizacji.
             </p>
             <FieldError id="organization-limit-form-error">
               {limitErrors.form}
@@ -1770,8 +1769,9 @@ export default function OrganizationDetails() {
               <span className="font-medium text-foreground">
                 {selectedActionUser?.name}
               </span>{" "}
-              zostanie usunięte z widoku organizacji. Ta osoba nie zaloguje się już na stare
-              konto, ale ten adres e-mail będzie można wykorzystać ponownie.
+              zostanie usunięte z widoku organizacji. Ta osoba nie zaloguje się
+              już na stare konto, ale ten adres e-mail będzie można wykorzystać
+              ponownie.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1856,7 +1856,9 @@ export default function OrganizationDetails() {
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="organization-existing-user-password">Nowe hasło</Label>
+              <Label htmlFor="organization-existing-user-password">
+                Nowe hasło
+              </Label>
               <div className="flex gap-2">
                 <div className="relative min-w-0 flex-1">
                   <Input
@@ -1873,7 +1875,9 @@ export default function OrganizationDetails() {
                     }}
                     autoComplete="new-password"
                     className="pr-20"
-                    aria-invalid={Boolean(passwordErrors.password || passwordErrors.form)}
+                    aria-invalid={Boolean(
+                      passwordErrors.password || passwordErrors.form
+                    )}
                     aria-describedby={
                       passwordErrors.password
                         ? "organization-existing-user-password-error"
@@ -1897,7 +1901,9 @@ export default function OrganizationDetails() {
                     size="icon"
                     className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
                     onClick={() => setShowPasswordDraft((visible) => !visible)}
-                    aria-label={showPasswordDraft ? "Ukryj hasło" : "Pokaż hasło"}
+                    aria-label={
+                      showPasswordDraft ? "Ukryj hasło" : "Pokaż hasło"
+                    }
                   >
                     {showPasswordDraft ? (
                       <EyeOff className="h-4 w-4" />
@@ -1969,14 +1975,19 @@ export default function OrganizationDetails() {
                   <UserRound className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{profileUser.name}</p>
+                  <p className="truncate text-sm font-medium">
+                    {profileUser.name}
+                  </p>
                   <p className="break-all text-xs text-muted-foreground">
                     {profileUser.email}
                   </p>
                 </div>
               </div>
               <div className="space-y-3 text-sm">
-                <ProfileRow label="Rola" value={getRoleLabel(profileUser.role)} />
+                <ProfileRow
+                  label="Rola"
+                  value={getRoleLabel(profileUser.role)}
+                />
                 <ProfileRow label="Organizacja" value={organization.name} />
                 {isScannerRole(profileUser.role) && (
                   <ProfileRow
@@ -1995,7 +2006,9 @@ export default function OrganizationDetails() {
                   </div>
                   <div className="mt-4 space-y-3">
                     <div>
-                      <Label htmlFor="scanner-profile-name">Imię i nazwisko</Label>
+                      <Label htmlFor="scanner-profile-name">
+                        Imię i nazwisko
+                      </Label>
                       <Input
                         id="scanner-profile-name"
                         value={scannerDraft.name}
@@ -2019,7 +2032,10 @@ export default function OrganizationDetails() {
                             : undefined
                         }
                       />
-                      <FieldError id="scanner-profile-name-error" className="mt-2">
+                      <FieldError
+                        id="scanner-profile-name-error"
+                        className="mt-2"
+                      >
                         {scannerErrors.name}
                       </FieldError>
                     </div>
@@ -2049,7 +2065,10 @@ export default function OrganizationDetails() {
                             : undefined
                         }
                       />
-                      <FieldError id="scanner-profile-email-error" className="mt-2">
+                      <FieldError
+                        id="scanner-profile-email-error"
+                        className="mt-2"
+                      >
                         {scannerErrors.email}
                       </FieldError>
                     </div>
@@ -2090,7 +2109,7 @@ export default function OrganizationDetails() {
                         selectedScanner,
                         selectedScanner.role === "scanner"
                           ? "scanner_plus"
-                          : "scanner",
+                          : "scanner"
                       )
                     }
                     disabled={isChangingScannerRole || isSavingScanner}
@@ -2309,7 +2328,8 @@ export default function OrganizationDetails() {
                 <span>
                   <span className="block font-medium">Ustaw hasło ręcznie</span>
                   <span className="block text-xs text-muted-foreground">
-                    Bez tej opcji użytkownik dostanie e-mail z linkiem do ustawienia hasła.
+                    Bez tej opcji użytkownik dostanie e-mail z linkiem do
+                    ustawienia hasła.
                   </span>
                 </span>
               </label>
@@ -2358,8 +2378,12 @@ export default function OrganizationDetails() {
                         variant="ghost"
                         size="icon"
                         className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                        onClick={() => setShowMemberPassword((visible) => !visible)}
-                        aria-label={showMemberPassword ? "Ukryj hasło" : "Pokaż hasło"}
+                        onClick={() =>
+                          setShowMemberPassword((visible) => !visible)
+                        }
+                        aria-label={
+                          showMemberPassword ? "Ukryj hasło" : "Pokaż hasło"
+                        }
                       >
                         {showMemberPassword ? (
                           <EyeOff className="h-4 w-4" />
@@ -2398,7 +2422,7 @@ export default function OrganizationDetails() {
                         <Checkbox
                           className="rounded-[2px]"
                           checked={memberForm.assigned_events.includes(
-                            event.id,
+                            event.id
                           )}
                           onCheckedChange={(checked) =>
                             toggleScannerEvent(event.id, checked === true)
@@ -2565,7 +2589,10 @@ export default function OrganizationDetails() {
               idPrefix="organization-event"
               locations={eventForm.office_locations}
               onChange={(locations) => {
-                setEventForm((prev) => ({ ...prev, office_locations: locations }));
+                setEventForm((prev) => ({
+                  ...prev,
+                  office_locations: locations,
+                }));
                 setEventErrors((prev) => ({
                   ...prev,
                   office_locations: undefined,
@@ -2576,8 +2603,8 @@ export default function OrganizationDetails() {
             />
             <p className="text-xs text-muted-foreground">
               Limit organizacji: {formatEventCount(organization.event_limit)}.
-              Utworzono {formatEventCount(totalOrganizationEvents)}.
-              Limit obejmuje także wydarzenia archiwalne.
+              Utworzono {formatEventCount(totalOrganizationEvents)}. Limit
+              obejmuje także wydarzenia archiwalne.
             </p>
             <FieldError id="organization-event-form-error">
               {eventErrors.form}
@@ -2655,7 +2682,3 @@ function EmptyTableState({
     </Card>
   );
 }
-
-
-
-

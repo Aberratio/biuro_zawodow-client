@@ -5,7 +5,6 @@ import {
   Activity,
   AlertTriangle,
   Archive,
-  Building2,
   CalendarDays,
   CheckCircle2,
   ChevronLeft,
@@ -25,7 +24,6 @@ import {
   Search,
   Shield,
   UserRound,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -75,7 +73,6 @@ import { toast } from "@/hooks/use-toast";
 import { API_BASE_URL, fetchJson } from "@/lib/api";
 import { mapApiUserToUi, type ApiUser } from "@/lib/data-context-helpers";
 import { validateStrongPassword } from "@/lib/form-validation";
-import { participantCountsAsCheckedIn } from "@/lib/participant-status";
 import { generateStrongPassword } from "@/lib/password";
 import {
   buildEventEmailsPath,
@@ -268,7 +265,10 @@ const USER_ROLE_TABS: Array<{ value: UserRoleTab; label: string }> = [
   { value: "scanner_plus", label: "Operator Plus" },
 ];
 
-const MANAGED_USER_ROLE_OPTIONS: Array<{ value: ManagedUserRole; label: string }> = [
+const MANAGED_USER_ROLE_OPTIONS: Array<{
+  value: ManagedUserRole;
+  label: string;
+}> = [
   { value: "admin", label: "Admin" },
   { value: "editor", label: "Organizator" },
   { value: "scanner", label: "Operator" },
@@ -302,7 +302,9 @@ function formatDateTime(value?: string | null): string {
 
 function getServerLogStatus(entry: ServerLogEntry): string {
   const status = entry.context?.status;
-  return typeof status === "number" || typeof status === "string" ? String(status) : "-";
+  return typeof status === "number" || typeof status === "string"
+    ? String(status)
+    : "-";
 }
 
 function getServerLogMethod(entry: ServerLogEntry): string {
@@ -330,7 +332,10 @@ function formatJson(value: unknown): string {
   return JSON.stringify(value ?? {}, null, 2);
 }
 
-function getNestedValue(source: Record<string, unknown> | undefined, path: string): unknown {
+function getNestedValue(
+  source: Record<string, unknown> | undefined,
+  path: string
+): unknown {
   return path.split(".").reduce<unknown>((current, part) => {
     if (!current || typeof current !== "object") return undefined;
     return (current as Record<string, unknown>)[part];
@@ -339,7 +344,9 @@ function getNestedValue(source: Record<string, unknown> | undefined, path: strin
 
 function metadataText(entry: AuditEntry, path: string): string {
   const value = getNestedValue(entry.metadata, path);
-  return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+  return typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
     ? String(value)
     : "";
 }
@@ -347,25 +354,63 @@ function metadataText(entry: AuditEntry, path: string): string {
 function AuditMetadataSummary({ entry }: { entry: AuditEntry }) {
   if (!entry.metadata || entry.source !== "audit") return null;
 
-  const browser = metadataText(entry, "client.user_agent") || metadataText(entry, "request.user_agent");
-  const platform = metadataText(entry, "client.platform") || metadataText(entry, "request.sec_ch_ua_platform");
+  const browser =
+    metadataText(entry, "client.user_agent") ||
+    metadataText(entry, "request.user_agent");
+  const platform =
+    metadataText(entry, "client.platform") ||
+    metadataText(entry, "request.sec_ch_ua_platform");
   const displayMode = metadataText(entry, "client.display_mode");
   const failureReason = metadataText(entry, "failure_reason");
   const emailDomain = metadataText(entry, "email_domain");
   const storage = [
-    metadataText(entry, "client.can_persist_session") && `sesja ${metadataText(entry, "client.can_persist_session")}`,
-    metadataText(entry, "client.indexed_db_available") && `IndexedDB ${metadataText(entry, "client.indexed_db_available")}`,
-    metadataText(entry, "client.online") && `online ${metadataText(entry, "client.online")}`,
+    metadataText(entry, "client.can_persist_session") &&
+      `sesja ${metadataText(entry, "client.can_persist_session")}`,
+    metadataText(entry, "client.indexed_db_available") &&
+      `IndexedDB ${metadataText(entry, "client.indexed_db_available")}`,
+    metadataText(entry, "client.online") &&
+      `online ${metadataText(entry, "client.online")}`,
   ].filter(Boolean);
 
   return (
     <div className="flex flex-wrap gap-1 pt-1">
-      {failureReason && <Badge variant="destructive" className="text-[0.68rem]">{failureReason}</Badge>}
-      {emailDomain && <Badge variant="outline" className="text-[0.68rem]">@{emailDomain}</Badge>}
-      {platform && <Badge variant="outline" className="max-w-[12rem] truncate text-[0.68rem]">{platform}</Badge>}
-      {displayMode && <Badge variant="outline" className="text-[0.68rem]">{displayMode}</Badge>}
-      {storage.map((item) => <Badge key={String(item)} variant="secondary" className="text-[0.68rem]">{item}</Badge>)}
-      {browser && <span className="block w-full truncate text-xs text-muted-foreground">{browser}</span>}
+      {failureReason && (
+        <Badge variant="destructive" className="text-[0.68rem]">
+          {failureReason}
+        </Badge>
+      )}
+      {emailDomain && (
+        <Badge variant="outline" className="text-[0.68rem]">
+          @{emailDomain}
+        </Badge>
+      )}
+      {platform && (
+        <Badge
+          variant="outline"
+          className="max-w-[12rem] truncate text-[0.68rem]"
+        >
+          {platform}
+        </Badge>
+      )}
+      {displayMode && (
+        <Badge variant="outline" className="text-[0.68rem]">
+          {displayMode}
+        </Badge>
+      )}
+      {storage.map((item) => (
+        <Badge
+          key={String(item)}
+          variant="secondary"
+          className="text-[0.68rem]"
+        >
+          {item}
+        </Badge>
+      ))}
+      {browser && (
+        <span className="block w-full truncate text-xs text-muted-foreground">
+          {browser}
+        </span>
+      )}
     </div>
   );
 }
@@ -375,7 +420,9 @@ function normalizeSearch(value: string): string {
 }
 
 function participantApiId(participantId: string): string {
-  return participantId.startsWith("p-") ? participantId.slice(2) : participantId;
+  return participantId.startsWith("p-")
+    ? participantId.slice(2)
+    : participantId;
 }
 
 export default function SuperAdmin() {
@@ -404,7 +451,9 @@ export default function SuperAdmin() {
   const [isSavingAdmin, setIsSavingAdmin] = useState(false);
   const [auditScope, setAuditScope] = useState<AuditScope>("all");
   const [entitySearch, setEntitySearch] = useState("");
-  const [selectedEntity, setSelectedEntity] = useState<EntityOption | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<EntityOption | null>(
+    null
+  );
   const [auditQuery, setAuditQuery] = useState("");
   const [auditCategory, setAuditCategory] = useState("all");
   const [auditOutcome, setAuditOutcome] = useState("all");
@@ -422,9 +471,12 @@ export default function SuperAdmin() {
   const [auditPage, setAuditPage] = useState(1);
   const [hasLoadedRemoteAudit, setHasLoadedRemoteAudit] = useState(false);
   const [isAuditLoading, setIsAuditLoading] = useState(false);
-  const [selectedAuditEntry, setSelectedAuditEntry] = useState<AuditEntry | null>(null);
+  const [selectedAuditEntry, setSelectedAuditEntry] =
+    useState<AuditEntry | null>(null);
   const [auditDialogOpen, setAuditDialogOpen] = useState(false);
-  const [serverLogSource, setServerLogSource] = useState<"application" | "php">("application");
+  const [serverLogSource, setServerLogSource] = useState<"application" | "php">(
+    "application"
+  );
   const [serverLogLevel, setServerLogLevel] = useState("all");
   const [serverLogQuery, setServerLogQuery] = useState("");
   const [serverLogRequestId, setServerLogRequestId] = useState("");
@@ -432,20 +484,35 @@ export default function SuperAdmin() {
   const [serverLogFrom, setServerLogFrom] = useState("");
   const [serverLogTo, setServerLogTo] = useState("");
   const [serverLogSort, setServerLogSort] = useState<ServerLogSortKey>("time");
-  const [serverLogDirection, setServerLogDirection] = useState<SortDirection>("desc");
-  const [serverLogEntries, setServerLogEntries] = useState<ServerLogEntry[]>([]);
-  const [serverLogMeta, setServerLogMeta] = useState<AuditMeta>({ page: 1, per_page: SERVER_LOG_PAGE_SIZE, total: 0, total_pages: 1 });
+  const [serverLogDirection, setServerLogDirection] =
+    useState<SortDirection>("desc");
+  const [serverLogEntries, setServerLogEntries] = useState<ServerLogEntry[]>(
+    []
+  );
+  const [serverLogMeta, setServerLogMeta] = useState<AuditMeta>({
+    page: 1,
+    per_page: SERVER_LOG_PAGE_SIZE,
+    total: 0,
+    total_pages: 1,
+  });
   const [serverLogPage, setServerLogPage] = useState(1);
   const [hasLoadedServerLogs, setHasLoadedServerLogs] = useState(false);
   const [isServerLogsLoading, setIsServerLogsLoading] = useState(false);
-  const [loggingStatus, setLoggingStatus] = useState<LoggingStatus | null>(null);
-  const [selectedServerLog, setSelectedServerLog] = useState<ServerLogEntry | null>(null);
+  const [loggingStatus, setLoggingStatus] = useState<LoggingStatus | null>(
+    null
+  );
+  const [selectedServerLog, setSelectedServerLog] =
+    useState<ServerLogEntry | null>(null);
   const [serverLogDialogOpen, setServerLogDialogOpen] = useState(false);
-  const [databaseTables, setDatabaseTables] = useState<DatabaseTableSummary[]>([]);
+  const [databaseTables, setDatabaseTables] = useState<DatabaseTableSummary[]>(
+    []
+  );
   const [selectedDatabaseTable, setSelectedDatabaseTable] = useState("");
   const [databaseTableSearch, setDatabaseTableSearch] = useState("");
   const [databaseColumns, setDatabaseColumns] = useState<DatabaseColumn[]>([]);
-  const [databaseRows, setDatabaseRows] = useState<Record<string, unknown>[]>([]);
+  const [databaseRows, setDatabaseRows] = useState<Record<string, unknown>[]>(
+    []
+  );
   const [databaseMeta, setDatabaseMeta] = useState<DatabaseMeta>({
     selected_table: null,
     page: 1,
@@ -456,19 +523,24 @@ export default function SuperAdmin() {
   const [databasePage, setDatabasePage] = useState(1);
   const [hasLoadedDatabase, setHasLoadedDatabase] = useState(false);
   const [isDatabaseLoading, setIsDatabaseLoading] = useState(false);
-  const [operationsData, setOperationsData] = useState<OperationsData>(EMPTY_OPERATIONS_DATA);
+  const [operationsData, setOperationsData] = useState<OperationsData>(
+    EMPTY_OPERATIONS_DATA
+  );
   const [hasLoadedOperations, setHasLoadedOperations] = useState(false);
   const [isOperationsLoading, setIsOperationsLoading] = useState(false);
-  const [archiveIssueTarget, setArchiveIssueTarget] = useState<OperationalIssue | null>(null);
+  const [archiveIssueTarget, setArchiveIssueTarget] =
+    useState<OperationalIssue | null>(null);
   const [archiveIssueReason, setArchiveIssueReason] = useState("");
   const [isArchivingIssue, setIsArchivingIssue] = useState(false);
   const [activeTab, setActiveTab] = useState("center");
-  const [activeUserRoleTab, setActiveUserRoleTab] = useState<UserRoleTab>("admin");
+  const [activeUserRoleTab, setActiveUserRoleTab] =
+    useState<UserRoleTab>("admin");
   const [userSearch, setUserSearch] = useState("");
   const [userOrganizationFilter, setUserOrganizationFilter] = useState("all");
   const [userEventFilter, setUserEventFilter] = useState("all");
   const [userSort, setUserSort] = useState<UserSortKey>("name");
-  const [userSortDirection, setUserSortDirection] = useState<SortDirection>("asc");
+  const [userSortDirection, setUserSortDirection] =
+    useState<SortDirection>("asc");
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
@@ -477,45 +549,62 @@ export default function SuperAdmin() {
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [roleUser, setRoleUser] = useState<User | null>(null);
-  const [roleForm, setRoleForm] = useState<{ role: ManagedUserRole; organization_id: string }>({
+  const [roleForm, setRoleForm] = useState<{
+    role: ManagedUserRole;
+    organization_id: string;
+  }>({
     role: "editor",
     organization_id: "",
   });
   const [isSavingUserRole, setIsSavingUserRole] = useState(false);
-  const [selectedActionUser, setSelectedActionUser] = useState<User | null>(null);
+  const [selectedActionUser, setSelectedActionUser] = useState<User | null>(
+    null
+  );
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordDraft, setPasswordDraft] = useState("");
   const [showPasswordDraft, setShowPasswordDraft] = useState(false);
-  const [passwordErrors, setPasswordErrors] = useState<{ password?: string; form?: string }>({});
+  const [passwordErrors, setPasswordErrors] = useState<{
+    password?: string;
+    form?: string;
+  }>({});
   const [isSettingPassword, setIsSettingPassword] = useState(false);
   const [isChangingUserRole, setIsChangingUserRole] = useState(false);
 
-  const allEvents = useMemo(() => [...events, ...archivedEvents], [archivedEvents, events]);
-  const productionEvents = useMemo(() => events.filter((event) => !event.is_test), [events]);
-  const productionArchivedEvents = useMemo(() => archivedEvents.filter((event) => !event.is_test), [archivedEvents]);
+  const allEvents = useMemo(
+    () => [...events, ...archivedEvents],
+    [archivedEvents, events]
+  );
+  const productionEvents = useMemo(
+    () => events.filter((event) => !event.is_test),
+    [events]
+  );
+  const productionArchivedEvents = useMemo(
+    () => archivedEvents.filter((event) => !event.is_test),
+    [archivedEvents]
+  );
   const isOnline = connectionState === "online";
 
   const roleCounts = useMemo(() => {
     return users.reduce<Record<Role, number>>(
       (counts, user) => ({ ...counts, [user.role]: counts[user.role] + 1 }),
-      { superadmin: 0, admin: 0, editor: 0, scanner: 0, scanner_plus: 0 },
+      { superadmin: 0, admin: 0, editor: 0, scanner: 0, scanner_plus: 0 }
     );
   }, [users]);
 
   const participantStatusCounts = useMemo(() => {
     return participants.reduce<Record<ParticipantStatus, number>>(
-      (counts, participant) => ({ ...counts, [participant.status]: counts[participant.status] + 1 }),
-      { not_checked_in: 0, checked_in: 0, checked_in_not_starting: 0 },
+      (counts, participant) => ({
+        ...counts,
+        [participant.status]: counts[participant.status] + 1,
+      }),
+      { not_checked_in: 0, checked_in: 0, checked_in_not_starting: 0 }
     );
   }, [participants]);
 
-  const checkedInCount = useMemo(
-    () => participants.filter((participant) => participantCountsAsCheckedIn(participant)).length,
-    [participants],
-  );
-
   const organizationNameById = useMemo(() => {
-    return new Map(organizations.map((organization) => [organization.id, organization.name]));
+    return new Map(
+      organizations.map((organization) => [organization.id, organization.name])
+    );
   }, [organizations]);
 
   const eventById = useMemo(() => {
@@ -523,8 +612,11 @@ export default function SuperAdmin() {
   }, [allEvents]);
 
   const organizationOptions = useMemo(
-    () => [...organizations].sort((left, right) => left.name.localeCompare(right.name, "pl")),
-    [organizations],
+    () =>
+      [...organizations].sort((left, right) =>
+        left.name.localeCompare(right.name, "pl")
+      ),
+    [organizations]
   );
 
   const activeRoleUsers = useMemo(() => {
@@ -533,7 +625,10 @@ export default function SuperAdmin() {
     const userSortValue = (user: User): string | number => {
       if (userSort === "email") return user.email.toLocaleLowerCase("pl-PL");
       if (userSort === "organization") {
-        return user.organization_id ? organizationNameById.get(user.organization_id) ?? user.organization_id : "Wszystkie organizacje";
+        return user.organization_id
+          ? (organizationNameById.get(user.organization_id) ??
+              user.organization_id)
+          : "Wszystkie organizacje";
       }
       if (userSort === "assignments") return user.assigned_events.length;
       if (userSort === "role") return roleLabels[user.role];
@@ -543,14 +638,19 @@ export default function SuperAdmin() {
     return users
       .filter((user) => user.role === activeUserRoleTab)
       .filter((user) => {
-        if (userOrganizationFilter !== "all" && user.organization_id !== userOrganizationFilter) {
+        if (
+          userOrganizationFilter !== "all" &&
+          user.organization_id !== userOrganizationFilter
+        ) {
           return false;
         }
 
         if (userEventFilter !== "all") {
           if (user.role === "editor") {
             return allEvents.some(
-              (event) => event.id === userEventFilter && event.organization_id === user.organization_id,
+              (event) =>
+                event.id === userEventFilter &&
+                event.organization_id === user.organization_id
             );
           }
 
@@ -561,7 +661,9 @@ export default function SuperAdmin() {
 
         if (!query) return true;
 
-        const organizationName = user.organization_id ? organizationNameById.get(user.organization_id) ?? "" : "";
+        const organizationName = user.organization_id
+          ? (organizationNameById.get(user.organization_id) ?? "")
+          : "";
         const assignedEventNames = user.assigned_events
           .map((eventId) => eventById.get(eventId)?.name ?? eventId)
           .join(" ");
@@ -572,9 +674,10 @@ export default function SuperAdmin() {
       .sort((left, right) => {
         const leftValue = userSortValue(left);
         const rightValue = userSortValue(right);
-        const comparison = typeof leftValue === "number" && typeof rightValue === "number"
-          ? leftValue - rightValue
-          : String(leftValue).localeCompare(String(rightValue), "pl");
+        const comparison =
+          typeof leftValue === "number" && typeof rightValue === "number"
+            ? leftValue - rightValue
+            : String(leftValue).localeCompare(String(rightValue), "pl");
         return userSortDirection === "asc" ? comparison : -comparison;
       });
   }, [
@@ -598,7 +701,9 @@ export default function SuperAdmin() {
 
   const availableEventFilters = useMemo(() => {
     if (userOrganizationFilter === "all") return allEvents;
-    return allEvents.filter((event) => event.organization_id === userOrganizationFilter);
+    return allEvents.filter(
+      (event) => event.organization_id === userOrganizationFilter
+    );
   }, [allEvents, userOrganizationFilter]);
 
   const entityOptions = useMemo<EntityOption[]>(() => {
@@ -622,7 +727,10 @@ export default function SuperAdmin() {
       return allEvents.map((event) => ({
         id: event.id,
         label: event.name,
-        meta: organizations.find((organization) => organization.id === event.organization_id)?.name ?? event.location,
+        meta:
+          organizations.find(
+            (organization) => organization.id === event.organization_id
+          )?.name ?? event.location,
       }));
     }
 
@@ -641,18 +749,23 @@ export default function SuperAdmin() {
     const query = normalizeSearch(entitySearch);
     if (!query) return entityOptions;
 
-    return entityOptions
-      .filter((entity) => `${entity.label} ${entity.meta}`.toLocaleLowerCase("pl-PL").includes(query));
+    return entityOptions.filter((entity) =>
+      `${entity.label} ${entity.meta}`
+        .toLocaleLowerCase("pl-PL")
+        .includes(query)
+    );
   }, [entityOptions, entitySearch]);
   const filteredEntityOptions = useMemo(
     () => matchingEntityOptions.slice(0, AUDIT_ENTITY_OPTION_LIMIT),
-    [matchingEntityOptions],
+    [matchingEntityOptions]
   );
 
   const filteredDatabaseTables = useMemo(() => {
     const query = normalizeSearch(databaseTableSearch);
     if (!query) return databaseTables;
-    return databaseTables.filter((table) => table.name.toLocaleLowerCase("pl-PL").includes(query));
+    return databaseTables.filter((table) =>
+      table.name.toLocaleLowerCase("pl-PL").includes(query)
+    );
   }, [databaseTableSearch, databaseTables]);
 
   const localAuditEntries = useMemo<AuditEntry[]>(() => {
@@ -669,23 +782,32 @@ export default function SuperAdmin() {
     }));
   }, [activityLog]);
 
-  const localAuditMeta = useMemo<AuditMeta>(() => ({
-    page: auditPage,
-    per_page: AUDIT_PAGE_SIZE,
-    total: localAuditEntries.length,
-    total_pages: Math.max(1, Math.ceil(localAuditEntries.length / AUDIT_PAGE_SIZE)),
-  }), [auditPage, localAuditEntries.length]);
+  const localAuditMeta = useMemo<AuditMeta>(
+    () => ({
+      page: auditPage,
+      per_page: AUDIT_PAGE_SIZE,
+      total: localAuditEntries.length,
+      total_pages: Math.max(
+        1,
+        Math.ceil(localAuditEntries.length / AUDIT_PAGE_SIZE)
+      ),
+    }),
+    [auditPage, localAuditEntries.length]
+  );
 
   const displayedAuditEntries = hasLoadedRemoteAudit
     ? auditEntries
-    : localAuditEntries.slice((auditPage - 1) * AUDIT_PAGE_SIZE, auditPage * AUDIT_PAGE_SIZE);
+    : localAuditEntries.slice(
+        (auditPage - 1) * AUDIT_PAGE_SIZE,
+        auditPage * AUDIT_PAGE_SIZE
+      );
   const displayedAuditMeta = hasLoadedRemoteAudit ? auditMeta : localAuditMeta;
 
   const buildAuditSearchParams = (
     nextScope = auditScope,
     nextEntity = selectedEntity,
     nextPage = auditPage,
-    overrides: AuditFilterOverrides = {},
+    overrides: AuditFilterOverrides = {}
   ) => {
     const nextQuery = overrides.query ?? auditQuery;
     const nextCategory = overrides.category ?? auditCategory;
@@ -717,8 +839,10 @@ export default function SuperAdmin() {
     });
     if (serverLogLevel !== "all") params.set("level", serverLogLevel);
     if (serverLogQuery.trim()) params.set("q", serverLogQuery.trim());
-    if (serverLogRequestId.trim()) params.set("request_id", serverLogRequestId.trim());
-    if (serverLogEventCode.trim()) params.set("event_code", serverLogEventCode.trim());
+    if (serverLogRequestId.trim())
+      params.set("request_id", serverLogRequestId.trim());
+    if (serverLogEventCode.trim())
+      params.set("event_code", serverLogEventCode.trim());
     if (serverLogFrom.trim()) params.set("from", serverLogFrom.trim());
     if (serverLogTo.trim()) params.set("to", serverLogTo.trim());
     return params;
@@ -728,22 +852,35 @@ export default function SuperAdmin() {
     nextScope = auditScope,
     nextEntity = selectedEntity,
     nextPage = auditPage,
-    overrides: AuditFilterOverrides = {},
+    overrides: AuditFilterOverrides = {}
   ) => {
     setIsAuditLoading(true);
     try {
-      const params = buildAuditSearchParams(nextScope, nextEntity, nextPage, overrides);
+      const params = buildAuditSearchParams(
+        nextScope,
+        nextEntity,
+        nextPage,
+        overrides
+      );
 
-      const { payload } = await fetchJson(`${API_BASE_URL}/superadmin/audit?${params.toString()}`, {
-        headers: getAuthHeaders(),
-      });
-      const responseData = payload as { data?: AuditEntry[]; meta?: Partial<AuditMeta> };
+      const { payload } = await fetchJson(
+        `${API_BASE_URL}/superadmin/audit?${params.toString()}`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
+      const responseData = payload as {
+        data?: AuditEntry[];
+        meta?: Partial<AuditMeta>;
+      };
       const data = responseData.data;
       setAuditEntries(Array.isArray(data) ? data : []);
       setAuditMeta({
         page: Number(responseData.meta?.page ?? nextPage),
         per_page: Number(responseData.meta?.per_page ?? AUDIT_PAGE_SIZE),
-        total: Number(responseData.meta?.total ?? (Array.isArray(data) ? data.length : 0)),
+        total: Number(
+          responseData.meta?.total ?? (Array.isArray(data) ? data.length : 0)
+        ),
         total_pages: Math.max(1, Number(responseData.meta?.total_pages ?? 1)),
       });
       setAuditPage(Number(responseData.meta?.page ?? nextPage));
@@ -751,7 +888,8 @@ export default function SuperAdmin() {
     } catch (error) {
       toast({
         title: "Nie udało się pobrać audytu",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     } finally {
@@ -783,25 +921,42 @@ export default function SuperAdmin() {
     try {
       const { payload } = await fetchJson(
         `${API_BASE_URL}/superadmin/audit/${encodeURIComponent(entry.id)}`,
-        { headers: getAuthHeaders() },
+        { headers: getAuthHeaders() }
       );
       const detail = (payload as { data?: Record<string, unknown> }).data;
       setSelectedAuditEntry({
         ...entry,
-        metadata: detail?.metadata && typeof detail.metadata === "object"
-          ? detail.metadata as Record<string, unknown>
-          : entry.metadata,
-        request_id: typeof detail?.request_id === "string" ? detail.request_id : entry.request_id,
-        user_name: typeof detail?.actor_name_snapshot === "string" ? detail.actor_name_snapshot : entry.user_name,
-        user_role: typeof detail?.actor_role_snapshot === "string" ? detail.actor_role_snapshot : entry.user_role,
-        target_type: typeof detail?.target_type === "string" ? detail.target_type : entry.target_type,
-        target_id: typeof detail?.target_id === "string" ? detail.target_id : entry.target_id,
+        metadata:
+          detail?.metadata && typeof detail.metadata === "object"
+            ? (detail.metadata as Record<string, unknown>)
+            : entry.metadata,
+        request_id:
+          typeof detail?.request_id === "string"
+            ? detail.request_id
+            : entry.request_id,
+        user_name:
+          typeof detail?.actor_name_snapshot === "string"
+            ? detail.actor_name_snapshot
+            : entry.user_name,
+        user_role:
+          typeof detail?.actor_role_snapshot === "string"
+            ? detail.actor_role_snapshot
+            : entry.user_role,
+        target_type:
+          typeof detail?.target_type === "string"
+            ? detail.target_type
+            : entry.target_type,
+        target_id:
+          typeof detail?.target_id === "string"
+            ? detail.target_id
+            : entry.target_id,
       });
       setAuditDialogOpen(true);
     } catch (error) {
       toast({
         title: "Nie udało się pobrać szczegółów audytu",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     }
@@ -812,11 +967,20 @@ export default function SuperAdmin() {
     try {
       const params = buildServerLogSearchParams(nextPage);
 
-      const [{ payload: logsPayload }, { payload: statusPayload }] = await Promise.all([
-        fetchJson(`${API_BASE_URL}/superadmin/server-logs?${params.toString()}`, { headers: getAuthHeaders() }),
-        fetchJson(`${API_BASE_URL}/superadmin/logging-status`, { headers: getAuthHeaders() }),
-      ]);
-      const logsData = logsPayload as { data?: ServerLogEntry[]; meta?: Partial<AuditMeta> };
+      const [{ payload: logsPayload }, { payload: statusPayload }] =
+        await Promise.all([
+          fetchJson(
+            `${API_BASE_URL}/superadmin/server-logs?${params.toString()}`,
+            { headers: getAuthHeaders() }
+          ),
+          fetchJson(`${API_BASE_URL}/superadmin/logging-status`, {
+            headers: getAuthHeaders(),
+          }),
+        ]);
+      const logsData = logsPayload as {
+        data?: ServerLogEntry[];
+        meta?: Partial<AuditMeta>;
+      };
       const entries = Array.isArray(logsData.data) ? logsData.data : [];
       setServerLogEntries(entries);
       setServerLogMeta({
@@ -826,12 +990,15 @@ export default function SuperAdmin() {
         total_pages: Math.max(1, Number(logsData.meta?.total_pages ?? 1)),
       });
       setServerLogPage(Number(logsData.meta?.page ?? nextPage));
-      setLoggingStatus((statusPayload as { data?: LoggingStatus }).data ?? null);
+      setLoggingStatus(
+        (statusPayload as { data?: LoggingStatus }).data ?? null
+      );
       setHasLoadedServerLogs(true);
     } catch (error) {
       toast({
         title: "Nie udało się pobrać logów serwera",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     } finally {
@@ -844,14 +1011,17 @@ export default function SuperAdmin() {
       const date = entry.timestamp.slice(0, 10);
       const { payload } = await fetchJson(
         `${API_BASE_URL}/superadmin/server-logs/${serverLogSource}/${date}/${encodeURIComponent(entry.id)}`,
-        { headers: getAuthHeaders() },
+        { headers: getAuthHeaders() }
       );
-      setSelectedServerLog((payload as { data?: ServerLogEntry }).data ?? entry);
+      setSelectedServerLog(
+        (payload as { data?: ServerLogEntry }).data ?? entry
+      );
       setServerLogDialogOpen(true);
     } catch (error) {
       toast({
         title: "Nie udało się pobrać szczegółów logu",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     }
@@ -862,10 +1032,14 @@ export default function SuperAdmin() {
     params.delete("page");
     params.delete("limit");
     try {
-      const response = await fetch(`${API_BASE_URL}/superadmin/server-logs/export.csv?${params.toString()}`, {
-        headers: getAuthHeaders(),
-      });
-      if (!response.ok) throw new Error(`Eksport zakończył się błędem ${response.status}`);
+      const response = await fetch(
+        `${API_BASE_URL}/superadmin/server-logs/export.csv?${params.toString()}`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
+      if (!response.ok)
+        throw new Error(`Eksport zakończył się błędem ${response.status}`);
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = url;
@@ -875,7 +1049,8 @@ export default function SuperAdmin() {
     } catch (error) {
       toast({
         title: "Nie udało się wyeksportować logów",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     }
@@ -886,10 +1061,14 @@ export default function SuperAdmin() {
     params.delete("page");
     params.delete("limit");
     try {
-      const response = await fetch(`${API_BASE_URL}/superadmin/audit/export.csv?${params.toString()}`, {
-        headers: getAuthHeaders(),
-      });
-      if (!response.ok) throw new Error(`Eksport zakończył się błędem ${response.status}`);
+      const response = await fetch(
+        `${API_BASE_URL}/superadmin/audit/export.csv?${params.toString()}`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
+      if (!response.ok)
+        throw new Error(`Eksport zakończył się błędem ${response.status}`);
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = url;
@@ -899,13 +1078,17 @@ export default function SuperAdmin() {
     } catch (error) {
       toast({
         title: "Nie udało się wyeksportować audytu",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     }
   };
 
-  const loadDatabase = async (nextTable = selectedDatabaseTable, nextPage = databasePage) => {
+  const loadDatabase = async (
+    nextTable = selectedDatabaseTable,
+    nextPage = databasePage
+  ) => {
     setIsDatabaseLoading(true);
     try {
       const params = new URLSearchParams({
@@ -916,21 +1099,29 @@ export default function SuperAdmin() {
         params.set("table", nextTable);
       }
 
-      const { payload } = await fetchJson(`${API_BASE_URL}/superadmin/database?${params.toString()}`, {
-        headers: getAuthHeaders(),
-      });
+      const { payload } = await fetchJson(
+        `${API_BASE_URL}/superadmin/database?${params.toString()}`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
       const responseData = payload as {
         tables?: DatabaseTableSummary[];
         columns?: DatabaseColumn[];
         rows?: Record<string, unknown>[];
         meta?: Partial<DatabaseMeta>;
       };
-      const tables = Array.isArray(responseData.tables) ? responseData.tables : [];
-      const columns = Array.isArray(responseData.columns) ? responseData.columns : [];
+      const tables = Array.isArray(responseData.tables)
+        ? responseData.tables
+        : [];
+      const columns = Array.isArray(responseData.columns)
+        ? responseData.columns
+        : [];
       const rows = Array.isArray(responseData.rows) ? responseData.rows : [];
-      const selectedTable = typeof responseData.meta?.selected_table === "string"
-        ? responseData.meta.selected_table
-        : nextTable || "";
+      const selectedTable =
+        typeof responseData.meta?.selected_table === "string"
+          ? responseData.meta.selected_table
+          : nextTable || "";
 
       setDatabaseTables(tables);
       setDatabaseColumns(columns);
@@ -948,7 +1139,8 @@ export default function SuperAdmin() {
     } catch (error) {
       toast({
         title: "Nie udało się pobrać danych z bazy",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     } finally {
@@ -959,30 +1151,45 @@ export default function SuperAdmin() {
   const loadOperations = async () => {
     setIsOperationsLoading(true);
     try {
-      const { payload } = await fetchJson(`${API_BASE_URL}/superadmin/operations`, {
-        headers: getAuthHeaders(),
-      });
+      const { payload } = await fetchJson(
+        `${API_BASE_URL}/superadmin/operations`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
       const responseData = payload as Partial<OperationsData>;
 
       setOperationsData({
-        generated_at: typeof responseData.generated_at === "string" ? responseData.generated_at : null,
+        generated_at:
+          typeof responseData.generated_at === "string"
+            ? responseData.generated_at
+            : null,
         summary: {
           critical_alerts: Number(responseData.summary?.critical_alerts ?? 0),
           warning_alerts: Number(responseData.summary?.warning_alerts ?? 0),
           quality_issues: Number(responseData.summary?.quality_issues ?? 0),
           sync_conflicts: Number(responseData.summary?.sync_conflicts ?? 0),
-          active_rate_limit_blocks: Number(responseData.summary?.active_rate_limit_blocks ?? 0),
+          active_rate_limit_blocks: Number(
+            responseData.summary?.active_rate_limit_blocks ?? 0
+          ),
         },
         alerts: Array.isArray(responseData.alerts) ? responseData.alerts : [],
-        sync_events: Array.isArray(responseData.sync_events) ? responseData.sync_events : [],
-        quality_issues: Array.isArray(responseData.quality_issues) ? responseData.quality_issues : [],
-        archived_issues: Array.isArray(responseData.archived_issues) ? responseData.archived_issues : [],
+        sync_events: Array.isArray(responseData.sync_events)
+          ? responseData.sync_events
+          : [],
+        quality_issues: Array.isArray(responseData.quality_issues)
+          ? responseData.quality_issues
+          : [],
+        archived_issues: Array.isArray(responseData.archived_issues)
+          ? responseData.archived_issues
+          : [],
       });
       setHasLoadedOperations(true);
     } catch (error) {
       toast({
         title: "Nie udało się pobrać danych operacyjnych",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     } finally {
@@ -1027,7 +1234,8 @@ export default function SuperAdmin() {
     } catch (error) {
       toast({
         title: "Nie udało się zarchiwizować ostrzeżenia",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     } finally {
@@ -1036,7 +1244,12 @@ export default function SuperAdmin() {
   };
 
   useEffect(() => {
-    if (activeTab === "center" && isOnline && !hasLoadedOperations && !isOperationsLoading) {
+    if (
+      activeTab === "center" &&
+      isOnline &&
+      !hasLoadedOperations &&
+      !isOperationsLoading
+    ) {
       void loadOperations();
     }
     // loadOperations intentionally remains local to keep this page's fetch state colocated.
@@ -1100,7 +1313,8 @@ export default function SuperAdmin() {
     } catch (error) {
       toast({
         title: "Nie udało się zapisać admina",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     } finally {
@@ -1111,10 +1325,13 @@ export default function SuperAdmin() {
   const resetAdminPassword = async (admin: User) => {
     try {
       if (admin.role === "admin") {
-        await fetchJson(`${API_BASE_URL}/superadmin/admins/${admin.id}/password-reset`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-        });
+        await fetchJson(
+          `${API_BASE_URL}/superadmin/admins/${admin.id}/password-reset`,
+          {
+            method: "POST",
+            headers: getAuthHeaders(),
+          }
+        );
       } else {
         const result = await triggerUserPasswordReset(admin.id);
         if (!result.ok) {
@@ -1128,7 +1345,8 @@ export default function SuperAdmin() {
     } catch (error) {
       toast({
         title: "Nie udało się wysłać resetu",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     }
@@ -1158,7 +1376,8 @@ export default function SuperAdmin() {
     } catch (error) {
       toast({
         title: "Nie udało się zarchiwizować konta",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     }
@@ -1238,14 +1457,20 @@ export default function SuperAdmin() {
     setIsSavingUserRole(true);
 
     try {
-      const payload = (await fetchJson(`${API_BASE_URL}/superadmin/users/${roleUser.id}/role`, {
-        method: "PATCH",
-        headers: getAuthHeaders(true),
-        body: JSON.stringify({
-          role: roleForm.role,
-          organization_id: roleForm.role === "admin" ? null : roleForm.organization_id,
-        }),
-      })).payload as { data?: ApiUser };
+      const payload = (
+        await fetchJson(
+          `${API_BASE_URL}/superadmin/users/${roleUser.id}/role`,
+          {
+            method: "PATCH",
+            headers: getAuthHeaders(true),
+            body: JSON.stringify({
+              role: roleForm.role,
+              organization_id:
+                roleForm.role === "admin" ? null : roleForm.organization_id,
+            }),
+          }
+        )
+      ).payload as { data?: ApiUser };
 
       if (!payload.data) {
         throw new Error("API user role change returned empty payload");
@@ -1255,7 +1480,9 @@ export default function SuperAdmin() {
 
       setRoleDialogOpen(false);
       setRoleUser(null);
-      setProfileUser((previous) => (previous?.id === updatedUser.id ? updatedUser : previous));
+      setProfileUser((previous) =>
+        previous?.id === updatedUser.id ? updatedUser : previous
+      );
 
       toast({ title: `Zmieniono rolę na ${roleLabels[updatedUser.role]}` });
       await refreshData();
@@ -1266,7 +1493,8 @@ export default function SuperAdmin() {
     } catch (error) {
       toast({
         title: "Nie udało się zmienić roli",
-        description: error instanceof Error ? error.message : "Spróbuj ponownie.",
+        description:
+          error instanceof Error ? error.message : "Spróbuj ponownie.",
         variant: "destructive",
       });
     } finally {
@@ -1312,7 +1540,9 @@ export default function SuperAdmin() {
     setIsSettingPassword(false);
 
     if (!result.ok) {
-      setPasswordErrors({ form: result.error ?? "Nie udało się ustawić hasła." });
+      setPasswordErrors({
+        form: result.error ?? "Nie udało się ustawić hasła.",
+      });
       return;
     }
 
@@ -1384,7 +1614,10 @@ export default function SuperAdmin() {
   };
 
   const goToAuditPage = (page: number) => {
-    const nextPage = Math.min(Math.max(1, page), displayedAuditMeta.total_pages);
+    const nextPage = Math.min(
+      Math.max(1, page),
+      displayedAuditMeta.total_pages
+    );
     if (nextPage === auditPage || isAuditLoading) return;
 
     setAuditPage(nextPage);
@@ -1401,29 +1634,52 @@ export default function SuperAdmin() {
 
   const goToDatabasePage = (page: number) => {
     const nextPage = Math.min(Math.max(1, page), databaseMeta.total_pages);
-    if (nextPage === databasePage || isDatabaseLoading || !selectedDatabaseTable) return;
+    if (
+      nextPage === databasePage ||
+      isDatabaseLoading ||
+      !selectedDatabaseTable
+    )
+      return;
 
     setDatabasePage(nextPage);
     void loadDatabase(selectedDatabaseTable, nextPage);
   };
 
-  const auditRangeStart = displayedAuditMeta.total === 0
-    ? 0
-    : (displayedAuditMeta.page - 1) * displayedAuditMeta.per_page + 1;
-  const auditRangeEnd = Math.min(displayedAuditMeta.total, displayedAuditMeta.page * displayedAuditMeta.per_page);
-  const databaseRangeStart = databaseMeta.total === 0
-    ? 0
-    : (databaseMeta.page - 1) * databaseMeta.per_page + 1;
-  const databaseRangeEnd = Math.min(databaseMeta.total, databaseMeta.page * databaseMeta.per_page);
-  const prioritizedOperationalIssues = [...operationsData.alerts, ...operationsData.quality_issues];
-  const setupRiskCount = prioritizedOperationalIssues.filter((issue) => (
-    issue.category === "event_no_operators"
-    || issue.category === "event_no_participants"
-    || issue.category === "event_unsent_emails"
-  )).length;
-  const criticalIssues = prioritizedOperationalIssues.filter((issue) => issue.severity === "critical");
-  const warningIssues = prioritizedOperationalIssues.filter((issue) => issue.severity === "warning");
-  const infoIssues = prioritizedOperationalIssues.filter((issue) => issue.severity === "info");
+  const auditRangeStart =
+    displayedAuditMeta.total === 0
+      ? 0
+      : (displayedAuditMeta.page - 1) * displayedAuditMeta.per_page + 1;
+  const auditRangeEnd = Math.min(
+    displayedAuditMeta.total,
+    displayedAuditMeta.page * displayedAuditMeta.per_page
+  );
+  const databaseRangeStart =
+    databaseMeta.total === 0
+      ? 0
+      : (databaseMeta.page - 1) * databaseMeta.per_page + 1;
+  const databaseRangeEnd = Math.min(
+    databaseMeta.total,
+    databaseMeta.page * databaseMeta.per_page
+  );
+  const prioritizedOperationalIssues = [
+    ...operationsData.alerts,
+    ...operationsData.quality_issues,
+  ];
+  const setupRiskCount = prioritizedOperationalIssues.filter(
+    (issue) =>
+      issue.category === "event_no_operators" ||
+      issue.category === "event_no_participants" ||
+      issue.category === "event_unsent_emails"
+  ).length;
+  const criticalIssues = prioritizedOperationalIssues.filter(
+    (issue) => issue.severity === "critical"
+  );
+  const warningIssues = prioritizedOperationalIssues.filter(
+    (issue) => issue.severity === "warning"
+  );
+  const infoIssues = prioritizedOperationalIssues.filter(
+    (issue) => issue.severity === "info"
+  );
 
   if (isLoading) {
     return <TableSkeleton rows={8} cols={4} subtitle="" showFilters />;
@@ -1446,10 +1702,30 @@ export default function SuperAdmin() {
       )}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={AlertTriangle} label="Alerty krytyczne" value={operationsData.summary.critical_alerts} detail={`${operationsData.summary.warning_alerts} ostrzeżeń`} />
-        <MetricCard icon={Cloud} label="Konflikty synchronizacji" value={operationsData.summary.sync_conflicts} detail={`${operationsData.sync_events.length} monitorowanych wydarzeń`} />
-        <MetricCard icon={Shield} label="Blokady logowania" value={operationsData.summary.active_rate_limit_blocks} detail="aktywne rate limit" />
-        <MetricCard icon={CalendarDays} label="Ryzyka wydarzeń" value={setupRiskCount} detail={`${productionEvents.length} aktywnych wydarzeń`} />
+        <MetricCard
+          icon={AlertTriangle}
+          label="Alerty krytyczne"
+          value={operationsData.summary.critical_alerts}
+          detail={`${operationsData.summary.warning_alerts} ostrzeżeń`}
+        />
+        <MetricCard
+          icon={Cloud}
+          label="Konflikty synchronizacji"
+          value={operationsData.summary.sync_conflicts}
+          detail={`${operationsData.sync_events.length} monitorowanych wydarzeń`}
+        />
+        <MetricCard
+          icon={Shield}
+          label="Blokady logowania"
+          value={operationsData.summary.active_rate_limit_blocks}
+          detail="aktywne rate limit"
+        />
+        <MetricCard
+          icon={CalendarDays}
+          label="Ryzyka wydarzeń"
+          value={setupRiskCount}
+          detail={`${productionEvents.length} aktywnych wydarzeń`}
+        />
       </div>
 
       <Tabs
@@ -1459,13 +1735,28 @@ export default function SuperAdmin() {
           if (value === "audit" && !hasLoadedRemoteAudit && !isAuditLoading) {
             void loadAudit("all", null, 1);
           }
-          if (value === "server-logs" && isOnline && !hasLoadedServerLogs && !isServerLogsLoading) {
+          if (
+            value === "server-logs" &&
+            isOnline &&
+            !hasLoadedServerLogs &&
+            !isServerLogsLoading
+          ) {
             void loadServerLogs(1);
           }
-          if (value === "database" && isOnline && !hasLoadedDatabase && !isDatabaseLoading) {
+          if (
+            value === "database" &&
+            isOnline &&
+            !hasLoadedDatabase &&
+            !isDatabaseLoading
+          ) {
             void loadDatabase("", 1);
           }
-          if (value === "center" && isOnline && !hasLoadedOperations && !isOperationsLoading) {
+          if (
+            value === "center" &&
+            isOnline &&
+            !hasLoadedOperations &&
+            !isOperationsLoading
+          ) {
             void loadOperations();
           }
         }}
@@ -1490,9 +1781,16 @@ export default function SuperAdmin() {
           >
             <TabsList className="grid h-auto w-full grid-cols-2 lg:w-auto lg:grid-cols-4">
               {USER_ROLE_TABS.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value} className="gap-2">
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="gap-2"
+                >
                   {tab.label}
-                  <Badge variant="secondary" className="px-1.5 py-0 text-[0.65rem]">
+                  <Badge
+                    variant="secondary"
+                    className="px-1.5 py-0 text-[0.65rem]"
+                  >
                     {roleCounts[tab.value]}
                   </Badge>
                 </TabsTrigger>
@@ -1531,7 +1829,10 @@ export default function SuperAdmin() {
                       <SelectContent>
                         <SelectItem value="all">Wszystkie</SelectItem>
                         {organizations.map((organization) => (
-                          <SelectItem key={organization.id} value={organization.id}>
+                          <SelectItem
+                            key={organization.id}
+                            value={organization.id}
+                          >
                             {organization.name}
                           </SelectItem>
                         ))}
@@ -1543,7 +1844,10 @@ export default function SuperAdmin() {
                     <Select
                       value={userEventFilter}
                       onValueChange={setUserEventFilter}
-                      disabled={activeUserRoleTab === "admin" || availableEventFilters.length === 0}
+                      disabled={
+                        activeUserRoleTab === "admin" ||
+                        availableEventFilters.length === 0
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -1560,14 +1864,21 @@ export default function SuperAdmin() {
                   </div>
                   <div className="space-y-2">
                     <Label>Sortuj po</Label>
-                    <Select value={userSort} onValueChange={(value) => setUserSort(value as UserSortKey)}>
+                    <Select
+                      value={userSort}
+                      onValueChange={(value) =>
+                        setUserSort(value as UserSortKey)
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="name">Nazwa</SelectItem>
                         <SelectItem value="email">E-mail</SelectItem>
-                        <SelectItem value="organization">Organizacja</SelectItem>
+                        <SelectItem value="organization">
+                          Organizacja
+                        </SelectItem>
                         <SelectItem value="assignments">Przypisania</SelectItem>
                         <SelectItem value="role">Rola</SelectItem>
                       </SelectContent>
@@ -1575,7 +1886,12 @@ export default function SuperAdmin() {
                   </div>
                   <div className="space-y-2">
                     <Label>Kierunek</Label>
-                    <Select value={userSortDirection} onValueChange={(value) => setUserSortDirection(value as SortDirection)}>
+                    <Select
+                      value={userSortDirection}
+                      onValueChange={(value) =>
+                        setUserSortDirection(value as SortDirection)
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -1605,101 +1921,174 @@ export default function SuperAdmin() {
               </CardContent>
             </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-3">
-              <CardTitle className="text-lg">Konta użytkowników</CardTitle>
-              <Badge variant="secondary">{activeRoleUsers.length}</Badge>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Konto</TableHead>
-                    <TableHead>Organizacja i przypisania</TableHead>
-                    <TableHead className="hidden sm:table-cell">Rola</TableHead>
-                    <TableHead className="text-right">Akcje</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activeRoleUsers.map((admin) => {
-                    const organizationName = admin.organization_id
-                      ? organizationNameById.get(admin.organization_id) ?? admin.organization_id
-                      : "Wszystkie organizacje";
-                    const assignedEventNames = admin.assigned_events
-                      .map((eventId) => eventById.get(eventId)?.name ?? eventId)
-                      .join(", ");
-                    const organizationEventCount = admin.organization_id
-                      ? allEvents.filter((event) => event.organization_id === admin.organization_id).length
-                      : allEvents.length;
-
-                    return (
-                    <TableRow key={admin.id}>
-                      <TableCell>
-                        <div className="min-w-0">
-                          <p className="truncate font-medium">{admin.name}</p>
-                          <p className="break-all text-xs text-muted-foreground">{admin.email}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1 text-sm">
-                          <p className="line-clamp-1">{organizationName}</p>
-                          {admin.role === "admin" && (
-                            <p className="text-xs text-muted-foreground">Pełny dostęp do systemu</p>
-                          )}
-                          {admin.role === "editor" && (
-                            <p className="text-xs text-muted-foreground">{organizationEventCount} wydarzeń organizacji</p>
-                          )}
-                          {(admin.role === "scanner" || admin.role === "scanner_plus") && (
-                            <p className="truncate text-xs text-muted-foreground">
-                              {admin.assigned_events.length > 0 ? assignedEventNames : "Brak przypisanych wydarzeń"}
-                            </p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <Badge variant="outline">{roleLabels[admin.role]}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => openUserDetails(admin)} title="Szczegóły konta" aria-label={`Szczegóły konta ${admin.name}`}>
-                            <UserRound className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => openEditUser(admin)} disabled={!isOnline} title="Edytuj" aria-label={`Edytuj konto ${admin.name}`}>
-                            <Edit3 className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => resetAdminPassword(admin)} disabled={!isOnline} title="Reset hasła" aria-label={`Wyślij reset hasła dla ${admin.name}`}>
-                            <KeyRound className="h-4 w-4" />
-                          </Button>
-                          {admin.role !== "admin" && (
-                            <Button variant="ghost" size="icon" onClick={() => openPasswordDialog(admin)} disabled={!isOnline} title="Ustaw hasło" aria-label={`Ustaw hasło dla ${admin.name}`}>
-                              <EyeOff className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="icon" onClick={() => openRoleDialog(admin)} disabled={!isOnline} title="Zmień rolę" aria-label={`Zmień rolę konta ${admin.name}`}>
-                            <Shield className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => openUserLogs(admin)} title="Logi konta" aria-label={`Zobacz logi konta ${admin.name}`}>
-                            <Activity className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => archiveAdmin(admin)} disabled={!isOnline} title="Archiwizuj" aria-label={`Archiwizuj konto ${admin.name}`}>
-                            <Archive className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    );
-                  })}
-                  {activeRoleUsers.length === 0 && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-3">
+                <CardTitle className="text-lg">Konta użytkowników</CardTitle>
+                <Badge variant="secondary">{activeRoleUsers.length}</Badge>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
-                        {activeUserFilterCount > 0 ? "Brak kont pasujących do aktywnych filtrów." : `Brak kont w sekcji ${USER_ROLE_TABS.find((tab) => tab.value === activeUserRoleTab)?.label.toLocaleLowerCase("pl-PL") ?? "użytkowników"}.`}
-                      </TableCell>
+                      <TableHead>Konto</TableHead>
+                      <TableHead>Organizacja i przypisania</TableHead>
+                      <TableHead className="hidden sm:table-cell">
+                        Rola
+                      </TableHead>
+                      <TableHead className="text-right">Akcje</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {activeRoleUsers.map((admin) => {
+                      const organizationName = admin.organization_id
+                        ? (organizationNameById.get(admin.organization_id) ??
+                          admin.organization_id)
+                        : "Wszystkie organizacje";
+                      const assignedEventNames = admin.assigned_events
+                        .map(
+                          (eventId) => eventById.get(eventId)?.name ?? eventId
+                        )
+                        .join(", ");
+                      const organizationEventCount = admin.organization_id
+                        ? allEvents.filter(
+                            (event) =>
+                              event.organization_id === admin.organization_id
+                          ).length
+                        : allEvents.length;
+
+                      return (
+                        <TableRow key={admin.id}>
+                          <TableCell>
+                            <div className="min-w-0">
+                              <p className="truncate font-medium">
+                                {admin.name}
+                              </p>
+                              <p className="break-all text-xs text-muted-foreground">
+                                {admin.email}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1 text-sm">
+                              <p className="line-clamp-1">{organizationName}</p>
+                              {admin.role === "admin" && (
+                                <p className="text-xs text-muted-foreground">
+                                  Pełny dostęp do systemu
+                                </p>
+                              )}
+                              {admin.role === "editor" && (
+                                <p className="text-xs text-muted-foreground">
+                                  {organizationEventCount} wydarzeń organizacji
+                                </p>
+                              )}
+                              {(admin.role === "scanner" ||
+                                admin.role === "scanner_plus") && (
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {admin.assigned_events.length > 0
+                                    ? assignedEventNames
+                                    : "Brak przypisanych wydarzeń"}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            <Badge variant="outline">
+                              {roleLabels[admin.role]}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openUserDetails(admin)}
+                                title="Szczegóły konta"
+                                aria-label={`Szczegóły konta ${admin.name}`}
+                              >
+                                <UserRound className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditUser(admin)}
+                                disabled={!isOnline}
+                                title="Edytuj"
+                                aria-label={`Edytuj konto ${admin.name}`}
+                              >
+                                <Edit3 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => resetAdminPassword(admin)}
+                                disabled={!isOnline}
+                                title="Reset hasła"
+                                aria-label={`Wyślij reset hasła dla ${admin.name}`}
+                              >
+                                <KeyRound className="h-4 w-4" />
+                              </Button>
+                              {admin.role !== "admin" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openPasswordDialog(admin)}
+                                  disabled={!isOnline}
+                                  title="Ustaw hasło"
+                                  aria-label={`Ustaw hasło dla ${admin.name}`}
+                                >
+                                  <EyeOff className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openRoleDialog(admin)}
+                                disabled={!isOnline}
+                                title="Zmień rolę"
+                                aria-label={`Zmień rolę konta ${admin.name}`}
+                              >
+                                <Shield className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openUserLogs(admin)}
+                                title="Logi konta"
+                                aria-label={`Zobacz logi konta ${admin.name}`}
+                              >
+                                <Activity className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => archiveAdmin(admin)}
+                                disabled={!isOnline}
+                                title="Archiwizuj"
+                                aria-label={`Archiwizuj konto ${admin.name}`}
+                              >
+                                <Archive className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {activeRoleUsers.length === 0 && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="py-8 text-center text-sm text-muted-foreground"
+                        >
+                          {activeUserFilterCount > 0
+                            ? "Brak kont pasujących do aktywnych filtrów."
+                            : `Brak kont w sekcji ${USER_ROLE_TABS.find((tab) => tab.value === activeUserRoleTab)?.label.toLocaleLowerCase("pl-PL") ?? "użytkowników"}.`}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </Tabs>
         </TabsContent>
 
@@ -1711,7 +2100,13 @@ export default function SuperAdmin() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => applyAuditPreset({ category: "authentication", outcome: "failure", query: "auth.login" })}
+                  onClick={() =>
+                    applyAuditPreset({
+                      category: "authentication",
+                      outcome: "failure",
+                      query: "auth.login",
+                    })
+                  }
                   disabled={isAuditLoading}
                 >
                   <AlertTriangle className="mr-2 h-4 w-4" />
@@ -1721,7 +2116,13 @@ export default function SuperAdmin() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => applyAuditPreset({ category: "authentication", outcome: "blocked", actionCode: "auth.login.rate_limited" })}
+                  onClick={() =>
+                    applyAuditPreset({
+                      category: "authentication",
+                      outcome: "blocked",
+                      actionCode: "auth.login.rate_limited",
+                    })
+                  }
                   disabled={isAuditLoading}
                 >
                   <Shield className="mr-2 h-4 w-4" />
@@ -1731,7 +2132,12 @@ export default function SuperAdmin() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => applyAuditPreset({ category: "authentication", query: "client_server_clock_skew_seconds" })}
+                  onClick={() =>
+                    applyAuditPreset({
+                      category: "authentication",
+                      query: "client_server_clock_skew_seconds",
+                    })
+                  }
                   disabled={isAuditLoading}
                 >
                   <Cloud className="mr-2 h-4 w-4" />
@@ -1741,7 +2147,12 @@ export default function SuperAdmin() {
               <div className="grid gap-3 lg:grid-cols-[10rem_10rem_10rem_minmax(0,1fr)_minmax(0,1fr)]">
                 <div className="space-y-2">
                   <Label>Zakres</Label>
-                  <Select value={auditScope} onValueChange={(value) => changeAuditScope(value as AuditScope)}>
+                  <Select
+                    value={auditScope}
+                    onValueChange={(value) =>
+                      changeAuditScope(value as AuditScope)
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -1757,8 +2168,13 @@ export default function SuperAdmin() {
 
                 <div className="space-y-2">
                   <Label>Kategoria</Label>
-                  <Select value={auditCategory} onValueChange={setAuditCategory}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select
+                    value={auditCategory}
+                    onValueChange={setAuditCategory}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Wszystkie</SelectItem>
                       <SelectItem value="authentication">Logowanie</SelectItem>
@@ -1777,7 +2193,9 @@ export default function SuperAdmin() {
                 <div className="space-y-2">
                   <Label>Wynik</Label>
                   <Select value={auditOutcome} onValueChange={setAuditOutcome}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Wszystkie</SelectItem>
                       <SelectItem value="success">Sukces</SelectItem>
@@ -1796,29 +2214,50 @@ export default function SuperAdmin() {
                       setSelectedEntity(null);
                     }}
                     disabled={auditScope === "all"}
-                    placeholder={auditScope === "all" ? "Cały system" : "Szukaj..."}
+                    placeholder={
+                      auditScope === "all" ? "Cały system" : "Szukaj..."
+                    }
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Tekst w logach</Label>
-                  <Input value={auditQuery} onChange={(event) => setAuditQuery(event.target.value)} placeholder="Akcja, osoba, pole..." />
+                  <Input
+                    value={auditQuery}
+                    onChange={(event) => setAuditQuery(event.target.value)}
+                    placeholder="Akcja, osoba, pole..."
+                  />
                 </div>
               </div>
 
               <div className="grid gap-3 lg:grid-cols-[minmax(10rem,14rem)_minmax(10rem,14rem)_minmax(10rem,14rem)_minmax(10rem,12rem)_auto_auto]">
                 <div className="space-y-2">
                   <Label htmlFor="superadmin-audit-from">Od</Label>
-                  <DateTimePicker id="superadmin-audit-from" value={auditFrom} onChange={setAuditFrom} />
+                  <DateTimePicker
+                    id="superadmin-audit-from"
+                    value={auditFrom}
+                    onChange={setAuditFrom}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="superadmin-audit-to">Do</Label>
-                  <DateTimePicker id="superadmin-audit-to" value={auditTo} onChange={setAuditTo} />
+                  <DateTimePicker
+                    id="superadmin-audit-to"
+                    value={auditTo}
+                    onChange={setAuditTo}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Sortuj po</Label>
-                  <Select value={auditSort} onValueChange={(value) => setAuditSort(value as AuditSortKey)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select
+                    value={auditSort}
+                    onValueChange={(value) =>
+                      setAuditSort(value as AuditSortKey)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="time">Czas</SelectItem>
                       <SelectItem value="severity">Poziom</SelectItem>
@@ -1830,8 +2269,15 @@ export default function SuperAdmin() {
                 </div>
                 <div className="space-y-2">
                   <Label>Kierunek</Label>
-                  <Select value={auditDirection} onValueChange={(value) => setAuditDirection(value as SortDirection)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select
+                    value={auditDirection}
+                    onValueChange={(value) =>
+                      setAuditDirection(value as SortDirection)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="desc">Malejąco</SelectItem>
                       <SelectItem value="asc">Rosnąco</SelectItem>
@@ -1839,39 +2285,62 @@ export default function SuperAdmin() {
                   </Select>
                 </div>
                 <div className="flex items-end">
-                  <Button onClick={() => void loadAudit(auditScope, selectedEntity, 1)} disabled={isAuditLoading} className="w-full lg:w-auto">
-                    {isAuditLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                  <Button
+                    onClick={() =>
+                      void loadAudit(auditScope, selectedEntity, 1)
+                    }
+                    disabled={isAuditLoading}
+                    className="w-full lg:w-auto"
+                  >
+                    {isAuditLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="mr-2 h-4 w-4" />
+                    )}
                     Szukaj
                   </Button>
                 </div>
                 <div className="flex items-end">
-                  <Button variant="outline" onClick={() => void exportAudit()} disabled={isAuditLoading} className="w-full lg:w-auto">
+                  <Button
+                    variant="outline"
+                    onClick={() => void exportAudit()}
+                    disabled={isAuditLoading}
+                    className="w-full lg:w-auto"
+                  >
                     <Download className="mr-2 h-4 w-4" />
                     Eksport CSV
                   </Button>
                 </div>
               </div>
 
-              {auditScope !== "all" && !selectedEntity && filteredEntityOptions.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">
-                    Pokazano maksymalnie {AUDIT_ENTITY_OPTION_LIMIT} z {matchingEntityOptions.length} pasujących encji. Zawęź wyszukiwanie, aby znaleźć konkretną pozycję.
-                  </p>
-                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                    {filteredEntityOptions.map((entity) => (
-                      <button
-                        key={entity.id}
-                        type="button"
-                        onClick={() => selectEntity(entity)}
-                        className="rounded-lg border bg-background px-3 py-2 text-left transition-colors hover:bg-accent"
-                      >
-                        <span className="block truncate text-sm font-medium">{entity.label}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{entity.meta}</span>
-                      </button>
-                    ))}
+              {auditScope !== "all" &&
+                !selectedEntity &&
+                filteredEntityOptions.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Pokazano maksymalnie {AUDIT_ENTITY_OPTION_LIMIT} z{" "}
+                      {matchingEntityOptions.length} pasujących encji. Zawęź
+                      wyszukiwanie, aby znaleźć konkretną pozycję.
+                    </p>
+                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                      {filteredEntityOptions.map((entity) => (
+                        <button
+                          key={entity.id}
+                          type="button"
+                          onClick={() => selectEntity(entity)}
+                          className="rounded-lg border bg-background px-3 py-2 text-left transition-colors hover:bg-accent"
+                        >
+                          <span className="block truncate text-sm font-medium">
+                            {entity.label}
+                          </span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {entity.meta}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {selectedEntity && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -1914,19 +2383,53 @@ export default function SuperAdmin() {
                 <TableBody>
                   {displayedAuditEntries.map((entry) => (
                     <TableRow key={`${entry.source}-${entry.id}`}>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(entry.timestamp)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                        {formatDateTime(entry.timestamp)}
+                      </TableCell>
                       <TableCell>
                         <div className="space-y-1">
                           <p className="text-sm font-medium">{entry.action}</p>
                           <div className="flex flex-wrap gap-1">
-                            {entry.category && <Badge variant="outline" className="text-[0.68rem]">{entry.category}</Badge>}
-                            {entry.outcome && <Badge variant={entry.outcome === "success" ? "secondary" : "destructive"} className="text-[0.68rem]">{entry.outcome}</Badge>}
-                            {entry.severity && <Badge variant="outline" className="text-[0.68rem]">{entry.severity}</Badge>}
+                            {entry.category && (
+                              <Badge
+                                variant="outline"
+                                className="text-[0.68rem]"
+                              >
+                                {entry.category}
+                              </Badge>
+                            )}
+                            {entry.outcome && (
+                              <Badge
+                                variant={
+                                  entry.outcome === "success"
+                                    ? "secondary"
+                                    : "destructive"
+                                }
+                                className="text-[0.68rem]"
+                              >
+                                {entry.outcome}
+                              </Badge>
+                            )}
+                            {entry.severity && (
+                              <Badge
+                                variant="outline"
+                                className="text-[0.68rem]"
+                              >
+                                {entry.severity}
+                              </Badge>
+                            )}
                           </div>
-                          {entry.action_code && <p className="font-mono text-xs text-muted-foreground">{entry.action_code}</p>}
-                          {entry.changed_fields && entry.changed_fields.length > 0 && (
-                            <p className="text-xs text-muted-foreground">{entry.changed_fields.join(", ")}</p>
+                          {entry.action_code && (
+                            <p className="font-mono text-xs text-muted-foreground">
+                              {entry.action_code}
+                            </p>
                           )}
+                          {entry.changed_fields &&
+                            entry.changed_fields.length > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                {entry.changed_fields.join(", ")}
+                              </p>
+                            )}
                           <AuditMetadataSummary entry={entry} />
                         </div>
                       </TableCell>
@@ -1935,11 +2438,25 @@ export default function SuperAdmin() {
                       </TableCell>
                       <TableCell className="text-sm">
                         <p>{entry.user_name || "-"}</p>
-                        {entry.request_id && <p className="truncate font-mono text-xs text-muted-foreground">{entry.request_id}</p>}
+                        {entry.request_id && (
+                          <p className="truncate font-mono text-xs text-muted-foreground">
+                            {entry.request_id}
+                          </p>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={entry.source === "participant_change" ? "secondary" : "outline"}>
-                          {entry.source === "participant_change" ? "zmiana" : entry.source === "audit" ? "audyt" : "aktywność"}
+                        <Badge
+                          variant={
+                            entry.source === "participant_change"
+                              ? "secondary"
+                              : "outline"
+                          }
+                        >
+                          {entry.source === "participant_change"
+                            ? "zmiana"
+                            : entry.source === "audit"
+                              ? "audyt"
+                              : "aktywność"}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -1957,7 +2474,10 @@ export default function SuperAdmin() {
                   ))}
                   {displayedAuditEntries.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      <TableCell
+                        colSpan={6}
+                        className="py-8 text-center text-sm text-muted-foreground"
+                      >
                         Brak logów dla wybranego zakresu.
                       </TableCell>
                     </TableRow>
@@ -1967,7 +2487,8 @@ export default function SuperAdmin() {
               {displayedAuditMeta.total_pages > 1 && (
                 <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                   <p className="text-sm text-muted-foreground">
-                    Strona {displayedAuditMeta.page} z {displayedAuditMeta.total_pages}
+                    Strona {displayedAuditMeta.page} z{" "}
+                    {displayedAuditMeta.total_pages}
                   </p>
                   <Pagination className="mx-0 w-auto justify-start sm:justify-end">
                     <PaginationContent>
@@ -1976,8 +2497,12 @@ export default function SuperAdmin() {
                           type="button"
                           variant="ghost"
                           size="icon"
-                          onClick={() => goToAuditPage(displayedAuditMeta.page - 1)}
-                          disabled={displayedAuditMeta.page <= 1 || isAuditLoading}
+                          onClick={() =>
+                            goToAuditPage(displayedAuditMeta.page - 1)
+                          }
+                          disabled={
+                            displayedAuditMeta.page <= 1 || isAuditLoading
+                          }
                           aria-label="Poprzednia strona"
                         >
                           <ChevronLeft className="h-4 w-4" />
@@ -1985,7 +2510,8 @@ export default function SuperAdmin() {
                       </PaginationItem>
                       <PaginationItem>
                         <span className="flex h-9 min-w-20 items-center justify-center rounded-md border px-3 text-sm tabular-nums">
-                          {displayedAuditMeta.page} / {displayedAuditMeta.total_pages}
+                          {displayedAuditMeta.page} /{" "}
+                          {displayedAuditMeta.total_pages}
                         </span>
                       </PaginationItem>
                       <PaginationItem>
@@ -1993,8 +2519,13 @@ export default function SuperAdmin() {
                           type="button"
                           variant="ghost"
                           size="icon"
-                          onClick={() => goToAuditPage(displayedAuditMeta.page + 1)}
-                          disabled={displayedAuditMeta.page >= displayedAuditMeta.total_pages || isAuditLoading}
+                          onClick={() =>
+                            goToAuditPage(displayedAuditMeta.page + 1)
+                          }
+                          disabled={
+                            displayedAuditMeta.page >=
+                              displayedAuditMeta.total_pages || isAuditLoading
+                          }
                           aria-label="Nastepna strona"
                         >
                           <ChevronRight className="h-4 w-4" />
@@ -2014,8 +2545,15 @@ export default function SuperAdmin() {
               <div className="grid gap-3 lg:grid-cols-[10rem_10rem_minmax(0,1fr)_minmax(12rem,16rem)_minmax(12rem,16rem)]">
                 <div className="space-y-2">
                   <Label>Źródło</Label>
-                  <Select value={serverLogSource} onValueChange={(value) => setServerLogSource(value as "application" | "php")}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select
+                    value={serverLogSource}
+                    onValueChange={(value) =>
+                      setServerLogSource(value as "application" | "php")
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="application">Aplikacja</SelectItem>
                       <SelectItem value="php">Błędy PHP</SelectItem>
@@ -2024,8 +2562,13 @@ export default function SuperAdmin() {
                 </div>
                 <div className="space-y-2">
                   <Label>Poziom</Label>
-                  <Select value={serverLogLevel} onValueChange={setServerLogLevel}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select
+                    value={serverLogLevel}
+                    onValueChange={setServerLogLevel}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Wszystkie</SelectItem>
                       <SelectItem value="info">Info</SelectItem>
@@ -2037,30 +2580,67 @@ export default function SuperAdmin() {
                 </div>
                 <div className="space-y-2">
                   <Label>Tekst, kod lub request ID</Label>
-                  <Input value={serverLogQuery} onChange={(event) => setServerLogQuery(event.target.value)} placeholder="Szukaj w logach..." />
+                  <Input
+                    value={serverLogQuery}
+                    onChange={(event) => setServerLogQuery(event.target.value)}
+                    placeholder="Szukaj w logach..."
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="superadmin-server-request-id">Request ID</Label>
-                  <Input id="superadmin-server-request-id" value={serverLogRequestId} onChange={(event) => setServerLogRequestId(event.target.value)} placeholder="req-..." />
+                  <Label htmlFor="superadmin-server-request-id">
+                    Request ID
+                  </Label>
+                  <Input
+                    id="superadmin-server-request-id"
+                    value={serverLogRequestId}
+                    onChange={(event) =>
+                      setServerLogRequestId(event.target.value)
+                    }
+                    placeholder="req-..."
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="superadmin-server-event-code">Event code</Label>
-                  <Input id="superadmin-server-event-code" value={serverLogEventCode} onChange={(event) => setServerLogEventCode(event.target.value)} placeholder="database.exception" />
+                  <Label htmlFor="superadmin-server-event-code">
+                    Event code
+                  </Label>
+                  <Input
+                    id="superadmin-server-event-code"
+                    value={serverLogEventCode}
+                    onChange={(event) =>
+                      setServerLogEventCode(event.target.value)
+                    }
+                    placeholder="database.exception"
+                  />
                 </div>
               </div>
               <div className="grid gap-3 lg:grid-cols-[minmax(10rem,14rem)_minmax(10rem,14rem)_minmax(10rem,14rem)_minmax(10rem,12rem)_auto_auto]">
                 <div className="space-y-2">
                   <Label htmlFor="superadmin-server-from">Od</Label>
-                  <DateTimePicker id="superadmin-server-from" value={serverLogFrom} onChange={setServerLogFrom} />
+                  <DateTimePicker
+                    id="superadmin-server-from"
+                    value={serverLogFrom}
+                    onChange={setServerLogFrom}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="superadmin-server-to">Do</Label>
-                  <DateTimePicker id="superadmin-server-to" value={serverLogTo} onChange={setServerLogTo} />
+                  <DateTimePicker
+                    id="superadmin-server-to"
+                    value={serverLogTo}
+                    onChange={setServerLogTo}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Sortuj po</Label>
-                  <Select value={serverLogSort} onValueChange={(value) => setServerLogSort(value as ServerLogSortKey)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select
+                    value={serverLogSort}
+                    onValueChange={(value) =>
+                      setServerLogSort(value as ServerLogSortKey)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="time">Czas</SelectItem>
                       <SelectItem value="level">Poziom</SelectItem>
@@ -2071,8 +2651,15 @@ export default function SuperAdmin() {
                 </div>
                 <div className="space-y-2">
                   <Label>Kierunek</Label>
-                  <Select value={serverLogDirection} onValueChange={(value) => setServerLogDirection(value as SortDirection)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select
+                    value={serverLogDirection}
+                    onValueChange={(value) =>
+                      setServerLogDirection(value as SortDirection)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="desc">Malejąco</SelectItem>
                       <SelectItem value="asc">Rosnąco</SelectItem>
@@ -2080,13 +2667,26 @@ export default function SuperAdmin() {
                   </Select>
                 </div>
                 <div className="flex items-end">
-                  <Button onClick={() => void loadServerLogs(1)} disabled={isServerLogsLoading} className="w-full lg:w-auto">
-                    {isServerLogsLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                  <Button
+                    onClick={() => void loadServerLogs(1)}
+                    disabled={isServerLogsLoading}
+                    className="w-full lg:w-auto"
+                  >
+                    {isServerLogsLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="mr-2 h-4 w-4" />
+                    )}
                     Szukaj
                   </Button>
                 </div>
                 <div className="flex items-end">
-                  <Button variant="outline" onClick={() => void exportServerLogs()} disabled={isServerLogsLoading} className="w-full lg:w-auto">
+                  <Button
+                    variant="outline"
+                    onClick={() => void exportServerLogs()}
+                    disabled={isServerLogsLoading}
+                    className="w-full lg:w-auto"
+                  >
                     <Download className="mr-2 h-4 w-4" />
                     Eksport CSV
                   </Button>
@@ -2094,13 +2694,24 @@ export default function SuperAdmin() {
               </div>
               {loggingStatus && (
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <Badge variant={loggingStatus.writable ? "secondary" : "destructive"}>
+                  <Badge
+                    variant={
+                      loggingStatus.writable ? "secondary" : "destructive"
+                    }
+                  >
                     zapis {loggingStatus.writable ? "aktywny" : "niedostępny"}
                   </Badge>
-                  <Badge variant="outline">retencja {loggingStatus.retention_days} dni</Badge>
+                  <Badge variant="outline">
+                    retencja {loggingStatus.retention_days} dni
+                  </Badge>
                   <Badge variant="outline">poziom {loggingStatus.level}</Badge>
-                  <Badge variant="outline">Sentry {loggingStatus.sentry_configured ? "aktywne" : "wyłączone"}</Badge>
-                  <Badge variant="outline">ostatni wpis {formatDateTime(loggingStatus.last_entry_at)}</Badge>
+                  <Badge variant="outline">
+                    Sentry{" "}
+                    {loggingStatus.sentry_configured ? "aktywne" : "wyłączone"}
+                  </Badge>
+                  <Badge variant="outline">
+                    ostatni wpis {formatDateTime(loggingStatus.last_entry_at)}
+                  </Badge>
                 </div>
               )}
             </CardContent>
@@ -2108,8 +2719,13 @@ export default function SuperAdmin() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3">
-              <CardTitle className="flex items-center gap-2 text-lg"><FileText className="h-5 w-5" />Logi serwera</CardTitle>
-              <p className="text-sm text-muted-foreground">{serverLogMeta.total} wpisów</p>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <FileText className="h-5 w-5" />
+                Logi serwera
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {serverLogMeta.total} wpisów
+              </p>
             </CardHeader>
             <CardContent className="p-0">
               <Table className="min-w-[1100px] table-fixed">
@@ -2129,30 +2745,94 @@ export default function SuperAdmin() {
 
                     return (
                       <TableRow key={entry.id}>
-                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(entry.timestamp)}</TableCell>
-                        <TableCell><Badge variant={entry.level === "error" || entry.level === "critical" ? "destructive" : "outline"}>{entry.level}</Badge></TableCell>
-                        <TableCell className="truncate font-mono text-xs" title={entry.path || "-"}>{entry.path || "-"}</TableCell>
-                        <TableCell className="font-mono text-xs">{getServerLogStatus(entry)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                          {formatDateTime(entry.timestamp)}
+                        </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={cn("font-mono", getServerLogMethodClassName(method))}>
+                          <Badge
+                            variant={
+                              entry.level === "error" ||
+                              entry.level === "critical"
+                                ? "destructive"
+                                : "outline"
+                            }
+                          >
+                            {entry.level}
+                          </Badge>
+                        </TableCell>
+                        <TableCell
+                          className="truncate font-mono text-xs"
+                          title={entry.path || "-"}
+                        >
+                          {entry.path || "-"}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {getServerLogStatus(entry)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "font-mono",
+                              getServerLogMethodClassName(method)
+                            )}
+                          >
                             {method}
                           </Badge>
                         </TableCell>
-                        <TableCell><Button size="sm" variant="ghost" onClick={() => void openServerLog(entry)}>Szczegóły</Button></TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void openServerLog(entry)}
+                          >
+                            Szczegóły
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
                   {serverLogEntries.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">Brak logów dla wybranego zakresu.</TableCell></TableRow>
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="py-8 text-center text-sm text-muted-foreground"
+                      >
+                        Brak logów dla wybranego zakresu.
+                      </TableCell>
+                    </TableRow>
                   )}
                 </TableBody>
               </Table>
               {serverLogMeta.total_pages > 1 && (
                 <div className="flex items-center justify-between border-t px-4 py-3">
-                  <p className="text-sm text-muted-foreground">Strona {serverLogMeta.page} z {serverLogMeta.total_pages}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Strona {serverLogMeta.page} z {serverLogMeta.total_pages}
+                  </p>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" disabled={serverLogMeta.page <= 1 || isServerLogsLoading} onClick={() => void loadServerLogs(serverLogMeta.page - 1)}>Poprzednia</Button>
-                    <Button variant="outline" size="sm" disabled={serverLogMeta.page >= serverLogMeta.total_pages || isServerLogsLoading} onClick={() => void loadServerLogs(serverLogMeta.page + 1)}>Następna</Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={serverLogMeta.page <= 1 || isServerLogsLoading}
+                      onClick={() =>
+                        void loadServerLogs(serverLogMeta.page - 1)
+                      }
+                    >
+                      Poprzednia
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={
+                        serverLogMeta.page >= serverLogMeta.total_pages ||
+                        isServerLogsLoading
+                      }
+                      onClick={() =>
+                        void loadServerLogs(serverLogMeta.page + 1)
+                      }
+                    >
+                      Następna
+                    </Button>
                   </div>
                 </div>
               )}
@@ -2165,11 +2845,15 @@ export default function SuperAdmin() {
             <CardContent className="space-y-4 p-4 sm:p-5">
               <div className="grid gap-3 lg:grid-cols-[minmax(14rem,20rem)_minmax(16rem,26rem)_auto_1fr]">
                 <div className="space-y-2">
-                  <Label htmlFor="superadmin-database-table-search">Szukaj tabeli</Label>
+                  <Label htmlFor="superadmin-database-table-search">
+                    Szukaj tabeli
+                  </Label>
                   <Input
                     id="superadmin-database-table-search"
                     value={databaseTableSearch}
-                    onChange={(event) => setDatabaseTableSearch(event.target.value)}
+                    onChange={(event) =>
+                      setDatabaseTableSearch(event.target.value)
+                    }
                     placeholder="Nazwa tabeli"
                     disabled={!hasLoadedDatabase}
                   />
@@ -2179,10 +2863,20 @@ export default function SuperAdmin() {
                   <Select
                     value={selectedDatabaseTable}
                     onValueChange={selectDatabaseTable}
-                    disabled={!isOnline || isDatabaseLoading || databaseTables.length === 0}
+                    disabled={
+                      !isOnline ||
+                      isDatabaseLoading ||
+                      databaseTables.length === 0
+                    }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={hasLoadedDatabase ? "Wybierz tabelę" : "Załaduj listę tabel"} />
+                      <SelectValue
+                        placeholder={
+                          hasLoadedDatabase
+                            ? "Wybierz tabelę"
+                            : "Załaduj listę tabel"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {filteredDatabaseTables.map((table) => (
@@ -2198,22 +2892,41 @@ export default function SuperAdmin() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => void loadDatabase(selectedDatabaseTable, selectedDatabaseTable ? databasePage : 1)}
+                    onClick={() =>
+                      void loadDatabase(
+                        selectedDatabaseTable,
+                        selectedDatabaseTable ? databasePage : 1
+                      )
+                    }
                     disabled={!isOnline || isDatabaseLoading}
                     className="w-full lg:w-auto"
                   >
-                    {isDatabaseLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    {isDatabaseLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
                     Odśwież
                   </Button>
                 </div>
 
                 <div className="flex flex-wrap items-end gap-2">
-                  <Badge variant="secondary">{databaseTables.length} tabel</Badge>
-                  {databaseTableSearch.trim() && <Badge variant="outline">{filteredDatabaseTables.length} pasuje</Badge>}
+                  <Badge variant="secondary">
+                    {databaseTables.length} tabel
+                  </Badge>
+                  {databaseTableSearch.trim() && (
+                    <Badge variant="outline">
+                      {filteredDatabaseTables.length} pasuje
+                    </Badge>
+                  )}
                   {selectedDatabaseTable && (
                     <>
-                      <Badge variant="outline">{databaseColumns.length} kolumn</Badge>
-                      <Badge variant="outline">{databaseMeta.total} wierszy</Badge>
+                      <Badge variant="outline">
+                        {databaseColumns.length} kolumn
+                      </Badge>
+                      <Badge variant="outline">
+                        {databaseMeta.total} wierszy
+                      </Badge>
                       <Badge variant="outline">dane wrażliwe maskowane</Badge>
                     </>
                   )}
@@ -2226,7 +2939,9 @@ export default function SuperAdmin() {
             <CardHeader className="flex flex-row items-center justify-between gap-3">
               <CardTitle className="flex min-w-0 items-center gap-2 text-lg">
                 <Database className="h-5 w-5 shrink-0" />
-                <span className="truncate">{selectedDatabaseTable || "Dane tabeli"}</span>
+                <span className="truncate">
+                  {selectedDatabaseTable || "Dane tabeli"}
+                </span>
               </CardTitle>
               {selectedDatabaseTable && (
                 <p className="shrink-0 text-sm text-muted-foreground">
@@ -2248,13 +2963,24 @@ export default function SuperAdmin() {
                       <TableHeader>
                         <TableRow>
                           {databaseColumns.map((column) => (
-                            <TableHead key={column.name} className="min-w-40 align-top">
+                            <TableHead
+                              key={column.name}
+                              className="min-w-40 align-top"
+                            >
                               <span className="flex items-center gap-1.5 truncate font-mono text-xs">
                                 {column.name}
-                                {column.masked && <Badge variant="secondary" className="px-1 py-0 text-[0.6rem]">maskowane</Badge>}
+                                {column.masked && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="px-1 py-0 text-[0.6rem]"
+                                  >
+                                    maskowane
+                                  </Badge>
+                                )}
                               </span>
                               <span className="block truncate text-[0.68rem] font-normal text-muted-foreground">
-                                {column.type}{column.key ? ` · ${column.key}` : ""}
+                                {column.type}
+                                {column.key ? ` · ${column.key}` : ""}
                               </span>
                             </TableHead>
                           ))}
@@ -2262,10 +2988,16 @@ export default function SuperAdmin() {
                       </TableHeader>
                       <TableBody>
                         {databaseRows.map((row, rowIndex) => (
-                          <TableRow key={`${selectedDatabaseTable}-${databaseMeta.page}-${rowIndex}`}>
+                          <TableRow
+                            key={`${selectedDatabaseTable}-${databaseMeta.page}-${rowIndex}`}
+                          >
                             {databaseColumns.map((column) => {
-                              const value = formatDatabaseValue(row[column.name]);
-                              const isNull = row[column.name] === null || typeof row[column.name] === "undefined";
+                              const value = formatDatabaseValue(
+                                row[column.name]
+                              );
+                              const isNull =
+                                row[column.name] === null ||
+                                typeof row[column.name] === "undefined";
 
                               return (
                                 <TableCell
@@ -2281,14 +3013,20 @@ export default function SuperAdmin() {
                         ))}
                         {databaseRows.length === 0 && !isDatabaseLoading && (
                           <TableRow>
-                            <TableCell colSpan={Math.max(databaseColumns.length, 1)} className="py-8 text-center text-sm text-muted-foreground">
+                            <TableCell
+                              colSpan={Math.max(databaseColumns.length, 1)}
+                              className="py-8 text-center text-sm text-muted-foreground"
+                            >
                               Brak wierszy w wybranej tabeli.
                             </TableCell>
                           </TableRow>
                         )}
                         {isDatabaseLoading && (
                           <TableRow>
-                            <TableCell colSpan={Math.max(databaseColumns.length, 1)} className="py-8 text-center text-sm text-muted-foreground">
+                            <TableCell
+                              colSpan={Math.max(databaseColumns.length, 1)}
+                              className="py-8 text-center text-sm text-muted-foreground"
+                            >
                               <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
                               Ładowanie danych...
                             </TableCell>
@@ -2310,8 +3048,12 @@ export default function SuperAdmin() {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              onClick={() => goToDatabasePage(databaseMeta.page - 1)}
-                              disabled={databaseMeta.page <= 1 || isDatabaseLoading}
+                              onClick={() =>
+                                goToDatabasePage(databaseMeta.page - 1)
+                              }
+                              disabled={
+                                databaseMeta.page <= 1 || isDatabaseLoading
+                              }
                               aria-label="Poprzednia strona"
                             >
                               <ChevronLeft className="h-4 w-4" />
@@ -2327,8 +3069,13 @@ export default function SuperAdmin() {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              onClick={() => goToDatabasePage(databaseMeta.page + 1)}
-                              disabled={databaseMeta.page >= databaseMeta.total_pages || isDatabaseLoading}
+                              onClick={() =>
+                                goToDatabasePage(databaseMeta.page + 1)
+                              }
+                              disabled={
+                                databaseMeta.page >= databaseMeta.total_pages ||
+                                isDatabaseLoading
+                              }
                               aria-label="Następna strona"
                             >
                               <ChevronRight className="h-4 w-4" />
@@ -2350,8 +3097,11 @@ export default function SuperAdmin() {
               <div>
                 <p className="font-medium">Centrum operacyjne</p>
                 <p className="text-sm text-muted-foreground">
-                  Alerty, synchronizacja i jakość danych wymagające uwagi superadmina.
-                  {operationsData.generated_at ? ` Ostatnia aktualizacja: ${formatDateTime(operationsData.generated_at)}.` : ""}
+                  Alerty, synchronizacja i jakość danych wymagające uwagi
+                  superadmina.
+                  {operationsData.generated_at
+                    ? ` Ostatnia aktualizacja: ${formatDateTime(operationsData.generated_at)}.`
+                    : ""}
                 </p>
               </div>
               <Button
@@ -2361,7 +3111,11 @@ export default function SuperAdmin() {
                 disabled={!isOnline || isOperationsLoading}
                 className="w-full sm:w-auto"
               >
-                {isOperationsLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                {isOperationsLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
                 Odśwież
               </Button>
             </CardContent>
@@ -2370,7 +3124,13 @@ export default function SuperAdmin() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3">
               <CardTitle className="text-lg">Wymaga uwagi</CardTitle>
-              <Badge variant={prioritizedOperationalIssues.length > 0 ? "destructive" : "secondary"}>
+              <Badge
+                variant={
+                  prioritizedOperationalIssues.length > 0
+                    ? "destructive"
+                    : "secondary"
+                }
+              >
                 {prioritizedOperationalIssues.length}
               </Badge>
             </CardHeader>
@@ -2381,22 +3141,46 @@ export default function SuperAdmin() {
                   Ładowanie centrum operacyjnego...
                 </p>
               )}
-              {!isOperationsLoading && hasLoadedOperations && prioritizedOperationalIssues.length === 0 && (
-                <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  Brak aktywnych alertów i problemów jakości danych.
-                </div>
+              {!isOperationsLoading &&
+                hasLoadedOperations &&
+                prioritizedOperationalIssues.length === 0 && (
+                  <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    Brak aktywnych alertów i problemów jakości danych.
+                  </div>
+                )}
+              {criticalIssues.length > 0 && (
+                <IssueGroup
+                  title="Krytyczne"
+                  issues={criticalIssues}
+                  onArchive={openArchiveIssueDialog}
+                />
               )}
-              {criticalIssues.length > 0 && <IssueGroup title="Krytyczne" issues={criticalIssues} onArchive={openArchiveIssueDialog} />}
-              {warningIssues.length > 0 && <IssueGroup title="Ostrzeżenia" issues={warningIssues} onArchive={openArchiveIssueDialog} />}
-              {infoIssues.length > 0 && <IssueGroup title="Informacyjne" issues={infoIssues} onArchive={openArchiveIssueDialog} />}
+              {warningIssues.length > 0 && (
+                <IssueGroup
+                  title="Ostrzeżenia"
+                  issues={warningIssues}
+                  onArchive={openArchiveIssueDialog}
+                />
+              )}
+              {infoIssues.length > 0 && (
+                <IssueGroup
+                  title="Informacyjne"
+                  issues={infoIssues}
+                  onArchive={openArchiveIssueDialog}
+                />
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3">
-              <CardTitle className="text-lg">Zarchiwizowane ostrzeżenia</CardTitle>
-              <Badge variant="secondary">{operationsData.archived_issues.length}</Badge>
+              <CardTitle className="text-lg">
+                Zarchiwizowane ostrzeżenia
+              </CardTitle>
+              <Badge variant="secondary">
+                {operationsData.archived_issues.length}
+              </Badge>
             </CardHeader>
             <CardContent className="space-y-3">
               {operationsData.archived_issues.length === 0 && (
@@ -2405,22 +3189,37 @@ export default function SuperAdmin() {
                 </p>
               )}
               {operationsData.archived_issues.map((issue) => (
-                <div key={issue.id} className="space-y-2 rounded-lg border p-3 sm:p-4">
+                <div
+                  key={issue.id}
+                  className="space-y-2 rounded-lg border p-3 sm:p-4"
+                >
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{issue.title}</p>
                     <Badge variant="outline">
-                      {issue.severity === "critical" ? "krytyczne" : issue.severity === "warning" ? "ostrzeżenie" : "informacja"}
+                      {issue.severity === "critical"
+                        ? "krytyczne"
+                        : issue.severity === "warning"
+                          ? "ostrzeżenie"
+                          : "informacja"}
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground">{issue.description}</p>
-                  {[issue.organization_name, issue.event_name].filter(Boolean).length > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {issue.description}
+                  </p>
+                  {[issue.organization_name, issue.event_name].filter(Boolean)
+                    .length > 0 && (
                     <p className="truncate text-xs text-muted-foreground">
-                      {[issue.organization_name, issue.event_name].filter(Boolean).join(" · ")}
+                      {[issue.organization_name, issue.event_name]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
                   )}
                   <div className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
                     <p>
-                      Zarchiwizował(a): <span className="font-medium text-foreground">{issue.archived_by_name}</span>
+                      Zarchiwizował(a):{" "}
+                      <span className="font-medium text-foreground">
+                        {issue.archived_by_name}
+                      </span>
                       {" · "}
                       {formatDateTime(issue.archived_at)}
                     </p>
@@ -2434,7 +3233,9 @@ export default function SuperAdmin() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3">
               <CardTitle className="text-lg">Konsola synchronizacji</CardTitle>
-              <Badge variant="secondary">{operationsData.sync_events.length}</Badge>
+              <Badge variant="secondary">
+                {operationsData.sync_events.length}
+              </Badge>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -2452,82 +3253,144 @@ export default function SuperAdmin() {
                   </TableHeader>
                   <TableBody>
                     {operationsData.sync_events.map((syncEvent) => {
-                      const conflictCount = syncEvent.conflicts_count + syncEvent.outbox_conflict_count;
+                      const conflictCount =
+                        syncEvent.conflicts_count +
+                        syncEvent.outbox_conflict_count;
                       return (
                         <TableRow key={syncEvent.event_id}>
                           <TableCell>
-                            <p className="font-medium">{syncEvent.event_name}</p>
-                            <p className="text-xs text-muted-foreground">{syncEvent.organization_name}</p>
+                            <p className="font-medium">
+                              {syncEvent.event_name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {syncEvent.organization_name}
+                            </p>
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
-                              {syncEvent.sync_mode === "local_authoritative" ? "lokalny" : "cloud"}
+                              {syncEvent.sync_mode === "local_authoritative"
+                                ? "lokalny"
+                                : "cloud"}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={syncEvent.sync_status === "conflict" || conflictCount > 0 ? "destructive" : "secondary"}>
+                            <Badge
+                              variant={
+                                syncEvent.sync_status === "conflict" ||
+                                conflictCount > 0
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                            >
                               {syncStatusLabel(syncEvent.sync_status)}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm">
-                            <span className="block">oczekuje: {syncEvent.pending_count}</span>
-                            <span className="block text-muted-foreground">konflikty: {conflictCount}, błędy: {syncEvent.error_count}</span>
+                            <span className="block">
+                              oczekuje: {syncEvent.pending_count}
+                            </span>
+                            <span className="block text-muted-foreground">
+                              konflikty: {conflictCount}, błędy:{" "}
+                              {syncEvent.error_count}
+                            </span>
                           </TableCell>
                           <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                             {formatDateTime(syncEvent.last_synced_at)}
                           </TableCell>
-                          <TableCell className="max-w-[18rem] truncate text-sm text-muted-foreground" title={syncEvent.last_error ?? ""}>
+                          <TableCell
+                            className="max-w-[18rem] truncate text-sm text-muted-foreground"
+                            title={syncEvent.last_error ?? ""}
+                          >
                             {syncEvent.last_error || "-"}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button asChild variant="ghost" size="sm">
-                              <Link to={buildEventPath(syncEvent.event_id)}>Wydarzenie</Link>
+                              <Link to={buildEventPath(syncEvent.event_id)}>
+                                Wydarzenie
+                              </Link>
                             </Button>
                           </TableCell>
                         </TableRow>
                       );
                     })}
-                    {hasLoadedOperations && operationsData.sync_events.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                          Brak wydarzeń korzystających z synchronizacji.
-                        </TableCell>
-                      </TableRow>
-                    )}
+                    {hasLoadedOperations &&
+                      operationsData.sync_events.length === 0 && (
+                        <TableRow>
+                          <TableCell
+                            colSpan={7}
+                            className="py-8 text-center text-sm text-muted-foreground"
+                          >
+                            Brak wydarzeń korzystających z synchronizacji.
+                          </TableCell>
+                        </TableRow>
+                      )}
                   </TableBody>
                 </Table>
               </div>
             </CardContent>
           </Card>
 
-          <p className="pt-2 text-sm font-medium text-muted-foreground">Statystyki systemu</p>
+          <p className="pt-2 text-sm font-medium text-muted-foreground">
+            Statystyki systemu
+          </p>
           <div className="grid gap-2 sm:gap-4 lg:grid-cols-2">
             <ControlCard title="Role" icon={Shield}>
               {Object.entries(roleCounts).map(([role, count]) => (
-                <ControlRow key={role} label={roleLabels[role as Role]} value={count} />
+                <ControlRow
+                  key={role}
+                  label={roleLabels[role as Role]}
+                  value={count}
+                />
               ))}
             </ControlCard>
 
             <ControlCard title="Uczestnicy" icon={UserRound}>
-              {Object.entries(participantStatusCounts).map(([status, count]) => (
-                <ControlRow key={status} label={participantStatusLabels[status as ParticipantStatus]} value={count} />
-              ))}
+              {Object.entries(participantStatusCounts).map(
+                ([status, count]) => (
+                  <ControlRow
+                    key={status}
+                    label={participantStatusLabels[status as ParticipantStatus]}
+                    value={count}
+                  />
+                )
+              )}
             </ControlCard>
 
             <ControlCard title="Wydarzenia" icon={CalendarDays}>
               <ControlRow label="Aktywne" value={productionEvents.length} />
-              <ControlRow label="Archiwalne" value={productionArchivedEvents.length} />
-              <ControlRow label="Z uczestnikami" value={new Set(participants.map((participant) => participant.event_id)).size} />
+              <ControlRow
+                label="Archiwalne"
+                value={productionArchivedEvents.length}
+              />
+              <ControlRow
+                label="Z uczestnikami"
+                value={
+                  new Set(
+                    participants.map((participant) => participant.event_id)
+                  ).size
+                }
+              />
             </ControlCard>
 
             <ControlCard title="Ostatnie aktywności" icon={Activity}>
               {activityLog.slice(0, 5).map((log) => (
-                <div key={log.id} className="border-b py-1.5 last:border-0 sm:py-2">
-                  <p className="break-words text-xs font-medium sm:text-sm">{log.action}</p>
-                  <p className="text-xs text-muted-foreground">{formatDateTime(log.timestamp)}</p>
+                <div
+                  key={log.id}
+                  className="border-b py-1.5 last:border-0 sm:py-2"
+                >
+                  <p className="break-words text-xs font-medium sm:text-sm">
+                    {log.action}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDateTime(log.timestamp)}
+                  </p>
                 </div>
               ))}
-              {activityLog.length === 0 && <p className="text-sm text-muted-foreground">Brak aktywności.</p>}
+              {activityLog.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Brak aktywności.
+                </p>
+              )}
             </ControlCard>
           </div>
         </TabsContent>
@@ -2550,14 +3413,18 @@ export default function SuperAdmin() {
             <div className="space-y-4">
               <div>
                 <p className="font-medium">{archiveIssueTarget.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{archiveIssueTarget.description}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {archiveIssueTarget.description}
+                </p>
               </div>
               <div>
                 <Label htmlFor="archive-issue-reason">Powód archiwizacji</Label>
                 <Textarea
                   id="archive-issue-reason"
                   value={archiveIssueReason}
-                  onChange={(event) => setArchiveIssueReason(event.target.value)}
+                  onChange={(event) =>
+                    setArchiveIssueReason(event.target.value)
+                  }
                   className="mt-2"
                   rows={4}
                   required
@@ -2583,7 +3450,9 @@ export default function SuperAdmin() {
               onClick={() => void archiveOperationalIssue()}
               disabled={isArchivingIssue || !archiveIssueReason.trim()}
             >
-              {isArchivingIssue && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              {isArchivingIssue && (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              )}
               Archiwizuj
             </Button>
           </DialogFooter>
@@ -2598,31 +3467,71 @@ export default function SuperAdmin() {
           {selectedAuditEntry && (
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">{formatDateTime(selectedAuditEntry.timestamp)}</Badge>
-                {selectedAuditEntry.action_code && <Badge variant="secondary">{selectedAuditEntry.action_code}</Badge>}
-                {selectedAuditEntry.outcome && <Badge variant={selectedAuditEntry.outcome === "success" ? "secondary" : "destructive"}>{selectedAuditEntry.outcome}</Badge>}
-                {selectedAuditEntry.request_id && <Badge variant="outline" className="font-mono">{selectedAuditEntry.request_id}</Badge>}
+                <Badge variant="outline">
+                  {formatDateTime(selectedAuditEntry.timestamp)}
+                </Badge>
+                {selectedAuditEntry.action_code && (
+                  <Badge variant="secondary">
+                    {selectedAuditEntry.action_code}
+                  </Badge>
+                )}
+                {selectedAuditEntry.outcome && (
+                  <Badge
+                    variant={
+                      selectedAuditEntry.outcome === "success"
+                        ? "secondary"
+                        : "destructive"
+                    }
+                  >
+                    {selectedAuditEntry.outcome}
+                  </Badge>
+                )}
+                {selectedAuditEntry.request_id && (
+                  <Badge variant="outline" className="font-mono">
+                    {selectedAuditEntry.request_id}
+                  </Badge>
+                )}
               </div>
               <div className="grid gap-3 text-sm md:grid-cols-2">
                 <div>
-                  <p className="text-xs uppercase text-muted-foreground">Akcja</p>
+                  <p className="text-xs uppercase text-muted-foreground">
+                    Akcja
+                  </p>
                   <p className="font-medium">{selectedAuditEntry.action}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-muted-foreground">Operator</p>
-                  <p>{selectedAuditEntry.user_name || "-"} {selectedAuditEntry.user_role ? `(${selectedAuditEntry.user_role})` : ""}</p>
+                  <p className="text-xs uppercase text-muted-foreground">
+                    Operator
+                  </p>
+                  <p>
+                    {selectedAuditEntry.user_name || "-"}{" "}
+                    {selectedAuditEntry.user_role
+                      ? `(${selectedAuditEntry.user_role})`
+                      : ""}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs uppercase text-muted-foreground">Cel</p>
-                  <p className="font-mono text-xs">{[selectedAuditEntry.target_type, selectedAuditEntry.target_id].filter(Boolean).join(":") || "-"}</p>
+                  <p className="font-mono text-xs">
+                    {[
+                      selectedAuditEntry.target_type,
+                      selectedAuditEntry.target_id,
+                    ]
+                      .filter(Boolean)
+                      .join(":") || "-"}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-muted-foreground">Powiązania</p>
+                  <p className="text-xs uppercase text-muted-foreground">
+                    Powiązania
+                  </p>
                   <RelatedAuditData entry={selectedAuditEntry} />
                 </div>
               </div>
               <div className="rounded-lg border bg-muted/30 p-3">
-                <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">Metadane diagnostyczne</p>
+                <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+                  Metadane diagnostyczne
+                </p>
                 <pre className="max-h-[48vh] overflow-auto whitespace-pre-wrap break-words text-xs leading-5">
                   {formatJson(selectedAuditEntry.metadata ?? {})}
                 </pre>
@@ -2645,7 +3554,9 @@ export default function SuperAdmin() {
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline">{selectedServerLog.level}</Badge>
                 <Badge variant="outline">{selectedServerLog.event_code}</Badge>
-                <Badge variant="outline">{formatDateTime(selectedServerLog.timestamp)}</Badge>
+                <Badge variant="outline">
+                  {formatDateTime(selectedServerLog.timestamp)}
+                </Badge>
               </div>
               <p className="text-sm">{selectedServerLog.message}</p>
               <pre className="max-h-[50vh] overflow-auto rounded-md border bg-muted/40 p-3 text-xs">
@@ -2654,10 +3565,20 @@ export default function SuperAdmin() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => void navigator.clipboard.writeText(selectedServerLog?.request_id || "")}>
-              <Copy className="mr-2 h-4 w-4" />Kopiuj request ID
+            <Button
+              variant="outline"
+              onClick={() =>
+                void navigator.clipboard.writeText(
+                  selectedServerLog?.request_id || ""
+                )
+              }
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Kopiuj request ID
             </Button>
-            <Button onClick={() => setServerLogDialogOpen(false)}>Zamknij</Button>
+            <Button onClick={() => setServerLogDialogOpen(false)}>
+              Zamknij
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2677,15 +3598,22 @@ export default function SuperAdmin() {
             <div className="space-y-4">
               <div className="rounded-lg border bg-muted/30 p-3">
                 <p className="font-medium">{profileUser.name}</p>
-                <p className="break-all text-sm text-muted-foreground">{profileUser.email}</p>
+                <p className="break-all text-sm text-muted-foreground">
+                  {profileUser.email}
+                </p>
               </div>
               <div className="grid gap-3 text-sm sm:grid-cols-2">
-                <AccountDetail label="Rola" value={roleLabels[profileUser.role]} />
+                <AccountDetail
+                  label="Rola"
+                  value={roleLabels[profileUser.role]}
+                />
                 <AccountDetail
                   label="Organizacja"
                   value={
                     profileUser.organization_id
-                      ? organizationNameById.get(profileUser.organization_id) ?? profileUser.organization_id
+                      ? (organizationNameById.get(
+                          profileUser.organization_id
+                        ) ?? profileUser.organization_id)
                       : "Wszystkie organizacje"
                   }
                 />
@@ -2698,46 +3626,83 @@ export default function SuperAdmin() {
                       : profileUser.role === "editor"
                         ? `${allEvents.filter((event) => event.organization_id === profileUser.organization_id).length} wydarzeń organizacji`
                         : profileUser.assigned_events
-                            .map((eventId) => eventById.get(eventId)?.name ?? eventId)
+                            .map(
+                              (eventId) =>
+                                eventById.get(eventId)?.name ?? eventId
+                            )
                             .join(", ") || "Brak"
                   }
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => openUserLogs(profileUser)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openUserLogs(profileUser)}
+                >
                   <Activity className="mr-1 h-4 w-4" />
                   Logi
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => openEditUser(profileUser)} disabled={!isOnline}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openEditUser(profileUser)}
+                  disabled={!isOnline}
+                >
                   <Edit3 className="mr-1 h-4 w-4" />
                   Edytuj
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => openRoleDialog(profileUser)} disabled={!isOnline}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openRoleDialog(profileUser)}
+                  disabled={!isOnline}
+                >
                   <Shield className="mr-1 h-4 w-4" />
                   Zmień rolę
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => resetAdminPassword(profileUser)} disabled={!isOnline}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => resetAdminPassword(profileUser)}
+                  disabled={!isOnline}
+                >
                   <KeyRound className="mr-1 h-4 w-4" />
                   Reset hasła
                 </Button>
                 {profileUser.role !== "admin" && (
-                  <Button variant="outline" size="sm" onClick={() => openPasswordDialog(profileUser)} disabled={!isOnline}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openPasswordDialog(profileUser)}
+                    disabled={!isOnline}
+                  >
                     <EyeOff className="mr-1 h-4 w-4" />
                     Ustaw hasło
                   </Button>
                 )}
-                {(profileUser.role === "scanner" || profileUser.role === "scanner_plus") && (
+                {(profileUser.role === "scanner" ||
+                  profileUser.role === "scanner_plus") && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => void toggleScannerRole(profileUser)}
                     disabled={!isOnline || isChangingUserRole}
                   >
-                    {isChangingUserRole && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-                    {profileUser.role === "scanner" ? "Zmień na Operator Plus" : "Zmień na Operator"}
+                    {isChangingUserRole && (
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    )}
+                    {profileUser.role === "scanner"
+                      ? "Zmień na Operator Plus"
+                      : "Zmień na Operator"}
                   </Button>
                 )}
-                <Button variant="destructive" size="sm" onClick={() => archiveAdmin(profileUser)} disabled={!isOnline}>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => archiveAdmin(profileUser)}
+                  disabled={!isOnline}
+                >
                   <Archive className="mr-1 h-4 w-4" />
                   Archiwizuj
                 </Button>
@@ -2770,7 +3735,12 @@ export default function SuperAdmin() {
               <Input
                 id="superadmin-user-name"
                 value={userForm.name}
-                onChange={(event) => setUserForm((previous) => ({ ...previous, name: event.target.value }))}
+                onChange={(event) =>
+                  setUserForm((previous) => ({
+                    ...previous,
+                    name: event.target.value,
+                  }))
+                }
               />
             </div>
             <div className="space-y-2">
@@ -2779,16 +3749,27 @@ export default function SuperAdmin() {
                 id="superadmin-user-email"
                 type="email"
                 value={userForm.email}
-                onChange={(event) => setUserForm((previous) => ({ ...previous, email: event.target.value }))}
+                onChange={(event) =>
+                  setUserForm((previous) => ({
+                    ...previous,
+                    email: event.target.value,
+                  }))
+                }
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUserDialogOpen(false)} disabled={isSavingUser}>
+            <Button
+              variant="outline"
+              onClick={() => setUserDialogOpen(false)}
+              disabled={isSavingUser}
+            >
               Anuluj
             </Button>
             <Button onClick={() => void saveUser()} disabled={isSavingUser}>
-              {isSavingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSavingUser && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Zapisz
             </Button>
           </DialogFooter>
@@ -2812,13 +3793,20 @@ export default function SuperAdmin() {
           <div className="space-y-4">
             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
               <p className="font-medium">{roleUser?.name}</p>
-              <p className="break-all text-xs text-muted-foreground">{roleUser?.email}</p>
+              <p className="break-all text-xs text-muted-foreground">
+                {roleUser?.email}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="superadmin-user-role">Rola</Label>
               <Select
                 value={roleForm.role}
-                onValueChange={(value) => setRoleForm((previous) => ({ ...previous, role: value as ManagedUserRole }))}
+                onValueChange={(value) =>
+                  setRoleForm((previous) => ({
+                    ...previous,
+                    role: value as ManagedUserRole,
+                  }))
+                }
               >
                 <SelectTrigger id="superadmin-user-role">
                   <SelectValue />
@@ -2834,10 +3822,17 @@ export default function SuperAdmin() {
             </div>
             {roleForm.role !== "admin" && (
               <div className="space-y-2">
-                <Label htmlFor="superadmin-user-role-organization">Organizacja</Label>
+                <Label htmlFor="superadmin-user-role-organization">
+                  Organizacja
+                </Label>
                 <Select
                   value={roleForm.organization_id}
-                  onValueChange={(value) => setRoleForm((previous) => ({ ...previous, organization_id: value }))}
+                  onValueChange={(value) =>
+                    setRoleForm((previous) => ({
+                      ...previous,
+                      organization_id: value,
+                    }))
+                  }
                 >
                   <SelectTrigger id="superadmin-user-role-organization">
                     <SelectValue placeholder="Wybierz organizację" />
@@ -2854,16 +3849,26 @@ export default function SuperAdmin() {
             )}
             {roleForm.role === "admin" && (
               <p className="text-sm text-muted-foreground">
-                Konto admina nie jest przypisane do jednej organizacji i zachowuje pełny dostęp.
+                Konto admina nie jest przypisane do jednej organizacji i
+                zachowuje pełny dostęp.
               </p>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRoleDialogOpen(false)} disabled={isSavingUserRole}>
+            <Button
+              variant="outline"
+              onClick={() => setRoleDialogOpen(false)}
+              disabled={isSavingUserRole}
+            >
               Anuluj
             </Button>
-            <Button onClick={() => void saveUserRole()} disabled={isSavingUserRole || !roleUser}>
-              {isSavingUserRole && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button
+              onClick={() => void saveUserRole()}
+              disabled={isSavingUserRole || !roleUser}
+            >
+              {isSavingUserRole && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Zapisz rolę
             </Button>
           </DialogFooter>
@@ -2889,7 +3894,9 @@ export default function SuperAdmin() {
           <div className="space-y-4">
             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
               <p className="font-medium">{selectedActionUser?.name}</p>
-              <p className="break-all text-xs text-muted-foreground">{selectedActionUser?.email}</p>
+              <p className="break-all text-xs text-muted-foreground">
+                {selectedActionUser?.email}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="superadmin-user-password">Nowe hasło</Label>
@@ -2923,27 +3930,50 @@ export default function SuperAdmin() {
                     size="icon"
                     className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
                     onClick={() => setShowPasswordDraft((visible) => !visible)}
-                    aria-label={showPasswordDraft ? "Ukryj hasło" : "Pokaż hasło"}
+                    aria-label={
+                      showPasswordDraft ? "Ukryj hasło" : "Pokaż hasło"
+                    }
                   >
-                    {showPasswordDraft ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPasswordDraft ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
-                <Button type="button" variant="outline" onClick={generatePasswordDraft}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={generatePasswordDraft}
+                >
                   <KeyRound className="mr-1 h-4 w-4" />
                   Generator
                 </Button>
               </div>
               <PasswordRequirements password={passwordDraft} />
-              <FieldError id="superadmin-user-password-error">{passwordErrors.password}</FieldError>
+              <FieldError id="superadmin-user-password-error">
+                {passwordErrors.password}
+              </FieldError>
             </div>
-            <FieldError id="superadmin-user-password-form-error">{passwordErrors.form}</FieldError>
+            <FieldError id="superadmin-user-password-form-error">
+              {passwordErrors.form}
+            </FieldError>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPasswordDialogOpen(false)} disabled={isSettingPassword}>
+            <Button
+              variant="outline"
+              onClick={() => setPasswordDialogOpen(false)}
+              disabled={isSettingPassword}
+            >
               Anuluj
             </Button>
-            <Button onClick={() => void saveUserPassword()} disabled={isSettingPassword || !selectedActionUser}>
-              {isSettingPassword && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+            <Button
+              onClick={() => void saveUserPassword()}
+              disabled={isSettingPassword || !selectedActionUser}
+            >
+              {isSettingPassword && (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              )}
               Zapisz hasło
             </Button>
           </DialogFooter>
@@ -2959,7 +3989,9 @@ export default function SuperAdmin() {
       >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editAdmin ? "Edytuj admina" : "Nowy admin"}</DialogTitle>
+            <DialogTitle>
+              {editAdmin ? "Edytuj admina" : "Nowy admin"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -2967,7 +3999,12 @@ export default function SuperAdmin() {
               <Input
                 id="superadmin-admin-name"
                 value={adminForm.name}
-                onChange={(event) => setAdminForm((previous) => ({ ...previous, name: event.target.value }))}
+                onChange={(event) =>
+                  setAdminForm((previous) => ({
+                    ...previous,
+                    name: event.target.value,
+                  }))
+                }
               />
             </div>
             <div className="space-y-2">
@@ -2976,7 +4013,12 @@ export default function SuperAdmin() {
                 id="superadmin-admin-email"
                 type="email"
                 value={adminForm.email}
-                onChange={(event) => setAdminForm((previous) => ({ ...previous, email: event.target.value }))}
+                onChange={(event) =>
+                  setAdminForm((previous) => ({
+                    ...previous,
+                    email: event.target.value,
+                  }))
+                }
               />
             </div>
           </div>
@@ -2985,7 +4027,9 @@ export default function SuperAdmin() {
               Anuluj
             </Button>
             <Button onClick={saveAdmin} disabled={isSavingAdmin}>
-              {isSavingAdmin && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSavingAdmin && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Zapisz
             </Button>
           </DialogFooter>
@@ -3050,7 +4094,11 @@ function IssueGroup({
         <Badge variant="outline">{issues.length}</Badge>
       </div>
       {issues.map((issue) => (
-        <OperationalIssueRow key={issue.id} issue={issue} onArchive={onArchive} />
+        <OperationalIssueRow
+          key={issue.id}
+          issue={issue}
+          onArchive={onArchive}
+        />
       ))}
     </div>
   );
@@ -3064,30 +4112,56 @@ function OperationalIssueRow({
   onArchive: (issue: OperationalIssue) => void;
 }) {
   const actionPath = operationalIssuePath(issue);
-  const contextLabel = [issue.organization_name, issue.event_name].filter(Boolean).join(" · ");
+  const contextLabel = [issue.organization_name, issue.event_name]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
       <div className="flex min-w-0 gap-3">
-        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-          issue.severity === "critical"
-            ? "bg-destructive/10 text-destructive"
-            : issue.severity === "warning"
-              ? "bg-amber-500/10 text-amber-700"
-              : "bg-primary/10 text-primary"
-        }`}>
-          {issue.severity === "info" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+        <div
+          className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+            issue.severity === "critical"
+              ? "bg-destructive/10 text-destructive"
+              : issue.severity === "warning"
+                ? "bg-amber-500/10 text-amber-700"
+                : "bg-primary/10 text-primary"
+          }`}
+        >
+          {issue.severity === "info" ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : (
+            <AlertTriangle className="h-4 w-4" />
+          )}
         </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-medium">{issue.title}</p>
-            <Badge variant={issue.severity === "critical" ? "destructive" : issue.severity === "warning" ? "secondary" : "outline"}>
-              {issue.severity === "critical" ? "krytyczne" : issue.severity === "warning" ? "ostrzeżenie" : "informacja"}
+            <Badge
+              variant={
+                issue.severity === "critical"
+                  ? "destructive"
+                  : issue.severity === "warning"
+                    ? "secondary"
+                    : "outline"
+              }
+            >
+              {issue.severity === "critical"
+                ? "krytyczne"
+                : issue.severity === "warning"
+                  ? "ostrzeżenie"
+                  : "informacja"}
             </Badge>
             {issue.count > 1 && <Badge variant="outline">{issue.count}</Badge>}
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">{issue.description}</p>
-          {contextLabel && <p className="mt-1 truncate text-xs text-muted-foreground">{contextLabel}</p>}
+          <p className="mt-1 text-sm text-muted-foreground">
+            {issue.description}
+          </p>
+          {contextLabel && (
+            <p className="mt-1 truncate text-xs text-muted-foreground">
+              {contextLabel}
+            </p>
+          )}
         </div>
       </div>
       <div className="flex shrink-0 gap-2">
@@ -3123,7 +4197,9 @@ function MetricCard({
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            {label}
+          </p>
           <p className="text-2xl font-semibold">{value}</p>
           <p className="truncate text-xs text-muted-foreground">{detail}</p>
         </div>
@@ -3135,15 +4211,21 @@ function MetricCard({
 function AccountDetail({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-md border bg-background/60 p-3">
-      <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-1 break-words text-sm font-medium">{value}</p>
     </div>
   );
 }
 
 function RelatedAuditData({ entry }: { entry: AuditEntry }) {
-  const participantId = entry.participant_id ? String(entry.participant_id) : "";
-  const participantUiId = participantId.startsWith("p-") ? participantId : `p-${participantId}`;
+  const participantId = entry.participant_id
+    ? String(entry.participant_id)
+    : "";
+  const participantUiId = participantId.startsWith("p-")
+    ? participantId
+    : `p-${participantId}`;
   const values = [
     entry.organization_id && entry.organization_name
       ? {
@@ -3169,7 +4251,12 @@ function RelatedAuditData({ entry }: { entry: AuditEntry }) {
           to: buildEventParticipantPath(entry.event_id, participantUiId),
         }
       : null,
-  ].filter((value): value is { key: string; label: string; meta: string; to: string } => value !== null);
+  ].filter(
+    (
+      value
+    ): value is { key: string; label: string; meta: string; to: string } =>
+      value !== null
+  );
 
   if (values.length === 0) {
     return <span className="text-sm text-muted-foreground">-</span>;
@@ -3210,7 +4297,9 @@ function ControlCard({
         </div>
         <CardTitle className="truncate text-sm sm:text-lg">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-0.5 px-3 pb-3 pt-0 sm:space-y-1 sm:px-6 sm:pb-6">{children}</CardContent>
+      <CardContent className="space-y-0.5 px-3 pb-3 pt-0 sm:space-y-1 sm:px-6 sm:pb-6">
+        {children}
+      </CardContent>
     </Card>
   );
 }
