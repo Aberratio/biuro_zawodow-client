@@ -80,6 +80,10 @@ import {
 import { getEventOfficeCloseAt, isEventOfficeOpen } from "@/lib/events";
 import { hasGlobalOrganizationScope } from "@/lib/roles";
 import { checkBrowserStorage } from "@/lib/browser-storage";
+import {
+  buildExportFallbackName as buildExportFallbackNameForEvent,
+  downloadCsvResponse,
+} from "@/lib/csv-export";
 
 type UserCreateInput = Omit<User, "id" | "password"> & { password?: string };
 type EventMutationInput = Omit<
@@ -322,9 +326,7 @@ interface DataContextType {
   getEventQrEmailDeliveries: (
     eventId: string
   ) => Promise<QrEmailDeliveryReport>;
-  scanParticipantQr: (
-    qrCode: string
-  ) => Promise<{
+  scanParticipantQr: (qrCode: string) => Promise<{
     ok: boolean;
     data?: ParticipantScanResult;
     error?: string;
@@ -2904,51 +2906,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   );
 
   const buildExportFallbackName = useCallback(
-    (eventId: string, type: "uczestnicy" | "logi" | "zmiany") => {
-      const event =
-        events.find((entry) => entry.id === eventId) ??
-        archivedEvents.find((entry) => entry.id === eventId);
-      const eventName = event?.name ?? "wydarzenie";
-      const slug =
-        eventName
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-+|-+$/g, "")
-          .slice(0, 48)
-          .replace(/-+$/g, "") || "wydarzenie";
-      const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-
-      return `bz-${type}-${slug}-${date}.csv`;
-    },
+    (eventId: string, type: "uczestnicy" | "logi" | "zmiany") =>
+      buildExportFallbackNameForEvent(events, archivedEvents, eventId, type),
     [archivedEvents, events]
-  );
-
-  const downloadCsvResponse = useCallback(
-    async (response: Response, fallbackName: string) => {
-      const blob = await response.blob();
-      const contentDisposition =
-        response.headers.get("content-disposition") ?? "";
-      const utf8FileNameMatch = contentDisposition.match(
-        /filename\*=UTF-8''([^;]+)/i
-      );
-      const quotedFileNameMatch = contentDisposition.match(
-        /filename="?([^";]+)"?/i
-      );
-      const fileName = utf8FileNameMatch?.[1]
-        ? decodeURIComponent(utf8FileNameMatch[1])
-        : (quotedFileNameMatch?.[1] ?? fallbackName);
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = objectUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(objectUrl);
-    },
-    []
   );
 
   const exportEventCsv = useCallback(
@@ -2989,7 +2949,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
     [
       buildExportFallbackName,
-      downloadCsvResponse,
       ensureOnline,
       getAuthHeaders,
       handleNetworkFailure,
@@ -3034,7 +2993,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
     [
       buildExportFallbackName,
-      downloadCsvResponse,
       ensureOnline,
       getAuthHeaders,
       handleNetworkFailure,
@@ -3079,7 +3037,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
     [
       buildExportFallbackName,
-      downloadCsvResponse,
       ensureOnline,
       getAuthHeaders,
       handleNetworkFailure,
