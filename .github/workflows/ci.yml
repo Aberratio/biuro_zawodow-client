@@ -38,7 +38,7 @@ jobs:
         run: npm run typecheck
 
       - name: Test
-        run: npm run test
+        run: npm run test:coverage
 
       - name: Build
         # npm run build's prebuild hook (unlock:dist) shells out to Windows

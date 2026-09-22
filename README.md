@@ -53,6 +53,7 @@ npm run preview      # preview production build
 npm run lint          # lint
 npm run test          # run tests
 npm run test:watch   # watch tests
+npm run test:coverage # run tests with coverage report
 ```
 
 ## Structure
@@ -84,6 +85,21 @@ npm run test
 ```
 
 Example tests: `src/contexts/DataContext.test.tsx`, `src/test/example.test.ts`.
+
+### Coverage
+
+```powershell
+npm run test:coverage
+```
+
+Runs the test suite with `@vitest/coverage-v8` and prints a text summary; `json-summary` and `html` reports are written to `coverage/` (gitignored) for local inspection. CI runs this command (not the plain `test` script) so that a coverage regression fails the build. The enforced minimums, configured in `vitest.config.ts` under `test.coverage.thresholds`, are:
+
+- Statements: 45%
+- Branches: 60%
+- Functions: 45%
+- Lines: 45%
+
+These sit below current coverage with margin — they're a regression floor, not a target. If you add a large untested feature or delete tests, CI will fail here.
 
 ## Deployment
 
