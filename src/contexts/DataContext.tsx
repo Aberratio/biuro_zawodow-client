@@ -36,9 +36,7 @@ import {
 } from "@/lib/api";
 import {
   type ApiEvent,
-  type ApiOrganization,
   type ApiParticipant,
-  type ApiUser,
   type BootstrapResponse,
   type ParticipantQrPreviewResponse,
   type ParticipantScanApiResponse,
@@ -84,6 +82,8 @@ import {
   buildExportFallbackName as buildExportFallbackNameForEvent,
   downloadCsvResponse,
 } from "@/lib/csv-export";
+import { useOrganizationMutations } from "@/contexts/data/useOrganizationMutations";
+import { useUserMutations } from "@/contexts/data/useUserMutations";
 
 type UserCreateInput = Omit<User, "id" | "password"> & { password?: string };
 type EventMutationInput = Omit<
@@ -2353,301 +2353,41 @@ export function DataProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  const addUser = useCallback(
-    async (userData: UserCreateInput) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const createUserPayload: Record<string, unknown> = {
-          name: userData.name,
-          email: userData.email,
-          role: userData.role,
-          organization_id: userData.organization_id,
-          assigned_events: userData.assigned_events,
-        };
-        if (userData.password) createUserPayload.password = userData.password;
-        const payload = (
-          await fetchJson(`${API_BASE_URL}/users`, {
-            method: "POST",
-            headers: getAuthHeaders(true),
-            body: JSON.stringify(createUserPayload),
-          })
-        ).payload as { data?: ApiUser };
-        if (!payload.data)
-          return { ok: false, error: "API user create returned empty payload" };
-        markLocalDataChanged();
-        const createdUser = mapApiUserToUi(payload.data);
-        setUsers((previous) => [...previous, createdUser]);
-        addLog(`Dodano użytkownika: ${createdUser.name}`);
-        return { ok: true };
-      }),
-    [addLog, ensureOnline, getAuthHeaders, markLocalDataChanged, runMutation]
-  );
+  const {
+    addUser,
+    updateUser,
+    removeUser,
+    triggerUserPasswordReset,
+    setUserPassword,
+    changeRole,
+    assignScannerEvents,
+  } = useUserMutations({
+    users,
+    setUsers,
+    ensureOnline,
+    runMutation,
+    addLog,
+    markLocalDataChanged,
+    getAuthHeaders,
+    syncStoredAuthUser,
+  });
 
-  const updateUser = useCallback(
-    async (userId: string, data: UserUpdateInput) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const payload = (
-          await fetchJson(`${API_BASE_URL}/users/${userId}`, {
-            method: "PATCH",
-            headers: getAuthHeaders(true),
-            body: JSON.stringify(data),
-          })
-        ).payload as { data?: ApiUser };
-        if (!payload.data)
-          return { ok: false, error: "API user update returned empty payload" };
-        markLocalDataChanged();
-        const updatedUser = mapApiUserToUi(payload.data);
-        setUsers((previous) =>
-          previous.map((user) => (user.id === userId ? updatedUser : user))
-        );
-        syncStoredAuthUser((user) => (user.id === userId ? updatedUser : user));
-        return { ok: true };
-      }),
-    [
-      ensureOnline,
-      getAuthHeaders,
-      markLocalDataChanged,
-      runMutation,
-      syncStoredAuthUser,
-    ]
-  );
-
-  const createOrganization = useCallback(
-    async (data: { name: string; event_limit: number }) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const payload = (
-          await fetchJson(`${API_BASE_URL}/organizations`, {
-            method: "POST",
-            headers: getAuthHeaders(true),
-            body: JSON.stringify(data),
-          })
-        ).payload as { data?: ApiOrganization };
-        if (!payload.data)
-          return {
-            ok: false,
-            error: "API organization create returned empty payload",
-          };
-        const createdOrganization = mapApiOrganizationToUi(payload.data);
-        markLocalDataChanged();
-        setOrganizations((previous) => [...previous, createdOrganization]);
-        return { ok: true, entityId: createdOrganization.id };
-      }),
-    [ensureOnline, getAuthHeaders, markLocalDataChanged, runMutation]
-  );
-
-  const updateOrganization = useCallback(
-    async (organizationId: string, data: OrganizationUpdateInput) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const payload = (
-          await fetchJson(`${API_BASE_URL}/organizations/${organizationId}`, {
-            method: "PATCH",
-            headers: getAuthHeaders(true),
-            body: JSON.stringify(data),
-          })
-        ).payload as { data?: ApiOrganization };
-        if (!payload.data)
-          return {
-            ok: false,
-            error: "API organization update returned empty payload",
-          };
-        const updatedOrganization = mapApiOrganizationToUi(payload.data);
-        setOrganizations((previous) =>
-          previous.map((organization) =>
-            organization.id === organizationId
-              ? updatedOrganization
-              : organization
-          )
-        );
-        if (data.name)
-          addLog(`Zaktualizowano organizację: ${updatedOrganization.name}`);
-        return { ok: true };
-      }),
-    [addLog, ensureOnline, getAuthHeaders, runMutation]
-  );
-
-  const updateOrganizationEventLimit = useCallback(
-    async (organizationId: string, eventLimit: number) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const assignedEventsCount = events.filter(
-          (event) => event.organization_id === organizationId
-        ).length;
-        if (eventLimit < assignedEventsCount)
-          return {
-            ok: false,
-            error: `Limit wydarzeń nie może być mniejszy niż ${assignedEventsCount}, bo tyle wydarzeń jest już przypisanych do tej organizacji.`,
-          };
-        const payload = (
-          await fetchJson(
-            `${API_BASE_URL}/organizations/${organizationId}/event-limit`,
-            {
-              method: "POST",
-              headers: getAuthHeaders(true),
-              body: JSON.stringify({ event_limit: eventLimit }),
-            }
-          )
-        ).payload as { data?: ApiOrganization };
-        if (!payload.data)
-          return {
-            ok: false,
-            error: "API organization update returned empty payload",
-          };
-        const updatedOrganization = mapApiOrganizationToUi(payload.data);
-        setOrganizations((previous) =>
-          previous.map((organization) =>
-            organization.id === organizationId
-              ? updatedOrganization
-              : organization
-          )
-        );
-        await loadBootstrap(true);
-        return { ok: true };
-      }),
-    [ensureOnline, events, getAuthHeaders, loadBootstrap, runMutation]
-  );
-
-  const deleteOrganization = useCallback(
-    async (organizationId: string) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const existingOrganization = organizations.find(
-          (organization) => organization.id === organizationId
-        );
-        await fetchJson(`${API_BASE_URL}/organizations/${organizationId}`, {
-          method: "DELETE",
-          headers: getAuthHeaders(),
-        });
-        setOrganizations((previous) =>
-          previous.filter((organization) => organization.id !== organizationId)
-        );
-        if (existingOrganization)
-          addLog(`Usunięto organizację: ${existingOrganization.name}`);
-        return { ok: true };
-      }),
-    [addLog, ensureOnline, getAuthHeaders, organizations, runMutation]
-  );
-
-  const assignScannerEvents = useCallback(
-    async (userId: string, eventIds: string[]) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const payload = (
-          await fetchJson(`${API_BASE_URL}/users/${userId}/event-assignments`, {
-            method: "PATCH",
-            headers: getAuthHeaders(true),
-            body: JSON.stringify({ assigned_events: eventIds }),
-          })
-        ).payload as { data?: ApiUser };
-        if (!payload.data)
-          return {
-            ok: false,
-            error: "API scanner assignment returned empty payload",
-          };
-        markLocalDataChanged();
-        const updatedUser = mapApiUserToUi(payload.data);
-        setUsers((previous) =>
-          previous.map((user) => (user.id === userId ? updatedUser : user))
-        );
-        syncStoredAuthUser((user) => (user.id === userId ? updatedUser : user));
-        return { ok: true };
-      }),
-    [
-      ensureOnline,
-      getAuthHeaders,
-      markLocalDataChanged,
-      runMutation,
-      syncStoredAuthUser,
-    ]
-  );
-
-  const removeUser = useCallback(
-    async (id: string) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const existingUser = users.find((user) => user.id === id);
-        await fetchJson(`${API_BASE_URL}/users/${id}`, {
-          method: "DELETE",
-          headers: getAuthHeaders(),
-        });
-        setUsers((previous) => previous.filter((user) => user.id !== id));
-        if (existingUser) addLog(`Usunięto użytkownika: ${existingUser.name}`);
-        return { ok: true };
-      }),
-    [addLog, ensureOnline, getAuthHeaders, runMutation, users]
-  );
-
-  const triggerUserPasswordReset = useCallback(
-    async (id: string) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const existingUser = users.find((user) => user.id === id);
-        await fetchJson(`${API_BASE_URL}/users/${id}/password-reset`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-        });
-        if (existingUser)
-          addLog(`Wysłano reset hasła użytkownikowi: ${existingUser.name}`);
-        return { ok: true };
-      }),
-    [addLog, ensureOnline, getAuthHeaders, runMutation, users]
-  );
-
-  const setUserPassword = useCallback(
-    async (id: string, password: string) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const existingUser = users.find((user) => user.id === id);
-        await fetchJson(`${API_BASE_URL}/users/${id}/password`, {
-          method: "PATCH",
-          headers: getAuthHeaders(true),
-          body: JSON.stringify({ password }),
-        });
-        if (existingUser)
-          addLog(`Ustawiono hasło użytkownikowi: ${existingUser.name}`);
-        return { ok: true };
-      }),
-    [addLog, ensureOnline, getAuthHeaders, runMutation, users]
-  );
-
-  const changeRole = useCallback(
-    async (userId: string, role: Role) =>
-      runMutation(async () => {
-        const offlineError = ensureOnline();
-        if (offlineError) return { ok: false, error: offlineError };
-        const payload = (
-          await fetchJson(`${API_BASE_URL}/users/${userId}/role`, {
-            method: "PATCH",
-            headers: getAuthHeaders(true),
-            body: JSON.stringify({ role }),
-          })
-        ).payload as { data?: ApiUser };
-        if (!payload.data)
-          return {
-            ok: false,
-            error: "API user role change returned empty payload",
-          };
-        const updatedUser = mapApiUserToUi(payload.data);
-        setUsers((previous) =>
-          previous.map((user) => (user.id === userId ? updatedUser : user))
-        );
-        syncStoredAuthUser((user) => (user.id === userId ? updatedUser : user));
-        return { ok: true };
-      }),
-    [ensureOnline, getAuthHeaders, runMutation, syncStoredAuthUser]
-  );
+  const {
+    createOrganization,
+    updateOrganization,
+    updateOrganizationEventLimit,
+    deleteOrganization,
+  } = useOrganizationMutations({
+    organizations,
+    setOrganizations,
+    events,
+    ensureOnline,
+    runMutation,
+    addLog,
+    markLocalDataChanged,
+    getAuthHeaders,
+    loadBootstrap,
+  });
 
   const sendParticipantQrEmail = useCallback(
     async (participantId: string) =>
