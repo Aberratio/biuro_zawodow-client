@@ -290,4 +290,25 @@ describe("EventPlatformConnectionSection", () => {
     // Only the initial GET happened: validation blocked the PUT.
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("shows the last stored test without inventing a participant count", async () => {
+    installFetch(() => ({
+      status: 200,
+      body: {
+        data: {
+          availability: available,
+          connection: {
+            ...storedConnection,
+            last_test_at: "2026-10-05T10:05:00Z",
+            last_test_status: "ok",
+          },
+        },
+      },
+    }));
+    renderSection();
+
+    const line = await screen.findByText(/Ostatni test/);
+    expect(line).toHaveTextContent("Połączenie działa.");
+    expect(line.textContent).not.toMatch(/uczestnik/);
+  });
 });

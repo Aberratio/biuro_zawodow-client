@@ -163,7 +163,9 @@ export function describeTestStatus(
 ): string {
   switch (status) {
     case "ok":
-      return `Połączenie działa. Platforma zwróciła ${pluralizeParticipants(participantCount ?? 0)}.`;
+      return participantCount === null
+        ? "Połączenie działa."
+        : `Połączenie działa. Platforma zwróciła ${pluralizeParticipants(participantCount)}.`;
     case "app_key_rejected":
       return "Platforma odrzuciła klucz aplikacji Biura Zawodów. Skontaktuj się z administratorem serwera.";
     case "token_rejected":

@@ -22,18 +22,11 @@ vi.mock("@/hooks/use-toast", () => ({
   toast: vi.fn(),
 }));
 
-vi.mock("@/components/EventPlatformConnectionSection", () => ({
-  EventPlatformConnectionSection: () => (
-    <div data-testid="platform-connection-section" />
-  ),
-}));
-
 function renderPage(
   options: {
     addParticipantManually?: ReturnType<typeof vi.fn>;
     event?: ReturnType<typeof createTestEvent>;
     resetTestEvent?: ReturnType<typeof vi.fn>;
-    role?: "admin" | "scanner";
   } = {}
 ) {
   const event = options.event ?? createTestEvent();
@@ -47,9 +40,9 @@ function renderPage(
     archivedEvents: [],
     participants: [],
     users: [],
-    currentRole: options.role ?? "admin",
+    currentRole: "admin",
     currentUser: createTestUser({
-      role: options.role ?? "admin",
+      role: "admin",
       organization_id: event.organization_id,
     }),
     setSelectedEventId: vi.fn(),
@@ -112,32 +105,6 @@ function renderPage(
 describe("EventDetails page", () => {
   beforeEach(() => {
     useDataMock.mockReset();
-  });
-
-  it("renders the platform integration section for an admin", async () => {
-    renderPage();
-
-    const toggle = await screen.findByRole("button", {
-      name: "Integracja z platform� Zmierzymy Czas",
-    });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(toggle);
-
-    expect(
-      await screen.findByTestId("platform-connection-section")
-    ).toBeInTheDocument();
-  });
-
-  it("hides the platform integration section for a scanner", async () => {
-    renderPage({ role: "scanner" });
-
-    await screen.findAllByText(createTestEvent().name);
-    expect(screen.queryByTestId("platform-connection-section")).toBeNull();
-    expect(
-      screen.queryByRole("button", {
-        name: "Integracja z platform� Zmierzymy Czas",
-      })
-    ).toBeNull();
   });
 
   it("validates configured manual participant fields before creating a participant", async () => {

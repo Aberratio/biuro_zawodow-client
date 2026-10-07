@@ -2014,7 +2014,7 @@ export default function EventDetails() {
 
           {canManageEventLifecycle && (
             <CollapsibleSection
-              title="Integracja z platform¹ Zmierzymy Czas"
+              title="Integracja z platformÄ… Zmierzymy Czas"
               defaultOpen={false}
             >
               <EventPlatformConnectionSection

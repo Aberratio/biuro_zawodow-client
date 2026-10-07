@@ -122,6 +122,7 @@ describe("platform connection helpers", () => {
     expect(describeTestStatus("ok", 12)).toBe(
       "Połączenie działa. Platforma zwróciła 12 uczestników."
     );
+    expect(describeTestStatus("ok", null)).toBe("Połączenie działa.");
     expect(describeTestStatus("ok", 1)).toBe(
       "Połączenie działa. Platforma zwróciła 1 uczestnika."
     );
