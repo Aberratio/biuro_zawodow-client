@@ -22,22 +22,36 @@ vi.mock("@/hooks/use-toast", () => ({
   toast: vi.fn(),
 }));
 
-function renderPage(options: {
-  addParticipantManually?: ReturnType<typeof vi.fn>;
-  event?: ReturnType<typeof createTestEvent>;
-  resetTestEvent?: ReturnType<typeof vi.fn>;
-} = {}) {
+vi.mock("@/components/EventPlatformConnectionSection", () => ({
+  EventPlatformConnectionSection: () => (
+    <div data-testid="platform-connection-section" />
+  ),
+}));
+
+function renderPage(
+  options: {
+    addParticipantManually?: ReturnType<typeof vi.fn>;
+    event?: ReturnType<typeof createTestEvent>;
+    resetTestEvent?: ReturnType<typeof vi.fn>;
+    role?: "admin" | "scanner";
+  } = {}
+) {
   const event = options.event ?? createTestEvent();
-  const addParticipantManually = options.addParticipantManually ?? vi.fn(async () => ({ ok: true }));
-  const resetTestEvent = options.resetTestEvent ?? vi.fn(async () => ({ ok: true }));
+  const addParticipantManually =
+    options.addParticipantManually ?? vi.fn(async () => ({ ok: true }));
+  const resetTestEvent =
+    options.resetTestEvent ?? vi.fn(async () => ({ ok: true }));
 
   useDataMock.mockReturnValue({
     events: [event],
     archivedEvents: [],
     participants: [],
     users: [],
-    currentRole: "admin",
-    currentUser: createTestUser({ role: "admin", organization_id: event.organization_id }),
+    currentRole: options.role ?? "admin",
+    currentUser: createTestUser({
+      role: options.role ?? "admin",
+      organization_id: event.organization_id,
+    }),
     setSelectedEventId: vi.fn(),
     isLoading: false,
     getParticipantFieldMappingsState: vi.fn(async () => ({
@@ -66,7 +80,11 @@ function renderPage(options: {
         }),
       ],
     })),
-    updateParticipantFieldMappings: vi.fn(async () => ({ ok: true, mappings: [], has_baseline_import: false })),
+    updateParticipantFieldMappings: vi.fn(async () => ({
+      ok: true,
+      mappings: [],
+      has_baseline_import: false,
+    })),
     addParticipantManually,
     addUser: vi.fn(async () => ({ ok: true })),
     assignScannerEvents: vi.fn(async () => ({ ok: true })),
@@ -85,7 +103,7 @@ function renderPage(options: {
       <Routes>
         <Route path="/events/:id" element={<EventDetails />} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 
   return { addParticipantManually, resetTestEvent };
@@ -96,35 +114,83 @@ describe("EventDetails page", () => {
     useDataMock.mockReset();
   });
 
+  it("renders the platform integration section for an admin", async () => {
+    renderPage();
+
+    const toggle = await screen.findByRole("button", {
+      name: "Integracja z platform� Zmierzymy Czas",
+    });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+
+    expect(
+      await screen.findByTestId("platform-connection-section")
+    ).toBeInTheDocument();
+  });
+
+  it("hides the platform integration section for a scanner", async () => {
+    renderPage({ role: "scanner" });
+
+    await screen.findAllByText(createTestEvent().name);
+    expect(screen.queryByTestId("platform-connection-section")).toBeNull();
+    expect(
+      screen.queryByRole("button", {
+        name: "Integracja z platform� Zmierzymy Czas",
+      })
+    ).toBeNull();
+  });
+
   it("validates configured manual participant fields before creating a participant", async () => {
     const addParticipantManually = vi.fn(async () => ({ ok: true }));
     renderPage({ addParticipantManually });
 
-    const participantSectionButtons = await screen.findAllByRole("button", { name: "Uczestnicy" });
-    const participantSectionToggle = participantSectionButtons.find((button) => button.getAttribute("aria-expanded") === "false");
+    const participantSectionButtons = await screen.findAllByRole("button", {
+      name: "Uczestnicy",
+    });
+    const participantSectionToggle = participantSectionButtons.find(
+      (button) => button.getAttribute("aria-expanded") === "false"
+    );
     expect(participantSectionToggle).toBeDefined();
     fireEvent.click(participantSectionToggle as HTMLElement);
-    fireEvent.click(await screen.findByRole("button", { name: "Dodaj uczestnika ręcznie" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Dodaj uczestnika ręcznie" })
+    );
 
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "anna@example.com" } });
-    fireEvent.change(screen.getByLabelText("Imię"), { target: { value: "Anna" } });
-    fireEvent.change(screen.getByLabelText("Wiek"), { target: { value: "17" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "anna@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Imię"), {
+      target: { value: "Anna" },
+    });
+    fireEvent.change(screen.getByLabelText("Wiek"), {
+      target: { value: "17" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Zapisz uczestnika" }));
 
-    expect(await screen.findByText("Pole Wiek musi mieć wartość nie mniejszą niż 18.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Pole Wiek musi mieć wartość nie mniejszą niż 18."
+      )
+    ).toBeInTheDocument();
     expect(addParticipantManually).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByLabelText("Wiek"), { target: { value: "21" } });
+    fireEvent.change(screen.getByLabelText("Wiek"), {
+      target: { value: "21" },
+    });
     fireEvent.click(screen.getByRole("combobox", { name: "Dystans" }));
     fireEvent.click(await screen.findByRole("option", { name: "10K" }));
     fireEvent.click(screen.getByRole("button", { name: "Zapisz uczestnika" }));
 
     await waitFor(() => {
-      expect(addParticipantManually).toHaveBeenCalledWith("event-1", "anna@example.com", expect.objectContaining({
-        "Imię": "Anna",
-        Dystans: "10K",
-        Wiek: "21",
-      }));
+      expect(addParticipantManually).toHaveBeenCalledWith(
+        "event-1",
+        "anna@example.com",
+        expect.objectContaining({
+          Imię: "Anna",
+          Dystans: "10K",
+          Wiek: "21",
+        })
+      );
     });
   });
 
@@ -137,13 +203,21 @@ describe("EventDetails page", () => {
 
     expect(await screen.findByText("Tryb testowy")).toBeInTheDocument();
 
-    const adminSectionButtons = await screen.findAllByRole("button", { name: "Administracja" });
-    const adminSectionToggle = adminSectionButtons.find((button) => button.getAttribute("aria-expanded") === "false");
+    const adminSectionButtons = await screen.findAllByRole("button", {
+      name: "Administracja",
+    });
+    const adminSectionToggle = adminSectionButtons.find(
+      (button) => button.getAttribute("aria-expanded") === "false"
+    );
     expect(adminSectionToggle).toBeDefined();
     fireEvent.click(adminSectionToggle as HTMLElement);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Resetuj dane testowe" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Resetuj dane" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Resetuj dane testowe" })
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Resetuj dane" })
+    );
 
     await waitFor(() => {
       expect(resetTestEvent).toHaveBeenCalledWith("event-1");
