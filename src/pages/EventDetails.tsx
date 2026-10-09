@@ -66,6 +66,7 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { EventPlatformConnectionSection } from "@/components/EventPlatformConnectionSection";
 import DetailSkeleton from "@/components/skeletons/DetailSkeleton";
 import type {
   EventOfficeLocation,
@@ -2010,6 +2011,18 @@ export default function EventDetails() {
               )}
             </div>
           </CollapsibleSection>
+
+          {canManageEventLifecycle && (
+            <CollapsibleSection
+              title="Integracja z platformą Zmierzymy Czas"
+              defaultOpen={false}
+            >
+              <EventPlatformConnectionSection
+                eventId={event.id}
+                isOnline={isOnline}
+              />
+            </CollapsibleSection>
+          )}
 
           {canDeleteEvent && (
             <CollapsibleSection title="Administracja" defaultOpen={false}>
