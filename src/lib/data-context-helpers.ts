@@ -1,14 +1,29 @@
-import type { ActivityLog, ConnectionState, Event, Organization, Participant, ParticipantStatus, PaymentStatus, User } from '@/types';
-import { createSnapshotVersion, type OfflineBootstrapSnapshot, type PendingParticipantMutation } from '@/lib/offline-store';
-import { API_BASE_URL } from '@/lib/api';
-import { normalizeParticipantStatus } from '@/lib/participant-status';
-import { isEventOfficeOpen } from '@/lib/events';
-import { hasGlobalOrganizationScope } from '@/lib/roles';
+import type {
+  ActivityLog,
+  ConnectionState,
+  Event,
+  Organization,
+  Participant,
+  ParticipantStatus,
+  PaymentStatus,
+  User,
+} from "@/types";
+import {
+  createSnapshotVersion,
+  type OfflineBootstrapSnapshot,
+  type PendingParticipantMutation,
+} from "@/lib/offline-store";
+import { API_BASE_URL } from "@/lib/api";
+import { normalizeParticipantStatus } from "@/lib/participant-status";
+import { isEventOfficeOpen } from "@/lib/events";
+import { hasGlobalOrganizationScope } from "@/lib/roles";
 
-export const SELECTED_ORGANIZATION_STORAGE_KEY_PREFIX = 'selected_organization_context';
-export const SELECTED_EVENT_STORAGE_KEY_PREFIX = 'selected_event_context';
-export const DEVICE_ID_STORAGE_KEY = 'offline_device_id';
-export const OFFLINE_ACTION_MESSAGE = 'Ta operacja jest dostępna tylko po połączeniu z serwerem. Aplikacja działa teraz na danych z pamięci lokalnej.';
+export const SELECTED_ORGANIZATION_STORAGE_KEY_PREFIX =
+  "selected_organization_context";
+export const SELECTED_EVENT_STORAGE_KEY_PREFIX = "selected_event_context";
+export const DEVICE_ID_STORAGE_KEY = "offline_device_id";
+export const OFFLINE_ACTION_MESSAGE =
+  "Ta operacja jest dostępna tylko po połączeniu z serwerem. Aplikacja działa teraz na danych z pamięci lokalnej.";
 
 export interface ApiParticipant {
   id: number | string;
@@ -21,8 +36,8 @@ export interface ApiParticipant {
   qr_code: string | null;
   custom_fields?: Record<string, string> | null;
   important_field_aliases?: string[] | null;
-  status: ParticipantStatus | 'pending' | null;
-  email_status: 'not_sent' | 'sent' | null;
+  status: ParticipantStatus | "pending" | null;
+  email_status: "not_sent" | "sent" | null;
   payment_status?: PaymentStatus | string | null;
   checked_in_at: string | null;
 }
@@ -32,12 +47,14 @@ export interface ApiUser {
   name: string;
   email: string;
   password?: string;
-  role: User['role'];
+  role: User["role"];
   organization_id?: string | null;
   assigned_events: string[];
 }
 
-export type ApiEvent = Omit<Event, 'is_test'> & { is_test?: boolean | number | string | null };
+export type ApiEvent = Omit<Event, "is_test"> & {
+  is_test?: boolean | number | string | null;
+};
 export type ApiOrganization = Organization;
 
 export interface BootstrapResponse {
@@ -53,14 +70,17 @@ export interface BootstrapResponse {
   };
 }
 
-export function mapApiOrganizationToUi(organization: ApiOrganization): Organization {
+export function mapApiOrganizationToUi(
+  organization: ApiOrganization
+): Organization {
   return { ...organization };
 }
 
 export function mapApiEventToUi(event: ApiEvent): Event {
   return {
     ...event,
-    is_test: event.is_test === true || event.is_test === 1 || event.is_test === '1',
+    is_test:
+      event.is_test === true || event.is_test === 1 || event.is_test === "1",
   };
 }
 
@@ -96,9 +116,9 @@ function readStoredContextValue(key: string): string {
   }
 
   try {
-    return localStorage.getItem(key) ?? '';
+    return localStorage.getItem(key) ?? "";
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -126,8 +146,10 @@ function persistStoredContextValue(key: string, value: string): void {
   }
 }
 
-export function readStoredSelectedOrganizationId(userId?: string | null): string {
-  if (!userId) return '';
+export function readStoredSelectedOrganizationId(
+  userId?: string | null
+): string {
+  if (!userId) return "";
 
   return readStoredContextValue(getSelectedOrganizationStorageKey(userId));
 }
@@ -137,16 +159,25 @@ export function getSelectedEventStorageKey(userId: string) {
 }
 
 export function readStoredSelectedEventId(userId?: string | null): string {
-  if (!userId) return '';
+  if (!userId) return "";
 
   return readStoredContextValue(getSelectedEventStorageKey(userId));
 }
 
-export function persistStoredSelectedOrganizationId(userId: string, organizationId: string): void {
-  persistStoredContextValue(getSelectedOrganizationStorageKey(userId), organizationId);
+export function persistStoredSelectedOrganizationId(
+  userId: string,
+  organizationId: string
+): void {
+  persistStoredContextValue(
+    getSelectedOrganizationStorageKey(userId),
+    organizationId
+  );
 }
 
-export function persistStoredSelectedEventId(userId: string, eventId: string): void {
+export function persistStoredSelectedEventId(
+  userId: string,
+  eventId: string
+): void {
   persistStoredContextValue(getSelectedEventStorageKey(userId), eventId);
 }
 
@@ -162,25 +193,29 @@ interface ParticipantLike {
   qr_code?: string | null;
   custom_fields?: Record<string, string> | null;
   important_field_aliases?: string[] | null;
-  status?: ParticipantStatus | 'pending' | string | null;
-  email_status?: 'not_sent' | 'sent' | string | null;
+  status?: ParticipantStatus | "pending" | string | null;
+  email_status?: "not_sent" | "sent" | string | null;
   payment_status?: PaymentStatus | string | null;
   checked_in_at?: string | null;
 }
 
 function toTrimmedString(value: unknown): string {
-  if (typeof value === 'string') return value.trim();
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value).trim();
-  return '';
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value).trim();
+  return "";
 }
 
 function normalizeCustomFields(value: unknown): Record<string, string> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
   }
 
   return Object.fromEntries(
-    Object.entries(value).map(([key, fieldValue]) => [key, toTrimmedString(fieldValue)])
+    Object.entries(value).map(([key, fieldValue]) => [
+      key,
+      toTrimmedString(fieldValue),
+    ])
   );
 }
 
@@ -190,96 +225,143 @@ function normalizeImportantFieldAliases(value: unknown): string[] {
   }
 
   return Array.from(
-    new Set(
-      value
-        .map(alias => toTrimmedString(alias))
-        .filter(Boolean),
-    ),
+    new Set(value.map((alias) => toTrimmedString(alias)).filter(Boolean))
   );
 }
 
 function normalizePaymentStatus(value: unknown): PaymentStatus {
-  return value === 'paid' || value === 'unpaid' || value === 'unknown' ? value : 'unknown';
+  return value === "paid" || value === "unpaid" || value === "unknown"
+    ? value
+    : "unknown";
 }
 
-export function mapApiParticipantToUi(participant: ParticipantLike | null | undefined, fallbackEventId: string): Participant {
+export function mapApiParticipantToUi(
+  participant: ParticipantLike | null | undefined,
+  fallbackEventId: string
+): Participant {
   const eventId = toTrimmedString(participant?.event_id) || fallbackEventId;
   const displayName = toTrimmedString(participant?.display_name);
   const cachedName = toTrimmedString(participant?.name);
   const firstName = toTrimmedString(participant?.first_name);
   const lastName = toTrimmedString(participant?.last_name);
-  const fallbackName = [firstName, lastName].filter(Boolean).join(' ');
+  const fallbackName = [firstName, lastName].filter(Boolean).join(" ");
   const email = toTrimmedString(participant?.email);
   const bibNumber = toTrimmedString(participant?.bib_number);
   const qrCode = toTrimmedString(participant?.qr_code);
   const checkedInAt = toTrimmedString(participant?.checked_in_at);
   const participantId = toTrimmedString(participant?.id);
-  const normalizedId = participantId.startsWith('p-')
+  const normalizedId = participantId.startsWith("p-")
     ? participantId
-    : `p-${participantId || 'unknown'}`;
+    : `p-${participantId || "unknown"}`;
 
   return {
     id: normalizedId,
     event_id: eventId,
-    name: displayName || cachedName || fallbackName || email || 'Nieznany uczestnik',
+    name:
+      displayName ||
+      cachedName ||
+      fallbackName ||
+      email ||
+      "Nieznany uczestnik",
     email,
     bib_number: bibNumber,
     qr_code: qrCode,
-    status: normalizeParticipantStatus(toTrimmedString(participant?.status) || undefined),
-    email_status: participant?.email_status === 'sent' ? 'sent' : 'not_sent',
+    status: normalizeParticipantStatus(
+      toTrimmedString(participant?.status) || undefined
+    ),
+    email_status: participant?.email_status === "sent" ? "sent" : "not_sent",
     payment_status: normalizePaymentStatus(participant?.payment_status),
     checked_in_at: checkedInAt || undefined,
     custom_fields: normalizeCustomFields(participant?.custom_fields),
-    important_field_aliases: normalizeImportantFieldAliases(participant?.important_field_aliases),
-    sync_state: 'synced',
+    important_field_aliases: normalizeImportantFieldAliases(
+      participant?.important_field_aliases
+    ),
+    sync_state: "synced",
     sync_error: undefined,
   };
 }
 
 export function participantUiIdToApiId(participantId: string): string {
-  return participantId.startsWith('p-') ? participantId.slice(2) : participantId;
+  return participantId.startsWith("p-")
+    ? participantId.slice(2)
+    : participantId;
 }
 
 export function mapApiUserToUi(user: ApiUser): User {
   return {
     ...user,
-    password: '',
+    password: "",
     organization_id: user.organization_id ?? undefined,
-    assigned_events: Array.isArray(user.assigned_events) ? user.assigned_events : [],
+    assigned_events: Array.isArray(user.assigned_events)
+      ? user.assigned_events
+      : [],
   };
 }
 
 export function getDefaultCurrentUser(): User {
-  return { id: '', name: '', email: '', password: '', role: 'scanner', assigned_events: [] };
+  return {
+    id: "",
+    name: "",
+    email: "",
+    password: "",
+    role: "scanner",
+    assigned_events: [],
+  };
 }
 
-export function getSelectableOrganizationsForUser(allOrganizations: Organization[], user: User): Organization[] {
+export function getSelectableOrganizationsForUser(
+  allOrganizations: Organization[],
+  user: User
+): Organization[] {
   if (!hasGlobalOrganizationScope(user.role)) return [];
   return allOrganizations;
 }
 
-export function getVisibleEventsForUser(allEvents: Event[], user: User, now = new Date()): Event[] {
-  const activeEvents = allEvents.filter(event => !event.archived_at && !event.deleted_at);
-  if (user.role === 'superadmin') return activeEvents;
-  if (user.role === 'admin') return activeEvents;
-  if (user.role === 'editor') return activeEvents.filter(event => event.organization_id === user.organization_id);
-  return activeEvents.filter(event => user.assigned_events.includes(event.id) && isEventOfficeOpen(event, now));
+export function getVisibleEventsForUser(
+  allEvents: Event[],
+  user: User,
+  now = new Date()
+): Event[] {
+  const activeEvents = allEvents.filter(
+    (event) => !event.archived_at && !event.deleted_at
+  );
+  if (user.role === "superadmin") return activeEvents;
+  if (user.role === "admin") return activeEvents;
+  if (user.role === "editor")
+    return activeEvents.filter(
+      (event) => event.organization_id === user.organization_id
+    );
+  return activeEvents.filter(
+    (event) =>
+      user.assigned_events.includes(event.id) && isEventOfficeOpen(event, now)
+  );
 }
 
-export function resolveSelectedOrganizationId(availableOrganizations: Organization[], preferredSelectedOrganizationId: string): string {
-  return availableOrganizations.some(organization => organization.id === preferredSelectedOrganizationId)
+export function resolveSelectedOrganizationId(
+  availableOrganizations: Organization[],
+  preferredSelectedOrganizationId: string
+): string {
+  return availableOrganizations.some(
+    (organization) => organization.id === preferredSelectedOrganizationId
+  )
     ? preferredSelectedOrganizationId
-    : availableOrganizations[0]?.id ?? '';
+    : (availableOrganizations[0]?.id ?? "");
 }
 
-export function resolveSelectedEventId(availableEvents: Event[], preferredSelectedEventId: string): string {
-  return availableEvents.some(event => event.id === preferredSelectedEventId)
+export function resolveSelectedEventId(
+  availableEvents: Event[],
+  preferredSelectedEventId: string
+): string {
+  return availableEvents.some((event) => event.id === preferredSelectedEventId)
     ? preferredSelectedEventId
-    : availableEvents[0]?.id ?? '';
+    : (availableEvents[0]?.id ?? "");
 }
 
 export function createClientMutationId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
   return `mutation-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -298,31 +380,43 @@ export function getDeviceId(): string {
 }
 
 export function getInitialConnectionState(): ConnectionState {
-  if (typeof navigator === 'undefined') return 'online';
-  return navigator.onLine ? 'online' : 'offline';
+  if (typeof navigator === "undefined") return "online";
+  return navigator.onLine ? "online" : "offline";
 }
 
-export function applyPendingMutations(participants: Participant[], pendingMutations: PendingParticipantMutation[]): Participant[] {
-  const latestMutationByParticipant = pendingMutations.reduce<Map<string, PendingParticipantMutation>>((accumulator, mutation) => {
+export function applyPendingMutations(
+  participants: Participant[],
+  pendingMutations: PendingParticipantMutation[]
+): Participant[] {
+  const latestMutationByParticipant = pendingMutations.reduce<
+    Map<string, PendingParticipantMutation>
+  >((accumulator, mutation) => {
     accumulator.set(mutation.participantId, mutation);
     return accumulator;
   }, new Map());
 
-  return participants.map(participant => {
+  return participants.map((participant) => {
     const mutation = latestMutationByParticipant.get(participant.id);
     if (!mutation) {
-      return { ...participant, sync_state: 'synced', sync_error: undefined };
+      return { ...participant, sync_state: "synced", sync_error: undefined };
     }
 
-    if (mutation.state === 'requires_review') {
-      return { ...participant, sync_state: 'requires_review', sync_error: mutation.error };
+    if (mutation.state === "requires_review") {
+      return {
+        ...participant,
+        sync_state: "requires_review",
+        sync_error: mutation.error,
+      };
     }
 
     return {
       ...participant,
       status: mutation.nextStatus,
-      checked_in_at: mutation.nextStatus === 'not_checked_in' ? undefined : (participant.checked_in_at ?? mutation.queuedAt),
-      sync_state: 'pending_sync',
+      checked_in_at:
+        mutation.nextStatus === "not_checked_in"
+          ? undefined
+          : (participant.checked_in_at ?? mutation.queuedAt),
+      sync_state: "pending_sync",
       sync_error: undefined,
     };
   });
@@ -355,26 +449,43 @@ export function buildOfflineSnapshot(args: {
       events: args.events.map(mapApiEventToUi),
       archivedEvents: args.archivedEvents.map(mapApiEventToUi),
       users: args.users,
-      participants: args.participants.map(participant => ({ ...participant, sync_state: 'synced', sync_error: undefined })),
+      participants: args.participants.map((participant) => ({
+        ...participant,
+        sync_state: "synced",
+        sync_error: undefined,
+      })),
       activityLog: args.activityLog,
     },
   };
 }
 
-export function createBootstrapSnapshotVersion(response: BootstrapResponse['data']): string {
+export function createBootstrapSnapshotVersion(
+  response: BootstrapResponse["data"]
+): string {
   return createSnapshotVersion({
     organizations: (response.organizations ?? []).map(mapApiOrganizationToUi),
     events: (response.events ?? []).map(mapApiEventToUi),
     archivedEvents: (response.archivedEvents ?? []).map(mapApiEventToUi),
     users: (response.users ?? []).map(mapApiUserToUi),
-    participants: (response.participants ?? []).map(participant => mapApiParticipantToUi(participant, '')),
-    activityLog: Array.isArray(response.activityLog) ? response.activityLog : [],
+    participants: (response.participants ?? []).map((participant) =>
+      mapApiParticipantToUi(participant, "")
+    ),
+    activityLog: Array.isArray(response.activityLog)
+      ? response.activityLog
+      : [],
   });
 }
 
-export function extractConflictParticipant(errorPayload: unknown): ApiParticipant | null {
-  if (!errorPayload || typeof errorPayload !== 'object') return null;
-  if ('data' in errorPayload && errorPayload.data && typeof errorPayload.data === 'object' && 'id' in errorPayload.data) {
+export function extractConflictParticipant(
+  errorPayload: unknown
+): ApiParticipant | null {
+  if (!errorPayload || typeof errorPayload !== "object") return null;
+  if (
+    "data" in errorPayload &&
+    errorPayload.data &&
+    typeof errorPayload.data === "object" &&
+    "id" in errorPayload.data
+  ) {
     return errorPayload.data as ApiParticipant;
   }
   return null;
