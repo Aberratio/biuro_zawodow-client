@@ -75,4 +75,56 @@ describe("mapApiParticipantToUi", () => {
     expect(participant.status).toBe("checked_in");
     expect(participant.email_status).toBe("sent");
   });
+
+  it("keeps the platform registration id and the withdrawal time of a platform participant", () => {
+    const withdrawn = mapApiParticipantToUi(
+      {
+        id: 7,
+        event_id: "event-1",
+        first_name: "Anna",
+        last_name: "Kowalska",
+        email: "anna@example.com",
+        bib_number: "101",
+        qr_code: "pqr_abc",
+        status: "not_checked_in",
+        email_status: "not_sent",
+        checked_in_at: null,
+        platform_registration_id: " reg-7 ",
+        platform_removed_at: "2026-10-09 10:00:00",
+      } as never,
+      "event-1"
+    );
+
+    expect(withdrawn.platform_registration_id).toBe("reg-7");
+    expect(withdrawn.platform_removed_at).toBe("2026-10-09 10:00:00");
+  });
+
+  it("leaves the platform fields empty for file imports and offline cache entries without them", () => {
+    const fromFile = mapApiParticipantToUi(
+      {
+        id: 8,
+        event_id: "event-1",
+        first_name: "Jan",
+        last_name: "Nowak",
+        email: "jan@example.com",
+        bib_number: null,
+        qr_code: "QR-8",
+        status: "not_checked_in",
+        email_status: "not_sent",
+        checked_in_at: null,
+        platform_registration_id: null,
+        platform_removed_at: null,
+      } as never,
+      "event-1"
+    );
+    const cached = mapApiParticipantToUi(
+      { id: "p-9", name: "Cache", email: "c@example.com" },
+      "event-1"
+    );
+
+    for (const participant of [fromFile, cached]) {
+      expect(participant.platform_removed_at ?? null).toBeNull();
+      expect(participant.platform_registration_id ?? null).toBeNull();
+    }
+  });
 });

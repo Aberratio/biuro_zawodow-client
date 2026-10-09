@@ -40,6 +40,8 @@ export interface ApiParticipant {
   email_status: "not_sent" | "sent" | null;
   payment_status?: PaymentStatus | string | null;
   checked_in_at: string | null;
+  platform_registration_id?: string | null;
+  platform_removed_at?: string | null;
 }
 
 export interface ApiUser {
@@ -197,6 +199,8 @@ interface ParticipantLike {
   email_status?: "not_sent" | "sent" | string | null;
   payment_status?: PaymentStatus | string | null;
   checked_in_at?: string | null;
+  platform_registration_id?: string | null;
+  platform_removed_at?: string | null;
 }
 
 function toTrimmedString(value: unknown): string {
@@ -250,6 +254,10 @@ export function mapApiParticipantToUi(
   const qrCode = toTrimmedString(participant?.qr_code);
   const checkedInAt = toTrimmedString(participant?.checked_in_at);
   const participantId = toTrimmedString(participant?.id);
+  const platformRegistrationId = toTrimmedString(
+    participant?.platform_registration_id
+  );
+  const platformRemovedAt = toTrimmedString(participant?.platform_removed_at);
   const normalizedId = participantId.startsWith("p-")
     ? participantId
     : `p-${participantId || "unknown"}`;
@@ -272,6 +280,8 @@ export function mapApiParticipantToUi(
     email_status: participant?.email_status === "sent" ? "sent" : "not_sent",
     payment_status: normalizePaymentStatus(participant?.payment_status),
     checked_in_at: checkedInAt || undefined,
+    platform_registration_id: platformRegistrationId || undefined,
+    platform_removed_at: platformRemovedAt || undefined,
     custom_fields: normalizeCustomFields(participant?.custom_fields),
     important_field_aliases: normalizeImportantFieldAliases(
       participant?.important_field_aliases

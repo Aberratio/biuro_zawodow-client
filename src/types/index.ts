@@ -67,6 +67,10 @@ export interface Participant {
   email_status: EmailStatus;
   payment_status: PaymentStatus;
   checked_in_at?: string;
+  /** Set when the participant comes from the platform (Zmierzymy Czas). */
+  platform_registration_id?: string | null;
+  /** UTC time (Y-m-d H:i:s) at which the platform cancelled or removed the registration. */
+  platform_removed_at?: string | null;
   custom_fields?: Record<string, string>;
   important_field_aliases?: string[];
   sync_state?: ParticipantSyncState;
