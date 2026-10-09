@@ -1,112 +1,141 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import Scanner from '@/pages/Scanner';
-import ParticipantDetails from '@/pages/ParticipantDetails';
-import type { Event, Participant, ParticipantFieldMapping, User } from '@/types';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import Scanner from "@/pages/Scanner";
+import ParticipantDetails from "@/pages/ParticipantDetails";
+import type {
+  Event,
+  Participant,
+  ParticipantFieldMapping,
+  User,
+} from "@/types";
 
 const useDataMock = vi.fn();
 
-vi.mock('@/contexts/DataContext', () => ({
+vi.mock("@/contexts/DataContext", () => ({
   useData: () => useDataMock(),
 }));
 
-vi.mock('@/hooks/use-toast', () => ({
+vi.mock("@/hooks/use-toast", () => ({
   toast: vi.fn(),
 }));
 
-vi.mock('@/hooks/use-route-event-context', () => ({
+vi.mock("@/hooks/use-route-event-context", () => ({
   useRouteEventContext: vi.fn(),
 }));
 
-vi.mock('@/components/ParticipantBibNumberConflictDialog', () => ({
+vi.mock("@/components/ParticipantBibNumberConflictDialog", () => ({
   ParticipantBibNumberConflictDialog: () => null,
 }));
 
-vi.mock('@/components/ParticipantSearch', () => ({
+vi.mock("@/components/ParticipantSearch", () => ({
   default: ({ autoFocus }: { autoFocus?: boolean }) => (
     <div>
       <label htmlFor="scanner-search">Szukaj uczestnika</label>
-      <input id="scanner-search" aria-label="Szukaj uczestnika" autoFocus={autoFocus} />
+      <input
+        id="scanner-search"
+        aria-label="Szukaj uczestnika"
+        autoFocus={autoFocus}
+      />
     </div>
   ),
 }));
 
-vi.mock('@/components/QrScannerView', () => ({
-  default: ({ onScan, paused }: { onScan: (decodedText: string) => void; paused?: boolean }) => (
-    paused
-      ? null
-      : (
-          <button type="button" onClick={() => onScan('QR-1')}>
-            Zasymuluj skan
-          </button>
-        )
-  ),
+vi.mock("@/components/QrScannerView", () => ({
+  default: ({
+    onScan,
+    paused,
+  }: {
+    onScan: (decodedText: string) => void;
+    paused?: boolean;
+  }) =>
+    paused ? null : (
+      <button type="button" onClick={() => onScan("QR-1")}>
+        Zasymuluj skan
+      </button>
+    ),
 }));
 
-function createEvent(id = 'event-1', name = 'Bieg Miejski'): Event {
+function createEvent(id = "event-1", name = "Bieg Miejski"): Event {
   return {
     id,
     name,
-    location: 'Warszawa',
-    organization_id: 'org-1',
-    office_open_at: '2099-04-12T07:00:00',
-    office_close_at: '2099-04-12T15:00:00',
-    office_locations: [{ name: 'Warszawa', google_maps_url: null, hours: [{ opens_at: '2099-04-12T07:00:00', closes_at: '2099-04-12T15:00:00' }] }],
+    location: "Warszawa",
+    organization_id: "org-1",
+    office_open_at: "2099-04-12T07:00:00",
+    office_close_at: "2099-04-12T15:00:00",
+    office_locations: [
+      {
+        name: "Warszawa",
+        google_maps_url: null,
+        hours: [
+          { opens_at: "2099-04-12T07:00:00", closes_at: "2099-04-12T15:00:00" },
+        ],
+      },
+    ],
   };
 }
 
 function createParticipant(
-  bibNumber = '',
-  options?: { importantFieldAliases?: string[]; customFields?: Record<string, string> },
+  bibNumber = "",
+  options?: {
+    importantFieldAliases?: string[];
+    customFields?: Record<string, string>;
+  }
 ): Participant {
   return {
-    id: 'p-1',
-    event_id: 'event-1',
-    name: 'Anna Kowalska',
-    email: 'anna@example.com',
+    id: "p-1",
+    event_id: "event-1",
+    name: "Anna Kowalska",
+    email: "anna@example.com",
     bib_number: bibNumber,
-    qr_code: 'QR-1',
-    status: 'not_checked_in',
-    email_status: 'not_sent',
+    qr_code: "QR-1",
+    status: "not_checked_in",
+    email_status: "not_sent",
     custom_fields: options?.customFields ?? {
-      Miasto: 'Warszawa',
-      Alergie: 'Orzeszki',
+      Miasto: "Warszawa",
+      Alergie: "Orzeszki",
     },
-    important_field_aliases: options?.importantFieldAliases ?? ['Alergie'],
+    important_field_aliases: options?.importantFieldAliases ?? ["Alergie"],
   };
 }
 
 function createMappings(): ParticipantFieldMapping[] {
   return [
     {
-      source_column_name: 'first_name',
-      alias: 'Imię',
-      field_role: 'display_name_part',
+      source_column_name: "first_name",
+      alias: "Imię",
+      field_role: "display_name_part",
       display_order: 0,
       is_required: false,
       is_active: true,
     },
     {
-      source_column_name: 'last_name',
-      alias: 'Nazwisko',
-      field_role: 'display_name_part',
+      source_column_name: "last_name",
+      alias: "Nazwisko",
+      field_role: "display_name_part",
       display_order: 1,
       is_required: false,
       is_active: true,
     },
     {
-      source_column_name: 'city',
-      alias: 'Miasto',
-      field_role: 'custom',
+      source_column_name: "city",
+      alias: "Miasto",
+      field_role: "custom",
       display_order: 2,
       is_required: false,
       is_active: true,
     },
     {
-      source_column_name: 'allergies',
-      alias: 'Alergie',
-      field_role: 'important_custom',
+      source_column_name: "allergies",
+      alias: "Alergie",
+      field_role: "important_custom",
       display_order: 3,
       is_required: false,
       is_active: true,
@@ -115,16 +144,24 @@ function createMappings(): ParticipantFieldMapping[] {
 }
 
 function createDataState(
-  role: User['role'],
-  bibNumber = '',
-  options?: { mappings?: ParticipantFieldMapping[]; participant?: Participant; mappingError?: boolean; events?: Event[]; selectedEventId?: string },
+  role: User["role"],
+  bibNumber = "",
+  options?: {
+    mappings?: ParticipantFieldMapping[];
+    participant?: Participant;
+    mappingError?: boolean;
+    events?: Event[];
+    selectedEventId?: string;
+  }
 ) {
   const event = createEvent();
   const events = options?.events ?? [event];
   const selectedEventId = options?.selectedEventId ?? event.id;
-  const selectedEvent = events.find(entry => entry.id === selectedEventId) ?? event;
+  const selectedEvent =
+    events.find((entry) => entry.id === selectedEventId) ?? event;
   const participant = options?.participant ?? createParticipant(bibNumber);
-  const scanEvent = events.find(entry => entry.id === participant.event_id) ?? selectedEvent;
+  const scanEvent =
+    events.find((entry) => entry.id === participant.event_id) ?? selectedEvent;
 
   return {
     participants: [participant],
@@ -147,48 +184,53 @@ function createDataState(
     })),
     isLoading: false,
     visibleEvents: events,
-    connectionState: 'online',
+    connectionState: "online",
     pendingMutationCount: 0,
-    scannerMode: 'online',
+    scannerMode: "online",
     getParticipantFieldMappings: options?.mappingError
-      ? vi.fn(async () => { throw new Error('mapping unavailable'); })
+      ? vi.fn(async () => {
+          throw new Error("mapping unavailable");
+        })
       : vi.fn(async () => options?.mappings ?? createMappings()),
     sendParticipantQrEmail: vi.fn(async () => ({ ok: true })),
     deleteParticipant: vi.fn(async () => ({ ok: true })),
     getParticipantQrPreview: vi.fn(async () => ({
       participant,
       event: scanEvent,
-      qr_code_svg_data_uri: 'data:image/svg+xml;base64,PHN2Zy8+',
-      qr_code_image_url: 'https://example.com/qr.svg',
+      qr_code_svg_data_uri: "data:image/svg+xml;base64,PHN2Zy8+",
+      qr_code_image_url: "https://example.com/qr.svg",
     })),
   };
 }
 
-const HARDWARE_SCAN_TOKEN = `pqr_${'ab12cd34'.repeat(6)}`;
+const HARDWARE_SCAN_TOKEN = `pqr_${"ab12cd34".repeat(6)}`;
 
 // Czytnik sprzetowy wystukuje token jak klawiatura i konczy Enterem.
 function typeHardwareScan(token: string, target: HTMLElement = document.body) {
   for (const character of token) {
     fireEvent.keyDown(target, { key: character });
   }
-  fireEvent.keyDown(target, { key: 'Enter' });
+  fireEvent.keyDown(target, { key: "Enter" });
 }
 
-function renderPages(initialEntries: string[] = ['/scanner']) {
+function renderPages(initialEntries: string[] = ["/scanner"]) {
   render(
     <MemoryRouter initialEntries={initialEntries}>
       <Routes>
         <Route path="/scanner" element={<Scanner />} />
-        <Route path="/events/:id/participants/:participantId" element={<ParticipantDetails />} />
+        <Route
+          path="/events/:id/participants/:participantId"
+          element={<ParticipantDetails />}
+        />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 }
 
-describe('Scanner page', () => {
+describe("Scanner page", () => {
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2099-04-12T10:00:00'));
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2099-04-12T10:00:00"));
     useDataMock.mockReset();
   });
 
@@ -196,119 +238,172 @@ describe('Scanner page', () => {
     vi.useRealTimers();
   });
 
-  it('shows inline bib number editing for roles above plain scanner and hides scan controls in detail view', async () => {
-    const dataState = createDataState('scanner_plus', '0');
+  it("shows inline bib number editing for roles above plain scanner and hides scan controls in detail view", async () => {
+    const dataState = createDataState("scanner_plus", "0");
     useDataMock.mockReturnValue(dataState);
 
     renderPages();
 
-    const searchInput = screen.getByRole('textbox', { name: 'Szukaj uczestnika' });
+    const searchInput = screen.getByRole("textbox", {
+      name: "Szukaj uczestnika",
+    });
     expect(searchInput).toBeInTheDocument();
     expect(searchInput).not.toHaveFocus();
-    fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
+    fireEvent.click(screen.getByRole("button", { name: "Zasymuluj skan" }));
 
-    await screen.findByText('Dane do weryfikacji');
+    await screen.findByText("Dane do weryfikacji");
 
-    expect(screen.queryByRole('textbox', { name: 'Szukaj uczestnika' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Zasymuluj skan' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'ODPRAW ZAWODNIKA' })).toHaveClass('scanner-check-in-action');
+    expect(
+      screen.queryByRole("textbox", { name: "Szukaj uczestnika" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Zasymuluj skan" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "ODPRAW ZAWODNIKA" })
+    ).toHaveClass("scanner-check-in-action");
 
-    const bibNumberInput = screen.getByRole('textbox', { name: 'Numer startowy' });
-    expect(bibNumberInput).toHaveValue('');
+    const bibNumberInput = screen.getByRole("textbox", {
+      name: "Numer startowy",
+    });
+    expect(bibNumberInput).toHaveValue("");
 
-    fireEvent.change(bibNumberInput, { target: { value: '123' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Zapisz numer' }));
+    fireEvent.change(bibNumberInput, { target: { value: "123" } });
+    fireEvent.click(screen.getByRole("button", { name: "Zapisz numer" }));
 
     await waitFor(() => {
-      expect(dataState.updateParticipantBibNumber).toHaveBeenCalledWith('p-1', '123');
+      expect(dataState.updateParticipantBibNumber).toHaveBeenCalledWith(
+        "p-1",
+        "123"
+      );
     });
   });
 
-  it('shows important mapped fields in the verification section and keeps them out of the remaining data box', async () => {
-    useDataMock.mockReturnValue(createDataState('scanner_plus'));
+  it("shows important mapped fields in the verification section and keeps them out of the remaining data box", async () => {
+    useDataMock.mockReturnValue(createDataState("scanner_plus"));
 
     renderPages();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
-    await screen.findByText('Dane do weryfikacji');
+    fireEvent.click(screen.getByRole("button", { name: "Zasymuluj skan" }));
+    await screen.findByText("Dane do weryfikacji");
 
-    const verificationSection = screen.getByText('Dane do weryfikacji').parentElement?.parentElement;
-    const remainingSection = screen.getByText('Pozostałe dane uczestnika').parentElement?.parentElement;
+    const verificationSection = screen.getByText("Dane do weryfikacji")
+      .parentElement?.parentElement;
+    const remainingSection = screen.getByText("Pozostałe dane uczestnika")
+      .parentElement?.parentElement;
 
     expect(verificationSection).not.toBeNull();
     expect(remainingSection).not.toBeNull();
 
-    expect(within(verificationSection as HTMLElement).getByText('Alergie')).toBeInTheDocument();
-    expect(within(verificationSection as HTMLElement).getByText('Orzeszki')).toBeInTheDocument();
-    expect(within(verificationSection as HTMLElement).queryByText('Miasto')).not.toBeInTheDocument();
+    expect(
+      within(verificationSection as HTMLElement).getByText("Alergie")
+    ).toBeInTheDocument();
+    expect(
+      within(verificationSection as HTMLElement).getByText("Orzeszki")
+    ).toBeInTheDocument();
+    expect(
+      within(verificationSection as HTMLElement).queryByText("Miasto")
+    ).not.toBeInTheDocument();
 
-    expect(within(remainingSection as HTMLElement).getByText('Miasto')).toBeInTheDocument();
-    expect(within(remainingSection as HTMLElement).getByText('Warszawa')).toBeInTheDocument();
-    expect(within(remainingSection as HTMLElement).queryByText('Alergie')).not.toBeInTheDocument();
-    expect(screen.queryByText('Ważne informacje uczestnika')).not.toBeInTheDocument();
+    expect(
+      within(remainingSection as HTMLElement).getByText("Miasto")
+    ).toBeInTheDocument();
+    expect(
+      within(remainingSection as HTMLElement).getByText("Warszawa")
+    ).toBeInTheDocument();
+    expect(
+      within(remainingSection as HTMLElement).queryByText("Alergie")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Ważne informacje uczestnika")
+    ).not.toBeInTheDocument();
   });
 
-  it('keeps important fields in the verification section during scanner fallback when mappings are unavailable', async () => {
-    const participant = createParticipant('', {
-      importantFieldAliases: ['Alergie'],
+  it("keeps important fields in the verification section during scanner fallback when mappings are unavailable", async () => {
+    const participant = createParticipant("", {
+      importantFieldAliases: ["Alergie"],
       customFields: {
-        Alergie: 'Orzeszki',
-        Miasto: 'Warszawa',
+        Alergie: "Orzeszki",
+        Miasto: "Warszawa",
       },
     });
-    useDataMock.mockReturnValue(createDataState('scanner_plus', '', { participant, mappingError: true }));
+    useDataMock.mockReturnValue(
+      createDataState("scanner_plus", "", { participant, mappingError: true })
+    );
 
     renderPages();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
-    await screen.findByText('Dane do weryfikacji');
+    fireEvent.click(screen.getByRole("button", { name: "Zasymuluj skan" }));
+    await screen.findByText("Dane do weryfikacji");
 
-    const verificationSection = screen.getByText('Dane do weryfikacji').parentElement?.parentElement;
-    const remainingSection = screen.getByText('Pozostałe dane uczestnika').parentElement?.parentElement;
+    const verificationSection = screen.getByText("Dane do weryfikacji")
+      .parentElement?.parentElement;
+    const remainingSection = screen.getByText("Pozostałe dane uczestnika")
+      .parentElement?.parentElement;
 
-    expect(within(verificationSection as HTMLElement).getByText('Alergie')).toBeInTheDocument();
-    expect(within(verificationSection as HTMLElement).getByText('Orzeszki')).toBeInTheDocument();
-    expect(within(remainingSection as HTMLElement).getByText('Miasto')).toBeInTheDocument();
-    expect(within(remainingSection as HTMLElement).getByText('Warszawa')).toBeInTheDocument();
-    expect(screen.queryByText('Ważne informacje uczestnika')).not.toBeInTheDocument();
+    expect(
+      within(verificationSection as HTMLElement).getByText("Alergie")
+    ).toBeInTheDocument();
+    expect(
+      within(verificationSection as HTMLElement).getByText("Orzeszki")
+    ).toBeInTheDocument();
+    expect(
+      within(remainingSection as HTMLElement).getByText("Miasto")
+    ).toBeInTheDocument();
+    expect(
+      within(remainingSection as HTMLElement).getByText("Warszawa")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Ważne informacje uczestnika")
+    ).not.toBeInTheDocument();
   });
 
-  it('does not expose inline participant editing for the plain scanner role', async () => {
-    useDataMock.mockReturnValue(createDataState('scanner', ''));
+  it("does not expose inline participant editing for the plain scanner role", async () => {
+    useDataMock.mockReturnValue(createDataState("scanner", ""));
 
     renderPages();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
-    await screen.findByText('Dane do weryfikacji');
+    fireEvent.click(screen.getByRole("button", { name: "Zasymuluj skan" }));
+    await screen.findByText("Dane do weryfikacji");
 
-    expect(screen.queryByRole('textbox', { name: 'Numer startowy' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Edytuj dane uczestnika' })).not.toBeInTheDocument();
-    expect(screen.getAllByText('Do uzupełnienia').length).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole("textbox", { name: "Numer startowy" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edytuj dane uczestnika" })
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText("Do uzupełnienia").length).toBeGreaterThan(0);
   });
 
-  it('opens participant edit dialog immediately after navigating from scanner edit action', async () => {
-    useDataMock.mockReturnValue(createDataState('scanner_plus', ''));
+  it("opens participant edit dialog immediately after navigating from scanner edit action", async () => {
+    useDataMock.mockReturnValue(createDataState("scanner_plus", ""));
 
     renderPages();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
-    await screen.findByRole('button', { name: 'Edytuj dane uczestnika' });
+    fireEvent.click(screen.getByRole("button", { name: "Zasymuluj skan" }));
+    await screen.findByRole("button", { name: "Edytuj dane uczestnika" });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edytuj dane uczestnika' }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edytuj dane uczestnika" })
+    );
 
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('heading', { name: 'Edytuj dane uczestnika' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('textbox', { name: 'Email' })).toHaveValue('anna@example.com');
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByRole("heading", { name: "Edytuj dane uczestnika" })
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("textbox", { name: "Email" })).toHaveValue(
+      "anna@example.com"
+    );
   });
 
-  it('opens the scanned participant under its own event when scanner plus has multiple events', async () => {
-    const firstEvent = createEvent('event-1', 'Bieg Miejski');
-    const secondEvent = createEvent('event-2', 'Triathlon');
+  it("opens the scanned participant under its own event when scanner plus has multiple events", async () => {
+    const firstEvent = createEvent("event-1", "Bieg Miejski");
+    const secondEvent = createEvent("event-2", "Triathlon");
     const participant = {
-      ...createParticipant(''),
+      ...createParticipant(""),
       event_id: secondEvent.id,
     };
-    const dataState = createDataState('scanner_plus', '', {
+    const dataState = createDataState("scanner_plus", "", {
       events: [firstEvent, secondEvent],
       participant,
       selectedEventId: firstEvent.id,
@@ -317,62 +412,84 @@ describe('Scanner page', () => {
 
     renderPages();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Zasymuluj skan' }));
-    await screen.findByRole('button', { name: 'Edytuj dane uczestnika' });
+    fireEvent.click(screen.getByRole("button", { name: "Zasymuluj skan" }));
+    await screen.findByRole("button", { name: "Edytuj dane uczestnika" });
 
-    expect(screen.getByText('Wydarzenie')).toBeInTheDocument();
-    expect(screen.getByText('Triathlon')).toBeInTheDocument();
+    expect(screen.getByText("Wydarzenie")).toBeInTheDocument();
+    expect(screen.getByText("Triathlon")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(dataState.selectEventContext).toHaveBeenCalledWith(secondEvent.id);
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edytuj dane uczestnika' }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edytuj dane uczestnika" })
+    );
 
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('textbox', { name: 'Email' })).toHaveValue('anna@example.com');
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("textbox", { name: "Email" })).toHaveValue(
+      "anna@example.com"
+    );
   });
 
-  it('opens the participant card when a hardware scanner types a token outside any input', async () => {
-    const dataState = createDataState('scanner_plus');
+  it("opens the participant card when a hardware scanner types a token outside any input", async () => {
+    const dataState = createDataState("scanner_plus");
     useDataMock.mockReturnValue(dataState);
 
     renderPages();
 
     typeHardwareScan(HARDWARE_SCAN_TOKEN);
 
-    await screen.findByText('Dane do weryfikacji');
-    expect(dataState.scanParticipantQr).toHaveBeenCalledWith(HARDWARE_SCAN_TOKEN);
-    expect(screen.getByText('Anna Kowalska')).toBeInTheDocument();
+    await screen.findByText("Dane do weryfikacji");
+    expect(dataState.scanParticipantQr).toHaveBeenCalledWith(
+      HARDWARE_SCAN_TOKEN
+    );
+    expect(screen.getByText("Anna Kowalska")).toBeInTheDocument();
   });
 
-  it('ignores hardware scanner keystrokes that land in the search field', async () => {
-    const dataState = createDataState('scanner_plus');
+  it("ignores hardware scanner keystrokes that land in the search field", async () => {
+    const dataState = createDataState("scanner_plus");
     useDataMock.mockReturnValue(dataState);
 
     renderPages();
 
-    typeHardwareScan(HARDWARE_SCAN_TOKEN, screen.getByRole('textbox', { name: 'Szukaj uczestnika' }));
+    typeHardwareScan(
+      HARDWARE_SCAN_TOKEN,
+      screen.getByRole("textbox", { name: "Szukaj uczestnika" })
+    );
 
     await waitFor(() => {
       expect(dataState.scanParticipantQr).not.toHaveBeenCalled();
     });
-    expect(screen.getByRole('textbox', { name: 'Szukaj uczestnika' })).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Szukaj uczestnika" })
+    ).toBeInTheDocument();
   });
 
-  it('highlights important participant data in the participant details view', async () => {
-    useDataMock.mockReturnValue(createDataState('scanner_plus'));
+  it("highlights important participant data in the participant details view", async () => {
+    useDataMock.mockReturnValue(createDataState("scanner_plus"));
 
-    renderPages(['/events/event-1/participants/p-1']);
+    renderPages(["/events/event-1/participants/p-1"]);
 
-    const importantSection = await screen.findByText('Ważne dane do weryfikacji');
-    const participantDataCard = screen.getByText('Dane uczestnika').parentElement?.parentElement;
+    const importantSection = await screen.findByText(
+      "Ważne dane do weryfikacji"
+    );
+    const participantDataCard =
+      screen.getByText("Dane uczestnika").parentElement?.parentElement;
 
     expect(importantSection).toBeInTheDocument();
     expect(participantDataCard).not.toBeNull();
-    expect(within(participantDataCard as HTMLElement).getByText('Alergie')).toBeInTheDocument();
-    expect(within(participantDataCard as HTMLElement).getByText('Orzeszki')).toBeInTheDocument();
-    expect(within(participantDataCard as HTMLElement).getByText('Miasto')).toBeInTheDocument();
-    expect(within(participantDataCard as HTMLElement).getByText('Warszawa')).toBeInTheDocument();
+    expect(
+      within(participantDataCard as HTMLElement).getByText("Alergie")
+    ).toBeInTheDocument();
+    expect(
+      within(participantDataCard as HTMLElement).getByText("Orzeszki")
+    ).toBeInTheDocument();
+    expect(
+      within(participantDataCard as HTMLElement).getByText("Miasto")
+    ).toBeInTheDocument();
+    expect(
+      within(participantDataCard as HTMLElement).getByText("Warszawa")
+    ).toBeInTheDocument();
   });
 });

@@ -28,13 +28,15 @@ vi.mock("@/components/ParticipantBibNumberConflictDialog", () => ({
   ParticipantBibNumberConflictDialog: () => null,
 }));
 
-function renderPage(options: {
-  sendParticipantQrEmail?: ReturnType<typeof vi.fn>;
-  deleteParticipant?: ReturnType<typeof vi.fn>;
-  updateParticipantDetails?: ReturnType<typeof vi.fn>;
-  mappings?: ReturnType<typeof createTestParticipantMapping>[];
-  customFields?: Record<string, string>;
-} = {}) {
+function renderPage(
+  options: {
+    sendParticipantQrEmail?: ReturnType<typeof vi.fn>;
+    deleteParticipant?: ReturnType<typeof vi.fn>;
+    updateParticipantDetails?: ReturnType<typeof vi.fn>;
+    mappings?: ReturnType<typeof createTestParticipantMapping>[];
+    customFields?: Record<string, string>;
+  } = {}
+) {
   const participant = createTestParticipant({
     custom_fields: {
       Miasto: "Warszawa",
@@ -42,9 +44,12 @@ function renderPage(options: {
     },
   });
   const event = createTestEvent();
-  const sendParticipantQrEmail = options.sendParticipantQrEmail ?? vi.fn(async () => ({ ok: true }));
-  const deleteParticipant = options.deleteParticipant ?? vi.fn(async () => ({ ok: true }));
-  const updateParticipantDetails = options.updateParticipantDetails ?? vi.fn(async () => ({ ok: true }));
+  const sendParticipantQrEmail =
+    options.sendParticipantQrEmail ?? vi.fn(async () => ({ ok: true }));
+  const deleteParticipant =
+    options.deleteParticipant ?? vi.fn(async () => ({ ok: true }));
+  const updateParticipantDetails =
+    options.updateParticipantDetails ?? vi.fn(async () => ({ ok: true }));
 
   useDataMock.mockReturnValue({
     participants: [participant],
@@ -55,7 +60,9 @@ function renderPage(options: {
     updateParticipantBibNumber: vi.fn(async () => ({ ok: true })),
     updateParticipantDetails,
     getParticipantFieldMappings: vi.fn(async () => [
-      ...(options.mappings ?? [createTestParticipantMapping({ alias: "Miasto" })]),
+      ...(options.mappings ?? [
+        createTestParticipantMapping({ alias: "Miasto" }),
+      ]),
     ]),
     sendParticipantQrEmail,
     deleteParticipant,
@@ -72,13 +79,23 @@ function renderPage(options: {
   render(
     <MemoryRouter initialEntries={["/events/event-1/participants/p-1"]}>
       <Routes>
-        <Route path="/events/:id/participants/:participantId" element={<ParticipantDetails />} />
-        <Route path="/events/:id/participants" element={<div data-testid="participants-route" />} />
+        <Route
+          path="/events/:id/participants/:participantId"
+          element={<ParticipantDetails />}
+        />
+        <Route
+          path="/events/:id/participants"
+          element={<div data-testid="participants-route" />}
+        />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 
-  return { sendParticipantQrEmail, deleteParticipant, updateParticipantDetails };
+  return {
+    sendParticipantQrEmail,
+    deleteParticipant,
+    updateParticipantDetails,
+  };
 }
 
 describe("ParticipantDetails page", () => {
@@ -96,16 +113,20 @@ describe("ParticipantDetails page", () => {
     await waitFor(() => {
       expect(sendParticipantQrEmail).toHaveBeenCalledWith("p-1");
     });
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
-      title: "Mail z QR wysłany",
-    }));
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Mail z QR wysłany",
+      })
+    );
   });
 
   it("confirms participant deletion and navigates back to the participant list", async () => {
     const { deleteParticipant } = renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Usuń uczestnika" }));
-    const deleteButtons = screen.getAllByRole("button", { name: "Usuń uczestnika" });
+    const deleteButtons = screen.getAllByRole("button", {
+      name: "Usuń uczestnika",
+    });
     fireEvent.click(deleteButtons[deleteButtons.length - 1]);
 
     await waitFor(() => {
@@ -125,7 +146,7 @@ describe("ParticipantDetails page", () => {
     fireEvent.click(screen.getAllByRole("button")[0]);
 
     expect(confirmSpy).toHaveBeenCalledWith(
-      expect.stringContaining("niezapisane zmiany"),
+      expect.stringContaining("niezapisane zmiany")
     );
     expect(screen.queryByTestId("participants-route")).not.toBeInTheDocument();
 
@@ -161,7 +182,9 @@ describe("ParticipantDetails page", () => {
       ],
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Edytuj dane uczestnika" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edytuj dane uczestnika" })
+    );
 
     const ageInput = screen.getByLabelText("Wiek") as HTMLInputElement;
     expect(ageInput.type).toBe("number");
@@ -169,7 +192,11 @@ describe("ParticipantDetails page", () => {
     fireEvent.change(ageInput, { target: { value: "17" } });
     fireEvent.click(screen.getByRole("button", { name: "Zapisz zmiany" }));
 
-    expect(await screen.findByText("Pole Wiek musi mieć wartość nie mniejszą niż 18.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Pole Wiek musi mieć wartość nie mniejszą niż 18."
+      )
+    ).toBeInTheDocument();
     expect(updateParticipantDetails).not.toHaveBeenCalled();
 
     fireEvent.change(ageInput, { target: { value: "21" } });
@@ -178,10 +205,14 @@ describe("ParticipantDetails page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Zapisz zmiany" }));
 
     await waitFor(() => {
-      expect(updateParticipantDetails).toHaveBeenCalledWith("p-1", "anna@example.com", expect.objectContaining({
-        Dystans: "10K",
-        Wiek: "21",
-      }));
+      expect(updateParticipantDetails).toHaveBeenCalledWith(
+        "p-1",
+        "anna@example.com",
+        expect.objectContaining({
+          Dystans: "10K",
+          Wiek: "21",
+        })
+      );
     });
   });
 });
