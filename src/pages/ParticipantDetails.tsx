@@ -5,6 +5,8 @@ import { useRouteEventContext } from "@/hooks/use-route-event-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PlatformWithdrawnBadge } from "@/components/PlatformWithdrawnBadge";
+import { isWithdrawnOnPlatform } from "@/lib/platform-withdrawal";
 import {
   ArrowLeft,
   CheckCircle,
@@ -819,6 +821,14 @@ export default function ParticipantDetails() {
                 {statusDefinition.label}
               </Badge>
             </div>
+            {isWithdrawnOnPlatform(participant) && (
+              <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-muted-foreground">Platforma</span>
+                <PlatformWithdrawnBadge
+                  removedAt={participant.platform_removed_at}
+                />
+              </div>
+            )}
             <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
               <span className="text-muted-foreground">Opłata</span>
               <Badge

@@ -35,9 +35,11 @@ function renderPage(
     updateParticipantDetails?: ReturnType<typeof vi.fn>;
     mappings?: ReturnType<typeof createTestParticipantMapping>[];
     customFields?: Record<string, string>;
+    platformRemovedAt?: string | null;
   } = {}
 ) {
   const participant = createTestParticipant({
+    platform_removed_at: options.platformRemovedAt ?? null,
     custom_fields: {
       Miasto: "Warszawa",
       ...(options.customFields ?? {}),
@@ -102,6 +104,24 @@ describe("ParticipantDetails page", () => {
   beforeEach(() => {
     useDataMock.mockReset();
     vi.mocked(toast).mockReset();
+  });
+
+  it("shows the platform withdrawal badge with its date only for withdrawn participants", () => {
+    renderPage({ platformRemovedAt: "2026-10-09 10:00:00" });
+    const badge = screen.getByText("Wycofany na platformie");
+    expect(badge).toHaveAttribute(
+      "title",
+      expect.stringContaining(
+        "Zapis anulowany lub usunięty na platformie Zmierzymy Czas"
+      )
+    );
+  });
+
+  it("shows no withdrawal badge for a participant that is active on the platform", () => {
+    renderPage();
+    expect(
+      screen.queryByText("Wycofany na platformie")
+    ).not.toBeInTheDocument();
   });
 
   it("confirms and sends a QR email for the participant", async () => {
