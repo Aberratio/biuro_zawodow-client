@@ -279,6 +279,46 @@ describe("Scanner page", () => {
     });
   });
 
+  it("warns about a participant withdrawn on the platform but still allows the check-in", async () => {
+    const participant = {
+      ...createParticipant("101"),
+      platform_removed_at: "2026-10-09 10:00:00",
+    };
+    const dataState = createDataState("scanner_plus", "101", { participant });
+    useDataMock.mockReturnValue(dataState);
+
+    renderPages();
+
+    fireEvent.click(screen.getByRole("button", { name: "Zasymuluj skan" }));
+    const warning = await screen.findByRole("alert");
+    expect(warning).toHaveTextContent(
+      "Uwaga: zapis tego uczestnika został anulowany na platformie Zmierzymy Czas (rezygnacja, zwrot lub usunięcie przez organizatora). Sprawdź to przed wydaniem pakietu."
+    );
+
+    const checkIn = screen.getByRole("button", { name: "ODPRAW ZAWODNIKA" });
+    expect(checkIn).toBeEnabled();
+    fireEvent.click(checkIn);
+    await waitFor(() => {
+      expect(dataState.updateParticipantStatus).toHaveBeenCalledWith(
+        "p-1",
+        "checked_in",
+        expect.anything()
+      );
+    });
+  });
+
+  it("shows no platform warning for a participant that is active on the platform", async () => {
+    useDataMock.mockReturnValue(createDataState("scanner_plus", "101"));
+
+    renderPages();
+
+    fireEvent.click(screen.getByRole("button", { name: "Zasymuluj skan" }));
+    await screen.findByText("Dane do weryfikacji");
+    expect(
+      screen.queryByText(/anulowany na platformie Zmierzymy Czas/)
+    ).not.toBeInTheDocument();
+  });
+
   it("shows important mapped fields in the verification section and keeps them out of the remaining data box", async () => {
     useDataMock.mockReturnValue(createDataState("scanner_plus"));
 

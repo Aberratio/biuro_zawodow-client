@@ -36,6 +36,8 @@ import {
   participantPaymentStatusLabels,
 } from "@/lib/participant-fields";
 import { formatBibNumber } from "@/lib/participants";
+import { PlatformWithdrawnWarning } from "@/components/PlatformWithdrawnBadge";
+import { isWithdrawnOnPlatform } from "@/lib/platform-withdrawal";
 import { getParticipantStatusDefinition } from "@/lib/participant-status";
 import { formatEventOfficeSchedule, isEventOfficeOpen } from "@/lib/events";
 import { buildEventParticipantPath } from "@/lib/routes";
@@ -990,6 +992,9 @@ export default function Scanner() {
                   <p className="text-base font-semibold text-foreground">
                     Podsumowanie odprawy
                   </p>
+                  {isWithdrawnOnPlatform(scannedParticipant) && (
+                    <PlatformWithdrawnWarning />
+                  )}
                   <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                     <div className="rounded-xl border bg-background/90 px-4 py-3 shadow-sm">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">

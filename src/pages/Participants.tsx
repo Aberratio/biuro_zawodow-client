@@ -4,6 +4,8 @@ import { useData } from "@/contexts/DataContext";
 import { useRouteEventContext } from "@/hooks/use-route-event-context";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { PlatformWithdrawnBadge } from "@/components/PlatformWithdrawnBadge";
+import { isWithdrawnOnPlatform } from "@/lib/platform-withdrawal";
 import {
   Select,
   SelectContent,
@@ -570,6 +572,12 @@ export default function Participants() {
                         <span className="block md:hidden text-xs text-muted-foreground truncate">
                           {participantEmail}
                         </span>
+                        {isWithdrawnOnPlatform(participant) && (
+                          <PlatformWithdrawnBadge
+                            removedAt={participant.platform_removed_at}
+                            className="mt-1 text-[10px]"
+                          />
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
