@@ -21,6 +21,14 @@ vi.mock("@/hooks/use-toast", () => ({
   toast: vi.fn(),
 }));
 
+const { refreshData } = vi.hoisted(() => ({
+  refreshData: vi.fn(async () => undefined),
+}));
+
+vi.mock("@/contexts/DataContext", () => ({
+  useData: () => ({ refreshData }),
+}));
+
 type Responder = (
   url: string,
   init: RequestInit
@@ -61,6 +69,7 @@ function renderSection(isOnline = true) {
 
 describe("EventPlatformConnectionSection", () => {
   beforeEach(() => {
+    refreshData.mockClear();
     vi.unstubAllGlobals();
     Object.assign(navigator, {
       clipboard: { writeText: vi.fn(async () => undefined) },
@@ -310,5 +319,253 @@ describe("EventPlatformConnectionSection", () => {
     const line = await screen.findByText(/Ostatni test/);
     expect(line).toHaveTextContent("Połączenie działa.");
     expect(line.textContent).not.toMatch(/uczestnik/);
+  });
+
+  it("pulls participants, announces the result and refreshes data", async () => {
+    const fetchMock = installFetch((url, init) => {
+      if (init.method === "POST" && url.endsWith("/platform-connection/pull")) {
+        return {
+          status: 200,
+          body: {
+            data: {
+              result: {
+                status: "ok",
+                summary: {
+                  fetched: 9,
+                  created: 4,
+                  updated: 2,
+                  unchanged: 3,
+                  skipped: 0,
+                  skipped_by_reason: [],
+                  removed: 1,
+                  restored: 0,
+                  possible_duplicates: 0,
+                  warnings: {},
+                  duration_ms: 120,
+                },
+                skipped_records: [],
+                possible_duplicate_registration_ids: [],
+              },
+              connection: {
+                ...storedConnection,
+                last_pull_at: "2026-10-07T10:00:00Z",
+                last_pull_status: "ok",
+              },
+            },
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: {
+          data: { availability: available, connection: storedConnection },
+        },
+      };
+    });
+    renderSection();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Pobierz uczestników teraz" })
+    );
+
+    const message = await screen.findByText(
+      "Pobrano listę z platformy: nowi 4, zaktualizowani 2, bez zmian 3. Usunięci na platformie: 1."
+    );
+    expect(message.closest('[aria-live="polite"]')).not.toBeNull();
+    await waitFor(() => expect(refreshData).toHaveBeenCalledWith(true));
+    const pullCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).endsWith("/platform-connection/pull")
+    );
+    expect(pullCall).toBeDefined();
+  });
+
+  it("disables the pull button when the integration is disabled or offline", async () => {
+    installFetch(() => ({
+      status: 200,
+      body: {
+        data: {
+          availability: available,
+          connection: { ...storedConnection, is_enabled: false },
+        },
+      },
+    }));
+    const first = renderSection();
+
+    const button = await screen.findByRole("button", {
+      name: "Pobierz uczestników teraz",
+    });
+    expect(button).toBeDisabled();
+    expect(
+      screen.getByText(
+        "Włącz integrację i zapisz połączenie, aby pobierać uczestników."
+      )
+    ).toBeInTheDocument();
+    first.unmount();
+
+    installFetch(() => ({
+      status: 200,
+      body: {
+        data: { availability: available, connection: storedConnection },
+      },
+    }));
+    renderSection(false);
+    expect(
+      await screen.findByRole("button", { name: "Pobierz uczestników teraz" })
+    ).toBeDisabled();
+  });
+
+  it("shows the last pull status from the connection", async () => {
+    installFetch(() => ({
+      status: 200,
+      body: {
+        data: {
+          availability: available,
+          connection: {
+            ...storedConnection,
+            last_pull_at: "2026-10-07T10:00:00Z",
+            last_pull_status: "partial",
+            last_pull_summary: {
+              fetched: 5,
+              created: 2,
+              updated: 1,
+              unchanged: 1,
+              skipped: 1,
+              skipped_by_reason: { qr_collision: 1 },
+              removed: 0,
+              restored: 0,
+              possible_duplicates: 0,
+              warnings: {},
+              duration_ms: 90,
+            },
+          },
+        },
+      },
+    }));
+    renderSection();
+
+    const line = await screen.findByText(/Ostatnie pobranie/);
+    expect(line).toHaveTextContent(
+      "Pobrano listę uczestników z platformy, ale część rekordów pominięto."
+    );
+    expect(line).toHaveTextContent("Nowi 2, zaktualizowani 1, bez zmian 1.");
+    expect(line).toHaveTextContent("Pominięto 1");
+  });
+
+  it("shows remaining seconds when the pull is throttled", async () => {
+    installFetch((url, init) => {
+      if (init.method === "POST" && url.endsWith("/platform-connection/pull")) {
+        return {
+          status: 429,
+          body: {
+            error: "Odczekaj chwilę przed kolejnym pobraniem uczestników.",
+            code: "platform_pull_throttled",
+            retry_after: 9,
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: {
+          data: { availability: available, connection: storedConnection },
+        },
+      };
+    });
+    renderSection();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Pobierz uczestników teraz" })
+    );
+
+    expect(
+      await screen.findByText("Odczekaj 9 s przed kolejnym pobraniem.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows the in-progress message on 409", async () => {
+    installFetch((url, init) => {
+      if (init.method === "POST" && url.endsWith("/platform-connection/pull")) {
+        return {
+          status: 409,
+          body: {
+            error:
+              "Pobieranie uczestników z platformy już trwa. Spróbuj za chwilę.",
+            code: "platform_pull_in_progress",
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: {
+          data: { availability: available, connection: storedConnection },
+        },
+      };
+    });
+    renderSection();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Pobierz uczestników teraz" })
+    );
+
+    expect(
+      await screen.findByText(
+        "Pobieranie uczestników z platformy już trwa. Spróbuj za chwilę."
+      )
+    ).toBeInTheDocument();
+    expect(refreshData).not.toHaveBeenCalled();
+  });
+
+  it("lists skipped platform registration ids without personal data", async () => {
+    installFetch((url, init) => {
+      if (init.method === "POST" && url.endsWith("/platform-connection/pull")) {
+        return {
+          status: 200,
+          body: {
+            data: {
+              result: {
+                status: "partial",
+                summary: {
+                  fetched: 3,
+                  created: 2,
+                  updated: 0,
+                  unchanged: 0,
+                  skipped: 1,
+                  skipped_by_reason: { qr_collision: 1 },
+                  removed: 0,
+                  restored: 0,
+                  possible_duplicates: 0,
+                  warnings: {},
+                  duration_ms: 10,
+                },
+                skipped_records: [
+                  { registration_id: "reg-0005", reason: "qr_collision" },
+                ],
+                possible_duplicate_registration_ids: [],
+              },
+              connection: storedConnection,
+            },
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: {
+          data: { availability: available, connection: storedConnection },
+        },
+      };
+    });
+    renderSection();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Pobierz uczestników teraz" })
+    );
+
+    expect(
+      await screen.findByText("Pominięte rekordy (ID zapisu na platformie)")
+    ).toBeInTheDocument();
+    const item = screen.getByText(/reg-0005/);
+    expect(item).toHaveTextContent(
+      "reg-0005 — kod QR jest już używany przez innego uczestnika (np. w innym wydarzeniu)"
+    );
+    expect(document.body.textContent).not.toMatch(/pqr_|zqr_|@/);
   });
 });
