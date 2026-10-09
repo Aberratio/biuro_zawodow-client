@@ -7,6 +7,7 @@ import {
   EyeOff,
   Loader2,
 } from "lucide-react";
+import { PlatformPushStatus } from "@/components/PlatformPushStatus";
 
 import {
   AlertDialog,
@@ -510,6 +511,7 @@ export function EventPlatformConnectionSection({
             {describeTestStatus(connection.last_test_status, null)}
           </p>
         )}
+        <PlatformPushStatus connection={connection} />
       </div>
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

@@ -163,6 +163,46 @@ describe("EventPlatformConnectionSection", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows how many office changes wait for the platform and when it last reported a change", async () => {
+    installFetch(() => ({
+      status: 200,
+      body: {
+        data: {
+          availability: available,
+          connection: {
+            ...storedConnection,
+            push_pending: 4,
+            push_failed: 1,
+            last_webhook_at: "2026-10-09T10:00:00Z",
+          },
+        },
+      },
+    }));
+    renderSection();
+
+    expect(
+      await screen.findByText(
+        "Odprawy i poprawki czekające na wysłanie do platformy: 4. Nieudane: 1 — ponowienie automatyczne."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Ostatnia zmiana z platformy: /)
+    ).toBeInTheDocument();
+  });
+
+  it("shows no queue line before the server reports counters", async () => {
+    installFetch(() => ({
+      status: 200,
+      body: {
+        data: { availability: available, connection: storedConnection },
+      },
+    }));
+    renderSection();
+
+    expect(await screen.findByText(/kończy się na …wxyz/)).toBeInTheDocument();
+    expect(screen.queryByText(/czekające na wysłanie do platformy/)).toBeNull();
+  });
+
   it("keeps the stored token when saving without a new token", async () => {
     let savedBody: Record<string, unknown> | null = null;
     installFetch((_url, init) => {

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   describeAvailabilityReason,
+  describePlatformPushStatus,
   describeTestStatus,
   generateOrganizationToken,
   savePlatformConnection,
@@ -203,5 +204,52 @@ describe("platform connection helpers", () => {
       organization_token: "t".repeat(40),
       is_enabled: true,
     });
+  });
+});
+
+describe("describePlatformPushStatus", () => {
+  const base = {
+    platform_event_id: "p1",
+    is_enabled: true,
+    token_set: true,
+    token_hint: "wxyz",
+    token_readable: true,
+    token_updated_at: null,
+    last_test_at: null,
+    last_test_status: null,
+    updated_at: null,
+  };
+
+  it("reports waiting changes, failures and the last platform change", () => {
+    const lines = describePlatformPushStatus({
+      ...base,
+      push_pending: 3,
+      push_failed: 2,
+      last_webhook_at: "2026-10-09T10:00:00Z",
+    });
+    expect(lines[0]).toBe(
+      "Odprawy i poprawki czekające na wysłanie do platformy: 3. Nieudane: 2 — ponowienie automatyczne."
+    );
+    expect(lines[1]).toMatch(/^Ostatnia zmiana z platformy: /);
+    expect(lines).toHaveLength(2);
+  });
+
+  it("stays quiet when the server has no queue counters yet", () => {
+    expect(describePlatformPushStatus({ ...base })).toEqual([]);
+    expect(
+      describePlatformPushStatus({
+        ...base,
+        push_pending: null,
+        push_failed: null,
+        last_webhook_at: null,
+      })
+    ).toEqual([]);
+    expect(describePlatformPushStatus(null)).toEqual([]);
+  });
+
+  it("omits the failure sentence when nothing failed", () => {
+    expect(
+      describePlatformPushStatus({ ...base, push_pending: 0, push_failed: 0 })
+    ).toEqual(["Odprawy i poprawki czekające na wysłanie do platformy: 0"]);
   });
 });
