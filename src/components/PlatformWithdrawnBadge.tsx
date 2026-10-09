@@ -15,7 +15,7 @@ export function PlatformWithdrawnBadge({
   return (
     <Badge
       variant="outline"
-      className={`border-amber-500/70 bg-amber-500/10 text-amber-800 dark:text-amber-300 ${className}`.trim()}
+      className={`border-amber-500/70 bg-amber-500/10 text-foreground ${className}`.trim()}
       title={describePlatformWithdrawal(removedAt)}
     >
       {PLATFORM_WITHDRAWN_LABEL}
@@ -28,7 +28,7 @@ export function PlatformWithdrawnWarning() {
   return (
     <div
       role="alert"
-      className="mt-3 rounded-xl border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-900 dark:text-amber-200"
+      className="mt-3 rounded-xl border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm font-medium text-foreground"
     >
       {PLATFORM_WITHDRAWN_SCAN_WARNING}
     </div>
