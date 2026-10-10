@@ -29,6 +29,9 @@ export interface PlatformConnection {
   token_updated_at: string | null;
   last_test_at: string | null;
   last_test_status: string | null;
+  last_pull_at: string | null;
+  last_pull_status: string | null;
+  last_pull_summary: PlatformPullSummary | null;
   updated_at: string | null;
 }
 
@@ -112,6 +115,138 @@ export async function deletePlatformConnection(
     headers,
   });
   return extractData<PlatformConnectionView>(payload);
+}
+
+export interface PlatformPullSummary {
+  fetched: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  skipped: number;
+  skipped_by_reason: Record<string, number>;
+  removed: number;
+  restored: number;
+  possible_duplicates: number;
+  warnings: Record<string, number>;
+  duration_ms: number;
+}
+
+export interface PlatformPullSkippedRecord {
+  registration_id: string;
+  reason: string;
+}
+
+export interface PlatformPullResult {
+  status: string;
+  summary: PlatformPullSummary | null;
+  skipped_records: PlatformPullSkippedRecord[];
+  possible_duplicate_registration_ids: string[];
+}
+
+export interface PlatformPullOutcome {
+  result: PlatformPullResult;
+  connection: PlatformConnection | null;
+}
+
+export async function pullPlatformParticipants(
+  eventId: string,
+  headers: Record<string, string>
+): Promise<PlatformPullOutcome> {
+  const { payload } = await fetchJson(connectionUrl(eventId, "/pull"), {
+    method: "POST",
+    headers,
+  });
+  return extractData<PlatformPullOutcome>(payload);
+}
+
+const UNEXPECTED_PLATFORM_RESPONSE =
+  "Platforma zwróciła nieoczekiwaną odpowiedź.";
+
+const PULL_STATUS_MESSAGES: Record<string, string> = {
+  ok: "Pobrano listę uczestników z platformy.",
+  partial:
+    "Pobrano listę uczestników z platformy, ale część rekordów pominięto.",
+  connection_disabled:
+    "Integracja z platformą jest wyłączona dla tego wydarzenia.",
+  connection_missing: "To wydarzenie nie ma zapisanego połączenia z platformą.",
+  token_unreadable:
+    "Zapisanego tokenu organizacji nie da się odczytać. Wklej token ponownie i zapisz.",
+  integration_unavailable:
+    "Integracja z platformą jest nieaktywna na tym serwerze.",
+  event_inactive: "Wydarzenie jest zarchiwizowane lub usunięte.",
+  event_not_found: "Nie znaleziono wydarzenia.",
+  in_progress:
+    "Pobieranie uczestników z platformy już trwa. Spróbuj za chwilę.",
+  app_key_rejected:
+    "Platforma odrzuciła klucz aplikacji Biura Zawodów. Skontaktuj się z administratorem serwera.",
+  token_rejected:
+    "Platforma odrzuciła token organizacji albo integracja z Biurem Zawodów nie jest włączona dla tego wydarzenia na platformie.",
+  platform_event_not_found: "Platforma nie zna wydarzenia o tym ID.",
+  platform_rate_limited:
+    "Platforma chwilowo ogranicza liczbę zapytań. Spróbuj za chwilę.",
+  network_error:
+    "Nie udało się połączyć z platformą (brak odpowiedzi lub przekroczony czas).",
+  invalid_response: UNEXPECTED_PLATFORM_RESPONSE,
+  platform_error: UNEXPECTED_PLATFORM_RESPONSE,
+  response_too_large: "Platforma zwróciła zbyt dużą odpowiedź.",
+  apply_failed:
+    "Pobieranie przerwał błąd zapisu w bazie. Część zmian mogła zostać zapisana — spróbuj ponownie.",
+};
+
+const SKIP_REASON_MESSAGES: Record<string, string> = {
+  qr_collision:
+    "kod QR jest już używany przez innego uczestnika (np. w innym wydarzeniu)",
+  invalid_record: "niepoprawny rekord z platformy",
+  duplicate_record: "powtórzony rekord z platformy",
+};
+
+export function describePullStatus(status: string | null): string {
+  if (status === null || status === "") {
+    return "Uczestnicy nie byli jeszcze pobierani.";
+  }
+  return PULL_STATUS_MESSAGES[status] ?? UNEXPECTED_PLATFORM_RESPONSE;
+}
+
+export function describeSkipReason(reason: string): string {
+  return SKIP_REASON_MESSAGES[reason] ?? "rekord pominięty";
+}
+
+function isPullSuccess(status: string): boolean {
+  return status === "ok" || status === "partial";
+}
+
+function describePullCounts(summary: PlatformPullSummary): string {
+  let text = `nowi ${summary.created}, zaktualizowani ${summary.updated}, bez zmian ${summary.unchanged}.`;
+  if (summary.removed > 0) {
+    text += ` Usunięci na platformie: ${summary.removed}.`;
+  }
+  if (summary.skipped > 0) {
+    const reasons = Object.entries(summary.skipped_by_reason ?? {})
+      .map(([reason, count]) => `${describeSkipReason(reason)} (${count})`)
+      .join(", ");
+    text += ` Pominięto ${summary.skipped}${reasons ? `: ${reasons}` : ""}.`;
+  }
+  if (summary.possible_duplicates > 0) {
+    text += ` Możliwe duplikaty z importu pliku: ${summary.possible_duplicates}.`;
+  }
+  return text;
+}
+
+export function describePullResult(result: PlatformPullResult): string {
+  if (isPullSuccess(result.status) && result.summary) {
+    return `Pobrano listę z platformy: ${describePullCounts(result.summary)}`;
+  }
+  return `Nie udało się pobrać uczestników. ${describePullStatus(result.status)}`;
+}
+
+/** Counts of the last stored pull, shown under the last pull status. */
+export function describeLastPullCounts(
+  status: string | null,
+  summary: PlatformPullSummary | null
+): string {
+  if (status === null || !isPullSuccess(status) || !summary) return "";
+  const text = describePullCounts(summary);
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /** 32 random bytes as base64url (43 characters). Generated in the browser, sent once, never returned by the API. */

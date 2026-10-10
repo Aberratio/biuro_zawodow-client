@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   describeAvailabilityReason,
+  describePullResult,
+  describePullStatus,
+  describeSkipReason,
   describeTestStatus,
   generateOrganizationToken,
+  pullPlatformParticipants,
   savePlatformConnection,
   validatePlatformConnectionForm,
   type PlatformAvailabilityReason,
@@ -203,5 +207,128 @@ describe("platform connection helpers", () => {
       organization_token: "t".repeat(40),
       is_enabled: true,
     });
+  });
+
+  it("pullPlatformParticipants posts to the encoded pull path with auth headers", async () => {
+    const outcome = {
+      result: {
+        status: "ok",
+        summary: null,
+        skipped_records: [],
+        possible_duplicate_registration_ids: [],
+      },
+      connection: null,
+    };
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ data: outcome }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await pullPlatformParticipants("evt/1", {
+      Authorization: "Bearer abc",
+    });
+
+    expect(result).toEqual(outcome);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toMatch(/\/events\/evt%2F1\/platform-connection\/pull$/);
+    expect(init.method).toBe("POST");
+    expect(init.headers).toEqual({ Authorization: "Bearer abc" });
+  });
+
+  it("describePullResult summarises created, updated, unchanged, removed, skipped and duplicates in Polish", () => {
+    const summary = {
+      fetched: 10,
+      created: 3,
+      updated: 2,
+      unchanged: 4,
+      skipped: 1,
+      skipped_by_reason: { qr_collision: 1 },
+      removed: 2,
+      restored: 0,
+      possible_duplicates: 5,
+      warnings: {},
+      duration_ms: 100,
+    };
+
+    expect(
+      describePullResult({
+        status: "partial",
+        summary,
+        skipped_records: [],
+        possible_duplicate_registration_ids: [],
+      })
+    ).toBe(
+      "Pobrano listę z platformy: nowi 3, zaktualizowani 2, bez zmian 4. Usunięci na platformie: 2. Pominięto 1: kod QR jest już używany przez innego uczestnika (np. w innym wydarzeniu) (1). Możliwe duplikaty z importu pliku: 5."
+    );
+    expect(
+      describePullResult({
+        status: "ok",
+        summary: {
+          ...summary,
+          skipped: 0,
+          skipped_by_reason: {},
+          removed: 0,
+          possible_duplicates: 0,
+        },
+        skipped_records: [],
+        possible_duplicate_registration_ids: [],
+      })
+    ).toBe("Pobrano listę z platformy: nowi 3, zaktualizowani 2, bez zmian 4.");
+    expect(
+      describePullResult({
+        status: "token_rejected",
+        summary: null,
+        skipped_records: [],
+        possible_duplicate_registration_ids: [],
+      })
+    ).toBe(
+      "Nie udało się pobrać uczestników. Platforma odrzuciła token organizacji albo integracja z Biurem Zawodów nie jest włączona dla tego wydarzenia na platformie."
+    );
+  });
+
+  it("describePullStatus covers every status and falls back for unknown codes", () => {
+    const statuses = [
+      "ok",
+      "partial",
+      "connection_disabled",
+      "connection_missing",
+      "token_unreadable",
+      "integration_unavailable",
+      "event_inactive",
+      "event_not_found",
+      "in_progress",
+      "app_key_rejected",
+      "token_rejected",
+      "platform_event_not_found",
+      "platform_rate_limited",
+      "network_error",
+      "invalid_response",
+      "platform_error",
+      "response_too_large",
+      "apply_failed",
+    ];
+    for (const status of statuses) {
+      expect(describePullStatus(status)).not.toBe("");
+    }
+    expect(describePullStatus("ok")).toBe(
+      "Pobrano listę uczestników z platformy."
+    );
+    expect(describePullStatus("network_error")).toBe(
+      "Nie udało się połączyć z platformą (brak odpowiedzi lub przekroczony czas)."
+    );
+    expect(describePullStatus("something_new")).toBe(
+      "Platforma zwróciła nieoczekiwaną odpowiedź."
+    );
+    expect(describePullStatus(null)).toBe(
+      "Uczestnicy nie byli jeszcze pobierani."
+    );
+    expect(describeSkipReason("qr_collision")).toContain("kod QR");
   });
 });

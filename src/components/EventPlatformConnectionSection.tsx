@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import {
   getApiErrorCode,
@@ -36,16 +37,24 @@ import {
   PLATFORM_UNAVAILABLE_HEADER,
   deletePlatformConnection,
   describeAvailabilityReason,
+  describeLastPullCounts,
+  describePullResult,
+  describePullStatus,
+  describeSkipReason,
   describeTestStatus,
   generateOrganizationToken,
   getPlatformConnection,
+  pullPlatformParticipants,
   savePlatformConnection,
   testPlatformConnection,
   validatePlatformConnectionForm,
   type PlatformConnectionFormErrors,
   type PlatformConnectionInput,
   type PlatformConnectionView,
+  type PlatformPullSkippedRecord,
 } from "@/lib/platform-connection";
+
+const PULL_RECHECK_DELAY_MS = 5000;
 
 interface EventPlatformConnectionSectionProps {
   eventId: string;
@@ -103,6 +112,25 @@ export function EventPlatformConnectionSection({
     text: string;
     ok: boolean;
   } | null>(null);
+  const { refreshData } = useData();
+  const [isPulling, setIsPulling] = useState(false);
+  const [pullMessage, setPullMessage] = useState<{
+    text: string;
+    ok: boolean;
+  } | null>(null);
+  const [skippedRecords, setSkippedRecords] = useState<
+    PlatformPullSkippedRecord[]
+  >([]);
+  const recheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (recheckTimerRef.current !== null) {
+        clearTimeout(recheckTimerRef.current);
+      }
+    },
+    []
+  );
 
   const applyView = useCallback((next: PlatformConnectionView) => {
     setView(next);
@@ -129,6 +157,16 @@ export function EventPlatformConnectionSection({
   const connection = view?.connection ?? null;
   const available = view?.availability.available ?? false;
   const formDisabled = !available || !isOnline || isSaving || isDeleting;
+  const canPullHelp =
+    available && isOnline && !(connection?.is_enabled ?? false);
+  const canPull =
+    available &&
+    isOnline &&
+    !!connection &&
+    connection.is_enabled &&
+    !isPulling &&
+    !isSaving &&
+    !isDeleting;
   const idErrorId = "platform-event-id-error";
   const tokenErrorId = "platform-token-error";
 
@@ -233,6 +271,54 @@ export function EventPlatformConnectionSection({
       }
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handlePull = async () => {
+    setIsPulling(true);
+    setPullMessage(null);
+    setSkippedRecords([]);
+    try {
+      const outcome = await pullPlatformParticipants(eventId, getAuthHeaders());
+      const succeeded =
+        outcome.result.status === "ok" || outcome.result.status === "partial";
+      setPullMessage({
+        text: describePullResult(outcome.result),
+        ok: succeeded,
+      });
+      setSkippedRecords(outcome.result.skipped_records ?? []);
+      setView((current) =>
+        current ? { ...current, connection: outcome.connection } : current
+      );
+      if (succeeded) {
+        try {
+          await refreshData(true);
+        } catch {
+          // The pull itself succeeded; the list refreshes on the next sync.
+        }
+      }
+    } catch (error) {
+      const retryAfter = getApiRetryAfter(error);
+      if (retryAfter !== null) {
+        setPullMessage({
+          text: `Odczekaj ${retryAfter} s przed kolejnym pobraniem.`,
+          ok: false,
+        });
+      } else if (isApiResponseError(error)) {
+        setPullMessage({ text: error.message, ok: false });
+      } else {
+        setPullMessage({
+          text: "Nie udało się potwierdzić wyniku pobierania. Sprawdź ostatni wynik za chwilę.",
+          ok: false,
+        });
+        recheckTimerRef.current = setTimeout(() => {
+          getPlatformConnection(eventId, getAuthHeaders())
+            .then(applyView)
+            .catch(() => undefined);
+        }, PULL_RECHECK_DELAY_MS);
+      }
+    } finally {
+      setIsPulling(false);
     }
   };
 
@@ -469,6 +555,19 @@ export function EventPlatformConnectionSection({
           )}
           Testuj połączenie
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => void handlePull()}
+          disabled={!canPull}
+          aria-busy={isPulling}
+          aria-describedby={canPullHelp ? "platform-pull-help" : undefined}
+        >
+          {isPulling && (
+            <Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden="true" />
+          )}
+          Pobierz uczestników teraz
+        </Button>
         {connection && (
           <Button
             type="button"
@@ -481,7 +580,45 @@ export function EventPlatformConnectionSection({
         )}
       </div>
 
-      <div aria-live="polite" className="min-h-5 text-sm">
+      {canPullHelp && (
+        <p id="platform-pull-help" className="text-xs text-muted-foreground">
+          Włącz integrację i zapisz połączenie, aby pobierać uczestników.
+        </p>
+      )}
+
+      <div aria-live="polite" className="min-h-5 space-y-1 text-sm">
+        {pullMessage && (
+          <p
+            className={
+              pullMessage.ok
+                ? "flex items-start gap-2 text-emerald-700"
+                : "flex items-start gap-2 text-destructive"
+            }
+          >
+            {pullMessage.ok ? (
+              <CheckCircle2
+                className="mt-0.5 h-4 w-4 shrink-0"
+                aria-hidden="true"
+              />
+            ) : (
+              <AlertCircle
+                className="mt-0.5 h-4 w-4 shrink-0"
+                aria-hidden="true"
+              />
+            )}
+            <span>{pullMessage.text}</span>
+          </p>
+        )}
+        {!pullMessage && connection?.last_pull_status && (
+          <p className="text-muted-foreground">
+            Ostatnie pobranie ({formatDateTime(connection.last_pull_at)}):{" "}
+            {describePullStatus(connection.last_pull_status)}{" "}
+            {describeLastPullCounts(
+              connection.last_pull_status,
+              connection.last_pull_summary
+            )}
+          </p>
+        )}
         {testMessage && (
           <p
             className={
@@ -511,6 +648,22 @@ export function EventPlatformConnectionSection({
           </p>
         )}
       </div>
+
+      {skippedRecords.length > 0 && (
+        <details className="text-sm">
+          <summary className="cursor-pointer font-medium">
+            Pominięte rekordy (ID zapisu na platformie)
+          </summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {skippedRecords.map((record, index) => (
+              <li key={`${record.registration_id}-${index}`}>
+                {record.registration_id || "brak ID"} —{" "}
+                {describeSkipReason(record.reason)}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
