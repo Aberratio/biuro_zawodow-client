@@ -4,6 +4,8 @@ import { useData } from "@/contexts/DataContext";
 import { useRouteEventContext } from "@/hooks/use-route-event-context";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { PlatformWithdrawnBadge } from "@/components/PlatformWithdrawnBadge";
+import { isWithdrawnOnPlatform } from "@/lib/platform-withdrawal";
 import {
   Select,
   SelectContent,
@@ -82,7 +84,8 @@ import {
   buildEventPath,
 } from "@/lib/routes";
 
-type ParticipantSortKey = "name" | "email" | "bib_number" | "status" | "payment_status";
+type ParticipantSortKey =
+  "name" | "email" | "bib_number" | "status" | "payment_status";
 type SortDirection = "asc" | "desc";
 
 function normalizeParticipantText(value: string | null | undefined) {
@@ -109,7 +112,8 @@ export default function Participants() {
   const [sortKey, setSortKey] = useState<ParticipantSortKey>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [mappings, setMappings] = useState<ParticipantFieldMapping[]>([]);
-  const [hasSavedParticipantListState, setHasSavedParticipantListState] = useState(false);
+  const [hasSavedParticipantListState, setHasSavedParticipantListState] =
+    useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualEmail, setManualEmail] = useState("");
   const [manualFields, setManualFields] = useState<Record<string, string>>({});
@@ -130,13 +134,16 @@ export default function Participants() {
   const eventParticipants = useMemo(
     () =>
       participants.filter(
-        (participant) => participant.event_id === activeEventId,
+        (participant) => participant.event_id === activeEventId
       ),
-    [activeEventId, participants],
+    [activeEventId, participants]
   );
   const sentQrEmailCount = useMemo(
-    () => eventParticipants.filter((participant) => participant.email_status === "sent").length,
-    [eventParticipants],
+    () =>
+      eventParticipants.filter(
+        (participant) => participant.email_status === "sent"
+      ).length,
+    [eventParticipants]
   );
 
   const filtered = useMemo(() => {
@@ -144,13 +151,13 @@ export default function Participants() {
       .filter((participant) => {
         const query = search.toLocaleLowerCase("pl");
         const participantName = normalizeParticipantText(
-          participant.name,
+          participant.name
         ).toLocaleLowerCase("pl");
         const participantEmail = normalizeParticipantText(
-          participant.email,
+          participant.email
         ).toLocaleLowerCase("pl");
         const participantBibNumber = normalizeParticipantText(
-          participant.bib_number,
+          participant.bib_number
         );
 
         return (
@@ -162,11 +169,12 @@ export default function Participants() {
       })
       .filter(
         (participant) =>
-          statusFilter === "all" || participant.status === statusFilter,
+          statusFilter === "all" || participant.status === statusFilter
       )
       .filter(
         (participant) =>
-          paymentFilter === "all" || participant.payment_status === paymentFilter,
+          paymentFilter === "all" ||
+          participant.payment_status === paymentFilter
       );
   }, [eventParticipants, paymentFilter, search, statusFilter]);
 
@@ -176,16 +184,18 @@ export default function Participants() {
     return [...filtered].sort((first, second) => {
       const firstStatus = getParticipantStatusDefinition(first.status).label;
       const secondStatus = getParticipantStatusDefinition(second.status).label;
-      const firstValue = sortKey === "status"
-        ? firstStatus
-        : sortKey === "payment_status"
-          ? participantPaymentStatusLabels[first.payment_status]
-          : first[sortKey];
-      const secondValue = sortKey === "status"
-        ? secondStatus
-        : sortKey === "payment_status"
-          ? participantPaymentStatusLabels[second.payment_status]
-          : second[sortKey];
+      const firstValue =
+        sortKey === "status"
+          ? firstStatus
+          : sortKey === "payment_status"
+            ? participantPaymentStatusLabels[first.payment_status]
+            : first[sortKey];
+      const secondValue =
+        sortKey === "status"
+          ? secondStatus
+          : sortKey === "payment_status"
+            ? participantPaymentStatusLabels[second.payment_status]
+            : second[sortKey];
 
       return (
         String(firstValue).localeCompare(String(secondValue), "pl", {
@@ -208,7 +218,9 @@ export default function Participants() {
       .then((state) => {
         setMappings(state.mappings);
         setManualFields(buildEmptyParticipantFieldValues(state.mappings));
-        setHasSavedParticipantListState(state.has_mapping || state.has_baseline_import);
+        setHasSavedParticipantListState(
+          state.has_mapping || state.has_baseline_import
+        );
       })
       .catch(() => {
         setMappings([]);
@@ -219,7 +231,7 @@ export default function Participants() {
 
   const activeMappings = useMemo(
     () => getActiveParticipantMappings(mappings),
-    [mappings],
+    [mappings]
   );
   const canAddParticipantsManuallyForRole =
     canAddParticipantManually(currentRole);
@@ -278,15 +290,19 @@ export default function Participants() {
       (accumulator, mapping) => {
         const error = validateParticipantFieldValue(
           mapping,
-          manualFields[mapping.alias] ?? "",
+          manualFields[mapping.alias] ?? ""
         );
         if (error) accumulator[mapping.alias] = error;
         return accumulator;
       },
-      {},
+      {}
     );
     const nextErrors = {
-      email: validateEmail(manualEmail, undefined, PARTICIPANT_EMAIL_MAX_LENGTH),
+      email: validateEmail(
+        manualEmail,
+        undefined,
+        PARTICIPANT_EMAIL_MAX_LENGTH
+      ),
       fields: fieldErrors,
     };
 
@@ -300,7 +316,7 @@ export default function Participants() {
     const result = await addParticipantManually(
       activeEventId,
       manualEmail,
-      manualFields,
+      manualFields
     );
     setManualSaving(false);
 
@@ -328,7 +344,10 @@ export default function Participants() {
     if (!activeEventId) return;
 
     setResetSaving(true);
-    const result = await resetEventParticipantList(activeEventId, resetRequiresQrConfirm || sentQrEmailCount > 0);
+    const result = await resetEventParticipantList(
+      activeEventId,
+      resetRequiresQrConfirm || sentQrEmailCount > 0
+    );
     setResetSaving(false);
 
     if (!result.ok) {
@@ -336,7 +355,8 @@ export default function Participants() {
         setResetRequiresQrConfirm(true);
         toast({
           title: "Potwierdź usunięcie po wysyłce QR",
-          description: "Dla tego wydarzenia wysłano już maile z kodami QR. Potwierdź operację ponownie w oknie.",
+          description:
+            "Dla tego wydarzenia wysłano już maile z kodami QR. Potwierdź operację ponownie w oknie.",
           variant: "destructive",
         });
         return;
@@ -380,54 +400,54 @@ export default function Participants() {
           title="Uczestnicy"
           actions={
             <>
-          <Button
-            variant="outline"
-            onClick={() => void refreshData()}
-            disabled={!activeEventId || !isOnline || isLoading}
-            title={
-              !isOnline
-                ? "Odświeżanie danych wymaga połączenia z serwerem."
-                : undefined
-            }
-            className="h-11 w-full sm:h-10 sm:w-auto"
-          >
-            <RefreshCcw
-              className={`h-4 w-4 mr-1 ${isLoading ? "animate-spin" : ""}`}
-            />
-            Odśwież dane
-          </Button>
-          {canImportParticipants && (
-            <Button
-              variant="outline"
-              onClick={() => navigate(buildEventImportPath(activeEventId))}
-              disabled={!isOnline}
-              className="h-11 w-full sm:h-10 sm:w-auto"
-            >
-              <FileUp className="h-4 w-4 mr-1" /> Import z pliku
-            </Button>
-          )}
-          {canResetParticipantList && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setResetRequiresQrConfirm(false);
-                setResetDialogOpen(true);
-              }}
-              disabled={!isOnline || resetSaving}
-              className="h-11 w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive sm:h-10 sm:w-auto"
-            >
-              <Trash2 className="h-4 w-4 mr-1" /> Usuń listę
-            </Button>
-          )}
-          {canAddManually && (
-            <Button
-              onClick={() => setManualOpen(true)}
-              className="h-11 w-full sm:h-10 sm:w-auto"
-              disabled={!isOnline}
-            >
-              <UserPlus className="h-4 w-4 mr-1" /> Dodaj ręcznie
-            </Button>
-          )}
+              <Button
+                variant="outline"
+                onClick={() => void refreshData()}
+                disabled={!activeEventId || !isOnline || isLoading}
+                title={
+                  !isOnline
+                    ? "Odświeżanie danych wymaga połączenia z serwerem."
+                    : undefined
+                }
+                className="h-11 w-full sm:h-10 sm:w-auto"
+              >
+                <RefreshCcw
+                  className={`h-4 w-4 mr-1 ${isLoading ? "animate-spin" : ""}`}
+                />
+                Odśwież dane
+              </Button>
+              {canImportParticipants && (
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(buildEventImportPath(activeEventId))}
+                  disabled={!isOnline}
+                  className="h-11 w-full sm:h-10 sm:w-auto"
+                >
+                  <FileUp className="h-4 w-4 mr-1" /> Import z pliku
+                </Button>
+              )}
+              {canResetParticipantList && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setResetRequiresQrConfirm(false);
+                    setResetDialogOpen(true);
+                  }}
+                  disabled={!isOnline || resetSaving}
+                  className="h-11 w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive sm:h-10 sm:w-auto"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" /> Usuń listę
+                </Button>
+              )}
+              {canAddManually && (
+                <Button
+                  onClick={() => setManualOpen(true)}
+                  className="h-11 w-full sm:h-10 sm:w-auto"
+                  disabled={!isOnline}
+                >
+                  <UserPlus className="h-4 w-4 mr-1" /> Dodaj ręcznie
+                </Button>
+              )}
             </>
           }
         />
@@ -439,9 +459,10 @@ export default function Participants() {
         </p>
       )}
 
-      {!isOnline && (canImportParticipants || canAddParticipantsManuallyForRole) && (
-        <OnlineOnlyNotice description="Operacje na liście uczestników są dostępne tylko po połączeniu z serwerem. Lista pozostaje dostępna do odczytu z lokalnego snapshotu." />
-      )}
+      {!isOnline &&
+        (canImportParticipants || canAddParticipantsManuallyForRole) && (
+          <OnlineOnlyNotice description="Operacje na liście uczestników są dostępne tylko po połączeniu z serwerem. Lista pozostaje dostępna do odczytu z lokalnego snapshotu." />
+        )}
 
       <div className="flex flex-col gap-3">
         <div className="relative">
@@ -505,19 +526,21 @@ export default function Participants() {
                 </TableHead>
                 <TableHead>{renderSortHeader("bib_number", "Numer")}</TableHead>
                 <TableHead>{renderSortHeader("status", "Status")}</TableHead>
-                <TableHead>{renderSortHeader("payment_status", "Opłata")}</TableHead>
+                <TableHead>
+                  {renderSortHeader("payment_status", "Opłata")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedParticipants.map((participant) => {
                 const status = getParticipantStatusDefinition(
-                  participant.status,
+                  participant.status
                 );
-                const participantName = normalizeParticipantText(
-                  participant.name,
-                ) || "Nieznany uczestnik";
+                const participantName =
+                  normalizeParticipantText(participant.name) ||
+                  "Nieznany uczestnik";
                 const participantEmail = normalizeParticipantText(
-                  participant.email,
+                  participant.email
                 );
 
                 return (
@@ -525,14 +548,20 @@ export default function Participants() {
                     key={participant.id}
                     className="cursor-pointer active:bg-accent/50"
                     onClick={() =>
-                      navigate(buildEventParticipantPath(participant.event_id, participant.id), {
-                        state: {
-                          backTo: buildEventParticipantsPath(
-                            participant.event_id,
-                          ),
-                          backLabel: "Wróć do listy uczestników wydarzenia",
-                        },
-                      })
+                      navigate(
+                        buildEventParticipantPath(
+                          participant.event_id,
+                          participant.id
+                        ),
+                        {
+                          state: {
+                            backTo: buildEventParticipantsPath(
+                              participant.event_id
+                            ),
+                            backLabel: "Wróć do listy uczestników wydarzenia",
+                          },
+                        }
+                      )
                     }
                   >
                     <TableCell>
@@ -543,6 +572,12 @@ export default function Participants() {
                         <span className="block md:hidden text-xs text-muted-foreground truncate">
                           {participantEmail}
                         </span>
+                        {isWithdrawnOnPlatform(participant) && (
+                          <PlatformWithdrawnBadge
+                            removedAt={participant.platform_removed_at}
+                            className="mt-1 text-[10px]"
+                          />
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
@@ -561,10 +596,20 @@ export default function Participants() {
                     </TableCell>
                     <TableCell>
                       <Badge
-                        variant={participant.payment_status === "unpaid" ? "destructive" : participant.payment_status === "paid" ? "default" : "secondary"}
+                        variant={
+                          participant.payment_status === "unpaid"
+                            ? "destructive"
+                            : participant.payment_status === "paid"
+                              ? "default"
+                              : "secondary"
+                        }
                         className="text-[10px]"
                       >
-                        {participantPaymentStatusLabels[participant.payment_status]}
+                        {
+                          participantPaymentStatusLabels[
+                            participant.payment_status
+                          ]
+                        }
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -581,19 +626,24 @@ export default function Participants() {
             <AlertDialogTitle>Usunąć listę uczestników?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <span className="block">
-                Ta operacja usunie {eventParticipants.length} uczestników tego wydarzenia razem z mapowaniem CSV, bazą importu i logami zmian uczestników.
+                Ta operacja usunie {eventParticipants.length} uczestników tego
+                wydarzenia razem z mapowaniem CSV, bazą importu i logami zmian
+                uczestników.
               </span>
               {sentQrEmailCount > 0 && (
                 <span className="flex gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 font-medium text-destructive">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>
-                    Dla {sentQrEmailCount} uczestników wysłano już maile z kodami QR. Usuwanie listy po wysyłce kodów QR to zły pomysł, bo wysłane kody przestaną pasować do aktualnej listy.
+                    Dla {sentQrEmailCount} uczestników wysłano już maile z
+                    kodami QR. Usuwanie listy po wysyłce kodów QR to zły pomysł,
+                    bo wysłane kody przestaną pasować do aktualnej listy.
                   </span>
                 </span>
               )}
               {resetRequiresQrConfirm && (
                 <span className="block font-medium text-destructive">
-                  Serwer wymaga dodatkowego potwierdzenia. Kliknij przycisk usunięcia jeszcze raz, jeśli na pewno chcesz kontynuować.
+                  Serwer wymaga dodatkowego potwierdzenia. Kliknij przycisk
+                  usunięcia jeszcze raz, jeśli na pewno chcesz kontynuować.
                 </span>
               )}
             </AlertDialogDescription>
@@ -608,7 +658,11 @@ export default function Participants() {
                 void handleResetParticipantList();
               }}
             >
-              {resetSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1 h-4 w-4" />}
+              {resetSaving ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-1 h-4 w-4" />
+              )}
               Usuń listę i mapowanie
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -33,6 +33,10 @@ export interface PlatformConnection {
   last_pull_status: string | null;
   last_pull_summary: PlatformPullSummary | null;
   updated_at: string | null;
+  /** Absent on servers that do not know the push queue yet. */
+  last_webhook_at?: string | null;
+  push_pending?: number | null;
+  push_failed?: number | null;
 }
 
 export interface PlatformConnectionView {
@@ -290,6 +294,36 @@ export function describeAvailabilityReason(code: string): string {
 function pluralizeParticipants(count: number): string {
   if (count === 1) return "1 uczestnika";
   return `${count} uczestników`;
+}
+
+/** Lines about office changes waiting for the platform and the last change reported by it. */
+export function describePlatformPushStatus(
+  connection: PlatformConnection | null
+): string[] {
+  if (!connection) return [];
+
+  const lines: string[] = [];
+  if (typeof connection.push_pending === "number") {
+    let line = `Odprawy i poprawki czekające na wysłanie do platformy: ${connection.push_pending}`;
+    if (
+      typeof connection.push_failed === "number" &&
+      connection.push_failed > 0
+    ) {
+      line += `. Nieudane: ${connection.push_failed} — ponowienie automatyczne.`;
+    }
+    lines.push(line);
+  }
+
+  if (connection.last_webhook_at) {
+    const date = new Date(connection.last_webhook_at);
+    if (!Number.isNaN(date.getTime())) {
+      lines.push(
+        `Ostatnia zmiana z platformy: ${date.toLocaleString("pl-PL")}`
+      );
+    }
+  }
+
+  return lines;
 }
 
 export function describeTestStatus(

@@ -1,25 +1,28 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
-import Participants from '@/pages/Participants';
-import { createTestParticipantMapping } from '@/test/factories';
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { describe, expect, it, vi } from "vitest";
+import Participants from "@/pages/Participants";
+import {
+  createTestParticipant,
+  createTestParticipantMapping,
+} from "@/test/factories";
 
 const useDataMock = vi.fn();
 
-vi.mock('@/contexts/DataContext', () => ({
+vi.mock("@/contexts/DataContext", () => ({
   useData: () => useDataMock(),
 }));
 
-vi.mock('@/hooks/use-toast', () => ({
+vi.mock("@/hooks/use-toast", () => ({
   toast: vi.fn(),
 }));
 
-vi.mock('@/hooks/use-route-event-context', () => ({
+vi.mock("@/hooks/use-route-event-context", () => ({
   useRouteEventContext: vi.fn(),
 }));
 
-describe('Participants page', () => {
-  it('allows removing an empty saved participant list after a fully invalid CSV import', async () => {
+describe("Participants page", () => {
+  it("allows removing an empty saved participant list after a fully invalid CSV import", async () => {
     const resetEventParticipantList = vi.fn(async () => ({
       ok: true,
       deleted_participant_count: 0,
@@ -30,8 +33,8 @@ describe('Participants page', () => {
 
     useDataMock.mockReturnValue({
       participants: [],
-      selectedEventId: 'event-1',
-      currentRole: 'admin',
+      selectedEventId: "event-1",
+      currentRole: "admin",
       isLoading: false,
       getParticipantFieldMappingsState: vi.fn(async () => ({
         has_mapping: true,
@@ -40,24 +43,73 @@ describe('Participants page', () => {
       })),
       addParticipantManually: vi.fn(),
       resetEventParticipantList,
-      connectionState: 'online',
+      connectionState: "online",
       refreshData: vi.fn(),
     });
 
     render(
-      <MemoryRouter initialEntries={['/events/event-1/participants']}>
+      <MemoryRouter initialEntries={["/events/event-1/participants"]}>
         <Routes>
           <Route path="/events/:id/participants" element={<Participants />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     );
 
-    const resetButton = await screen.findByRole('button', { name: /Usuń listę/i });
+    const resetButton = await screen.findByRole("button", {
+      name: /Usuń listę/i,
+    });
     fireEvent.click(resetButton);
-    fireEvent.click(screen.getByRole('button', { name: /Usuń listę i mapowanie/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Usuń listę i mapowanie/i })
+    );
 
     await waitFor(() => {
-      expect(resetEventParticipantList).toHaveBeenCalledWith('event-1', false);
+      expect(resetEventParticipantList).toHaveBeenCalledWith("event-1", false);
     });
+  });
+
+  it("marks participants withdrawn on the platform in the list and nobody else", async () => {
+    useDataMock.mockReturnValue({
+      participants: [
+        createTestParticipant({
+          id: "p-1",
+          name: "Anna Wycofana",
+          platform_removed_at: "2026-10-09 10:00:00",
+        }),
+        createTestParticipant({
+          id: "p-2",
+          name: "Jan Aktywny",
+          qr_code: "QR-2",
+          platform_removed_at: null,
+        }),
+      ],
+      selectedEventId: "event-1",
+      currentRole: "admin",
+      isLoading: false,
+      getParticipantFieldMappingsState: vi.fn(async () => ({
+        has_mapping: false,
+        has_baseline_import: false,
+        mappings: [],
+      })),
+      addParticipantManually: vi.fn(),
+      resetEventParticipantList: vi.fn(),
+      connectionState: "online",
+      refreshData: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/events/event-1/participants"]}>
+        <Routes>
+          <Route path="/events/:id/participants" element={<Participants />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const badges = await screen.findAllByText("Wycofany na platformie");
+    expect(badges).toHaveLength(1);
+    expect(badges[0].closest("tr")).toHaveTextContent("Anna Wycofana");
+    expect(screen.getByText("Jan Aktywny").closest("tr")).not.toHaveTextContent(
+      "Wycofany na platformie"
+    );
   });
 });

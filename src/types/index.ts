@@ -1,14 +1,18 @@
-export type Role = 'superadmin' | 'admin' | 'editor' | 'scanner' | 'scanner_plus';
+export type Role =
+  "superadmin" | "admin" | "editor" | "scanner" | "scanner_plus";
 
-export type ParticipantStatus = 'not_checked_in' | 'checked_in' | 'checked_in_not_starting';
-export type EmailStatus = 'not_sent' | 'sent';
-export type PaymentStatus = 'unknown' | 'paid' | 'unpaid';
-export type ParticipantSyncState = 'synced' | 'pending_sync' | 'requires_review';
-export type ConnectionState = 'online' | 'degraded' | 'offline';
-export type SnapshotSource = 'network' | 'cache' | 'none';
-export type ScannerMode = 'online' | 'offline_queue' | 'read_only';
-export type SessionState = 'online' | 'offline_cached' | 'expired';
-export type ServiceWorkerState = 'unsupported' | 'checking' | 'ready' | 'unavailable';
+export type ParticipantStatus =
+  "not_checked_in" | "checked_in" | "checked_in_not_starting";
+export type EmailStatus = "not_sent" | "sent";
+export type PaymentStatus = "unknown" | "paid" | "unpaid";
+export type ParticipantSyncState =
+  "synced" | "pending_sync" | "requires_review";
+export type ConnectionState = "online" | "degraded" | "offline";
+export type SnapshotSource = "network" | "cache" | "none";
+export type ScannerMode = "online" | "offline_queue" | "read_only";
+export type SessionState = "online" | "offline_cached" | "expired";
+export type ServiceWorkerState =
+  "unsupported" | "checking" | "ready" | "unavailable";
 
 export interface AppDiagnostics {
   sessionStorageAvailable: boolean;
@@ -63,6 +67,10 @@ export interface Participant {
   email_status: EmailStatus;
   payment_status: PaymentStatus;
   checked_in_at?: string;
+  /** Set when the participant comes from the platform (Zmierzymy Czas). */
+  platform_registration_id?: string | null;
+  /** UTC time (Y-m-d H:i:s) at which the platform cancelled or removed the registration. */
+  platform_removed_at?: string | null;
   custom_fields?: Record<string, string>;
   important_field_aliases?: string[];
   sync_state?: ParticipantSyncState;
@@ -70,14 +78,14 @@ export interface Participant {
 }
 
 export type QrDeliveryEffectiveStatus =
-  | 'pending'
-  | 'processing'
-  | 'retry'
-  | 'sent'
-  | 'failed'
-  | 'bounced'
-  | 'suppressed'
-  | 'unknown';
+  | "pending"
+  | "processing"
+  | "retry"
+  | "sent"
+  | "failed"
+  | "bounced"
+  | "suppressed"
+  | "unknown";
 
 export interface QrEmailDelivery {
   email_id: string;
@@ -134,15 +142,21 @@ export interface ParticipantScanResult {
   };
 }
 
-export type ParticipantFieldRole = 'email' | 'display_name_part' | 'bib_number' | 'payment_status' | 'custom' | 'important_custom';
-export type ParticipantFieldType = 'text' | 'number' | 'date' | 'select';
+export type ParticipantFieldRole =
+  | "email"
+  | "display_name_part"
+  | "bib_number"
+  | "payment_status"
+  | "custom"
+  | "important_custom";
+export type ParticipantFieldType = "text" | "number" | "date" | "select";
 
 export interface ParticipantFieldValidationRules {
   min_length?: number;
   max_length?: number;
   min?: number | string;
   max?: number | string;
-  date_format?: 'dmy' | 'mdy' | 'ymd';
+  date_format?: "dmy" | "mdy" | "ymd";
   options?: string[];
 }
 

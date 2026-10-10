@@ -5,6 +5,8 @@ import { useRouteEventContext } from "@/hooks/use-route-event-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PlatformWithdrawnBadge } from "@/components/PlatformWithdrawnBadge";
+import { isWithdrawnOnPlatform } from "@/lib/platform-withdrawal";
 import {
   ArrowLeft,
   CheckCircle,
@@ -75,9 +77,7 @@ import {
   canManageParticipantData as canManageParticipantDataForRole,
   canUseParticipantAdminActions,
 } from "@/lib/roles";
-import {
-  buildEventParticipantsPath,
-} from "@/lib/routes";
+import { buildEventParticipantsPath } from "@/lib/routes";
 
 function formatParticipantDateTime(value: string): string {
   const normalizedValue = value.includes(" ") ? value.replace(" ", "T") : value;
@@ -158,7 +158,7 @@ function useUnsavedParticipantChangesGuard(hasUnsavedChanges: boolean) {
     window.history.pushState(
       { ...window.history.state, participantUnsavedChangesGuard: true },
       "",
-      currentUrl,
+      currentUrl
     );
 
     const handlePopState = () => {
@@ -178,7 +178,7 @@ function useUnsavedParticipantChangesGuard(hasUnsavedChanges: boolean) {
       window.history.pushState(
         { ...window.history.state, participantUnsavedChangesGuard: true },
         "",
-        currentUrl,
+        currentUrl
       );
     };
 
@@ -215,7 +215,8 @@ function useUnsavedParticipantChangesGuard(hasUnsavedChanges: boolean) {
     };
 
     document.addEventListener("click", handleDocumentClick, true);
-    return () => document.removeEventListener("click", handleDocumentClick, true);
+    return () =>
+      document.removeEventListener("click", handleDocumentClick, true);
   }, [hasUnsavedChanges]);
 
   return confirmDiscardChanges;
@@ -261,7 +262,7 @@ export default function ParticipantDetails() {
   const [bibNumberError, setBibNumberError] = useState<string | undefined>();
   const [transferEmail, setTransferEmail] = useState("");
   const [transferFields, setTransferFields] = useState<Record<string, string>>(
-    {},
+    {}
   );
   const [transferErrors, setTransferErrors] = useState<{
     email?: string;
@@ -274,12 +275,11 @@ export default function ParticipantDetails() {
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSavingTransfer, setIsSavingTransfer] = useState(false);
   const [isDeletingParticipant, setIsDeletingParticipant] = useState(false);
-  const canManageParticipantData =
-    canManageParticipantDataForRole(currentRole);
+  const canManageParticipantData = canManageParticipantDataForRole(currentRole);
   const canUseAdminActions = canUseParticipantAdminActions(currentRole);
   const isOnline = connectionState === "online";
   const shouldOpenEditOnMount = Boolean(
-    (location.state as { openEdit?: boolean } | null)?.openEdit,
+    (location.state as { openEdit?: boolean } | null)?.openEdit
   );
   const navigationState = location.state as {
     backTo?: string;
@@ -353,16 +353,16 @@ export default function ParticipantDetails() {
 
   const activeMappings = useMemo(
     () => getActiveParticipantMappings(mappings),
-    [mappings],
+    [mappings]
   );
   const bibNumberMapping = useMemo(
     () => activeMappings.find((mapping) => mapping.field_role === "bib_number"),
-    [activeMappings],
+    [activeMappings]
   );
   const editableMappings = useMemo(
     () =>
       activeMappings.filter((mapping) => mapping.field_role !== "bib_number"),
-    [activeMappings],
+    [activeMappings]
   );
   const participantDataEntries = useMemo(() => {
     if (!participant) {
@@ -381,7 +381,11 @@ export default function ParticipantDetails() {
     const seenLabels = new Set(["Imię i nazwisko", "Email"]);
 
     for (const mapping of activeMappings) {
-      if (mapping.field_role === "bib_number" || mapping.field_role === "payment_status") continue;
+      if (
+        mapping.field_role === "bib_number" ||
+        mapping.field_role === "payment_status"
+      )
+        continue;
       const value = (mappedValues[mapping.alias] ?? "").trim();
       if (!value) continue;
       entries.push({
@@ -395,7 +399,7 @@ export default function ParticipantDetails() {
     }
 
     for (const [label, value] of Object.entries(
-      participant.custom_fields ?? {},
+      participant.custom_fields ?? {}
     )) {
       const normalizedLabel = label.trim();
       const normalizedValue = value.trim();
@@ -465,12 +469,12 @@ export default function ParticipantDetails() {
 
   const hasUnsavedParticipantChanges = Boolean(
     participant &&
-      canManageParticipantData &&
-      (statusValue !== participant.status ||
-        bibNumberValue.trim() !== participant.bib_number.trim()),
+    canManageParticipantData &&
+    (statusValue !== participant.status ||
+      bibNumberValue.trim() !== participant.bib_number.trim())
   );
   const confirmDiscardParticipantChanges = useUnsavedParticipantChangesGuard(
-    hasUnsavedParticipantChanges,
+    hasUnsavedParticipantChanges
   );
 
   if (isLoading) return <DetailSkeleton />;
@@ -481,10 +485,13 @@ export default function ParticipantDetails() {
       </div>
     );
 
-  const participantEventId = routeEventId || participant.event_id || event?.id || "";
+  const participantEventId =
+    routeEventId || participant.event_id || event?.id || "";
   const backTo =
     navigationState?.backTo ??
-    (participantEventId ? buildEventParticipantsPath(participantEventId) : "/events");
+    (participantEventId
+      ? buildEventParticipantsPath(participantEventId)
+      : "/events");
   const backLabel =
     navigationState?.backLabel ??
     (participantEventId ? "Wróć do uczestników" : "Wróć do wydarzeń");
@@ -547,7 +554,9 @@ export default function ParticipantDetails() {
     }
 
     if (normalizedBibNumber.length > PARTICIPANT_BIB_NUMBER_MAX_LENGTH) {
-      setBibNumberError(`Numer startowy może mieć maksymalnie ${PARTICIPANT_BIB_NUMBER_MAX_LENGTH} znaki.`);
+      setBibNumberError(
+        `Numer startowy może mieć maksymalnie ${PARTICIPANT_BIB_NUMBER_MAX_LENGTH} znaki.`
+      );
       return;
     }
 
@@ -556,12 +565,12 @@ export default function ParticipantDetails() {
     try {
       const result = await updateParticipantBibNumber(
         participant.id,
-        normalizedBibNumber,
+        normalizedBibNumber
       );
       if (result.conflict) {
         setPendingBibNumberCandidate(result.conflict.bibNumber);
         setBibNumberConflictParticipants(
-          result.conflict.conflictingParticipants,
+          result.conflict.conflictingParticipants
         );
         setBibNumberConflictOpen(true);
         return;
@@ -587,14 +596,14 @@ export default function ParticipantDetails() {
   };
 
   const handleResolveBibNumberConflict = async (
-    resolution: "keep_duplicates" | "delete_conflicts",
+    resolution: "keep_duplicates" | "delete_conflicts"
   ) => {
     setIsSavingBibNumber(true);
     try {
       const result = await updateParticipantBibNumber(
         participant.id,
         pendingBibNumberCandidate,
-        { conflictResolution: resolution },
+        { conflictResolution: resolution }
       );
       if (!result.ok) {
         setBibNumberError(result.error);
@@ -642,16 +651,20 @@ export default function ParticipantDetails() {
   const handleTransferSubmit = async () => {
     const fieldErrors = activeMappings
       .filter((mapping) => mapping.field_role !== "bib_number")
-      .reduce<Record<string, string>>(
-        (accumulator, mapping) => {
-          const error = validateParticipantFieldValue(mapping, transferFields[mapping.alias] ?? "");
-          if (error) accumulator[mapping.alias] = error;
-          return accumulator;
-        },
-        {},
-      );
+      .reduce<Record<string, string>>((accumulator, mapping) => {
+        const error = validateParticipantFieldValue(
+          mapping,
+          transferFields[mapping.alias] ?? ""
+        );
+        if (error) accumulator[mapping.alias] = error;
+        return accumulator;
+      }, {});
     const nextErrors = {
-      email: validateEmail(transferEmail, undefined, PARTICIPANT_EMAIL_MAX_LENGTH),
+      email: validateEmail(
+        transferEmail,
+        undefined,
+        PARTICIPANT_EMAIL_MAX_LENGTH
+      ),
       fields: fieldErrors,
     };
 
@@ -666,7 +679,7 @@ export default function ParticipantDetails() {
       const result = await updateParticipantDetails(
         participant.id,
         transferEmail,
-        transferFields,
+        transferFields
       );
       if (!result.ok) {
         setTransferErrors({
@@ -708,7 +721,7 @@ export default function ParticipantDetails() {
     navigate(
       participant.event_id
         ? buildEventParticipantsPath(participant.event_id)
-        : "/events",
+        : "/events"
     );
   };
 
@@ -808,9 +821,25 @@ export default function ParticipantDetails() {
                 {statusDefinition.label}
               </Badge>
             </div>
+            {isWithdrawnOnPlatform(participant) && (
+              <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-muted-foreground">Platforma</span>
+                <PlatformWithdrawnBadge
+                  removedAt={participant.platform_removed_at}
+                />
+              </div>
+            )}
             <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
               <span className="text-muted-foreground">Opłata</span>
-              <Badge variant={participant.payment_status === "unpaid" ? "destructive" : participant.payment_status === "paid" ? "default" : "secondary"}>
+              <Badge
+                variant={
+                  participant.payment_status === "unpaid"
+                    ? "destructive"
+                    : participant.payment_status === "paid"
+                      ? "default"
+                      : "secondary"
+                }
+              >
                 {participantPaymentStatusLabels[participant.payment_status]}
               </Badge>
             </div>
