@@ -47,6 +47,10 @@ Fill in the PR template (what changed, why, how it was tested). Pull requests
 are routed to reviewers via [`CODEOWNERS`](./.github/CODEOWNERS), so no need to
 manually pick a reviewer.
 
+If the change is notable for someone using the app, add a line under
+`## [Unreleased]` in [`CHANGELOG.md`](./CHANGELOG.md). How versions are cut
+and deployed is described in [`RELEASING.md`](./RELEASING.md).
+
 ## Future considerations
 
 Adopting [Conventional Commits](https://www.conventionalcommits.org/) with a

@@ -19,3 +19,4 @@
 - [ ] `npm run lint` passes
 - [ ] `npm run typecheck` passes
 - [ ] `npm run test` passes
+- [ ] `CHANGELOG.md` has an entry under `[Unreleased]`, or the change is not notable (refactor, tests, CI only)
