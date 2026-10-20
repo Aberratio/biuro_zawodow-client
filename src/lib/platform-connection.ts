@@ -39,8 +39,24 @@ export interface PlatformConnection {
   push_failed?: number | null;
 }
 
+/** Who may use the integration, switched by a superadmin. */
+export type PlatformIntegrationMode = "off" | "superadmin" | "on";
+
+export const PLATFORM_INTEGRATION_MODES: PlatformIntegrationMode[] = [
+  "off",
+  "superadmin",
+  "on",
+];
+
+export interface PlatformIntegrationAccess {
+  mode: PlatformIntegrationMode;
+  can_use: boolean;
+}
+
 export interface PlatformConnectionView {
   availability: { available: boolean; reasons: string[] };
+  /** Only in GET replies; absent on servers without the switch, which allow everyone. */
+  access?: PlatformIntegrationAccess;
   connection: PlatformConnection | null;
 }
 
@@ -119,6 +135,51 @@ export async function deletePlatformConnection(
     headers,
   });
   return extractData<PlatformConnectionView>(payload);
+}
+
+export async function getPlatformIntegrationMode(
+  headers: Record<string, string>
+): Promise<PlatformIntegrationMode> {
+  const { payload } = await fetchJson(
+    `${API_BASE_URL}/superadmin/platform-integration`,
+    { method: "GET", headers }
+  );
+  return extractData<{ mode: PlatformIntegrationMode }>(payload).mode;
+}
+
+export async function savePlatformIntegrationMode(
+  headers: Record<string, string>,
+  mode: PlatformIntegrationMode
+): Promise<PlatformIntegrationMode> {
+  const { payload } = await fetchJson(
+    `${API_BASE_URL}/superadmin/platform-integration`,
+    { method: "PUT", headers, body: JSON.stringify({ mode }) }
+  );
+  return extractData<{ mode: PlatformIntegrationMode }>(payload).mode;
+}
+
+export function describePlatformIntegrationMode(
+  mode: PlatformIntegrationMode
+): { label: string; description: string } {
+  switch (mode) {
+    case "off":
+      return {
+        label: "Wyłączona",
+        description: "Nikt nie może korzystać z integracji.",
+      };
+    case "superadmin":
+      return {
+        label: "Tylko superadmin",
+        description:
+          "Superadmini testują integrację, pozostali widzą informację, że będzie dostępna wkrótce.",
+      };
+    case "on":
+      return {
+        label: "Włączona dla wszystkich",
+        description:
+          "Administratorzy i edytorzy mogą łączyć wydarzenia z platformą i importować uczestników.",
+      };
+  }
 }
 
 export interface PlatformPullSummary {

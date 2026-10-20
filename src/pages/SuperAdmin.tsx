@@ -71,6 +71,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { API_BASE_URL, fetchJson } from "@/lib/api";
+import { PlatformIntegrationSwitch } from "@/components/PlatformIntegrationSwitch";
 import { mapApiUserToUi, type ApiUser } from "@/lib/data-context-helpers";
 import { validateStrongPassword } from "@/lib/form-validation";
 import { generateStrongPassword } from "@/lib/password";
@@ -3092,6 +3093,8 @@ export default function SuperAdmin() {
         </TabsContent>
 
         <TabsContent value="center" className="space-y-3 sm:space-y-4">
+          <PlatformIntegrationSwitch />
+
           <Card>
             <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
               <div>

@@ -30,10 +30,27 @@ vi.mock("@/hooks/use-toast", () => ({
   toast: vi.fn(),
 }));
 
+// Covered by its own test; it would take a response from the ordered fetchJson mocks below.
+vi.mock("@/components/PlatformIntegrationSwitch", () => ({
+  PlatformIntegrationSwitch: () => null,
+}));
+
 // Testy sprawdzają parametry zapytań, a nie sam wybierak daty — zastępujemy go zwykłym polem.
 vi.mock("@/components/ui/date-time-picker", () => ({
-  DateTimePicker: ({ id, value, onChange }: { id?: string; value: string; onChange: (value: string) => void }) => (
-    <input id={id} value={value} onChange={(event) => onChange(event.target.value)} />
+  DateTimePicker: ({
+    id,
+    value,
+    onChange,
+  }: {
+    id?: string;
+    value: string;
+    onChange: (value: string) => void;
+  }) => (
+    <input
+      id={id}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
   ),
 }));
 
@@ -80,7 +97,7 @@ function renderPage() {
   return render(
     <MemoryRouter>
       <SuperAdmin />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 }
 
@@ -109,44 +126,50 @@ describe("SuperAdmin page", () => {
           sync_conflicts: 2,
           active_rate_limit_blocks: 0,
         },
-        alerts: [{
-          id: "event-no-operators-event-1",
-          severity: "critical",
-          category: "event_no_operators",
-          title: "Wydarzenie bez operatorów",
-          description: "Bieg Miejski nie ma przypisanych operatorów.",
-          count: 1,
-          event_id: "event-1",
-          event_name: "Bieg Miejski",
-          organization_id: "org-1",
-          organization_name: "Organizacja Testowa",
-        }],
-        sync_events: [{
-          event_id: "event-1",
-          event_name: "Bieg Miejski",
-          organization_id: "org-1",
-          organization_name: "Organizacja Testowa",
-          sync_mode: "local_authoritative",
-          sync_status: "conflict",
-          conflicts_count: 2,
-          last_synced_at: "2099-04-12T09:00:00Z",
-          pending_count: 1,
-          outbox_conflict_count: 0,
-          error_count: 0,
-          last_error: null,
-        }],
-        quality_issues: [{
-          id: "duplicate-email-event-1",
-          severity: "warning",
-          category: "duplicate_emails",
-          title: "Powtarzające się adresy e-mail",
-          description: "Bieg Miejski ma powtarzające się adresy e-mail.",
-          count: 2,
-          event_id: "event-1",
-          event_name: "Bieg Miejski",
-          organization_id: "org-1",
-          organization_name: "Organizacja Testowa",
-        }],
+        alerts: [
+          {
+            id: "event-no-operators-event-1",
+            severity: "critical",
+            category: "event_no_operators",
+            title: "Wydarzenie bez operatorów",
+            description: "Bieg Miejski nie ma przypisanych operatorów.",
+            count: 1,
+            event_id: "event-1",
+            event_name: "Bieg Miejski",
+            organization_id: "org-1",
+            organization_name: "Organizacja Testowa",
+          },
+        ],
+        sync_events: [
+          {
+            event_id: "event-1",
+            event_name: "Bieg Miejski",
+            organization_id: "org-1",
+            organization_name: "Organizacja Testowa",
+            sync_mode: "local_authoritative",
+            sync_status: "conflict",
+            conflicts_count: 2,
+            last_synced_at: "2099-04-12T09:00:00Z",
+            pending_count: 1,
+            outbox_conflict_count: 0,
+            error_count: 0,
+            last_error: null,
+          },
+        ],
+        quality_issues: [
+          {
+            id: "duplicate-email-event-1",
+            severity: "warning",
+            category: "duplicate_emails",
+            title: "Powtarzające się adresy e-mail",
+            description: "Bieg Miejski ma powtarzające się adresy e-mail.",
+            count: 2,
+            event_id: "event-1",
+            event_name: "Bieg Miejski",
+            organization_id: "org-1",
+            organization_name: "Organizacja Testowa",
+          },
+        ],
       },
     });
 
@@ -155,15 +178,20 @@ describe("SuperAdmin page", () => {
     await waitFor(() => {
       expect(mocks.fetchJson).toHaveBeenCalledWith(
         "http://api.test/superadmin/operations",
-        expect.objectContaining({ headers: { Authorization: "Bearer token" } }),
+        expect.objectContaining({ headers: { Authorization: "Bearer token" } })
       );
     });
 
     expect(screen.getByText("Wydarzenie bez operatorów")).toBeInTheDocument();
     expect(screen.getByText("Konsola synchronizacji")).toBeInTheDocument();
-    expect(screen.getByText("Powtarzające się adresy e-mail")).toBeInTheDocument();
+    expect(
+      screen.getByText("Powtarzające się adresy e-mail")
+    ).toBeInTheDocument();
     expect(screen.getByText("Konflikty synchronizacji")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Centrum" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: "Centrum" })).toHaveAttribute(
+      "data-state",
+      "active"
+    );
   });
 
   it("loads and renders redacted server logs with logging status", async () => {
@@ -173,17 +201,19 @@ describe("SuperAdmin page", () => {
       })
       .mockResolvedValueOnce({
         payload: {
-          data: [{
-            id: "srv-1",
-            timestamp: "2099-04-12T10:00:00Z",
-            level: "error",
-            event_code: "database.exception",
-            message: "Database error",
-            request_id: "req-12345678",
-            method: "GET",
-            path: "/superadmin/server-logs",
-            context: { status: 500 },
-          }],
+          data: [
+            {
+              id: "srv-1",
+              timestamp: "2099-04-12T10:00:00Z",
+              level: "error",
+              event_code: "database.exception",
+              message: "Database error",
+              request_id: "req-12345678",
+              method: "GET",
+              path: "/superadmin/server-logs",
+              context: { status: 500 },
+            },
+          ],
           meta: { page: 1, per_page: 50, total: 1, total_pages: 1 },
         },
       })
@@ -202,7 +232,9 @@ describe("SuperAdmin page", () => {
     renderPage();
     activateTab("Logi");
 
-    await waitFor(() => expect(screen.getByText("/superadmin/server-logs")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("/superadmin/server-logs")).toBeInTheDocument()
+    );
     expect(screen.getByText("500")).toBeInTheDocument();
     expect(screen.getByText("GET")).toBeInTheDocument();
     expect(screen.getByText("Sentry aktywne")).toBeInTheDocument();
@@ -220,24 +252,39 @@ describe("SuperAdmin page", () => {
 
     const view = renderPage();
     activateTab("Audyt");
-    await waitFor(() => expect(view.container.querySelector("#superadmin-audit-from")).not.toBeNull());
-    fireEvent.change(view.container.querySelector("#superadmin-audit-from") as HTMLInputElement, {
-      target: { value: "2099-04-12T08:00" },
-    });
-    fireEvent.change(view.container.querySelector("#superadmin-audit-to") as HTMLInputElement, {
-      target: { value: "2099-04-12T12:00" },
-    });
+    await waitFor(() =>
+      expect(
+        view.container.querySelector("#superadmin-audit-from")
+      ).not.toBeNull()
+    );
+    fireEvent.change(
+      view.container.querySelector(
+        "#superadmin-audit-from"
+      ) as HTMLInputElement,
+      {
+        target: { value: "2099-04-12T08:00" },
+      }
+    );
+    fireEvent.change(
+      view.container.querySelector("#superadmin-audit-to") as HTMLInputElement,
+      {
+        target: { value: "2099-04-12T12:00" },
+      }
+    );
     fireEvent.click(screen.getByRole("button", { name: /Szukaj/ }));
 
     await waitFor(() => {
-      expect(mocks.fetchJson.mock.calls.some(([url]) => (
-        typeof url === "string"
-        && url.includes("/superadmin/audit?")
-        && url.includes("from=2099-04-12T08%3A00")
-        && url.includes("to=2099-04-12T12%3A00")
-        && url.includes("sort=time")
-        && url.includes("direction=desc")
-      ))).toBe(true);
+      expect(
+        mocks.fetchJson.mock.calls.some(
+          ([url]) =>
+            typeof url === "string" &&
+            url.includes("/superadmin/audit?") &&
+            url.includes("from=2099-04-12T08%3A00") &&
+            url.includes("to=2099-04-12T12%3A00") &&
+            url.includes("sort=time") &&
+            url.includes("direction=desc")
+        )
+      ).toBe(true);
     });
   });
 
@@ -253,32 +300,57 @@ describe("SuperAdmin page", () => {
 
     const view = renderPage();
     activateTab("Logi");
-    await waitFor(() => expect(view.container.querySelector("#superadmin-server-request-id")).not.toBeNull());
-    fireEvent.change(view.container.querySelector("#superadmin-server-request-id") as HTMLInputElement, {
-      target: { value: "req-12345678" },
-    });
-    fireEvent.change(view.container.querySelector("#superadmin-server-event-code") as HTMLInputElement, {
-      target: { value: "database.exception" },
-    });
-    fireEvent.change(view.container.querySelector("#superadmin-server-from") as HTMLInputElement, {
-      target: { value: "2099-04-12T08:00" },
-    });
-    fireEvent.change(view.container.querySelector("#superadmin-server-to") as HTMLInputElement, {
-      target: { value: "2099-04-12T12:00" },
-    });
+    await waitFor(() =>
+      expect(
+        view.container.querySelector("#superadmin-server-request-id")
+      ).not.toBeNull()
+    );
+    fireEvent.change(
+      view.container.querySelector(
+        "#superadmin-server-request-id"
+      ) as HTMLInputElement,
+      {
+        target: { value: "req-12345678" },
+      }
+    );
+    fireEvent.change(
+      view.container.querySelector(
+        "#superadmin-server-event-code"
+      ) as HTMLInputElement,
+      {
+        target: { value: "database.exception" },
+      }
+    );
+    fireEvent.change(
+      view.container.querySelector(
+        "#superadmin-server-from"
+      ) as HTMLInputElement,
+      {
+        target: { value: "2099-04-12T08:00" },
+      }
+    );
+    fireEvent.change(
+      view.container.querySelector("#superadmin-server-to") as HTMLInputElement,
+      {
+        target: { value: "2099-04-12T12:00" },
+      }
+    );
     fireEvent.click(screen.getByRole("button", { name: /Szukaj/ }));
 
     await waitFor(() => {
-      expect(mocks.fetchJson.mock.calls.some(([url]) => (
-        typeof url === "string"
-        && url.includes("/superadmin/server-logs?")
-        && url.includes("request_id=req-12345678")
-        && url.includes("event_code=database.exception")
-        && url.includes("from=2099-04-12T08%3A00")
-        && url.includes("to=2099-04-12T12%3A00")
-        && url.includes("sort=time")
-        && url.includes("direction=desc")
-      ))).toBe(true);
+      expect(
+        mocks.fetchJson.mock.calls.some(
+          ([url]) =>
+            typeof url === "string" &&
+            url.includes("/superadmin/server-logs?") &&
+            url.includes("request_id=req-12345678") &&
+            url.includes("event_code=database.exception") &&
+            url.includes("from=2099-04-12T08%3A00") &&
+            url.includes("to=2099-04-12T12%3A00") &&
+            url.includes("sort=time") &&
+            url.includes("direction=desc")
+        )
+      ).toBe(true);
     });
   });
 });

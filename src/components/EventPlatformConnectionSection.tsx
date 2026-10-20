@@ -5,6 +5,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Info,
   Loader2,
 } from "lucide-react";
 import { PlatformPushStatus } from "@/components/PlatformPushStatus";
@@ -52,6 +53,7 @@ import {
   type PlatformConnectionFormErrors,
   type PlatformConnectionInput,
   type PlatformConnectionView,
+  type PlatformIntegrationAccess,
   type PlatformPullSkippedRecord,
 } from "@/lib/platform-connection";
 
@@ -97,6 +99,8 @@ export function EventPlatformConnectionSection({
     []
   );
   const [view, setView] = useState<PlatformConnectionView | null>(null);
+  // Only GET replies carry it, so later writes must not reset it.
+  const [access, setAccess] = useState<PlatformIntegrationAccess | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [platformEventId, setPlatformEventId] = useState("");
@@ -143,7 +147,9 @@ export function EventPlatformConnectionSection({
     setIsLoading(true);
     setLoadError(null);
     try {
-      applyView(await getPlatformConnection(eventId, getAuthHeaders()));
+      const next = await getPlatformConnection(eventId, getAuthHeaders());
+      setAccess(next.access ?? null);
+      applyView(next);
     } catch {
       setLoadError("Nie udało się wczytać ustawień integracji z platformą.");
     } finally {
@@ -374,6 +380,17 @@ export function EventPlatformConnectionSection({
     );
   }
 
+  if (access && !access.can_use) {
+    return (
+      <p className="flex items-start gap-2 text-sm text-muted-foreground">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        {access.mode === "off"
+          ? "Integracja z platformą Zmierzymy Czas jest wyłączona."
+          : "Integracja z platformą Zmierzymy Czas jest w przygotowaniu. Wkrótce połączysz tu wydarzenie z platformą i zaimportujesz z niej uczestników."}
+      </p>
+    );
+  }
+
   const idDescribedBy = [
     "platform-event-id-help",
     errors.platformEventId ? idErrorId : null,
@@ -389,6 +406,15 @@ export function EventPlatformConnectionSection({
 
   return (
     <div className="space-y-5">
+      {access?.mode === "superadmin" && (
+        <p className="flex items-start gap-2 text-sm text-muted-foreground">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          Tryb testowy: integracja działa tylko dla superadminów. Pozostali
+          widzą informację, że będzie dostępna wkrótce. Zmienisz to w panelu
+          Superadmin.
+        </p>
+      )}
+
       {!available && view && (
         <Alert>
           <p className="text-sm font-semibold">{PLATFORM_UNAVAILABLE_HEADER}</p>
