@@ -23,7 +23,8 @@ describe("resolveAppVersion", () => {
   });
 
   it("shows nothing for a local build", () => {
-    expect(resolveAppVersion(undefined, undefined)).toBeNull();
+    // Empty strings, not undefined: undefined would fall back to import.meta.env.
+    expect(resolveAppVersion("", "")).toBeNull();
     expect(resolveAppVersion("", "unknown")).toBeNull();
   });
 });
