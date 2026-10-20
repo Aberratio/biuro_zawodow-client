@@ -16,6 +16,8 @@ and deployed.
 - Importing participants from the ZmierzymyCzas platform from event details.
 - Participants withdrawn on the platform are flagged, and pending platform
   updates are listed in event settings.
+- The sidebar shows the running version, or the commit for a deploy that is
+  not a release.
 
 ### Fixed
 

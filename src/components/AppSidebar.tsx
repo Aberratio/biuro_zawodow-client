@@ -60,6 +60,7 @@ import {
   buildOrganizationPath,
 } from "@/lib/routes";
 import { openCookiePreferences } from "@/lib/cookie-consent";
+import { resolveAppVersion } from "@/lib/app-version";
 
 const allItems = [
   {
@@ -165,6 +166,8 @@ const workspaceInfoCardClassName =
   "mt-3 rounded-[0.85rem] bg-[hsl(220_7%_11%/0.72)] px-4 py-3.5 text-xs leading-5 text-sidebar-foreground/66";
 
 const sidebarLogoClassName = "h-[3.5rem] w-auto object-contain";
+
+const appVersion = resolveAppVersion();
 
 function EventWorkspaceSkeleton({
   showOrganizationSection,
@@ -575,6 +578,14 @@ export function AppSidebar() {
                   >
                     Preferencje cookies
                   </button>
+                  {appVersion ? (
+                    <p
+                      className="px-3 pt-1 font-mono text-[11px] text-sidebar-foreground/40"
+                      title={appVersion.title}
+                    >
+                      {appVersion.label}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ) : (
