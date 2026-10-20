@@ -16,23 +16,6 @@ and deployed.
 - Importing participants from the ZmierzymyCzas platform from event details.
 - Participants withdrawn on the platform are flagged, and pending platform
   updates are listed in event settings.
-- Coverage-enforced tests with minimum thresholds, run in CI on every pull
-  request.
-- Pre-commit hooks (husky, lint-staged, prettier) and Dependabot updates for
-  npm and GitHub Actions.
-- MIT licence, contributing guide, pull request and issue templates, and
-  code owners.
-
-### Changed
-
-- Strict TypeScript compiler flags and the unused-variables lint rule are on.
-- `DataContext` is split into focused hooks.
-- npm is the only package manager.
-
-### Removed
-
-- Unused Playwright end-to-end tooling.
-- Unused `react-resizable-panels` dependency.
 
 ### Fixed
 
