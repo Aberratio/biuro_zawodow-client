@@ -119,6 +119,77 @@ describe("EventPlatformConnectionSection", () => {
     ).toBeDisabled();
   });
 
+  it("shows only a notice when the superadmin switch does not allow the user yet", async () => {
+    const fetchMock = installFetch(() => ({
+      status: 200,
+      body: {
+        data: {
+          availability: available,
+          access: { mode: "superadmin", can_use: false },
+          connection: null,
+        },
+      },
+    }));
+    renderSection();
+
+    expect(
+      await screen.findByText(
+        /Integracja z platformą Zmierzymy Czas jest w przygotowaniu/
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("ID wydarzenia na platformie")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Zapisz połączenie" })
+    ).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("says the integration is off when the superadmin switched it off", async () => {
+    installFetch(() => ({
+      status: 200,
+      body: {
+        data: {
+          availability: available,
+          access: { mode: "off", can_use: false },
+          connection: null,
+        },
+      },
+    }));
+    renderSection();
+
+    expect(
+      await screen.findByText(
+        "Integracja z platformą Zmierzymy Czas jest wyłączona."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("ID wydarzenia na platformie")
+    ).not.toBeInTheDocument();
+  });
+
+  it("lets a superadmin use the form in test mode and says who else sees it", async () => {
+    installFetch(() => ({
+      status: 200,
+      body: {
+        data: {
+          availability: available,
+          access: { mode: "superadmin", can_use: true },
+          connection: null,
+        },
+      },
+    }));
+    renderSection();
+
+    expect(
+      await screen.findByText(
+        /Tryb testowy: integracja działa tylko dla superadminów/
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("ID wydarzenia na platformie")).toBeEnabled();
+  });
+
   it("generates a token, saves it once and clears it from the form after saving", async () => {
     let savedBody: Record<string, unknown> | null = null;
     installFetch((_url, init) => {

@@ -18,6 +18,11 @@ and deployed.
   updates are listed in event settings.
 - The sidebar shows the running version, or the commit for a deploy that is
   not a release.
+- A switch in the superadmin centre decides who may use the platform
+  integration: nobody, superadmins only, or everyone. While it is limited to
+  superadmins, other users see a notice in event details that the
+  integration is coming soon. _Requires biuro_zawodow-api 2026.10.1 or
+  later._
 
 ### Fixed
 
