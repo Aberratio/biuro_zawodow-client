@@ -30,9 +30,7 @@ export function PlatformIntegrationSwitch() {
     } catch {
       setLoadError("Nie udało się wczytać ustawienia integracji z platformą.");
     }
-    // Load once on mount; getAuthHeaders changes identity on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [getAuthHeaders]);
 
   useEffect(() => {
     void load();
